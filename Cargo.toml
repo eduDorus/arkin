@@ -1,0 +1,65 @@
+[package]
+authors = ["Dorus Janssens <dorus.janssens@gmail.com>"]
+name = "aurelion"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "server"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "ws"
+path = "src/bin/ws.rs"
+
+[dependencies]
+
+# Traits
+trait-variant = "0.1.2"
+
+# Async
+tokio = { version = "1.38.0", features = ["full"] }
+flume = "0.11.0"
+futures-util = { version = "0.3" }
+
+# HTTP & Websockets
+tokio-rustls = { version = "0.26"} 
+tokio-tungstenite = {version = "0.23", features = ["native-tls"]}
+reqwest = {version = "0.11", features = ["json"], default-features = false}
+url = {version = "2.5"}
+# fastwebsockets = { version = "0.8" }
+# tokio-native-tls = { version = "0.3", features = ["aws_lc_rs"]}
+
+# Data Types
+rust_decimal = {version = "1.35", default-features = false, features = ["std", "serde"]}
+rust_decimal_macros = "1.34"
+
+# Serialization
+serde = {version = "1.0", features = ["derive"]}
+serde_json = {version = "1.0", features = []}
+
+# Time
+time = {version = "0.3", features = ["macros", "serde", "parsing", "formatting"], default-features = false}
+
+# Logging & Tracing
+tracing = { version = "0.1", features = [] }
+tracing-futures = { version = "0.2", features = ["tokio"] }
+tracing-subscriber = { version = "0.3", features = ["local-time", "parking_lot", "env-filter"] }
+
+# Error handling
+anyhow = {version = "1.0", features = ["std"], default-features = false}
+thiserror = {version = "1.0", features = [], default-features = false}
+
+# Config
+config = {version = "0.14", features = ["yaml"]}
+
+# Allocator
+mimalloc = {version = "0.1", default-features = false}
+
+[profile.release]
+lto = "thin"
+
+[profile.maxperf]
+codegen-units = 1
+inherits = "release"
+lto = "fat"
