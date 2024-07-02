@@ -12,19 +12,19 @@ pub struct MarketState {
 impl MarketState {
     pub fn handle_tick_update(&mut self, tick: &Tick) {
         let instrument = tick.instrument.clone();
-        let quotes = self.quotes.entry(instrument).or_insert_with(VecDeque::new);
+        let quotes = self.quotes.entry(instrument).or_default();
         quotes.push_back(tick.to_owned());
     }
 
     pub fn handle_trade_update(&mut self, trade: &Trade) {
         let instrument = trade.instrument.clone();
-        let trades = self.trades.entry(instrument).or_insert_with(VecDeque::new);
+        let trades = self.trades.entry(instrument).or_default();
         trades.push_back(trade.to_owned());
     }
 
     pub fn handle_agg_trade_update(&mut self, trade: &Trade) {
         let instrument = trade.instrument.clone();
-        let agg_trades = self.agg_trades.entry(instrument).or_insert_with(VecDeque::new);
+        let agg_trades = self.agg_trades.entry(instrument).or_default();
         agg_trades.push_back(trade.to_owned());
     }
 }

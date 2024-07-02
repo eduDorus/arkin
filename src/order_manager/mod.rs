@@ -20,6 +20,7 @@ impl OrderManager for OrderManagerType {
     }
 }
 
+#[derive(Default)]
 pub struct SingleOrderManager {}
 
 impl SingleOrderManager {

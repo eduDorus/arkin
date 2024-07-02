@@ -20,6 +20,7 @@ impl Portfolio for PortfolioType {
     }
 }
 
+#[derive(Default)]
 pub struct SinglePortfolio {}
 
 impl SinglePortfolio {
