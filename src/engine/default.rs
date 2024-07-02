@@ -12,12 +12,12 @@ use crate::{
 use super::errors::EngineError;
 
 pub struct DefaultEngine {
-    state: State,
-    features: Vec<FeatureType>,
-    strategies: Vec<StrategyType>,
-    allocation: AllocationType,
-    risk: RiskType,
-    execution: ExecutionType,
+    pub state: State,
+    pub features: Vec<FeatureType>,
+    pub strategies: Vec<StrategyType>,
+    pub allocation: AllocationType,
+    pub risk: RiskType,
+    pub execution: ExecutionType,
 }
 
 impl DefaultEngine {
