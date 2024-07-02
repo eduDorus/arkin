@@ -13,7 +13,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 use tracing::{debug, error, info};
 use url::Url;
 
-use crate::models::MarketEvent;
+use crate::{models::MarketEvent, utils::Deduplicator};
 
 #[derive(Serialize, Clone)]
 pub struct Subscription {
@@ -49,6 +49,9 @@ pub struct WebSocketManager {
     /// Subscription to be sent to the WebSocket server.
     pub subscription: Subscription,
 
+    /// Deduplicator
+    pub deduplicator: Deduplicator,
+
     /// Limit the max number of connections.
     ///
     /// A `Semaphore` is used to limit the max number of connections. Before
@@ -61,10 +64,16 @@ pub struct WebSocketManager {
 }
 
 impl WebSocketManager {
-    pub async fn new(url: Url, connections: u8, subscriptions: Subscription) -> Result<Self> {
+    pub async fn new(
+        url: Url,
+        connections: u8,
+        deduplicate_lookback: usize,
+        subscriptions: Subscription,
+    ) -> Result<Self> {
         Ok(Self {
             url,
             subscription: subscriptions,
+            deduplicator: Deduplicator::new(deduplicate_lookback),
             limit_connections: Arc::new(Semaphore::new(connections as usize)),
         })
     }
@@ -80,7 +89,9 @@ impl WebSocketManager {
                     let msg = msg?;
                     // let bin_data = msg.into_data();
                     let data = msg.to_string();
-                    info!("Received message: {}", data);
+                    if self.deduplicator.check(&data) {
+                        info!("Received new message: {}", data);
+                    }
                 },
                 permit = self.limit_connections.clone().acquire_owned() => {
                     // This should never fail, as the semaphore is never closed.

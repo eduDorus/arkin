@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
     let url = Url::from_str("wss://fstream.binance.com/ws")?;
 
     let subscription = Subscription::new(vec!["btcusdt@aggTrade", "btcusdt@ticker"]);
-    let mut ws = WebSocketManager::new(url, 1, subscription).await?;
+    let mut ws = WebSocketManager::new(url, 5, 100, subscription).await?;
 
     let (rx, _tx) = flume::unbounded();
     ws.run(rx).await?;
