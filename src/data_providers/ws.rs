@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use flume::Sender;
 use futures_util::{SinkExt, StreamExt};
-use serde::Serialize;
 use tokio::{
     net::TcpStream,
     select,
@@ -13,41 +12,13 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 use tracing::{debug, error, info};
 use url::Url;
 
-use crate::{models::MarketEvent, utils::Deduplicator};
+use crate::utils::Deduplicator;
 
-#[derive(Serialize, Clone)]
-pub struct Subscription {
-    method: String,
-    params: Vec<String>,
-    id: u64,
-}
-
-impl Subscription {
-    pub fn new(channels: Vec<&str>) -> Self {
-        Self {
-            method: "SUBSCRIBE".to_string(),
-            params: channels.iter().map(|c| c.to_string()).collect(),
-            id: 0,
-        }
-    }
-
-    fn update_id(&mut self, id: u64) {
-        self.id = id;
-    }
-}
-
-impl From<Subscription> for Message {
-    fn from(sub: Subscription) -> Self {
-        Message::Text(serde_json::to_string(&sub).expect("Failed to serialize subscription"))
-    }
-}
+use super::binance::Subscription;
 
 /// A WebSocket manager handles multiple WebSocket connections.
 pub struct WebSocketManager {
     pub url: Url,
-
-    /// Subscription to be sent to the WebSocket server.
-    pub subscription: Subscription,
 
     /// Deduplicator
     pub deduplicator: Deduplicator,
@@ -55,7 +26,7 @@ pub struct WebSocketManager {
     /// Limit the max number of connections.
     ///
     /// A `Semaphore` is used to limit the max number of connections. Before
-    /// attempting to accept a new connection, a permit is acquired from the
+    /// attempo accept a new connection, a permit is acquired from the
     /// semaphore. If none are available, the listener waits for one.
     ///
     /// When handlers complete processing a connection, the permit is returned
@@ -64,21 +35,15 @@ pub struct WebSocketManager {
 }
 
 impl WebSocketManager {
-    pub async fn new(
-        url: Url,
-        connections: u8,
-        deduplicate_lookback: usize,
-        subscriptions: Subscription,
-    ) -> Result<Self> {
-        Ok(Self {
+    pub fn new(url: Url, connections: u8, deduplicate_lookback: usize) -> Self {
+        Self {
             url,
-            subscription: subscriptions,
             deduplicator: Deduplicator::new(deduplicate_lookback),
             limit_connections: Arc::new(Semaphore::new(connections as usize)),
-        })
+        }
     }
 
-    pub async fn run(&mut self, _manager_tx: Sender<MarketEvent>) -> Result<()> {
+    pub async fn run(&mut self, manager_tx: Sender<String>, subscription: Subscription) -> Result<()> {
         // Use select for new data in receiver or spawn new connection on permit
         info!("Starting WebSocket manager...");
         let (sender, receiver) = flume::unbounded::<Message>();
@@ -91,13 +56,14 @@ impl WebSocketManager {
                     let data = msg.to_string();
                     if self.deduplicator.check(&data) {
                         info!("Received new message: {}", data);
+                        manager_tx.send_async(data).await?;
                     }
                 },
                 permit = self.limit_connections.clone().acquire_owned() => {
                     // This should never fail, as the semaphore is never closed.
                     let permit = permit?;
                     info!("Acquired permit: {:?}", permit);
-                    match self.start_handler(permit, sender.clone()).await {
+                    match self.start_handler(permit, sender.clone(), subscription.clone()).await {
                         Ok(_) => info!("Started new handler"),
                         Err(e) => error!("Failed to start new handler: {:?}", e),
                     }
@@ -106,8 +72,13 @@ impl WebSocketManager {
         }
     }
 
-    async fn start_handler(&self, permit: OwnedSemaphorePermit, sender: Sender<Message>) -> Result<()> {
-        let mut handle = Handler::new(&self.url, sender, self.subscription.clone()).await?;
+    async fn start_handler(
+        &self,
+        permit: OwnedSemaphorePermit,
+        sender: Sender<Message>,
+        subscription: Subscription,
+    ) -> Result<()> {
+        let mut handle = Handler::new(&self.url, sender, subscription).await?;
         tokio::spawn(async move {
             if let Err(err) = handle.run().await {
                 error!("Websocket handler: {:?}", err);

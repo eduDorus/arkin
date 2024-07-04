@@ -49,14 +49,20 @@ impl Deduplicator {
 
 #[cfg(test)]
 mod tests {
+    use tracing::info;
+
+    use crate::logging;
+
     use super::*;
 
     #[test]
     fn test_hash_string_consistency() {
+        logging::init_test_tracing();
         let input = "hello";
         let hash1 = Deduplicator::hash_string(input);
         let hash2 = Deduplicator::hash_string(input);
         assert_eq!(hash1, hash2, "Hashes should be consistent for the same input");
+        info!("Hash for '{}': {}", input, hash1)
     }
 
     #[test]
