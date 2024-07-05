@@ -35,11 +35,11 @@ pub struct WebSocketManager {
 }
 
 impl WebSocketManager {
-    pub fn new(url: Url, connections: u8, deduplicate_lookback: usize) -> Self {
+    pub fn new(url: Url, connections: usize, deduplicate_lookback: usize) -> Self {
         Self {
             url,
             deduplicator: Deduplicator::new(deduplicate_lookback),
-            limit_connections: Arc::new(Semaphore::new(connections as usize)),
+            limit_connections: Arc::new(Semaphore::new(connections)),
         }
     }
 
@@ -55,8 +55,7 @@ impl WebSocketManager {
                     // let bin_data = msg.into_data();
                     let data = msg.to_string();
                     if self.deduplicator.check(&data) {
-                        info!("Received new message: {}", data);
-                        manager_tx.send_async(data).await?;
+                        manager_tx.send_async(data).await.unwrap();
                     }
                 },
                 permit = self.limit_connections.clone().acquire_owned() => {

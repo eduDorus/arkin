@@ -8,12 +8,7 @@ edition = "2021"
 name = "server"
 path = "src/bin/main.rs"
 
-[[bin]]
-name = "ws"
-path = "src/bin/ws.rs"
-
 [dependencies]
-
 # Traits
 trait-variant = "0.1.2"
 

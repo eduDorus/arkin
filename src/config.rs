@@ -1,4 +1,4 @@
-use std::env;
+use std::{collections::HashMap, env};
 
 use config::{Config, Environment, File};
 use serde::Deserialize;
@@ -7,6 +7,23 @@ use tracing::error;
 #[derive(Debug, Deserialize, Clone)]
 pub struct GlobalConfig {
     pub name: String,
+    pub data_providers: DataProviderFactoryConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct DataProviderFactoryConfig {
+    pub binance: HashMap<String, BinanceDataProviderConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct BinanceDataProviderConfig {
+    pub enabled: bool,
+    pub ws_url: String,
+    pub ws_channels: Vec<String>,
+    pub api_key: Option<String>,
+    pub api_secret: Option<String>,
+    pub connections_per_manager: usize,
+    pub duplicate_lookback: usize,
 }
 
 pub fn load() -> GlobalConfig {
