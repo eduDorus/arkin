@@ -3,9 +3,11 @@ use tracing::{error, info};
 use crate::{
     config::GlobalConfig,
     data_providers::{factory::DataProviderFactory, DataProvider},
+    state::State,
 };
 
 pub struct Server {
+    state: State,
     data_provider_factory: DataProviderFactory,
 }
 
@@ -50,6 +52,7 @@ impl ServerBuilder {
     pub fn build(self) -> Server {
         let config = self.config.unwrap();
         Server {
+            state: State::new(&config.state),
             data_provider_factory: DataProviderFactory::new(&config.data_providers),
         }
     }

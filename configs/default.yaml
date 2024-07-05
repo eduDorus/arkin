@@ -10,9 +10,17 @@ data_providers:
       connections_per_manager: 3
       duplicate_lookback: 1000
     usdm_ticker:
-      enabled: true
+      enabled: false
       ws_url: wss://fstream.binance.com/ws
       ws_channels:
         - btcusdt@ticker
       connections_per_manager: 3
       duplicate_lookback: 1000
+
+state:
+  market_state:
+    enabled: true
+  portfolio:
+    enabled: true
+  order_manager:
+    enabled: true

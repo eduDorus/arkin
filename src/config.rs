@@ -7,7 +7,30 @@ use tracing::error;
 #[derive(Debug, Deserialize, Clone)]
 pub struct GlobalConfig {
     pub name: String,
+    pub state: StateConfig,
     pub data_providers: DataProviderFactoryConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct StateConfig {
+    pub market_state: MarketStateConfig,
+    pub portfolio: PortfolioConfig,
+    pub order_manager: OrderManagerConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct MarketStateConfig {
+    pub enabled: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct PortfolioConfig {
+    pub enabled: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct OrderManagerConfig {
+    pub enabled: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]

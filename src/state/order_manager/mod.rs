@@ -2,8 +2,6 @@ use tracing::info;
 
 use crate::models::OrderUpdate;
 
-pub mod errors;
-
 pub trait OrderManager {
     fn handle_order_update(&self, update: &OrderUpdate);
 }

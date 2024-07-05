@@ -2,8 +2,6 @@ use tracing::info;
 
 use crate::models::PositionUpdate;
 
-pub mod errors;
-
 pub trait Portfolio {
     fn handle_position_update(&self, update: &PositionUpdate);
 }
