@@ -6,11 +6,11 @@ pub mod ws;
 use binance::BinanceDataProvider;
 use flume::Sender;
 
-use crate::models::{OrderUpdate, PositionUpdate, Tick, Trade, TradeUpdate};
+use crate::models::{MarketEvent, OrderUpdate, PositionUpdate, Tick, Trade, TradeUpdate};
 
 #[trait_variant::make(Send)]
 pub trait DataProvider: Clone {
-    async fn start(&self, sender: Sender<String>);
+    async fn start(&self, sender: Sender<MarketEvent>);
 }
 
 #[derive(Clone)]
@@ -32,7 +32,7 @@ pub enum DataProviderType {
 }
 
 impl DataProvider for DataProviderType {
-    async fn start(&self, sender: Sender<String>) {
+    async fn start(&self, sender: Sender<MarketEvent>) {
         match self {
             DataProviderType::Binance(b) => b.start(sender).await,
         }

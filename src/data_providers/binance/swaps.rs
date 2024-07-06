@@ -1,7 +1,12 @@
-use crate::utils::custom_serde;
+use crate::{
+    models::{BookUpdate, BookUpdateSide, MarketEvent, Price, Quantity, Trade},
+    utils::custom_serde,
+};
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use time::OffsetDateTime;
+
+use super::parser::BinanceParser;
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
@@ -65,6 +70,19 @@ pub struct BinanceSwapsTradeData {
     pub maker: bool, // The true = sell, false = buy
 }
 
+impl From<BinanceSwapsTradeData> for MarketEvent {
+    fn from(data: BinanceSwapsTradeData) -> Self {
+        let instrument = BinanceParser::parse_instrument(&data.instrument);
+        MarketEvent::Trade(Trade::new(
+            instrument,
+            data.transaction_time,
+            data.event_time,
+            Price::new(data.price).unwrap(), // TODO: Fix this
+            Quantity::new(data.quantity),
+        ))
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct BinanceSwapsAggTrade {
     pub stream: String,
@@ -93,6 +111,19 @@ pub struct BinanceSwapsAggTradeData {
     pub quantity: Decimal,
     #[serde(rename = "m")]
     pub maker: bool, // The true = sell, false = buy
+}
+
+impl From<BinanceSwapsAggTradeData> for MarketEvent {
+    fn from(data: BinanceSwapsAggTradeData) -> Self {
+        let instrument = BinanceParser::parse_instrument(&data.instrument);
+        MarketEvent::AggTrade(Trade::new(
+            instrument,
+            data.transaction_time,
+            data.event_time,
+            Price::new(data.price).unwrap(), // TODO: Fix this
+            Quantity::new(data.quantity),
+        ))
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -129,6 +160,27 @@ pub struct BinanceSwapsBookUpdate {
     pub quantity: Decimal,
 }
 
+impl From<BinanceSwapsBookData> for MarketEvent {
+    fn from(data: BinanceSwapsBookData) -> Self {
+        let instrument = BinanceParser::parse_instrument(&data.instrument);
+        MarketEvent::BookUpdate(BookUpdate {
+            instrument,
+            transaction_time: data.transaction_time,
+            event_time: data.event_time,
+            bids: data
+                .bids
+                .iter()
+                .map(|b| BookUpdateSide::new(Price::new(b.price).unwrap(), Quantity::new(b.quantity)))
+                .collect(),
+            asks: data
+                .asks
+                .iter()
+                .map(|a| BookUpdateSide::new(Price::new(a.price).unwrap(), Quantity::new(a.quantity)))
+                .collect(),
+        })
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct BinanceSwapsTick {
     pub stream: String,
@@ -155,6 +207,21 @@ pub struct BinanceSwapsTickData {
     pub ask_price: Decimal,
     #[serde(rename = "A")]
     pub ask_quantity: Decimal,
+}
+
+impl From<BinanceSwapsTickData> for MarketEvent {
+    fn from(data: BinanceSwapsTickData) -> Self {
+        let instrument = BinanceParser::parse_instrument(&data.instrument);
+        MarketEvent::Tick(crate::models::Tick {
+            instrument,
+            transaction_time: data.transaction_time,
+            event_time: data.event_time,
+            bid_price: Price::new(data.bid_price).unwrap(), // TODO: Fix this
+            bid_quantity: Quantity::new(data.bid_quantity),
+            ask_price: Price::new(data.ask_price).unwrap(), // TODO: Fix this
+            ask_quantity: Quantity::new(data.ask_quantity),
+        })
+    }
 }
 
 #[cfg(test)]

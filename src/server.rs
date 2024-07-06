@@ -43,7 +43,7 @@ impl Server {
         loop {
             let msg = rx.recv_async().await;
             match msg {
-                Ok(m) => info!(m), // Would update the state here
+                Ok(m) => info!("{}", m), // Would update the state here
                 Err(e) => error!("{}", e),
             }
         }

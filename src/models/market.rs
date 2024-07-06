@@ -9,7 +9,7 @@ pub enum MarketEvent {
     Tick(Tick),
     Trade(Trade),
     AggTrade(Trade),
-    // OrderBookUpdate(OrderBookUpdate),
+    BookUpdate(BookUpdate),
 }
 
 impl fmt::Display for MarketEvent {
@@ -18,7 +18,7 @@ impl fmt::Display for MarketEvent {
             MarketEvent::Tick(tick) => write!(f, "Tick: {}", tick),
             MarketEvent::Trade(trade) => write!(f, "Trade: {}", trade),
             MarketEvent::AggTrade(trade) => write!(f, "AggTrade: {}", trade),
-            // MarketEvent::OrderBookUpdate(order_book_update) => write!(f, "{}", order_book_update),
+            MarketEvent::BookUpdate(book_update) => write!(f, "Book Update: {}", book_update),
         }
     }
 }
@@ -78,35 +78,28 @@ impl fmt::Display for Trade {
 }
 
 #[derive(Clone)]
-pub struct OrderBookUpdate {
+pub struct BookUpdate {
     pub instrument: Instrument,
+    pub transaction_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
-    pub side: OrderBookSide,
-    pub price: Price,
-    pub quantity: Quantity,
+    pub bids: Vec<BookUpdateSide>,
+    pub asks: Vec<BookUpdateSide>,
 }
 
-impl fmt::Display for OrderBookUpdate {
+impl fmt::Display for BookUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {} {}",
-            self.instrument, self.event_time, self.side, self.price, self.quantity
-        )
+        write!(f, "{} {}", self.instrument, self.event_time)
     }
 }
 
 #[derive(Clone)]
-pub enum OrderBookSide {
-    Bid,
-    Ask,
+pub struct BookUpdateSide {
+    pub price: Price,
+    pub quantity: Quantity,
 }
 
-impl fmt::Display for OrderBookSide {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            OrderBookSide::Bid => write!(f, "Bid"),
-            OrderBookSide::Ask => write!(f, "Ask"),
-        }
+impl BookUpdateSide {
+    pub fn new(price: Price, quantity: Quantity) -> Self {
+        Self { price, quantity }
     }
 }

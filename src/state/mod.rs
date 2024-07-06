@@ -20,7 +20,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(config: &StateConfig) -> Self {
+    pub fn new(_config: &StateConfig) -> Self {
         let market = MarketState::default();
         let order_manager = OrderManagerType::SingleVenue(order_manager::SingleOrderManager::new());
         let portfolio = PortfolioType::Single(portfolio::SinglePortfolio::new());
@@ -37,6 +37,7 @@ impl State {
             MarketEvent::Tick(tick) => self.market.handle_tick_update(tick),
             MarketEvent::Trade(trade) => self.market.handle_trade_update(trade),
             MarketEvent::AggTrade(agg_trade) => self.market.handle_agg_trade_update(agg_trade),
+            MarketEvent::BookUpdate(book_update) => self.market.handle_book_update(book_update),
         }
     }
 

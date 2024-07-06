@@ -1,17 +1,23 @@
-use std::collections::{HashMap, VecDeque};
-
+use crate::models::{BookUpdate, Instrument, Tick, Trade};
 use parking_lot::RwLock;
-
-use crate::models::{Instrument, Tick, Trade};
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Default)]
 pub struct MarketState {
+    book: RwLock<HashMap<Instrument, VecDeque<BookUpdate>>>,
     quotes: RwLock<HashMap<Instrument, VecDeque<Tick>>>,
     trades: RwLock<HashMap<Instrument, VecDeque<Trade>>>,
     agg_trades: RwLock<HashMap<Instrument, VecDeque<Trade>>>,
 }
 
 impl MarketState {
+    pub fn handle_book_update(&self, book_update: &BookUpdate) {
+        let instrument = book_update.instrument.clone();
+        let mut locked_book = self.book.write();
+        let book = locked_book.entry(instrument).or_default();
+        book.push_back(book_update.to_owned());
+    }
+
     pub fn handle_tick_update(&self, tick: &Tick) {
         let instrument = tick.instrument.clone();
         let mut locked_quotes = self.quotes.write();

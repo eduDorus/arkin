@@ -1,12 +1,13 @@
 use flume::Sender;
 use serde::Serialize;
 use tokio_tungstenite::tungstenite::Message;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use url::Url;
 
 use crate::{
     config::BinanceDataProviderConfig,
-    data_providers::{ws::WebSocketManager, DataProvider},
+    data_providers::{binance::parser::BinanceParser, ws::WebSocketManager, DataProvider},
+    models::MarketEvent,
 };
 
 #[derive(Clone)]
@@ -33,8 +34,14 @@ impl BinanceDataProvider {
 }
 
 impl DataProvider for BinanceDataProvider {
-    async fn start(&self, sender: Sender<String>) {
+    async fn start(&self, sender: Sender<MarketEvent>) {
         info!("Starting Binance data provider");
+
+        // Check for API key and secret
+        if self.api_key.is_none() || self.api_secret.is_none() {
+            warn!("API key and secret are required for faster connection on Binance data provider");
+        }
+
         let mut ws_manager =
             WebSocketManager::new(self.url.clone(), self.connections_per_manager, self.duplicate_lookback);
 
@@ -48,8 +55,14 @@ impl DataProvider for BinanceDataProvider {
         loop {
             let res = rx.recv_async().await;
             match res {
-                Ok(m) => {
-                    sender.send_async(m).await.unwrap();
+                Ok(data) => {
+                    let res = BinanceParser::parse(&data);
+                    match res {
+                        Ok(event) => {
+                            sender.send_async(event).await.expect("Failed to send market event to sender");
+                        }
+                        Err(e) => error!("{}", e),
+                    }
                 }
                 Err(e) => error!("{}", e),
             }
