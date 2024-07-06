@@ -21,7 +21,7 @@ pub struct DefaultEngineBuilder {
 
 impl DefaultEngineBuilder {
     pub fn with_strategy(mut self, strategy: StrategyType) -> Self {
-        self.strategies = Some(strategy);
+        self.strategy = Some(strategy);
         self
     }
 
@@ -37,7 +37,7 @@ impl DefaultEngineBuilder {
 
     pub fn build(self) -> Result<DefaultEngine, EngineError> {
         Ok(DefaultEngine {
-            strategies: self.strategies,
+            strategies: self.strategy.ok_or(EngineError::BuilderError("Strategy not set".into()))?,
             allocation: self.allocation.ok_or(EngineError::BuilderError("Allocation not set".into()))?,
             execution: self.execution.ok_or(EngineError::BuilderError("Execution not set".into()))?,
         })

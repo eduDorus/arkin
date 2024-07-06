@@ -1,13 +1,15 @@
+use std::sync::Arc;
+
 use tracing::{error, info};
 
 use crate::{
     config::GlobalConfig,
-    data_providers::{factory::DataProviderFactory, DataProvider},
+    data_providers::{factory::DataProviderFactory, DataProvider, DataProviderType},
     state::State,
 };
 
 pub struct Server {
-    state: State,
+    state: Arc<State>,
     data_provider_factory: DataProviderFactory,
 }
 
@@ -17,21 +19,31 @@ impl Server {
     }
 
     pub async fn run(&self) {
-        let (data_provider_tx, data_provider_rx) = flume::unbounded();
+        tokio::spawn(Server::data_provider_task(
+            self.state.clone(),
+            self.data_provider_factory.create_data_providers(),
+        ));
+
+        // Wait for interrupt signal
+        tokio::signal::ctrl_c().await.expect("Failed to listen for event");
+    }
+
+    async fn data_provider_task(_state: Arc<State>, data_providers: Vec<DataProviderType>) {
+        info!("Spawning data provider task");
 
         info!("Providers starting...");
-        for provider in &self.data_provider_factory.create_data_providers() {
-            let local_provider = provider.clone();
-            let local_tx = data_provider_tx.clone();
-            tokio::spawn(async move { local_provider.start(local_tx).await });
+        let (tx, rx) = flume::unbounded();
+        for provider in data_providers {
+            let local_tx = tx.clone();
+            tokio::spawn(async move { provider.start(local_tx).await });
         }
         info!("Providers started");
 
-        info!("Listening to incoming");
+        info!("Listening to incoming data");
         loop {
-            let msg = data_provider_rx.recv_async().await;
+            let msg = rx.recv_async().await;
             match msg {
-                Ok(m) => info!(m),
+                Ok(m) => info!(m), // Would update the state here
                 Err(e) => error!("{}", e),
             }
         }
@@ -52,7 +64,7 @@ impl ServerBuilder {
     pub fn build(self) -> Server {
         let config = self.config.unwrap();
         Server {
-            state: State::new(&config.state),
+            state: Arc::new(State::new(&config.state)),
             data_provider_factory: DataProviderFactory::new(&config.data_providers),
         }
     }

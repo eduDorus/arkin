@@ -4,8 +4,8 @@ mod order_manager;
 mod portfolio;
 
 use market::MarketState;
-use order_manager::OrderManagerType;
-use portfolio::PortfolioType;
+use order_manager::{OrderManager, OrderManagerType};
+use portfolio::{Portfolio, PortfolioType};
 use tracing::warn;
 
 use crate::{

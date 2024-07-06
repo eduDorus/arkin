@@ -7,14 +7,14 @@ data_providers:
       ws_url: wss://fstream.binance.com/ws
       ws_channels:
         - btcusdt@aggTrade
-      connections_per_manager: 3
+      connections_per_manager: 2
       duplicate_lookback: 1000
     usdm_ticker:
-      enabled: false
+      enabled: true
       ws_url: wss://fstream.binance.com/ws
       ws_channels:
         - btcusdt@ticker
-      connections_per_manager: 3
+      connections_per_manager: 2
       duplicate_lookback: 1000
 
 state:

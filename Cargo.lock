@@ -69,6 +69,7 @@ dependencies = [
  "flume",
  "futures-util",
  "mimalloc",
+ "parking_lot 0.12.3",
  "reqwest",
  "rust_decimal",
  "rust_decimal_macros",
