@@ -1,19 +1,12 @@
 name: Aurelion
 
-data_providers:
+ingestors:
   binance:
     usdm_trades:
       enabled: true
       ws_url: wss://fstream.binance.com/ws
       ws_channels:
         - btcusdt@aggTrade
-      connections_per_manager: 2
-      duplicate_lookback: 1000
-    usdm_ticker:
-      enabled: true
-      ws_url: wss://fstream.binance.com/ws
-      ws_channels:
-        - btcusdt@ticker
       connections_per_manager: 2
       duplicate_lookback: 1000
 

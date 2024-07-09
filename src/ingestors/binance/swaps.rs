@@ -1,5 +1,5 @@
 use crate::{
-    models::{BookUpdate, BookUpdateSide, MarketEvent, Price, Quantity, Trade},
+    models::{BookUpdate, BookUpdateSide, MarketEvent, Price, Quantity, Tick, Trade},
     utils::custom_serde,
 };
 use rust_decimal::Decimal;
@@ -43,6 +43,7 @@ pub enum BinanceSwapsEvent {
 //     ]
 // },
 #[derive(Debug, Deserialize)]
+#[allow(unused)]
 pub struct BinanceSwapsTrade {
     pub stream: String,
     pub data: BinanceSwapsTradeData,
@@ -75,7 +76,6 @@ impl From<BinanceSwapsTradeData> for MarketEvent {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
         MarketEvent::Trade(Trade::new(
             instrument,
-            data.transaction_time,
             data.event_time,
             Price::new(data.price).unwrap(), // TODO: Fix this
             Quantity::new(data.quantity),
@@ -84,6 +84,7 @@ impl From<BinanceSwapsTradeData> for MarketEvent {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(unused)]
 pub struct BinanceSwapsAggTrade {
     pub stream: String,
     pub data: BinanceSwapsAggTradeData,
@@ -118,7 +119,6 @@ impl From<BinanceSwapsAggTradeData> for MarketEvent {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
         MarketEvent::AggTrade(Trade::new(
             instrument,
-            data.transaction_time,
             data.event_time,
             Price::new(data.price).unwrap(), // TODO: Fix this
             Quantity::new(data.quantity),
@@ -127,6 +127,7 @@ impl From<BinanceSwapsAggTradeData> for MarketEvent {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(unused)]
 pub struct BinanceSwapsBook {
     pub stream: String,
     pub data: BinanceSwapsBookData,
@@ -165,7 +166,6 @@ impl From<BinanceSwapsBookData> for MarketEvent {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
         MarketEvent::BookUpdate(BookUpdate {
             instrument,
-            transaction_time: data.transaction_time,
             event_time: data.event_time,
             bids: data
                 .bids
@@ -182,6 +182,7 @@ impl From<BinanceSwapsBookData> for MarketEvent {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(unused)]
 pub struct BinanceSwapsTick {
     pub stream: String,
     pub data: BinanceSwapsTickData,
@@ -212,15 +213,14 @@ pub struct BinanceSwapsTickData {
 impl From<BinanceSwapsTickData> for MarketEvent {
     fn from(data: BinanceSwapsTickData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        MarketEvent::Tick(crate::models::Tick {
+        MarketEvent::Tick(Tick::new(
             instrument,
-            transaction_time: data.transaction_time,
-            event_time: data.event_time,
-            bid_price: Price::new(data.bid_price).unwrap(), // TODO: Fix this
-            bid_quantity: Quantity::new(data.bid_quantity),
-            ask_price: Price::new(data.ask_price).unwrap(), // TODO: Fix this
-            ask_quantity: Quantity::new(data.ask_quantity),
-        })
+            data.event_time,
+            Price::new(data.bid_price).unwrap(), // TODO: Fix this
+            Quantity::new(data.bid_quantity),
+            Price::new(data.ask_price).unwrap(), // TODO: Fix this
+            Quantity::new(data.ask_quantity),
+        ))
     }
 }
 
@@ -248,9 +248,15 @@ mod tests {
     }
 
     #[test]
-
     fn test_binance_futures_ticker() {
         let json_data = r#"{"stream":"btcusdt@bookTicker","data":{"e":"bookTicker","u":2487455691211,"s":"BTCUSDT","b":"21840.40","B":"21.292","a":"21840.50","A":"11.169","T":1676026461537,"E":1676026461542}}"#;
         let _ = serde_json::from_str::<BinanceSwapsTick>(json_data).unwrap();
+    }
+
+    #[test]
+    #[ignore]
+    fn test_binance_futures_ticker_2() {
+        let json_data = r#"{"e":"24hrTicker","E":1720514702587,"s":"BTCUSDT","p":"697.00","P":"1.220","w":"56741.24","c":"57820.20","Q":"0.002","o":"57123.20","h":"58200.00","l":"54890.00","v":"388968.569","q":"22070559902.21","O":1720428300000,"C":1720514702585,"F":5147088255,"L":5151564448,"n":4476166}"#;
+        let _ = serde_json::from_str::<BinanceSwapsTickData>(json_data).unwrap();
     }
 }

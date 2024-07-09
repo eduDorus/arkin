@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::{
     config::GlobalConfig,
-    data_providers::{factory::DataProviderFactory, DataProvider, DataProviderType},
+    ingestors::{factory::IngestorFactory, Ingestor, IngestorType},
     state::State,
 };
 
 pub struct Server {
     state: Arc<State>,
-    data_provider_factory: DataProviderFactory,
+    ingestor_factory: IngestorFactory,
 }
 
 impl Server {
@@ -19,21 +19,21 @@ impl Server {
     }
 
     pub async fn run(&self) {
-        tokio::spawn(Server::data_provider_task(
+        tokio::spawn(Server::ingestor_task(
             self.state.clone(),
-            self.data_provider_factory.create_data_providers(),
+            self.ingestor_factory.create_ingestors(),
         ));
 
         // Wait for interrupt signal
         tokio::signal::ctrl_c().await.expect("Failed to listen for event");
     }
 
-    async fn data_provider_task(_state: Arc<State>, data_providers: Vec<DataProviderType>) {
+    async fn ingestor_task(state: Arc<State>, ingestors: Vec<IngestorType>) {
         info!("Spawning data provider task");
 
         info!("Providers starting...");
         let (tx, rx) = flume::unbounded();
-        for provider in data_providers {
+        for provider in ingestors {
             let local_tx = tx.clone();
             tokio::spawn(async move { provider.start(local_tx).await });
         }
@@ -43,7 +43,10 @@ impl Server {
         loop {
             let msg = rx.recv_async().await;
             match msg {
-                Ok(m) => info!("{}", m), // Would update the state here
+                Ok(m) => {
+                    debug!("{}", m);
+                    state.market_update(&m);
+                }
                 Err(e) => error!("{}", e),
             }
         }
@@ -65,7 +68,7 @@ impl ServerBuilder {
         let config = self.config.unwrap();
         Server {
             state: Arc::new(State::new(&config.state)),
-            data_provider_factory: DataProviderFactory::new(&config.data_providers),
+            ingestor_factory: IngestorFactory::new(&config.ingestors),
         }
     }
 }

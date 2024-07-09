@@ -8,7 +8,7 @@ use tracing::error;
 pub struct GlobalConfig {
     pub name: String,
     pub state: StateConfig,
-    pub data_providers: DataProviderFactoryConfig,
+    pub ingestors: IngestorFactoryConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -34,12 +34,12 @@ pub struct OrderManagerConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct DataProviderFactoryConfig {
-    pub binance: HashMap<String, BinanceDataProviderConfig>,
+pub struct IngestorFactoryConfig {
+    pub binance: HashMap<String, BinanceIngestorConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct BinanceDataProviderConfig {
+pub struct BinanceIngestorConfig {
     pub enabled: bool,
     pub ws_url: String,
     pub ws_channels: Vec<String>,

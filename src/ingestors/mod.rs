@@ -3,13 +3,13 @@ pub mod errors;
 pub mod factory;
 pub mod ws;
 
-use binance::BinanceDataProvider;
+use binance::BinanceIngestor;
 use flume::Sender;
 
 use crate::models::{MarketEvent, OrderUpdate, PositionUpdate, Tick, Trade, TradeUpdate};
 
 #[trait_variant::make(Send)]
-pub trait DataProvider: Clone {
+pub trait Ingestor: Clone {
     async fn start(&self, sender: Sender<MarketEvent>);
 }
 
@@ -27,14 +27,14 @@ pub enum DataEvent {
 }
 
 #[derive(Clone)]
-pub enum DataProviderType {
-    Binance(BinanceDataProvider),
+pub enum IngestorType {
+    Binance(BinanceIngestor),
 }
 
-impl DataProvider for DataProviderType {
+impl Ingestor for IngestorType {
     async fn start(&self, sender: Sender<MarketEvent>) {
         match self {
-            DataProviderType::Binance(b) => b.start(sender).await,
+            IngestorType::Binance(b) => b.start(sender).await,
         }
     }
 }

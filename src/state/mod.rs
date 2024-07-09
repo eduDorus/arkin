@@ -6,7 +6,7 @@ mod portfolio;
 use market::MarketState;
 use order_manager::{OrderManager, OrderManagerType};
 use portfolio::{Portfolio, PortfolioType};
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     config::StateConfig,
@@ -33,6 +33,7 @@ impl State {
     }
 
     pub fn market_update(&self, event: &MarketEvent) {
+        debug!("State received market event: {}", event);
         match event {
             MarketEvent::Tick(tick) => self.market.handle_tick_update(tick),
             MarketEvent::Trade(trade) => self.market.handle_trade_update(trade),
@@ -42,6 +43,7 @@ impl State {
     }
 
     pub fn account_update(&self, event: &AccountEvent) {
+        debug!("State received account event: {}", event);
         match event {
             AccountEvent::PositionUpdate(position) => self.portfolio.handle_position_update(position),
             AccountEvent::OrderUpdate(order) => self.order_manager.handle_order_update(order),

@@ -5,13 +5,13 @@ use tracing::{error, info, warn};
 use url::Url;
 
 use crate::{
-    config::BinanceDataProviderConfig,
-    data_providers::{binance::parser::BinanceParser, ws::WebSocketManager, DataProvider},
+    config::BinanceIngestorConfig,
+    ingestors::{binance::parser::BinanceParser, ws::WebSocketManager, Ingestor},
     models::MarketEvent,
 };
 
 #[derive(Clone)]
-pub struct BinanceDataProvider {
+pub struct BinanceIngestor {
     url: Url,
     channels: Vec<String>,
     api_key: Option<String>,
@@ -20,8 +20,8 @@ pub struct BinanceDataProvider {
     duplicate_lookback: usize,
 }
 
-impl BinanceDataProvider {
-    pub fn new(config: &BinanceDataProviderConfig) -> Self {
+impl BinanceIngestor {
+    pub fn new(config: &BinanceIngestorConfig) -> Self {
         Self {
             url: config.ws_url.parse().expect("Failed to parse ws binance URL"),
             channels: config.ws_channels.to_owned(),
@@ -33,7 +33,7 @@ impl BinanceDataProvider {
     }
 }
 
-impl DataProvider for BinanceDataProvider {
+impl Ingestor for BinanceIngestor {
     async fn start(&self, sender: Sender<MarketEvent>) {
         info!("Starting Binance data provider");
 

@@ -26,12 +26,31 @@ impl fmt::Display for MarketEvent {
 #[derive(Clone)]
 pub struct Tick {
     pub instrument: Instrument,
-    pub transaction_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub bid_price: Price,
     pub bid_quantity: Quantity,
     pub ask_price: Price,
     pub ask_quantity: Quantity,
+}
+
+impl Tick {
+    pub fn new(
+        instrument: Instrument,
+        event_time: OffsetDateTime,
+        bid_price: Price,
+        bid_quantity: Quantity,
+        ask_price: Price,
+        ask_quantity: Quantity,
+    ) -> Self {
+        Self {
+            instrument,
+            event_time,
+            bid_price,
+            bid_quantity,
+            ask_price,
+            ask_quantity,
+        }
+    }
 }
 
 impl fmt::Display for Tick {
@@ -47,23 +66,15 @@ impl fmt::Display for Tick {
 #[derive(Clone)]
 pub struct Trade {
     pub instrument: Instrument,
-    pub transaction_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub price: Price,
     pub quantity: Quantity, // Negative for sell, positive for buy
 }
 
 impl Trade {
-    pub fn new(
-        instrument: Instrument,
-        transaction_time: OffsetDateTime,
-        event_time: OffsetDateTime,
-        price: Price,
-        quantity: Quantity,
-    ) -> Self {
+    pub fn new(instrument: Instrument, event_time: OffsetDateTime, price: Price, quantity: Quantity) -> Self {
         Self {
             instrument,
-            transaction_time,
             event_time,
             price,
             quantity,
@@ -80,7 +91,6 @@ impl fmt::Display for Trade {
 #[derive(Clone)]
 pub struct BookUpdate {
     pub instrument: Instrument,
-    pub transaction_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub bids: Vec<BookUpdateSide>,
     pub asks: Vec<BookUpdateSide>,
