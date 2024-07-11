@@ -1,12 +1,12 @@
 use super::{allocation::AllocationType, errors::EngineError, execution::ExecutionType, strategies::StrategyType};
 
-pub struct DefaultEngine {
+pub struct DefaultTrader {
     pub strategies: StrategyType,
     pub allocation: AllocationType,
     pub execution: ExecutionType,
 }
 
-impl DefaultEngine {
+impl DefaultTrader {
     pub fn builder() -> DefaultEngineBuilder {
         DefaultEngineBuilder::default()
     }
@@ -35,8 +35,8 @@ impl DefaultEngineBuilder {
         self
     }
 
-    pub fn build(self) -> Result<DefaultEngine, EngineError> {
-        Ok(DefaultEngine {
+    pub fn build(self) -> Result<DefaultTrader, EngineError> {
+        Ok(DefaultTrader {
             strategies: self.strategy.ok_or(EngineError::BuilderError("Strategy not set".into()))?,
             allocation: self.allocation.ok_or(EngineError::BuilderError("Allocation not set".into()))?,
             execution: self.execution.ok_or(EngineError::BuilderError("Execution not set".into()))?,

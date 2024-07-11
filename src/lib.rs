@@ -1,7 +1,6 @@
 pub mod analytics;
 pub mod config;
 pub mod constants;
-pub mod engine;
 pub mod errors;
 pub mod features;
 pub mod ingestors;
@@ -9,4 +8,5 @@ pub mod logging;
 pub mod models;
 pub mod server;
 pub mod state;
+pub mod trader;
 pub mod utils;

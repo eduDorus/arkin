@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
     info!("Starting Aurelion 🚀");
 
     let config = config::load();
-    info!("Loaded configuration: {:?}", config);
+    info!("Loaded configuration: {}", serde_json::to_string_pretty(&config)?);
 
     let server = Server::builder().config(&config).build();
     server.run().await;

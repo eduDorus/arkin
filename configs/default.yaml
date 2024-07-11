@@ -1,9 +1,7 @@
 name: Aurelion
 
 ingestors:
-  binance:
-    usdm_trades:
-      enabled: true
+  - binance:
       ws_url: wss://fstream.binance.com/ws
       ws_channels:
         - btcusdt@aggTrade
@@ -17,3 +15,41 @@ state:
     enabled: true
   order_manager:
     enabled: true
+
+features:
+  - vwap:
+      window: 10
+  # - sma:
+  #     window: 50
+  # - sma:
+  #     window: 200
+  # - ema:
+  #     window: 50
+  # - ema:
+  #     window: 200
+
+traders:
+  wide_quoter:
+    strategy:
+      wide:
+        spread_in_pct: 0.1
+    allocation:
+      fixed:
+        max_allocation: 0.1
+    execution:
+      forward:
+        max_order_size: 0.1
+        min_order_size: 0.01
+  spreader:
+    strategy:
+      spreader:
+        front_leg: BTCUSDT
+        back_leg: ETHUSDT
+        min_spread: 0.1
+    allocation:
+      fixed:
+        max_allocation: 0.1
+    execution:
+      forward:
+        max_order_size: 0.1
+        min_order_size: 0.01

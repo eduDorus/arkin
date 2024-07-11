@@ -10,6 +10,7 @@ use tracing::{debug, warn};
 
 use crate::{
     config::StateConfig,
+    features::FeatureEvent,
     models::{AccountEvent, MarketEvent},
 };
 
@@ -51,5 +52,10 @@ impl State {
                 warn!("Unhandled account event: {}", event)
             }
         }
+    }
+
+    pub fn feature_update(&self, event: &FeatureEvent) {
+        debug!("State received feature event: {}", event);
+        self.market.handle_feature_update(event);
     }
 }

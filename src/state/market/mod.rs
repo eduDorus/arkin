@@ -1,13 +1,19 @@
-use crate::models::{BookUpdate, Instrument, Tick, Trade};
+use crate::{
+    features::FeatureEvent,
+    models::{BookUpdate, Instrument, Tick, Trade},
+};
 use parking_lot::RwLock;
 use std::collections::{HashMap, VecDeque};
+use tracing::info;
 
 #[derive(Default)]
+#[allow(unused)]
 pub struct MarketState {
     book: RwLock<HashMap<Instrument, VecDeque<BookUpdate>>>,
     quotes: RwLock<HashMap<Instrument, VecDeque<Tick>>>,
     trades: RwLock<HashMap<Instrument, VecDeque<Trade>>>,
     agg_trades: RwLock<HashMap<Instrument, VecDeque<Trade>>>,
+    features: RwLock<HashMap<Instrument, VecDeque<FeatureEvent>>>,
 }
 
 impl MarketState {
@@ -37,5 +43,9 @@ impl MarketState {
         let mut locked_agg_trades = self.agg_trades.write();
         let agg_trades = locked_agg_trades.entry(instrument).or_default();
         agg_trades.push_back(trade.to_owned());
+    }
+
+    pub fn handle_feature_update(&self, feature_event: &FeatureEvent) {
+        info!("MarketState received feature event: {}", feature_event);
     }
 }
