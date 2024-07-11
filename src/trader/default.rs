@@ -1,5 +1,8 @@
-use super::{allocation::AllocationType, errors::EngineError, execution::ExecutionType, strategies::StrategyType};
+use super::{
+    allocation::AllocationType, errors::EngineError, execution::ExecutionType, strategies::StrategyType, Trader,
+};
 
+#[derive(Clone)]
 pub struct DefaultTrader {
     pub strategies: StrategyType,
     pub allocation: AllocationType,
@@ -9,6 +12,15 @@ pub struct DefaultTrader {
 impl DefaultTrader {
     pub fn builder() -> DefaultEngineBuilder {
         DefaultEngineBuilder::default()
+    }
+}
+
+impl Trader for DefaultTrader {
+    async fn start(&self) {
+        println!(
+            "Starting trader with strategy: {}, allocation: {}, execution: {}",
+            self.strategies, self.allocation, self.execution
+        );
     }
 }
 

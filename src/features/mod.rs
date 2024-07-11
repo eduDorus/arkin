@@ -5,12 +5,11 @@ mod vwap;
 use core::fmt;
 
 pub use factory::FeatureFactory;
-use flume::Sender;
 use vwap::{VWAPFeature, VWAP};
 
 #[trait_variant::make(Send)]
 pub trait Feature: Clone {
-    async fn start(&self, sender: Sender<FeatureEvent>);
+    async fn start(&self);
 }
 
 #[derive(Clone)]
@@ -48,9 +47,9 @@ impl fmt::Display for FeatureType {
 }
 
 impl Feature for FeatureType {
-    async fn start(&self, sender: Sender<FeatureEvent>) {
+    async fn start(&self) {
         match self {
-            FeatureType::VWAP(f) => f.start(sender).await,
+            FeatureType::VWAP(f) => f.start().await,
         }
     }
 }

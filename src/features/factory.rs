@@ -1,23 +1,19 @@
-use crate::{config::FeatureConfig, features::vwap::VWAPFeature};
+use std::sync::Arc;
+
+use crate::{config::FeatureConfig, features::vwap::VWAPFeature, state::State};
 
 use super::FeatureType;
 
-pub struct FeatureFactory {
-    pub features: Vec<FeatureConfig>,
-}
+pub struct FeatureFactory {}
 
 impl FeatureFactory {
-    pub fn new(features: Vec<FeatureConfig>) -> FeatureFactory {
-        FeatureFactory { features }
-    }
-
-    pub fn create_features(&self) -> Vec<FeatureType> {
+    pub fn create_features(state: Arc<State>, config: &[FeatureConfig]) -> Vec<FeatureType> {
         let mut features = Vec::new();
 
-        for config in &self.features {
+        for config in config {
             match config {
                 FeatureConfig::VWAP(config) => {
-                    features.push(FeatureType::VWAP(VWAPFeature::new(config)));
+                    features.push(FeatureType::VWAP(VWAPFeature::new(state.to_owned(), config)));
                 }
                 FeatureConfig::SMA(_) => unimplemented!(),
                 FeatureConfig::EMA(_) => unimplemented!(),

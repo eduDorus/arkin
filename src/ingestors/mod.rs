@@ -3,14 +3,15 @@ pub mod errors;
 pub mod factory;
 pub mod ws;
 
-use binance::BinanceIngestor;
-use flume::Sender;
+use core::fmt;
 
-use crate::models::{MarketEvent, OrderUpdate, PositionUpdate, Tick, Trade, TradeUpdate};
+use binance::BinanceIngestor;
+
+use crate::models::{OrderUpdate, PositionUpdate, Tick, Trade, TradeUpdate};
 
 #[trait_variant::make(Send)]
 pub trait Ingestor: Clone {
-    async fn start(&self, sender: Sender<MarketEvent>);
+    async fn start(&self);
 }
 
 #[derive(Clone)]
@@ -32,9 +33,17 @@ pub enum IngestorType {
 }
 
 impl Ingestor for IngestorType {
-    async fn start(&self, sender: Sender<MarketEvent>) {
+    async fn start(&self) {
         match self {
-            IngestorType::Binance(b) => b.start(sender).await,
+            IngestorType::Binance(b) => b.start().await,
+        }
+    }
+}
+
+impl fmt::Display for IngestorType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IngestorType::Binance(_) => write!(f, "Binance"),
         }
     }
 }

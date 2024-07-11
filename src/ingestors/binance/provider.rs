@@ -1,4 +1,5 @@
-use flume::Sender;
+use std::sync::Arc;
+
 use serde::Serialize;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{error, info, warn};
@@ -7,11 +8,12 @@ use url::Url;
 use crate::{
     config::BinanceIngestorConfig,
     ingestors::{binance::parser::BinanceParser, ws::WebSocketManager, Ingestor},
-    models::MarketEvent,
+    state::State,
 };
 
 #[derive(Clone)]
 pub struct BinanceIngestor {
+    state: Arc<State>,
     url: Url,
     channels: Vec<String>,
     api_key: Option<String>,
@@ -21,8 +23,9 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    pub fn new(config: &BinanceIngestorConfig) -> Self {
+    pub fn new(state: Arc<State>, config: &BinanceIngestorConfig) -> Self {
         Self {
+            state,
             url: config.ws_url.parse().expect("Failed to parse ws binance URL"),
             channels: config.ws_channels.to_owned(),
             api_key: config.api_key.to_owned(),
@@ -34,7 +37,7 @@ impl BinanceIngestor {
 }
 
 impl Ingestor for BinanceIngestor {
-    async fn start(&self, sender: Sender<MarketEvent>) {
+    async fn start(&self) {
         info!("Starting Binance data provider");
 
         // Check for API key and secret
@@ -59,7 +62,7 @@ impl Ingestor for BinanceIngestor {
                     let res = BinanceParser::parse(&data);
                     match res {
                         Ok(event) => {
-                            sender.send_async(event).await.expect("Failed to send market event to sender");
+                            self.state.market_update(&event);
                         }
                         Err(e) => error!("{}", e),
                     }

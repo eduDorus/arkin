@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
-use tracing::{debug, error, info};
+use tracing::{info};
 
 use crate::{
     config::GlobalConfig,
     features::{Feature, FeatureFactory, FeatureType},
     ingestors::{factory::IngestorFactory, Ingestor, IngestorType},
     state::State,
+    trader::{Trader, TraderFactory, TraderType},
 };
 
 pub struct Server {
     state: Arc<State>,
-    ingestor_factory: IngestorFactory,
-    feature_factory: FeatureFactory,
+    config: GlobalConfig,
 }
 
 impl Server {
@@ -21,64 +21,50 @@ impl Server {
     }
 
     pub async fn run(&self) {
-        tokio::spawn(Server::ingestor_task(
-            self.state.clone(),
-            self.ingestor_factory.create_ingestors(),
-        ));
+        let ingestors = IngestorFactory::create_ingestors(self.state.clone(), &self.config.ingestors);
+        tokio::spawn(Server::ingestor_task(ingestors));
 
-        tokio::spawn(Server::feature_task(self.state.clone(), self.feature_factory.create_features()));
+        let features = FeatureFactory::create_features(self.state.clone(), &self.config.features);
+        tokio::spawn(Server::feature_task(features));
+
+        let traders = TraderFactory::create_traders(self.state.clone(), &self.config.traders);
+        tokio::spawn(async move { Server::trader_task(traders) });
 
         // Wait for interrupt signal
         tokio::signal::ctrl_c().await.expect("Failed to listen for event");
     }
 
-    async fn ingestor_task(state: Arc<State>, ingestors: Vec<IngestorType>) {
+    async fn ingestor_task(ingestors: Vec<IngestorType>) {
         info!("Spawning ingestor task");
 
         info!("Ingestors starting...");
-        let (tx, rx) = flume::unbounded();
         for ingestor in ingestors {
-            let local_tx = tx.clone();
-            tokio::spawn(async move { ingestor.start(local_tx).await });
+            info!("Starting ingestor {}", ingestor);
+            tokio::spawn(async move { ingestor.start().await });
         }
-        info!("Ingestors started");
-
-        info!("Listening to incoming data");
-        loop {
-            let msg = rx.recv_async().await;
-            match msg {
-                Ok(m) => {
-                    debug!("{}", m);
-                    state.market_update(&m);
-                }
-                Err(e) => error!("{}", e),
-            }
-        }
+        info!("Ingestors spawned");
     }
 
-    async fn feature_task(state: Arc<State>, features: Vec<FeatureType>) {
+    async fn feature_task(features: Vec<FeatureType>) {
         info!("Spawning feature task");
 
         info!("Features starting...");
-        let (tx, rx) = flume::unbounded();
         for feature in features {
             info!("Starting feature {}", feature);
-            let local_tx = tx.clone();
-            tokio::spawn(async move { feature.start(local_tx).await });
+            tokio::spawn(async move { feature.start().await });
         }
-        info!("Features started");
+        info!("Features spawned");
+    }
 
-        info!("Listening to created features");
-        loop {
-            let msg = rx.recv_async().await;
-            match msg {
-                Ok(m) => {
-                    debug!("{}", m);
-                    state.feature_update(&m);
-                }
-                Err(e) => error!("{}", e),
-            }
+    async fn trader_task(traders: Vec<TraderType>) {
+        info!("Spawning trader task");
+
+        info!("Traders starting...");
+        for trader in traders {
+            info!("Starting trader {}", trader);
+            tokio::spawn(async move { trader.start().await });
         }
+        info!("Traders spawned");
     }
 }
 
@@ -97,8 +83,7 @@ impl ServerBuilder {
         let config = self.config.unwrap();
         Server {
             state: Arc::new(State::new(&config.state)),
-            ingestor_factory: IngestorFactory::new(config.ingestors.to_owned()),
-            feature_factory: FeatureFactory::new(config.features.to_owned()),
+            config,
         }
     }
 }

@@ -110,25 +110,26 @@ pub struct SpreaderConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AllocationConfig {
-    #[serde(rename = "fixed")]
-    Fixed(FixedAllocationConfig),
+    #[serde(rename = "Limited")]
+    Limited(LimitedAllocationConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FixedAllocationConfig {
+pub struct LimitedAllocationConfig {
     pub max_allocation: Decimal,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ExecutionConfig {
     #[serde(rename = "forward")]
-    Forward(ForwardExecutionConfig),
+    Forward(BinanceExecutionConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ForwardExecutionConfig {
-    pub max_order_size: Decimal,
-    pub min_order_size: Decimal,
+pub struct BinanceExecutionConfig {
+    pub max_orders_per_minute: u64,
+    pub max_order_size_notional: Decimal,
+    pub min_order_size_notional: Decimal,
 }
 
 pub fn load() -> GlobalConfig {
