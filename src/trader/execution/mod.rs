@@ -72,7 +72,7 @@ impl Execution for ExecutionType {
 impl fmt::Display for ExecutionType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ExecutionType::Binance(_) => write!(f, "Forward"),
+            ExecutionType::Binance(_) => write!(f, "Binance"),
         }
     }
 }

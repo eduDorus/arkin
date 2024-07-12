@@ -61,7 +61,7 @@ impl WebSocketManager {
                 permit = self.limit_connections.clone().acquire_owned() => {
                     // This should never fail, as the semaphore is never closed.
                     let permit = permit?;
-                    info!("Acquired permit: {:?}", permit);
+                    debug!("Acquired permit: {:?}", permit);
                     match self.start_handler(permit, sender.clone(), subscription.clone()).await {
                         Ok(_) => info!("Started new handler"),
                         Err(e) => error!("Failed to start new handler: {:?}", e),

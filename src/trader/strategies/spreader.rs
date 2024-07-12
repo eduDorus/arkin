@@ -24,6 +24,7 @@ impl Spreader {
 
 impl Strategy for Spreader {
     async fn start(&self) {
+        info!("Starting spreader strategy...");
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
 
         loop {

@@ -24,6 +24,7 @@ impl WideQuoter {
 
 impl Strategy for WideQuoter {
     async fn start(&self) {
+        info!("Starting wide quoter strategy...");
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
 
         loop {

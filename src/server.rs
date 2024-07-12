@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tracing::{info};
+use tracing::info;
 
 use crate::{
     config::GlobalConfig,
@@ -28,7 +28,7 @@ impl Server {
         tokio::spawn(Server::feature_task(features));
 
         let traders = TraderFactory::create_traders(self.state.clone(), &self.config.traders);
-        tokio::spawn(async move { Server::trader_task(traders) });
+        tokio::spawn(Server::trader_task(traders));
 
         // Wait for interrupt signal
         tokio::signal::ctrl_c().await.expect("Failed to listen for event");
@@ -37,7 +37,6 @@ impl Server {
     async fn ingestor_task(ingestors: Vec<IngestorType>) {
         info!("Spawning ingestor task");
 
-        info!("Ingestors starting...");
         for ingestor in ingestors {
             info!("Starting ingestor {}", ingestor);
             tokio::spawn(async move { ingestor.start().await });

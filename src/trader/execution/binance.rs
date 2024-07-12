@@ -29,7 +29,7 @@ impl BinanceExecution {
 
 impl Execution for BinanceExecution {
     async fn start(&self, receiver: Receiver<ExecutionEvent>) {
-        info!("Starting binance execution");
+        info!("Starting binance execution...");
         while let Ok(event) = receiver.recv_async().await {
             info!("Binance execution received event: {}", event);
         }

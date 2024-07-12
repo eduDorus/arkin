@@ -38,11 +38,11 @@ impl BinanceIngestor {
 
 impl Ingestor for BinanceIngestor {
     async fn start(&self) {
-        info!("Starting Binance data provider");
+        info!("Starting Binance ingestor");
 
         // Check for API key and secret
         if self.api_key.is_none() || self.api_secret.is_none() {
-            warn!("API key and secret are required for faster connection on Binance data provider");
+            warn!("API key and secret are required for faster connection on Binance ingestor");
         }
 
         let mut ws_manager =

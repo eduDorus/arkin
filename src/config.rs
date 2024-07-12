@@ -90,7 +90,7 @@ pub struct TraderConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum StrategyConfig {
-    #[serde(rename = "wide")]
+    #[serde(rename = "wide_quoter")]
     WideQuoter(WideQuoterConfig),
     #[serde(rename = "spreader")]
     Spreader(SpreaderConfig),
@@ -110,7 +110,7 @@ pub struct SpreaderConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AllocationConfig {
-    #[serde(rename = "Limited")]
+    #[serde(rename = "limited")]
     Limited(LimitedAllocationConfig),
 }
 
@@ -121,8 +121,8 @@ pub struct LimitedAllocationConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ExecutionConfig {
-    #[serde(rename = "forward")]
-    Forward(BinanceExecutionConfig),
+    #[serde(rename = "binance")]
+    Binance(BinanceExecutionConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

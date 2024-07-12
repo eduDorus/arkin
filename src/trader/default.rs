@@ -1,3 +1,5 @@
+use tracing::info;
+
 use super::{
     allocation::AllocationType, errors::EngineError, execution::ExecutionType, strategies::StrategyType, Trader,
 };
@@ -17,7 +19,7 @@ impl DefaultTrader {
 
 impl Trader for DefaultTrader {
     async fn start(&self) {
-        println!(
+        info!(
             "Starting trader with strategy: {}, allocation: {}, execution: {}",
             self.strategies, self.allocation, self.execution
         );

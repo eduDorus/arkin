@@ -31,13 +31,13 @@ features:
 traders:
   wide_quoter:
     strategy:
-      wide:
+      wide_quoter:
         spread_in_pct: 1.
     allocation:
-      fixed:
+      limited:
         max_allocation: 0.1
     execution:
-      forward:
+      binance:
         max_orders_per_minute: 5
         max_order_size_notional: 1000.
         min_order_size_notional: 100.
@@ -48,9 +48,10 @@ traders:
         back_leg: ETHUSDT
         min_spread: 0.1
     allocation:
-      fixed:
+      limited:
         max_allocation: 0.1
     execution:
-      forward:
-        max_order_size: 0.1
-        min_order_size: 0.01
+      binance:
+        max_orders_per_minute: 5
+        max_order_size_notional: 1000.
+        min_order_size_notional: 100.
