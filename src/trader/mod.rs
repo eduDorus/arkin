@@ -2,7 +2,6 @@ pub mod errors;
 
 mod allocation;
 mod default;
-mod execution;
 mod factory;
 mod strategies;
 

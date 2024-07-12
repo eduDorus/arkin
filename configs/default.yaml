@@ -36,11 +36,7 @@ traders:
     allocation:
       limited:
         max_allocation: 0.1
-    execution:
-      binance:
-        max_orders_per_minute: 5
-        max_order_size_notional: 1000.
-        min_order_size_notional: 100.
+
   spreader:
     strategy:
       spreader:
@@ -50,8 +46,9 @@ traders:
     allocation:
       limited:
         max_allocation: 0.1
-    execution:
-      binance:
-        max_orders_per_minute: 5
-        max_order_size_notional: 1000.
-        min_order_size_notional: 100.
+
+execution:
+  - binance:
+      max_orders_per_minute: 5
+      max_order_size_notional: 1000.
+      min_order_size_notional: 100.

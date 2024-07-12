@@ -12,6 +12,7 @@ pub struct GlobalConfig {
     pub ingestors: Vec<IngestorConfig>,
     pub features: Vec<FeatureConfig>,
     pub traders: HashMap<String, TraderConfig>,
+    pub execution: Vec<ExecutionConfig>,
 }
 
 // STATE
@@ -85,7 +86,6 @@ pub struct EMAConfig {
 pub struct TraderConfig {
     pub strategy: StrategyConfig,
     pub allocation: AllocationConfig,
-    pub execution: ExecutionConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

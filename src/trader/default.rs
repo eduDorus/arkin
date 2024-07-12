@@ -1,14 +1,11 @@
 use tracing::info;
 
-use super::{
-    allocation::AllocationType, errors::EngineError, execution::ExecutionType, strategies::StrategyType, Trader,
-};
+use super::{allocation::AllocationType, errors::EngineError, strategies::StrategyType, Trader};
 
 #[derive(Clone)]
 pub struct DefaultTrader {
     pub strategies: StrategyType,
     pub allocation: AllocationType,
-    pub execution: ExecutionType,
 }
 
 impl DefaultTrader {
@@ -20,8 +17,8 @@ impl DefaultTrader {
 impl Trader for DefaultTrader {
     async fn start(&self) {
         info!(
-            "Starting trader with strategy: {}, allocation: {}, execution: {}",
-            self.strategies, self.allocation, self.execution
+            "Starting trader with strategy: {}, allocation: {}",
+            self.strategies, self.allocation
         );
     }
 }
@@ -30,7 +27,6 @@ impl Trader for DefaultTrader {
 pub struct DefaultEngineBuilder {
     strategy: Option<StrategyType>,
     allocation: Option<AllocationType>,
-    execution: Option<ExecutionType>,
 }
 
 impl DefaultEngineBuilder {
@@ -44,16 +40,10 @@ impl DefaultEngineBuilder {
         self
     }
 
-    pub fn with_execution(mut self, execution: ExecutionType) -> Self {
-        self.execution = Some(execution);
-        self
-    }
-
     pub fn build(self) -> Result<DefaultTrader, EngineError> {
         Ok(DefaultTrader {
             strategies: self.strategy.ok_or(EngineError::BuilderError("Strategy not set".into()))?,
             allocation: self.allocation.ok_or(EngineError::BuilderError("Allocation not set".into()))?,
-            execution: self.execution.ok_or(EngineError::BuilderError("Execution not set".into()))?,
         })
     }
 }

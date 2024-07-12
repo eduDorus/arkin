@@ -38,7 +38,7 @@ impl BinanceIngestor {
 
 impl Ingestor for BinanceIngestor {
     async fn start(&self) {
-        info!("Starting Binance ingestor");
+        info!("Starting binance ingestor...");
 
         // Check for API key and secret
         if self.api_key.is_none() || self.api_secret.is_none() {

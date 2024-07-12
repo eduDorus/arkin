@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
-use flume::Receiver;
 use rust_decimal::Decimal;
 use tracing::info;
 
 use crate::{config::BinanceExecutionConfig, state::State};
 
-use super::{Execution, ExecutionEvent};
+use super::Execution;
 
 #[derive(Clone)]
 pub struct BinanceExecution {
@@ -28,10 +27,13 @@ impl BinanceExecution {
 }
 
 impl Execution for BinanceExecution {
-    async fn start(&self, receiver: Receiver<ExecutionEvent>) {
+    async fn start(&self) {
         info!("Starting binance execution...");
-        while let Ok(event) = receiver.recv_async().await {
-            info!("Binance execution received event: {}", event);
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+
+        loop {
+            interval.tick().await;
+            info!("Executing binance orders...");
         }
     }
 }

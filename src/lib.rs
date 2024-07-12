@@ -2,6 +2,7 @@ pub mod analytics;
 pub mod config;
 pub mod constants;
 pub mod errors;
+pub mod execution;
 pub mod features;
 pub mod ingestors;
 pub mod logging;

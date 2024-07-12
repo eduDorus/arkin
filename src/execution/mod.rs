@@ -1,7 +1,6 @@
 use core::fmt;
 
 use binance::BinanceExecution;
-use flume::Receiver;
 
 use crate::models::{Instrument, Price, Quantity};
 
@@ -13,7 +12,7 @@ pub use factory::ExecutionFactory;
 
 #[trait_variant::make(Send)]
 pub trait Execution: Clone {
-    async fn start(&self, receiver: Receiver<ExecutionEvent>);
+    async fn start(&self);
 }
 
 #[derive(Clone)]
@@ -62,9 +61,9 @@ pub enum ExecutionType {
 }
 
 impl Execution for ExecutionType {
-    async fn start(&self, receiver: Receiver<ExecutionEvent>) {
+    async fn start(&self) {
         match self {
-            ExecutionType::Binance(exec) => exec.start(receiver).await,
+            ExecutionType::Binance(exec) => exec.start().await,
         }
     }
 }

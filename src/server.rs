@@ -4,6 +4,7 @@ use tracing::info;
 
 use crate::{
     config::GlobalConfig,
+    execution::{Execution, ExecutionFactory, ExecutionType},
     features::{Feature, FeatureFactory, FeatureType},
     ingestors::{factory::IngestorFactory, Ingestor, IngestorType},
     state::State,
@@ -30,40 +31,39 @@ impl Server {
         let traders = TraderFactory::create_traders(self.state.clone(), &self.config.traders);
         tokio::spawn(Server::trader_task(traders));
 
+        let execution = ExecutionFactory::from_config(self.state.clone(), &self.config.execution);
+        tokio::spawn(Server::execution_task(execution));
+
         // Wait for interrupt signal
         tokio::signal::ctrl_c().await.expect("Failed to listen for event");
     }
 
     async fn ingestor_task(ingestors: Vec<IngestorType>) {
-        info!("Spawning ingestor task");
-
+        info!("Spawning ingestor tasks...");
         for ingestor in ingestors {
-            info!("Starting ingestor {}", ingestor);
             tokio::spawn(async move { ingestor.start().await });
         }
-        info!("Ingestors spawned");
     }
 
     async fn feature_task(features: Vec<FeatureType>) {
-        info!("Spawning feature task");
-
-        info!("Features starting...");
+        info!("Spawning feature tasks...");
         for feature in features {
-            info!("Starting feature {}", feature);
             tokio::spawn(async move { feature.start().await });
         }
-        info!("Features spawned");
     }
 
     async fn trader_task(traders: Vec<TraderType>) {
-        info!("Spawning trader task");
-
-        info!("Traders starting...");
+        info!("Spawning trader tasks...");
         for trader in traders {
-            info!("Starting trader {}", trader);
             tokio::spawn(async move { trader.start().await });
         }
-        info!("Traders spawned");
+    }
+
+    async fn execution_task(executors: Vec<ExecutionType>) {
+        info!("Spawning execution tasks...");
+        for executor in executors {
+            tokio::spawn(async move { executor.start().await });
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use rust_decimal::Decimal;
+use tracing::info;
 
 use crate::{config::VWAPConfig, models::Price, state::State};
 
@@ -35,6 +36,7 @@ impl VWAPFeature {
 
 impl Feature for VWAPFeature {
     async fn start(&self) {
+        info!("Starting VWAP feature...");
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
 
         loop {
