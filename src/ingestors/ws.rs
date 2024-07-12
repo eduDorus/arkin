@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use flume::Sender;
@@ -7,6 +7,7 @@ use tokio::{
     net::TcpStream,
     select,
     sync::{OwnedSemaphorePermit, Semaphore},
+    time::sleep,
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info};
@@ -64,7 +65,10 @@ impl WebSocketManager {
                     debug!("Acquired permit: {:?}", permit);
                     match self.start_handler(permit, sender.clone(), subscription.clone()).await {
                         Ok(_) => info!("Started new handler"),
-                        Err(e) => error!("Failed to start new handler: {:?}", e),
+                        Err(e) => {
+                            error!("Failed to start new handler: {:?}", e);
+                            sleep(Duration::from_secs(5)).await;
+                        }
                     }
                 }
             }

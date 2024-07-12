@@ -41,8 +41,15 @@ pub struct OrderManagerConfig {
 // INGESTORS
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum IngestorConfig {
+    #[serde(rename = "backtest")]
+    Backtest(BacktestIngestorConfig),
     #[serde(rename = "binance")]
     Binance(BinanceIngestorConfig),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BacktestIngestorConfig {
+    pub market_data: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -123,10 +130,19 @@ pub struct LimitedAllocationConfig {
 pub enum ExecutionConfig {
     #[serde(rename = "binance")]
     Binance(BinanceExecutionConfig),
+    #[serde(rename = "backtest")]
+    Backtest(BacktestExecutionConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BinanceExecutionConfig {
+    pub max_orders_per_minute: u64,
+    pub max_order_size_notional: Decimal,
+    pub min_order_size_notional: Decimal,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BacktestExecutionConfig {
     pub max_orders_per_minute: u64,
     pub max_order_size_notional: Decimal,
     pub min_order_size_notional: Decimal,

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{config::IngestorConfig, state::State};
 
-use super::{binance::BinanceIngestor, IngestorType};
+use super::{backtest::BacktestIngestor, binance::BinanceIngestor, IngestorType};
 
 pub struct IngestorFactory {}
 
@@ -12,6 +12,9 @@ impl IngestorFactory {
 
         for config in config {
             match config {
+                IngestorConfig::Backtest(config) => {
+                    ingestors.push(IngestorType::Backtest(BacktestIngestor::new(state.to_owned(), config)))
+                }
                 IngestorConfig::Binance(config) => {
                     ingestors.push(IngestorType::Binance(BinanceIngestor::new(state.to_owned(), config)));
                 }

@@ -1,9 +1,11 @@
 use core::fmt;
 
+use backtest::BacktestExecution;
 use binance::BinanceExecution;
 
 use crate::models::{Instrument, Price, Quantity};
 
+mod backtest;
 mod binance;
 pub mod errors;
 mod factory;
@@ -13,6 +15,30 @@ pub use factory::ExecutionFactory;
 #[trait_variant::make(Send)]
 pub trait Execution: Clone {
     async fn start(&self);
+}
+
+#[derive(Clone)]
+pub enum ExecutionType {
+    Binance(BinanceExecution),
+    Backtest(BacktestExecution),
+}
+
+impl Execution for ExecutionType {
+    async fn start(&self) {
+        match self {
+            ExecutionType::Binance(exec) => exec.start().await,
+            ExecutionType::Backtest(exec) => exec.start().await,
+        }
+    }
+}
+
+impl fmt::Display for ExecutionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExecutionType::Binance(_) => write!(f, "Binance"),
+            ExecutionType::Backtest(_) => write!(f, "Backtest"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -52,26 +78,5 @@ pub struct Market {
 impl fmt::Display for Market {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} quantity {}", self.instrument, self.quantity)
-    }
-}
-
-#[derive(Clone)]
-pub enum ExecutionType {
-    Binance(BinanceExecution),
-}
-
-impl Execution for ExecutionType {
-    async fn start(&self) {
-        match self {
-            ExecutionType::Binance(exec) => exec.start().await,
-        }
-    }
-}
-
-impl fmt::Display for ExecutionType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ExecutionType::Binance(_) => write!(f, "Binance"),
-        }
     }
 }

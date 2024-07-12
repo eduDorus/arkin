@@ -1,12 +1,14 @@
 name: Aurelion
 
 ingestors:
-  - binance:
-      ws_url: wss://fstream.binance.com/ws
-      ws_channels:
-        - btcusdt@aggTrade
-      connections_per_manager: 2
-      duplicate_lookback: 1000
+  - backtest:
+      market_data: true
+  # - binance:
+  #     ws_url: wss://fstream.binance.com/ws
+  #     ws_channels:
+  #       - btcusdt@aggTrade
+  #     connections_per_manager: 2
+  #     duplicate_lookback: 1000
 
 state:
   market_state:
@@ -48,7 +50,11 @@ traders:
         max_allocation: 0.1
 
 execution:
-  - binance:
+  # - binance:
+  #     max_orders_per_minute: 5
+  #     max_order_size_notional: 1000.
+  #     min_order_size_notional: 100.
+  - backtest:
       max_orders_per_minute: 5
       max_order_size_notional: 1000.
       min_order_size_notional: 100.

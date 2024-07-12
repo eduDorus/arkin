@@ -6,7 +6,7 @@ use crate::{
     config::GlobalConfig,
     execution::{Execution, ExecutionFactory, ExecutionType},
     features::{Feature, FeatureFactory, FeatureType},
-    ingestors::{factory::IngestorFactory, Ingestor, IngestorType},
+    ingestors::{Ingestor, IngestorFactory, IngestorType},
     state::State,
     trader::{Trader, TraderFactory, TraderType},
 };
