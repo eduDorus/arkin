@@ -1,13 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{config::TraderConfig, state::State};
+use crate::{config::TraderConfig, state::StateManager};
 
 use super::{allocation::AllocationFactory, strategies::StrategyFactory, DefaultTrader, TraderType};
 
 pub struct TraderFactory {}
 
 impl TraderFactory {
-    pub fn create_traders(state: Arc<State>, config: &HashMap<String, TraderConfig>) -> Vec<TraderType> {
+    pub fn create_traders(state: Arc<StateManager>, config: &HashMap<String, TraderConfig>) -> Vec<TraderType> {
         let mut traders = Vec::new();
 
         for config in config.values() {
@@ -16,7 +16,7 @@ impl TraderFactory {
         traders
     }
 
-    pub fn create_trader(state: Arc<State>, config: &TraderConfig) -> TraderType {
+    pub fn create_trader(state: Arc<StateManager>, config: &TraderConfig) -> TraderType {
         let strategy = StrategyFactory::from_config(state.clone(), &config.strategy);
         let allocation = AllocationFactory::from_config(state.clone(), &config.allocation);
 

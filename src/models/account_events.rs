@@ -2,13 +2,19 @@ use core::fmt;
 
 use time::OffsetDateTime;
 
-use super::{Instrument, Price, Quantity};
+use super::{Instrument, Price, Quantity, Venue};
+
+#[derive(Clone)]
+pub struct Account {
+    pub name: String,
+    pub venue: Venue,
+}
 
 #[derive(Clone)]
 pub enum AccountEvent {
-    PositionUpdate(PositionUpdate),
-    OrderUpdate(OrderUpdate),
-    TradeUpdate(TradeUpdate),
+    PositionUpdate(Position),
+    OrderUpdate(Order),
+    FillUpdate(Fill),
 }
 
 impl fmt::Display for AccountEvent {
@@ -16,26 +22,26 @@ impl fmt::Display for AccountEvent {
         match self {
             AccountEvent::PositionUpdate(position) => write!(f, "Position update: {}", position),
             AccountEvent::OrderUpdate(order) => write!(f, "Order update: {}", order),
-            AccountEvent::TradeUpdate(trade) => write!(f, "Trade update: {}", trade),
+            AccountEvent::FillUpdate(fill) => write!(f, "Fill update: {}", fill),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct PositionUpdate {
+pub struct Position {
     pub instrument: Instrument,
     pub event_time: OffsetDateTime,
     pub quantity: Quantity,
 }
 
-impl fmt::Display for PositionUpdate {
+impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {}", self.instrument, self.quantity)
     }
 }
 
 #[derive(Clone)]
-pub struct OrderUpdate {
+pub struct Order {
     pub instrument: Instrument,
     pub event_time: OffsetDateTime,
     pub state: OrderState,
@@ -44,7 +50,7 @@ pub struct OrderUpdate {
     pub average_fill_price: Price,
 }
 
-impl fmt::Display for OrderUpdate {
+impl fmt::Display for Order {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -78,14 +84,14 @@ impl fmt::Display for OrderState {
 }
 
 #[derive(Clone)]
-pub struct TradeUpdate {
+pub struct Fill {
     pub instrument: Instrument,
     pub event_time: OffsetDateTime,
     pub price: Price,
     pub quantity: Quantity,
 }
 
-impl fmt::Display for TradeUpdate {
+impl fmt::Display for Fill {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {} at {}", self.instrument, self.quantity, self.price)
     }

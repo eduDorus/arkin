@@ -128,10 +128,10 @@ pub struct LimitedAllocationConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ExecutionConfig {
-    #[serde(rename = "binance")]
-    Binance(BinanceExecutionConfig),
     #[serde(rename = "backtest")]
     Backtest(BacktestExecutionConfig),
+    #[serde(rename = "binance")]
+    Binance(BinanceExecutionConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

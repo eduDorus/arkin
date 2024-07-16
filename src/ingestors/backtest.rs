@@ -7,19 +7,19 @@ use tracing::info;
 use crate::{
     config::BacktestIngestorConfig,
     models::{Asset, Instrument, MarketEvent, PerpetualContract, Price, Quantity, Trade, Venue},
-    state::State,
+    state::StateManager,
 };
 
 use super::Ingestor;
 
 #[derive(Clone)]
 pub struct BacktestIngestor {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     market_data: bool,
 }
 
 impl BacktestIngestor {
-    pub fn new(state: Arc<State>, config: &BacktestIngestorConfig) -> Self {
+    pub fn new(state: Arc<StateManager>, config: &BacktestIngestorConfig) -> Self {
         BacktestIngestor {
             state,
             market_data: config.market_data,

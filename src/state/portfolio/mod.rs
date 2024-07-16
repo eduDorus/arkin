@@ -1,9 +1,10 @@
 use tracing::info;
 
-use crate::models::PositionUpdate;
+use crate::models::{Fill, Position};
 
 pub trait Portfolio {
-    fn handle_position_update(&self, update: &PositionUpdate);
+    fn handle_position_update(&self, update: &Position);
+    fn handle_fill_update(&self, fill: &Fill) {}
 }
 
 pub enum PortfolioType {
@@ -11,9 +12,15 @@ pub enum PortfolioType {
 }
 
 impl Portfolio for PortfolioType {
-    fn handle_position_update(&self, update: &PositionUpdate) {
+    fn handle_position_update(&self, update: &Position) {
         match self {
             PortfolioType::Single(portfolio) => portfolio.handle_position_update(update),
+        }
+    }
+
+    fn handle_fill_update(&self, fill: &Fill) {
+        match self {
+            PortfolioType::Single(portfolio) => portfolio.handle_fill_update(fill),
         }
     }
 }
@@ -28,7 +35,11 @@ impl SinglePortfolio {
 }
 
 impl Portfolio for SinglePortfolio {
-    fn handle_position_update(&self, update: &PositionUpdate) {
+    fn handle_position_update(&self, update: &Position) {
         info!("Portfolio received position update: {}", update)
+    }
+
+    fn handle_fill_update(&self, fill: &Fill) {
+        info!("Portfolio received fill update: {}", fill)
     }
 }

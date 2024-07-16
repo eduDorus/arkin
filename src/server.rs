@@ -7,12 +7,12 @@ use crate::{
     execution::{Execution, ExecutionFactory, ExecutionType},
     features::{Feature, FeatureFactory, FeatureType},
     ingestors::{Ingestor, IngestorFactory, IngestorType},
-    state::State,
+    state::StateManager,
     trader::{Trader, TraderFactory, TraderType},
 };
 
 pub struct Server {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     config: GlobalConfig,
 }
 
@@ -81,7 +81,7 @@ impl ServerBuilder {
     pub fn build(self) -> Server {
         let config = self.config.unwrap();
         Server {
-            state: Arc::new(State::new(&config.state)),
+            state: Arc::new(StateManager::new(&config.state)),
             config,
         }
     }

@@ -8,12 +8,12 @@ use url::Url;
 use crate::{
     config::BinanceIngestorConfig,
     ingestors::{binance::parser::BinanceParser, ws::WebSocketManager, Ingestor},
-    state::State,
+    state::StateManager,
 };
 
 #[derive(Clone)]
 pub struct BinanceIngestor {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     url: Url,
     channels: Vec<String>,
     api_key: Option<String>,
@@ -23,7 +23,7 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    pub fn new(state: Arc<State>, config: &BinanceIngestorConfig) -> Self {
+    pub fn new(state: Arc<StateManager>, config: &BinanceIngestorConfig) -> Self {
         Self {
             state,
             url: config.ws_url.parse().expect("Failed to parse ws binance URL"),

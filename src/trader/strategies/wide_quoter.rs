@@ -3,18 +3,18 @@ use std::sync::Arc;
 use rust_decimal::Decimal;
 use tracing::info;
 
-use crate::{config::WideQuoterConfig, state::State};
+use crate::{config::WideQuoterConfig, state::StateManager};
 
 use super::Strategy;
 
 #[derive(Clone)]
 pub struct WideQuoter {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     spread_in_pct: Decimal,
 }
 
 impl WideQuoter {
-    pub fn new(state: Arc<State>, config: &WideQuoterConfig) -> Self {
+    pub fn new(state: Arc<StateManager>, config: &WideQuoterConfig) -> Self {
         Self {
             state,
             spread_in_pct: config.spread_in_pct,

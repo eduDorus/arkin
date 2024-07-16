@@ -1,11 +1,7 @@
-use std::sync::Arc;
-
-use rust_decimal::Decimal;
+use super::Feature;
+use crate::{config::VWAPConfig, models::Price, state::StateManager};
+use std::{sync::Arc, time::Duration};
 use tracing::info;
-
-use crate::{config::VWAPConfig, models::Price, state::State};
-
-use super::{Feature, FeatureEvent};
 
 #[derive(Clone)]
 #[allow(clippy::upper_case_acronyms)]
@@ -21,28 +17,25 @@ impl VWAP {
 
 #[derive(Clone)]
 pub struct VWAPFeature {
-    state: Arc<State>,
-    window: u64,
+    state: Arc<StateManager>,
+    window: Duration,
 }
 
 impl VWAPFeature {
-    pub fn new(state: Arc<State>, config: &VWAPConfig) -> VWAPFeature {
-        VWAPFeature {
-            state,
-            window: config.window,
-        }
+    pub fn new(state: Arc<StateManager>, config: &VWAPConfig) -> VWAPFeature {
+        let window = Duration::from_secs(config.window);
+        VWAPFeature { state, window }
     }
 }
 
 impl Feature for VWAPFeature {
     async fn start(&self) {
         info!("Starting VWAP feature...");
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
 
-        loop {
-            interval.tick().await;
-            let vwap = VWAP::new(Price::new(Decimal::new(10, 0)).unwrap());
-            self.state.feature_update(&FeatureEvent::VWAP(vwap))
+        let mut rx = self.state.listen_feature_frequency(Duration::from_secs(5));
+
+        while let Ok(_) = rx.recv().await {
+            info!("VWAPFeature new tick...");
         }
     }
 }

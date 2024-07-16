@@ -9,6 +9,9 @@ name = "server"
 path = "src/bin/main.rs"
 
 [dependencies]
+# Data Structures
+dashmap = { version = "6.0.1", features = ["inline"] }
+
 # Multi-threading
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] }
 
@@ -20,17 +23,18 @@ tokio = { version = "1.38.0", features = ["full"] }
 flume = "0.11.0"
 futures-util = { version = "0.3" }
 
+# Database
+clickhouse = { version = "0.11.6", features = ["time"] }
+
 # HTTP & Websockets
 tokio-rustls = { version = "0.26"} 
 tokio-tungstenite = {version = "0.23", features = ["native-tls"]}
 reqwest = {version = "0.11", features = ["json"], default-features = false}
 url = {version = "2.5"}
-# fastwebsockets = { version = "0.8" }
-# tokio-native-tls = { version = "0.3", features = ["aws_lc_rs"]}
 
 # Data Types
 rust_decimal = {version = "1.35", default-features = false, features = ["std", "serde"]}
-rust_decimal_macros = "1.34"
+rust_decimal_macros = "1.35"
 
 # Serialization
 serde = {version = "1.0", features = ["derive"]}

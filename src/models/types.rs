@@ -1,4 +1,5 @@
 use core::fmt;
+use std::ops::{Add, Mul};
 
 use anyhow::Result;
 use rust_decimal::prelude::*;
@@ -50,6 +51,22 @@ impl Price {
 impl fmt::Display for Price {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl Add<Price> for Price {
+    type Output = Price;
+
+    fn add(self, rhs: Price) -> Price {
+        Price(self.0 + rhs.0)
+    }
+}
+
+impl Mul<Quantity> for Price {
+    type Output = Decimal;
+
+    fn mul(self, rhs: Quantity) -> Decimal {
+        self.0 * rhs.value()
     }
 }
 

@@ -3,20 +3,20 @@ use std::sync::Arc;
 use rust_decimal::Decimal;
 use tracing::info;
 
-use crate::{config::BacktestExecutionConfig, state::State};
+use crate::{config::BacktestExecutionConfig, state::StateManager};
 
 use super::Execution;
 
 #[derive(Clone)]
 pub struct BacktestExecution {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     max_orders_per_minute: u64,
     max_order_size_notional: Decimal,
     min_order_size_notional: Decimal,
 }
 
 impl BacktestExecution {
-    pub fn new(state: Arc<State>, config: &BacktestExecutionConfig) -> Self {
+    pub fn new(state: Arc<StateManager>, config: &BacktestExecutionConfig) -> Self {
         BacktestExecution {
             state,
             max_orders_per_minute: config.max_orders_per_minute,

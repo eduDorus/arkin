@@ -1,14 +1,15 @@
 name: Aurelion
 
 ingestors:
-  - backtest:
-      market_data: true
-  # - binance:
-  #     ws_url: wss://fstream.binance.com/ws
-  #     ws_channels:
-  #       - btcusdt@aggTrade
-  #     connections_per_manager: 2
-  #     duplicate_lookback: 1000
+  # - backtest:
+  #     market_data: true
+  - binance:
+      ws_url: wss://fstream.binance.com/ws
+      ws_channels:
+        - btcusdt@aggTrade
+        - ethusdt@aggTrade
+      connections_per_manager: 2
+      duplicate_lookback: 1000
 
 state:
   market_state:

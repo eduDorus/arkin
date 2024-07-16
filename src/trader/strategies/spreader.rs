@@ -3,18 +3,18 @@ use std::sync::Arc;
 use rust_decimal::Decimal;
 use tracing::info;
 
-use crate::{config::SpreaderConfig, state::State};
+use crate::{config::SpreaderConfig, state::StateManager};
 
 use super::Strategy;
 
 #[derive(Clone)]
 pub struct Spreader {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     spread_in_pct: Decimal,
 }
 
 impl Spreader {
-    pub fn new(state: Arc<State>, config: &SpreaderConfig) -> Self {
+    pub fn new(state: Arc<StateManager>, config: &SpreaderConfig) -> Self {
         Self {
             state,
             spread_in_pct: config.min_spread,

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use crate::{config::FeatureConfig, features::vwap::VWAPFeature, state::State};
+use crate::{config::FeatureConfig, features::vwap::VWAPFeature, state::StateManager};
 
 use super::FeatureType;
 
 pub struct FeatureFactory {}
 
 impl FeatureFactory {
-    pub fn create_features(state: Arc<State>, config: &[FeatureConfig]) -> Vec<FeatureType> {
+    pub fn create_features(state: Arc<StateManager>, config: &[FeatureConfig]) -> Vec<FeatureType> {
         let mut features = Vec::new();
 
         for config in config {

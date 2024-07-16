@@ -3,20 +3,20 @@ use std::sync::Arc;
 use rust_decimal::Decimal;
 use tracing::info;
 
-use crate::{config::BinanceExecutionConfig, state::State};
+use crate::{config::BinanceExecutionConfig, state::StateManager};
 
 use super::Execution;
 
 #[derive(Clone)]
 pub struct BinanceExecution {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     max_orders_per_minute: u64,
     max_order_size_notional: Decimal,
     min_order_size_notional: Decimal,
 }
 
 impl BinanceExecution {
-    pub fn new(state: Arc<State>, config: &BinanceExecutionConfig) -> Self {
+    pub fn new(state: Arc<StateManager>, config: &BinanceExecutionConfig) -> Self {
         BinanceExecution {
             state,
             max_orders_per_minute: config.max_orders_per_minute,
