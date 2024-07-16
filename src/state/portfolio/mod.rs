@@ -4,7 +4,7 @@ use crate::models::{Fill, Position};
 
 pub trait Portfolio {
     fn handle_position_update(&self, update: &Position);
-    fn handle_fill_update(&self, fill: &Fill) {}
+    fn handle_fill_update(&self, _fill: &Fill) {}
 }
 
 pub enum PortfolioType {

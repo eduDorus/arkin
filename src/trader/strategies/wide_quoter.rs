@@ -8,6 +8,7 @@ use crate::{config::WideQuoterConfig, state::StateManager};
 use super::Strategy;
 
 #[derive(Clone)]
+#[allow(unused)]
 pub struct WideQuoter {
     state: Arc<StateManager>,
     spread_in_pct: Decimal,

@@ -8,6 +8,7 @@ use crate::{config::SpreaderConfig, state::StateManager};
 use super::Strategy;
 
 #[derive(Clone)]
+#[allow(unused)]
 pub struct Spreader {
     state: Arc<StateManager>,
     spread_in_pct: Decimal,

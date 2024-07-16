@@ -1,10 +1,7 @@
+use crate::models::Instrument;
 use core::fmt;
-
-use flume::Sender;
 use limited::LimitedAllocation;
 use rust_decimal::Decimal;
-
-use crate::models::Instrument;
 
 pub mod errors;
 mod factory;
@@ -13,11 +10,13 @@ mod limited;
 pub use factory::AllocationFactory;
 
 #[trait_variant::make(Send)]
+#[allow(unused)]
 pub trait Allocation: Clone {
-    async fn start(&self, sender: Sender<AllocationEvent>);
+    async fn start(&self);
 }
 
 #[derive(Clone)]
+#[allow(unused)]
 pub enum AllocationEvent {
     Signal(Signal),
     // Weighted(Vec<Weighted>),

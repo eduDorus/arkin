@@ -8,6 +8,7 @@ use crate::{config::BacktestExecutionConfig, state::StateManager};
 use super::Execution;
 
 #[derive(Clone)]
+#[allow(unused)]
 pub struct BacktestExecution {
     state: Arc<StateManager>,
     max_orders_per_minute: u64,

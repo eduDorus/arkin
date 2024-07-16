@@ -1,8 +1,6 @@
-use core::fmt;
-
-use time::OffsetDateTime;
-
 use super::{Instrument, Price, Quantity};
+use core::fmt;
+use time::OffsetDateTime;
 
 #[derive(Clone)]
 pub enum MarketEvent {
@@ -10,6 +8,26 @@ pub enum MarketEvent {
     Trade(Trade),
     AggTrade(Trade),
     BookUpdate(BookUpdate),
+}
+
+impl MarketEvent {
+    pub fn event_time(&self) -> OffsetDateTime {
+        match self {
+            MarketEvent::Tick(tick) => tick.event_time,
+            MarketEvent::Trade(trade) => trade.event_time,
+            MarketEvent::AggTrade(trade) => trade.event_time,
+            MarketEvent::BookUpdate(book_update) => book_update.event_time,
+        }
+    }
+
+    pub fn instrument(&self) -> Instrument {
+        match self {
+            MarketEvent::Tick(tick) => tick.instrument.clone(),
+            MarketEvent::Trade(trade) => trade.instrument.clone(),
+            MarketEvent::AggTrade(trade) => trade.instrument.clone(),
+            MarketEvent::BookUpdate(book_update) => book_update.instrument.clone(),
+        }
+    }
 }
 
 impl fmt::Display for MarketEvent {

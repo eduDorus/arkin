@@ -13,6 +13,7 @@ use crate::{
 use super::Ingestor;
 
 #[derive(Clone)]
+#[allow(unused)]
 pub struct BacktestIngestor {
     state: Arc<StateManager>,
     market_data: bool,
@@ -41,7 +42,7 @@ impl Ingestor for BacktestIngestor {
                 Price::new(Decimal::new(50000, 0)).unwrap(),
                 Quantity::new(Decimal::new(1, 0)),
             );
-            self.state.market_update(&MarketEvent::Trade(trade))
+            self.state.market_update(&MarketEvent::Trade(trade)).await
         }
     }
 }

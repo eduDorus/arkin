@@ -8,6 +8,7 @@ use crate::{config::BinanceExecutionConfig, state::StateManager};
 use super::Execution;
 
 #[derive(Clone)]
+#[allow(unused)]
 pub struct BinanceExecution {
     state: Arc<StateManager>,
     max_orders_per_minute: u64,

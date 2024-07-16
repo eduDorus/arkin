@@ -1,80 +1,98 @@
+use std::cmp::Ordering;
+
 use crate::{
     features::FeatureEvent,
-    models::{BookUpdate, Instrument, Tick, Trade},
+    models::{AccountEvent, Instrument, MarketEvent},
 };
-use dashmap::DashMap;
-use std::collections::BTreeMap;
+use scc::{ebr::Guard, TreeIndex};
 use time::{Duration, OffsetDateTime};
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Default)]
 #[allow(unused)]
-pub struct MarketState {
-    book: DashMap<Instrument, BTreeMap<OffsetDateTime, BookUpdate>>,
-    quotes: DashMap<Instrument, BTreeMap<OffsetDateTime, Tick>>,
-    trades: DashMap<Instrument, BTreeMap<OffsetDateTime, Trade>>,
-    agg_trades: DashMap<Instrument, BTreeMap<OffsetDateTime, Trade>>,
-    features: DashMap<Instrument, BTreeMap<OffsetDateTime, FeatureEvent>>,
+pub struct StateData {
+    market: TreeIndex<CompositeKey, MarketEvent>,
+    account: TreeIndex<CompositeKey, AccountEvent>,
+    features: TreeIndex<CompositeKey, FeatureEvent>,
 }
 
-impl MarketState {
-    pub fn handle_book_update(&self, book_update: &BookUpdate) {
-        let instrument = book_update.instrument.clone();
-        let mut book = self.book.entry(instrument).or_default();
-        book.insert(book_update.event_time, book_update.to_owned());
-    }
+// Composite key struct
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct CompositeKey {
+    timestamp: OffsetDateTime,
+    index: u64,
+}
 
-    pub fn handle_tick_update(&self, tick: &Tick) {
-        let instrument = tick.instrument.clone();
-        let mut quotes = self.quotes.entry(instrument).or_default();
-        quotes.insert(tick.event_time, tick.to_owned());
-    }
-
-    pub fn handle_trade_update(&self, trade: &Trade) {
-        let instrument = trade.instrument.clone();
-        let mut trades = self.trades.entry(instrument).or_default();
-        trades.insert(trade.event_time, trade.to_owned());
-    }
-
-    pub fn handle_agg_trade_update(&self, trade: &Trade) {
-        info!("MarketState received agg trade: {}", trade);
-        let instrument = trade.instrument.clone();
-        {
-            let mut agg_trades = self.agg_trades.entry(instrument.to_owned()).or_default();
-            agg_trades.insert(trade.event_time, trade.to_owned());
-        }
-
-        // Print current trade history
-        let trades = self.get_agg_trades(&instrument, &trade.event_time, &Duration::seconds(5));
-        for trade in trades {
-            info!("- Trade: {}", trade);
+impl CompositeKey {
+    pub fn new(timestamp: &OffsetDateTime) -> Self {
+        CompositeKey {
+            timestamp: timestamp.to_owned(),
+            index: 0,
         }
     }
 
-    pub fn handle_feature_update(&self, feature_event: &FeatureEvent) {
-        info!("MarketState received feature event: {}", feature_event);
+    pub fn new_max(timestamp: &OffsetDateTime) -> Self {
+        CompositeKey {
+            timestamp: timestamp.to_owned(),
+            index: u64::MAX,
+        }
     }
 
-    pub fn get_agg_trades(
-        &self,
-        instrument: &Instrument,
-        start_time: &OffsetDateTime,
-        window: &Duration,
-    ) -> Vec<Trade> {
-        let end_time = *start_time - *window;
+    pub fn increment(&mut self) {
+        self.index += 1;
+    }
+}
+
+// Implement ordering for the CompositeKey
+impl Ord for CompositeKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.timestamp.cmp(&other.timestamp).then_with(|| self.index.cmp(&other.index))
+    }
+}
+
+impl PartialOrd for CompositeKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl StateData {
+    pub async fn handle_market_event(&self, event: &MarketEvent) {
+        let mut key = CompositeKey::new(&event.event_time());
+        while (self.market.insert_async(key.clone(), event.to_owned()).await).is_err() {
+            key.increment();
+        }
+    }
+
+    pub async fn handle_account_event(&self, event: &AccountEvent) {
+        let mut key = CompositeKey::new(&event.event_time());
+        while (self.account.insert_async(key.clone(), event.to_owned()).await).is_err() {
+            key.increment();
+        }
+    }
+
+    pub async fn handle_feature_event(&self, event: &FeatureEvent) {
+        let mut key = CompositeKey::new(event.event_time());
+        while (self.features.insert_async(key.clone(), event.to_owned()).await).is_err() {
+            key.increment();
+        }
+    }
+
+    pub fn list_market(&self, instrument: &Instrument, from: &OffsetDateTime, window: &Duration) -> Vec<MarketEvent> {
+        let from_key = CompositeKey::new_max(from);
+        let end_time = *from - *window;
+        let end_key = CompositeKey::new(&end_time);
         info!(
             "Getting trades for instrument: {} from: {} till: {}",
-            instrument, start_time, end_time
+            instrument, from, end_time
         );
-        if let Some(trades_map) = self.agg_trades.get(instrument) {
-            trades_map
-                .range(end_time..=*start_time)
-                .map(|(_, trade)| trade)
-                .cloned()
-                .collect()
-        } else {
-            warn!("No trades found for instrument: {}", instrument);
-            Vec::new()
-        }
+        let guard = Guard::new();
+        self.market
+            .range(end_key..=from_key, &guard)
+            .map(|(_, trade)| trade)
+            .filter(|e| matches!(e, MarketEvent::AggTrade(_)))
+            .filter(|e| e.instrument() == *instrument)
+            .cloned()
+            .collect()
     }
 }

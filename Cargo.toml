@@ -10,7 +10,8 @@ path = "src/bin/main.rs"
 
 [dependencies]
 # Data Structures
-dashmap = { version = "6.0.1", features = ["inline"] }
+# dashmap = { version = "6.0.1", features = ["inline"] }
+scc = "2.1.4"
 
 # Multi-threading
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] }

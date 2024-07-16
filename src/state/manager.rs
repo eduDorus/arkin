@@ -1,5 +1,4 @@
-use std::time::Duration;
-
+use time::Duration;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{debug, error};
 
@@ -7,17 +6,17 @@ use crate::{
     config::StateConfig,
     features::FeatureEvent,
     models::{AccountEvent, MarketEvent},
-    state::{order_manager::OrderManager, portfolio::Portfolio},
 };
 
 use super::{
-    market::MarketState,
+    market::StateData,
     order_manager::{OrderManagerType, SingleOrderManager},
     portfolio::{PortfolioType, SinglePortfolio},
 };
 
+#[allow(unused)]
 pub struct StateManager {
-    market: MarketState,
+    pub data: StateData,
     order_manager: OrderManagerType,
     portfolio: PortfolioType,
     market_sender: Sender<MarketEvent>,
@@ -26,7 +25,7 @@ pub struct StateManager {
 
 impl StateManager {
     pub fn new(_config: &StateConfig) -> Self {
-        let market = MarketState::default();
+        let market = StateData::default();
         let order_manager = OrderManagerType::SingleVenue(SingleOrderManager::new());
         let portfolio = PortfolioType::Single(SinglePortfolio::new());
 
@@ -34,7 +33,7 @@ impl StateManager {
         let (account_sender, _) = broadcast::channel(1024);
 
         StateManager {
-            market,
+            data: market,
             order_manager,
             portfolio,
             market_sender,
@@ -42,14 +41,9 @@ impl StateManager {
         }
     }
 
-    pub fn market_update(&self, event: &MarketEvent) {
+    pub async fn market_update(&self, event: &MarketEvent) {
         debug!("State received market event: {}", event);
-        match event {
-            MarketEvent::Tick(tick) => self.market.handle_tick_update(tick),
-            MarketEvent::Trade(trade) => self.market.handle_trade_update(trade),
-            MarketEvent::AggTrade(agg_trade) => self.market.handle_agg_trade_update(agg_trade),
-            MarketEvent::BookUpdate(book_update) => self.market.handle_book_update(book_update),
-        }
+        self.data.handle_market_event(event).await;
         if self.market_sender.receiver_count() > 0 {
             if let Err(e) = self.market_sender.send(event.to_owned()) {
                 error!("Error sending market event: {}", e);
@@ -57,18 +51,14 @@ impl StateManager {
         }
     }
 
-    pub fn account_update(&self, event: &AccountEvent) {
+    pub async fn account_update(&self, event: &AccountEvent) {
         debug!("State received account event: {}", event);
-        match event {
-            AccountEvent::PositionUpdate(e) => self.portfolio.handle_position_update(e),
-            AccountEvent::OrderUpdate(e) => self.order_manager.handle_order_update(e),
-            AccountEvent::FillUpdate(e) => self.portfolio.handle_fill_update(e),
-        }
+        self.data.handle_account_event(event).await;
     }
 
-    pub fn feature_update(&self, event: &FeatureEvent) {
+    pub async fn feature_update(&self, event: &FeatureEvent) {
         debug!("State received feature event: {}", event);
-        self.market.handle_feature_update(event);
+        self.data.handle_feature_event(event).await;
     }
 
     pub fn listen_market_updates(&self) -> Receiver<MarketEvent> {
@@ -84,7 +74,7 @@ impl StateManager {
 
         tokio::spawn(async move {
             loop {
-                tokio::time::sleep(frequency).await;
+                tokio::time::sleep(std::time::Duration::from_secs(frequency.whole_seconds() as u64)).await;
                 if let Err(e) = sender.send(()) {
                     error!("Error sending feature frequency event: {}", e);
                 }
