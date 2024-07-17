@@ -59,3 +59,17 @@ execution:
       max_orders_per_minute: 5
       max_order_size_notional: 1000.
       min_order_size_notional: 100.
+
+tardis:
+  base_url: https://api.tardis.dev/v1/data-feeds
+  max_concurrent_requests: 1
+  subscriptions:
+    - exchange: binance_swap
+      start: 2023-10-01 00:00:00
+      channels:
+        - agg_trade
+        - book
+      symbols:
+        - BTCUSDT
+        - ETHUSDT
+        - SOLUSDT

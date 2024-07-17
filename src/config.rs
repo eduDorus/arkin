@@ -13,6 +13,7 @@ pub struct GlobalConfig {
     pub features: Vec<FeatureConfig>,
     pub traders: HashMap<String, TraderConfig>,
     pub execution: Vec<ExecutionConfig>,
+    pub tardis: TardisConfig,
 }
 
 // STATE
@@ -146,6 +147,13 @@ pub struct BacktestExecutionConfig {
     pub max_orders_per_minute: u64,
     pub max_order_size_notional: Decimal,
     pub min_order_size_notional: Decimal,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TardisConfig {
+    pub api_secret: Option<String>,
+    pub base_url: String,
+    pub max_concurrent_requests: usize,
 }
 
 pub fn load() -> GlobalConfig {

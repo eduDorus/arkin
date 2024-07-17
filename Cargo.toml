@@ -8,10 +8,14 @@ edition = "2021"
 name = "server"
 path = "src/bin/main.rs"
 
+[[bin]]
+name = "utils"
+path = "src/bin/utils.rs"
+
 [dependencies]
 # Data Structures
-# dashmap = { version = "6.0.1", features = ["inline"] }
-scc = "2.1.4"
+# dashmap = { version = "6.0", features = ["inline"] }
+scc = "2.1"
 
 # Multi-threading
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] }
@@ -20,8 +24,8 @@ parking_lot = { version = "0.12", features = ["hardware-lock-elision"] }
 trait-variant = "0.1.2"
 
 # Async
-tokio = { version = "1.38.0", features = ["full"] }
-flume = "0.11.0"
+tokio = { version = "1.38", features = ["full"] }
+flume = "0.11"
 futures-util = { version = "0.3" }
 
 # Database
@@ -36,6 +40,7 @@ url = {version = "2.5"}
 # Data Types
 rust_decimal = {version = "1.35", default-features = false, features = ["std", "serde"]}
 rust_decimal_macros = "1.35"
+bytes = "1.6"
 
 # Serialization
 serde = {version = "1.0", features = ["derive"]}
@@ -56,8 +61,15 @@ thiserror = {version = "1.0", features = [], default-features = false}
 # Config
 config = {version = "0.14", features = ["yaml"]}
 
+# Retry
+backoff = { version = "0.4", features = ["tokio"] }
+
 # Allocator
 mimalloc = {version = "0.1", default-features = false}
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
 
 [profile.release]
 lto = "thin"

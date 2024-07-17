@@ -8,6 +8,7 @@ pub mod ingestors;
 pub mod logging;
 pub mod models;
 pub mod server;
+pub mod services;
 pub mod state;
 pub mod trader;
 pub mod utils;
