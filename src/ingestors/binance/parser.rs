@@ -1,4 +1,4 @@
-use crate::models::{Asset, Instrument, MarketEvent, PerpetualContract, Venue};
+use crate::models::{Asset, Event, Instrument, PerpetualContract, Venue};
 use anyhow::Result;
 use tracing::error;
 
@@ -7,7 +7,7 @@ use super::swaps::BinanceSwapsEvent;
 pub struct BinanceParser {}
 
 impl BinanceParser {
-    pub fn parse(data: &str) -> Result<MarketEvent> {
+    pub fn parse(data: &str) -> Result<Event> {
         let event = match serde_json::from_str::<BinanceSwapsEvent>(data) {
             Ok(e) => e,
             Err(e) => {

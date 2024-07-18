@@ -1,13 +1,15 @@
 pub mod errors;
 
-mod account_events;
+mod account;
+mod events;
 mod instrument;
-mod market_events;
+mod market;
 mod types;
 mod venue;
 
-pub use account_events::*;
+pub use account::*;
+pub use events::*;
 pub use instrument::*;
-pub use market_events::*;
+pub use market::*;
 pub use types::*;
 pub use venue::*;

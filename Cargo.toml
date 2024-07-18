@@ -3,6 +3,7 @@ authors = ["Dorus Janssens <dorus.janssens@gmail.com>"]
 name = "aurelion"
 version = "0.1.0"
 edition = "2021"
+default-run = "server"
 
 [[bin]]
 name = "server"
@@ -68,7 +69,7 @@ backoff = { version = "0.4", features = ["tokio"] }
 mimalloc = {version = "0.1", default-features = false}
 
 # CLI
-clap = { version = "4.5", features = ["derive"] }
+clap = {version = "4.5", features = ["std", "derive", "color", "suggestions"]}
 
 
 [profile.release]

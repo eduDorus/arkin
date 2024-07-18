@@ -1,5 +1,5 @@
 use crate::{
-    models::{BookUpdate, BookUpdateSide, MarketEvent, Price, Quantity, Tick, Trade},
+    models::{BookUpdate, BookUpdateSide, Event, Price, Quantity, Tick, Trade},
     utils::custom_serde,
 };
 use rust_decimal::Decimal;
@@ -71,10 +71,10 @@ pub struct BinanceSwapsTradeData {
     pub maker: bool, // The true = sell, false = buy
 }
 
-impl From<BinanceSwapsTradeData> for MarketEvent {
+impl From<BinanceSwapsTradeData> for Event {
     fn from(data: BinanceSwapsTradeData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        MarketEvent::Trade(Trade::new(
+        Event::TradeUpdate(Trade::new(
             instrument,
             data.event_time,
             Price::new(data.price).unwrap(), // TODO: Fix this
@@ -114,10 +114,10 @@ pub struct BinanceSwapsAggTradeData {
     pub maker: bool, // The true = sell, false = buy
 }
 
-impl From<BinanceSwapsAggTradeData> for MarketEvent {
+impl From<BinanceSwapsAggTradeData> for Event {
     fn from(data: BinanceSwapsAggTradeData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        MarketEvent::AggTrade(Trade::new(
+        Event::AggTradeUpdate(Trade::new(
             instrument,
             data.event_time,
             Price::new(data.price).unwrap(), // TODO: Fix this
@@ -161,10 +161,10 @@ pub struct BinanceSwapsBookUpdate {
     pub quantity: Decimal,
 }
 
-impl From<BinanceSwapsBookData> for MarketEvent {
+impl From<BinanceSwapsBookData> for Event {
     fn from(data: BinanceSwapsBookData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        MarketEvent::BookUpdate(BookUpdate {
+        Event::BookUpdate(BookUpdate {
             instrument,
             event_time: data.event_time,
             bids: data
@@ -231,10 +231,10 @@ pub struct BinanceSwapsTickData {
     pub ask_quantity: Decimal,
 }
 
-impl From<BinanceSwapsTickData> for MarketEvent {
+impl From<BinanceSwapsTickData> for Event {
     fn from(data: BinanceSwapsTickData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        MarketEvent::Tick(Tick::new(
+        Event::TickUpdate(Tick::new(
             instrument,
             data.event_time,
             Price::new(data.bid_price).unwrap(), // TODO: Fix this

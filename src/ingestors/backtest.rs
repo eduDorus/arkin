@@ -6,7 +6,7 @@ use tracing::info;
 
 use crate::{
     config::BacktestIngestorConfig,
-    models::{Asset, Instrument, MarketEvent, PerpetualContract, Price, Quantity, Trade, Venue},
+    models::{Asset, Event, Instrument, PerpetualContract, Price, Quantity, Trade, Venue},
     state::StateManager,
 };
 
@@ -42,7 +42,7 @@ impl Ingestor for BacktestIngestor {
                 Price::new(Decimal::new(50000, 0)).unwrap(),
                 Quantity::new(Decimal::new(1, 0)),
             );
-            self.state.market_update(&MarketEvent::Trade(trade)).await
+            self.state.market_update(Event::TradeUpdate(trade)).await
         }
     }
 }

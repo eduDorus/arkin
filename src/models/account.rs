@@ -1,46 +1,11 @@
 use super::{Instrument, Price, Quantity, Venue};
-use core::fmt;
+use std::fmt;
 use time::OffsetDateTime;
 
 #[derive(Clone)]
 pub struct Account {
     pub name: String,
     pub venue: Venue,
-}
-
-#[derive(Clone)]
-pub enum AccountEvent {
-    PositionUpdate(Position),
-    OrderUpdate(Order),
-    FillUpdate(Fill),
-}
-
-impl AccountEvent {
-    pub fn event_time(&self) -> OffsetDateTime {
-        match self {
-            AccountEvent::PositionUpdate(position) => position.event_time,
-            AccountEvent::OrderUpdate(order) => order.event_time,
-            AccountEvent::FillUpdate(fill) => fill.event_time,
-        }
-    }
-
-    pub fn instrument(&self) -> Instrument {
-        match self {
-            AccountEvent::PositionUpdate(position) => position.instrument.clone(),
-            AccountEvent::OrderUpdate(order) => order.instrument.clone(),
-            AccountEvent::FillUpdate(fill) => fill.instrument.clone(),
-        }
-    }
-}
-
-impl fmt::Display for AccountEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AccountEvent::PositionUpdate(position) => write!(f, "Position update: {}", position),
-            AccountEvent::OrderUpdate(order) => write!(f, "Order update: {}", order),
-            AccountEvent::FillUpdate(fill) => write!(f, "Fill update: {}", fill),
-        }
-    }
 }
 
 #[derive(Clone)]

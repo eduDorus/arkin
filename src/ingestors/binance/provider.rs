@@ -62,7 +62,7 @@ impl Ingestor for BinanceIngestor {
                     let res = BinanceParser::parse(&data);
                     match res {
                         Ok(event) => {
-                            self.state.market_update(&event).await;
+                            self.state.market_update(event).await;
                         }
                         Err(e) => error!("{}", e),
                     }

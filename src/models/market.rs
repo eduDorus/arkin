@@ -1,45 +1,6 @@
 use super::{Instrument, Price, Quantity};
-use core::fmt;
+use std::fmt;
 use time::OffsetDateTime;
-
-#[derive(Clone)]
-pub enum MarketEvent {
-    Tick(Tick),
-    Trade(Trade),
-    AggTrade(Trade),
-    BookUpdate(BookUpdate),
-}
-
-impl MarketEvent {
-    pub fn event_time(&self) -> OffsetDateTime {
-        match self {
-            MarketEvent::Tick(tick) => tick.event_time,
-            MarketEvent::Trade(trade) => trade.event_time,
-            MarketEvent::AggTrade(trade) => trade.event_time,
-            MarketEvent::BookUpdate(book_update) => book_update.event_time,
-        }
-    }
-
-    pub fn instrument(&self) -> Instrument {
-        match self {
-            MarketEvent::Tick(tick) => tick.instrument.clone(),
-            MarketEvent::Trade(trade) => trade.instrument.clone(),
-            MarketEvent::AggTrade(trade) => trade.instrument.clone(),
-            MarketEvent::BookUpdate(book_update) => book_update.instrument.clone(),
-        }
-    }
-}
-
-impl fmt::Display for MarketEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            MarketEvent::Tick(tick) => write!(f, "Tick: {}", tick),
-            MarketEvent::Trade(trade) => write!(f, "Trade: {}", trade),
-            MarketEvent::AggTrade(trade) => write!(f, "AggTrade: {}", trade),
-            MarketEvent::BookUpdate(book_update) => write!(f, "Book Update: {}", book_update),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct Tick {

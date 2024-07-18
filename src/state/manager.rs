@@ -2,11 +2,7 @@ use time::Duration;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{debug, error};
 
-use crate::{
-    config::StateConfig,
-    features::FeatureEvent,
-    models::{AccountEvent, MarketEvent},
-};
+use crate::{config::StateConfig, models::Event};
 
 use super::{
     market::StateData,
@@ -19,54 +15,28 @@ pub struct StateManager {
     pub data: StateData,
     order_manager: OrderManagerType,
     portfolio: PortfolioType,
-    market_sender: Sender<MarketEvent>,
-    account_sender: Sender<AccountEvent>,
+    event_update: Sender<Event>,
 }
 
 impl StateManager {
     pub fn new(_config: &StateConfig) -> Self {
-        let market = StateData::default();
+        let data = StateData::default();
         let order_manager = OrderManagerType::SingleVenue(SingleOrderManager::new());
         let portfolio = PortfolioType::Single(SinglePortfolio::new());
 
-        let (market_sender, _) = broadcast::channel(1024);
-        let (account_sender, _) = broadcast::channel(1024);
+        let (event_update, _) = broadcast::channel(1024);
 
         StateManager {
-            data: market,
+            data,
             order_manager,
             portfolio,
-            market_sender,
-            account_sender,
+            event_update,
         }
     }
 
-    pub async fn market_update(&self, event: &MarketEvent) {
+    pub async fn market_update(&self, event: Event) {
         debug!("State received market event: {}", event);
-        self.data.handle_market_event(event).await;
-        if self.market_sender.receiver_count() > 0 {
-            if let Err(e) = self.market_sender.send(event.to_owned()) {
-                error!("Error sending market event: {}", e);
-            }
-        }
-    }
-
-    pub async fn account_update(&self, event: &AccountEvent) {
-        debug!("State received account event: {}", event);
-        self.data.handle_account_event(event).await;
-    }
-
-    pub async fn feature_update(&self, event: &FeatureEvent) {
-        debug!("State received feature event: {}", event);
-        self.data.handle_feature_event(event).await;
-    }
-
-    pub fn listen_market_updates(&self) -> Receiver<MarketEvent> {
-        self.market_sender.subscribe()
-    }
-
-    pub fn listen_account_updates(&self) -> Receiver<AccountEvent> {
-        self.account_sender.subscribe()
+        self.data.add_event(event).await;
     }
 
     pub fn listen_feature_frequency(&self, frequency: Duration) -> Receiver<()> {
