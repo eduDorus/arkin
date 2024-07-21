@@ -1,4 +1,5 @@
 use crate::{
+    ingestors::IngestorID,
     models::{BookUpdate, BookUpdateSide, Event, Price, Quantity, Tick, Trade},
     utils::custom_serde,
 };
@@ -77,8 +78,10 @@ impl From<BinanceSwapsTradeData> for Event {
         Event::TradeUpdate(Trade::new(
             instrument,
             data.event_time,
+            data.trade_id,
             Price::new(data.price).unwrap(), // TODO: Fix this
             Quantity::new(data.quantity),
+            IngestorID::Binance,
         ))
     }
 }
@@ -120,8 +123,10 @@ impl From<BinanceSwapsAggTradeData> for Event {
         Event::AggTradeUpdate(Trade::new(
             instrument,
             data.event_time,
+            data.agg_trade_id,
             Price::new(data.price).unwrap(), // TODO: Fix this
             Quantity::new(data.quantity),
+            IngestorID::Binance,
         ))
     }
 }
@@ -164,20 +169,19 @@ pub struct BinanceSwapsBookUpdate {
 impl From<BinanceSwapsBookData> for Event {
     fn from(data: BinanceSwapsBookData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::BookUpdate(BookUpdate {
+        Event::BookUpdate(BookUpdate::new(
+            data.event_time,
             instrument,
-            event_time: data.event_time,
-            bids: data
-                .bids
+            data.bids
                 .iter()
                 .map(|b| BookUpdateSide::new(Price::new(b.price).unwrap(), Quantity::new(b.quantity)))
                 .collect(),
-            asks: data
-                .asks
+            data.asks
                 .iter()
                 .map(|a| BookUpdateSide::new(Price::new(a.price).unwrap(), Quantity::new(a.quantity)))
                 .collect(),
-        })
+            IngestorID::Binance,
+        ))
     }
 }
 
@@ -235,12 +239,13 @@ impl From<BinanceSwapsTickData> for Event {
     fn from(data: BinanceSwapsTickData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
         Event::TickUpdate(Tick::new(
-            instrument,
             data.event_time,
+            instrument,
             Price::new(data.bid_price).unwrap(), // TODO: Fix this
             Quantity::new(data.bid_quantity),
             Price::new(data.ask_price).unwrap(), // TODO: Fix this
             Quantity::new(data.ask_quantity),
+            IngestorID::Binance,
         ))
     }
 }

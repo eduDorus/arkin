@@ -39,3 +39,20 @@ impl fmt::Display for IngestorType {
         }
     }
 }
+
+#[derive(Clone)]
+pub enum IngestorID {
+    Backtest,
+    Binance,
+    Tardis,
+}
+
+impl fmt::Display for IngestorID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IngestorID::Backtest => write!(f, "backtest"),
+            IngestorID::Binance => write!(f, "binance"),
+            IngestorID::Tardis => write!(f, "tardis"),
+        }
+    }
+}

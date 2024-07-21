@@ -14,6 +14,7 @@ pub struct GlobalConfig {
     pub traders: HashMap<String, TraderConfig>,
     pub execution: Vec<ExecutionConfig>,
     pub tardis: TardisConfig,
+    pub clickhouse: ClickhouseConfig,
 }
 
 // STATE
@@ -154,6 +155,14 @@ pub struct TardisConfig {
     pub api_secret: Option<String>,
     pub base_url: String,
     pub max_concurrent_requests: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ClickhouseConfig {
+    pub url: String,
+    pub user: String,
+    pub password: String,
+    pub database: String,
 }
 
 pub fn load() -> GlobalConfig {

@@ -153,7 +153,6 @@ impl Handler {
             Message::Ping(ping) => {
                 debug!("Handler received ping: {:?}", ping);
                 self.stream.send(Message::Pong(ping)).await?;
-                debug!("Sent pong");
             }
             _ => {
                 debug!("Handler received other message: {:?}", msg);

@@ -6,6 +6,7 @@ use tracing::info;
 
 use crate::{
     config::BacktestIngestorConfig,
+    ingestors::IngestorID,
     models::{Asset, Event, Instrument, PerpetualContract, Price, Quantity, Trade, Venue},
     state::StateManager,
 };
@@ -33,16 +34,21 @@ impl Ingestor for BacktestIngestor {
         info!("Starting backtest ingestor...");
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
 
+        let mut trade_id = 0;
+
         loop {
             interval.tick().await;
             let perp = PerpetualContract::new(&Venue::Binance, &Asset::new("BTC"), &Asset::new("USDT"));
             let trade = Trade::new(
                 Instrument::Perpetual(perp),
                 OffsetDateTime::now_utc(),
+                trade_id,
                 Price::new(Decimal::new(50000, 0)).unwrap(),
                 Quantity::new(Decimal::new(1, 0)),
+                IngestorID::Backtest,
             );
-            self.state.market_update(Event::TradeUpdate(trade)).await
+            self.state.market_update(Event::TradeUpdate(trade)).await;
+            trade_id += 1;
         }
     }
 }

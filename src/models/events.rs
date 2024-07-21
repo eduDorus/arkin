@@ -1,5 +1,6 @@
 use std::fmt;
 
+use strum::EnumIter;
 use time::OffsetDateTime;
 
 use crate::features::VWAP;
@@ -23,8 +24,8 @@ pub enum Event {
     VWAP(VWAP),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum EventType {
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumIter)]
+pub enum EventID {
     // Market
     TickUpdate,
     TradeUpdate,
@@ -40,22 +41,22 @@ pub enum EventType {
     VWAP,
 }
 
-impl fmt::Display for EventType {
+impl fmt::Display for EventID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             // Market
-            EventType::TickUpdate => write!(f, "Tick Update"),
-            EventType::TradeUpdate => write!(f, "Trade Update"),
-            EventType::AggTradeUpdate => write!(f, "Agg trade update"),
-            EventType::BookUpdate => write!(f, "Book update"),
+            EventID::TickUpdate => write!(f, "Tick Update"),
+            EventID::TradeUpdate => write!(f, "Trade Update"),
+            EventID::AggTradeUpdate => write!(f, "Agg trade update"),
+            EventID::BookUpdate => write!(f, "Book update"),
 
             // Account
-            EventType::PositionUpdate => write!(f, "Position update"),
-            EventType::OrderUpdate => write!(f, "Order update"),
-            EventType::FillUpdate => write!(f, "Fill update"),
+            EventID::PositionUpdate => write!(f, "Position update"),
+            EventID::OrderUpdate => write!(f, "Order update"),
+            EventID::FillUpdate => write!(f, "Fill update"),
 
             // Features
-            EventType::VWAP => write!(f, "VWAP update"),
+            EventID::VWAP => write!(f, "VWAP update"),
         }
     }
 }
@@ -98,21 +99,21 @@ impl Event {
         }
     }
 
-    pub fn event_type(&self) -> &EventType {
+    pub fn event_type(&self) -> &EventID {
         match self {
             // Market
-            Event::TickUpdate(_) => &EventType::TickUpdate,
-            Event::TradeUpdate(_) => &EventType::TradeUpdate,
-            Event::AggTradeUpdate(_) => &EventType::AggTradeUpdate,
-            Event::BookUpdate(_) => &EventType::BookUpdate,
+            Event::TickUpdate(_) => &EventID::TickUpdate,
+            Event::TradeUpdate(_) => &EventID::TradeUpdate,
+            Event::AggTradeUpdate(_) => &EventID::AggTradeUpdate,
+            Event::BookUpdate(_) => &EventID::BookUpdate,
 
             // Account
-            Event::PositionUpdate(_) => &EventType::PositionUpdate,
-            Event::OrderUpdate(_) => &EventType::OrderUpdate,
-            Event::FillUpdate(_) => &EventType::FillUpdate,
+            Event::PositionUpdate(_) => &EventID::PositionUpdate,
+            Event::OrderUpdate(_) => &EventID::OrderUpdate,
+            Event::FillUpdate(_) => &EventID::FillUpdate,
 
             // Features
-            Event::VWAP(_) => &EventType::VWAP,
+            Event::VWAP(_) => &EventID::VWAP,
         }
     }
 }

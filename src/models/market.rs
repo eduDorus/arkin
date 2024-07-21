@@ -1,33 +1,40 @@
+use crate::ingestors::IngestorID;
+
 use super::{Instrument, Price, Quantity};
 use std::fmt;
 use time::OffsetDateTime;
 
 #[derive(Clone)]
 pub struct Tick {
-    pub instrument: Instrument,
+    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
+    pub instrument: Instrument,
     pub bid_price: Price,
     pub bid_quantity: Quantity,
     pub ask_price: Price,
     pub ask_quantity: Quantity,
+    pub source: IngestorID,
 }
 
 impl Tick {
     pub fn new(
-        instrument: Instrument,
         event_time: OffsetDateTime,
+        instrument: Instrument,
         bid_price: Price,
         bid_quantity: Quantity,
         ask_price: Price,
         ask_quantity: Quantity,
+        source: IngestorID,
     ) -> Self {
         Self {
-            instrument,
+            received_time: OffsetDateTime::now_utc(),
             event_time,
+            instrument,
             bid_price,
             bid_quantity,
             ask_price,
             ask_quantity,
+            source,
         }
     }
 }
@@ -44,19 +51,32 @@ impl fmt::Display for Tick {
 
 #[derive(Clone)]
 pub struct Trade {
-    pub instrument: Instrument,
+    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
+    pub instrument: Instrument,
+    pub trade_id: u64,
     pub price: Price,
     pub quantity: Quantity, // Negative for sell, positive for buy
+    pub source: IngestorID,
 }
 
 impl Trade {
-    pub fn new(instrument: Instrument, event_time: OffsetDateTime, price: Price, quantity: Quantity) -> Self {
+    pub fn new(
+        instrument: Instrument,
+        event_time: OffsetDateTime,
+        trade_id: u64,
+        price: Price,
+        quantity: Quantity,
+        source: IngestorID,
+    ) -> Self {
         Self {
-            instrument,
+            received_time: OffsetDateTime::now_utc(),
             event_time,
+            instrument,
+            trade_id,
             price,
             quantity,
+            source,
         }
     }
 }
@@ -69,15 +89,43 @@ impl fmt::Display for Trade {
 
 #[derive(Clone)]
 pub struct BookUpdate {
-    pub instrument: Instrument,
+    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
+    pub instrument: Instrument,
     pub bids: Vec<BookUpdateSide>,
     pub asks: Vec<BookUpdateSide>,
+    pub source: IngestorID,
+}
+
+impl BookUpdate {
+    pub fn new(
+        event_time: OffsetDateTime,
+        instrument: Instrument,
+        bids: Vec<BookUpdateSide>,
+        asks: Vec<BookUpdateSide>,
+        source: IngestorID,
+    ) -> Self {
+        Self {
+            received_time: OffsetDateTime::now_utc(),
+            event_time,
+            instrument,
+            bids,
+            asks,
+            source,
+        }
+    }
 }
 
 impl fmt::Display for BookUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.instrument, self.event_time)
+        write!(
+            f,
+            "{} {} bid: {} ask: {}",
+            self.instrument,
+            self.event_time,
+            self.bids.len(),
+            self.asks.len()
+        )
     }
 }
 
@@ -90,5 +138,11 @@ pub struct BookUpdateSide {
 impl BookUpdateSide {
     pub fn new(price: Price, quantity: Quantity) -> Self {
         Self { price, quantity }
+    }
+}
+
+impl fmt::Display for BookUpdateSide {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}: {}", self.price, self.quantity)
     }
 }

@@ -1,15 +1,13 @@
 name: Aurelion
 
 ingestors:
-  # - backtest:
-  #     market_data: true
   - binance:
       ws_url: wss://fstream.binance.com/ws
       ws_channels:
         - btcusdt@aggTrade
-        - ethusdt@aggTrade
-      connections_per_manager: 2
-      duplicate_lookback: 1000
+        - btcusdt@bookTicker
+      connections_per_manager: 1
+      duplicate_lookback: 100
 
 state:
   market_state:
@@ -73,3 +71,8 @@ tardis:
         - BTCUSDT
         - ETHUSDT
         - SOLUSDT
+
+clickhouse:
+  url: http://127.0.0.1:18123
+  user: aurelion_admin
+  database: aurelion

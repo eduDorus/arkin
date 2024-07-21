@@ -14,9 +14,8 @@ name = "utils"
 path = "src/bin/utils.rs"
 
 [dependencies]
-# Data Structures
-# dashmap = { version = "6.0", features = ["inline"] }
-scc = "2.1"
+# Utiliy
+strum = { version = "0.26", features = ["derive"] }
 
 # Multi-threading
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] }
@@ -30,7 +29,7 @@ flume = "0.11"
 futures-util = { version = "0.3" }
 
 # Database
-clickhouse = { version = "0.11.6", features = ["time"] }
+clickhouse = { version = "0.12", features = ["time"] }
 
 # HTTP & Websockets
 tokio-rustls = { version = "0.26"} 
@@ -42,6 +41,10 @@ url = {version = "2.5"}
 rust_decimal = {version = "1.35", default-features = false, features = ["std", "serde"]}
 rust_decimal_macros = "1.35"
 bytes = "1.6"
+
+# Data Structures
+# dashmap = { version = "6.0", features = ["inline"] }
+scc = "2.1"
 
 # Serialization
 serde = {version = "1.0", features = ["derive"]}

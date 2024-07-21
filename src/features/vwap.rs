@@ -1,7 +1,7 @@
 use super::Feature;
 use crate::{
     config::VWAPConfig,
-    models::{Asset, EventType, Instrument, PerpetualContract, Price, Venue},
+    models::{Asset, EventID, Instrument, PerpetualContract, Price, Venue},
     state::StateManager,
 };
 use std::fmt;
@@ -45,19 +45,20 @@ impl Feature for VWAPFeature {
 
         while (rx.recv().await).is_ok() {
             info!("VWAP feature tick...");
-            let instrument = PerpetualContract::new(&Venue::Binance, &Asset::new("BTC"), &Asset::new("USDT"));
-            let res = self.state.data.list_events(
-                &[Instrument::Perpetual(instrument)],
-                &[EventType::AggTradeUpdate],
-                OffsetDateTime::now_utc(),
-                Duration::seconds(5),
-            );
+            let instrument =
+                Instrument::Perpetual(PerpetualContract::new(&Venue::Binance, &Asset::new("BTC"), &Asset::new("USDT")));
+            let res = self
+                .state
+                .data
+                .list_events(OffsetDateTime::now_utc(), Duration::seconds(5), |event| {
+                    if matches!(event.event_type(), EventID::TradeUpdate) && event.instrument() == &instrument {
+                        return Some(event);
+                    }
+                    None
+                });
             info!("Window:");
-            for ((instrument, event_type), events) in res {
-                info!("{}: {}", instrument, event_type);
-                for event in events {
-                    info!("- {}", event);
-                }
+            for event in res {
+                info!("- {}: {}: {}", event.instrument(), event.event_type(), event);
             }
         }
     }
