@@ -1,6 +1,6 @@
 use time::Duration;
 use tokio::sync::broadcast::{self, Receiver, Sender};
-use tracing::{error, info};
+use tracing::error;
 
 use crate::{config::StateConfig, models::Event};
 
@@ -35,7 +35,6 @@ impl StateManager {
     }
 
     pub async fn market_update(&self, event: Event) {
-        info!("State received market event: {}", event);
         self.data.add_event(event).await;
     }
 

@@ -3,6 +3,7 @@ use crate::{
     config::VWAPConfig,
     models::{Asset, EventID, Instrument, PerpetualContract, Price, Venue},
     state::StateManager,
+    utils::create_interval,
 };
 use std::fmt;
 use std::sync::Arc;
@@ -15,6 +16,16 @@ pub struct VWAP {
     pub instrument: Instrument,
     pub event_time: OffsetDateTime,
     pub price: Price,
+}
+
+impl VWAP {
+    pub fn new(instrument: Instrument, event_time: OffsetDateTime, price: Price) -> VWAP {
+        VWAP {
+            instrument,
+            event_time,
+            price,
+        }
+    }
 }
 
 impl fmt::Display for VWAP {
@@ -40,26 +51,28 @@ impl VWAPFeature {
 impl Feature for VWAPFeature {
     async fn start(&self) {
         info!("Starting VWAP feature...");
+        let mut interval = create_interval(Duration::seconds(5));
 
-        let mut rx = self.state.listen_feature_frequency(Duration::seconds(5));
-
-        while (rx.recv().await).is_ok() {
+        loop {
+            interval.tick().await;
+            let now = OffsetDateTime::now_utc().replace_nanosecond(0).expect("Failed to round");
             info!("VWAP feature tick...");
             let instrument =
                 Instrument::Perpetual(PerpetualContract::new(&Venue::Binance, &Asset::new("BTC"), &Asset::new("USDT")));
-            let res = self
-                .state
-                .data
-                .list_events(OffsetDateTime::now_utc(), Duration::seconds(5), |event| {
-                    if matches!(event.event_type(), EventID::TradeUpdate) && event.instrument() == &instrument {
-                        return Some(event);
-                    }
-                    None
-                });
+
+            let res = self.state.data.list_events(now, Duration::seconds(5), |event| {
+                if matches!(event.event_type(), EventID::AggTradeUpdate) && event.instrument() == &instrument {
+                    return Some(event);
+                }
+                None
+            });
+
             info!("Window:");
             for event in res {
                 info!("- {}: {}: {}", event.instrument(), event.event_type(), event);
             }
+
+            // let vwap = VWAP::new(instrument, now, Price::new(Decimal::ZERO).expect("Failed to create price"));
         }
     }
 }

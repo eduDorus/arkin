@@ -36,7 +36,6 @@ impl CompositeKey {
     }
 }
 
-// TODO: Implement the Ord and PartialOrd traits for Instrument and EventType
 impl Ord for CompositeKey {
     fn cmp(&self, other: &Self) -> Ordering {
         self.timestamp.cmp(&other.timestamp).then_with(|| self.index.cmp(&other.index))
@@ -55,20 +54,25 @@ impl StateData {
         while self.events.insert_async(key.clone(), event.clone()).await.is_err() {
             key.increment();
         }
+        info!(
+            "State added event: {}, now holds {} events",
+            event.event_type(),
+            self.events.len()
+        );
     }
 
     pub fn list_events<F>(&self, from: OffsetDateTime, window: Duration, predicate: F) -> Vec<Event>
     where
         F: Fn(&Event) -> Option<&Event>,
     {
-        let end_time = from - window;
+        let end_time = from - (window - Duration::nanoseconds(1));
 
         info!("Getting data from: {} till: {}", from, end_time);
 
-        let guard = Guard::new();
-
         let from_key = CompositeKey::new_max(&from);
         let end_key = CompositeKey::new(&end_time);
+
+        let guard = Guard::new();
 
         let events = self
             .events
