@@ -1,9 +1,12 @@
+mod models;
+
 use crate::{
     config::ClickhouseConfig,
     models::{Event, EventID},
 };
 use anyhow::Result;
 use clickhouse::{insert::Insert, Client, Row};
+use models::TickCH;
 use serde::Serialize;
 use strum::IntoEnumIterator;
 
@@ -39,9 +42,11 @@ impl ClickhouseConnector {
 
         for event in events {
             match event {
-                Event::TickUpdate(e) => inserts.push(e.into()),
+                Event::TickUpdate(e) => {
+                    let trade: TickCH = e.into();
+                    inserts.push(trade);
+                }
                 Event::TradeUpdate(e) => inserts.push(e),
-                Event::BookUpdate(e) => inserts.push(e),
                 _ => {}
             }
         }

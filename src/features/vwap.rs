@@ -60,7 +60,7 @@ impl Feature for VWAPFeature {
             let instrument =
                 Instrument::Perpetual(PerpetualContract::new(&Venue::Binance, &Asset::new("BTC"), &Asset::new("USDT")));
 
-            let res = self.state.data.list_events(now, Duration::seconds(5), |event| {
+            let res = self.state.data.list_agg_trades(now, Duration::seconds(5), |event| {
                 if matches!(event.event_type(), EventID::AggTradeUpdate) && event.instrument() == &instrument {
                     return Some(event);
                 }
@@ -68,8 +68,8 @@ impl Feature for VWAPFeature {
             });
 
             info!("Window:");
-            for event in res {
-                info!("- {}: {}: {}", event.instrument(), event.event_type(), event);
+            for trade in res {
+                info!("- {}: {}: {}", trade.instrument, trade.trade_id, trade);
             }
 
             // let vwap = VWAP::new(instrument, now, Price::new(Decimal::ZERO).expect("Failed to create price"));

@@ -12,7 +12,6 @@ pub enum Event {
     // Market
     TickUpdate(Tick),
     TradeUpdate(Trade),
-    AggTradeUpdate(Trade),
     BookUpdate(BookUpdate),
 
     // Account
@@ -68,7 +67,6 @@ impl Event {
             // Market
             Event::TickUpdate(e) => &e.event_time,
             Event::TradeUpdate(e) => &e.event_time,
-            Event::AggTradeUpdate(e) => &e.event_time,
             Event::BookUpdate(e) => &e.event_time,
 
             // Account
@@ -86,7 +84,6 @@ impl Event {
             // Market
             Event::TickUpdate(e) => &e.instrument,
             Event::TradeUpdate(e) => &e.instrument,
-            Event::AggTradeUpdate(e) => &e.instrument,
             Event::BookUpdate(e) => &e.instrument,
 
             // Account
@@ -104,7 +101,6 @@ impl Event {
             // Market
             Event::TickUpdate(_) => &EventID::TickUpdate,
             Event::TradeUpdate(_) => &EventID::TradeUpdate,
-            Event::AggTradeUpdate(_) => &EventID::AggTradeUpdate,
             Event::BookUpdate(_) => &EventID::BookUpdate,
 
             // Account
@@ -123,7 +119,6 @@ impl fmt::Display for Event {
         match self {
             Event::TickUpdate(tick) => write!(f, "Tick update: {}", tick),
             Event::TradeUpdate(trade) => write!(f, "Trade update: {}", trade),
-            Event::AggTradeUpdate(trade) => write!(f, "Agg trade update: {}", trade),
             Event::BookUpdate(book) => write!(f, "Book update: {}", book),
             Event::PositionUpdate(position) => write!(f, "Position update: {}", position),
             Event::OrderUpdate(order) => write!(f, "Order update: {}", order),

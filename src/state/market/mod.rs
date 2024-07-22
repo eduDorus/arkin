@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::models::Event;
+use crate::models::{Event, Trade};
 use scc::{ebr::Guard, TreeIndex};
 use time::{Duration, OffsetDateTime};
 use tracing::info;
@@ -65,7 +65,7 @@ impl StateData {
     where
         F: Fn(&Event) -> Option<&Event>,
     {
-        let end_time = from - (window - Duration::nanoseconds(1));
+        let end_time = from - (window + Duration::nanoseconds(1));
 
         info!("Getting data from: {} till: {}", from, end_time);
 
@@ -83,5 +83,22 @@ impl StateData {
             .collect::<Vec<_>>();
 
         events
+    }
+
+    pub fn list_agg_trades<F>(&self, from: OffsetDateTime, window: Duration, predicate: F) -> Vec<Trade>
+    where
+        F: Fn(&Event) -> Option<&Event>,
+    {
+        self.list_events(from, window, predicate)
+            .iter()
+            .filter_map(|event| {
+                if let Event::TradeUpdate(trade) = event {
+                    Some(trade)
+                } else {
+                    None
+                }
+            })
+            .cloned()
+            .collect()
     }
 }

@@ -120,7 +120,7 @@ pub struct BinanceSwapsAggTradeData {
 impl From<BinanceSwapsAggTradeData> for Event {
     fn from(data: BinanceSwapsAggTradeData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::AggTradeUpdate(Trade::new(
+        Event::TradeUpdate(Trade::new(
             instrument,
             data.event_time,
             data.agg_trade_id,
