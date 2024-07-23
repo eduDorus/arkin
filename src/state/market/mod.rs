@@ -1,9 +1,12 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashSet};
 
-use crate::models::{Event, Trade};
+use crate::{
+    constants::TIMESTAMP_FORMAT,
+    models::{Event, Instrument, Trade},
+};
 use scc::{ebr::Guard, TreeIndex};
 use time::{Duration, OffsetDateTime};
-use tracing::info;
+use tracing::{debug, info};
 
 #[derive(Default)]
 pub struct StateData {
@@ -54,11 +57,16 @@ impl StateData {
         while self.events.insert_async(key.clone(), event.clone()).await.is_err() {
             key.increment();
         }
-        info!(
+        debug!(
             "State added event: {}, now holds {} events",
             event.event_type(),
             self.events.len()
         );
+    }
+
+    pub fn list_instruments(&self) -> HashSet<Instrument> {
+        let guard = Guard::new();
+        self.events.iter(&guard).map(|(_, e)| e.instrument()).cloned().collect()
     }
 
     pub fn list_events<F>(&self, from: OffsetDateTime, window: Duration, predicate: F) -> Vec<Event>
@@ -67,7 +75,11 @@ impl StateData {
     {
         let end_time = from - (window + Duration::nanoseconds(1));
 
-        info!("Getting data from: {} till: {}", from, end_time);
+        info!(
+            "Getting data from: {} till: {}",
+            from.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp"),
+            end_time.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp")
+        );
 
         let from_key = CompositeKey::new_max(&from);
         let end_key = CompositeKey::new(&end_time);
@@ -85,7 +97,7 @@ impl StateData {
         events
     }
 
-    pub fn list_agg_trades<F>(&self, from: OffsetDateTime, window: Duration, predicate: F) -> Vec<Trade>
+    pub fn list_trades<F>(&self, from: OffsetDateTime, window: Duration, predicate: F) -> Vec<Trade>
     where
         F: Fn(&Event) -> Option<&Event>,
     {

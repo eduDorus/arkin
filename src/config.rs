@@ -77,6 +77,7 @@ pub enum FeatureConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VWAPConfig {
+    pub frequency: u64,
     pub window: u64,
 }
 

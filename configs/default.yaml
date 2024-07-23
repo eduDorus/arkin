@@ -19,7 +19,11 @@ state:
 
 features:
   - vwap:
-      window: 10
+      frequency: 5 # In seconds
+      window: 60 # In seconds
+  - vwap:
+      frequency: 10 # In seconds
+      window: 300 # In seconds
   # - sma:
   #     window: 50
   # - sma:

@@ -1,5 +1,5 @@
 use core::fmt;
-use std::ops::{Add, Mul};
+use std::ops::{Add, AddAssign, Div, Mul};
 
 use anyhow::Result;
 use rust_decimal::prelude::*;
@@ -9,7 +9,7 @@ use crate::constants;
 
 use super::errors::ModelError;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Expiry(OffsetDateTime);
 
 impl Expiry {
@@ -31,7 +31,7 @@ impl fmt::Display for Expiry {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Price(Decimal);
 
 impl Price {
@@ -45,6 +45,12 @@ impl Price {
 
     pub fn value(&self) -> Decimal {
         self.0
+    }
+}
+
+impl From<Decimal> for Price {
+    fn from(price: Decimal) -> Self {
+        Price(price)
     }
 }
 
@@ -62,15 +68,37 @@ impl Add<Price> for Price {
     }
 }
 
-impl Mul<Quantity> for Price {
-    type Output = Decimal;
-
-    fn mul(self, rhs: Quantity) -> Decimal {
-        self.0 * rhs.value()
+impl AddAssign<Price> for Price {
+    fn add_assign(&mut self, rhs: Price) {
+        self.0 += rhs.0;
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+impl Mul<Quantity> for Price {
+    type Output = Notional;
+
+    fn mul(self, rhs: Quantity) -> Notional {
+        Notional(self.0 * rhs.value())
+    }
+}
+
+impl Div<Notional> for Price {
+    type Output = Quantity;
+
+    fn div(self, rhs: Notional) -> Quantity {
+        Quantity(self.0 / rhs.value())
+    }
+}
+
+impl Div<Quantity> for Price {
+    type Output = Notional;
+
+    fn div(self, rhs: Quantity) -> Notional {
+        Notional(self.0 / rhs.value())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Quantity(Decimal);
 
 impl Quantity {
@@ -81,10 +109,89 @@ impl Quantity {
     pub fn value(&self) -> Decimal {
         self.0
     }
+
+    pub fn abs(&self) -> Self {
+        self.0.abs().into()
+    }
+}
+
+impl From<Decimal> for Quantity {
+    fn from(quantity: Decimal) -> Self {
+        Quantity(quantity)
+    }
 }
 
 impl fmt::Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl AddAssign<Quantity> for Quantity {
+    fn add_assign(&mut self, rhs: Quantity) {
+        self.0 += rhs.0;
+    }
+}
+
+impl Mul<Price> for Quantity {
+    type Output = Notional;
+
+    fn mul(self, rhs: Price) -> Notional {
+        Notional(self.0 * rhs.value())
+    }
+}
+
+impl Div<Notional> for Quantity {
+    type Output = Price;
+
+    fn div(self, rhs: Notional) -> Price {
+        Price(self.0 / rhs.value())
+    }
+}
+
+impl Div<Price> for Quantity {
+    type Output = Notional;
+
+    fn div(self, rhs: Price) -> Notional {
+        Notional(self.0 / rhs.value())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Notional(Decimal);
+
+impl Notional {
+    pub fn new(notional: Decimal) -> Self {
+        Notional(notional)
+    }
+
+    pub fn value(&self) -> Decimal {
+        self.0
+    }
+}
+
+impl From<Decimal> for Notional {
+    fn from(notional: Decimal) -> Self {
+        Notional(notional)
+    }
+}
+
+impl fmt::Display for Notional {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl AddAssign<Notional> for Notional {
+    fn add_assign(&mut self, rhs: Notional) {
+        self.0 += rhs.0;
+    }
+}
+
+impl Div<Quantity> for Notional {
+    type Output = Price;
+
+    fn div(self, rhs: Quantity) -> Price {
+        Price(self.0 / rhs.value())
     }
 }
