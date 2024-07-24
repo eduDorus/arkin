@@ -1,12 +1,12 @@
 use std::fmt;
 
+use crossover::CrossoverStrategy;
 use spreader::Spreader;
-use wide_quoter::WideQuoter;
 
+mod crossover;
 pub mod errors;
 mod factory;
 mod spreader;
-mod wide_quoter;
 
 pub use factory::StrategyFactory;
 
@@ -17,7 +17,7 @@ pub trait Strategy: Clone {
 
 #[derive(Clone)]
 pub enum StrategyType {
-    WideQuoter(WideQuoter),
+    WideQuoter(CrossoverStrategy),
     Spreader(Spreader),
 }
 

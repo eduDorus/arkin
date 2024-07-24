@@ -83,6 +83,7 @@ pub enum FeatureConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VWAPConfig {
+    pub id: String,
     pub frequency: u64,
     pub window: u64,
 }
@@ -106,15 +107,17 @@ pub struct TraderConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum StrategyConfig {
-    #[serde(rename = "wide_quoter")]
-    WideQuoter(WideQuoterConfig),
+    #[serde(rename = "crossover")]
+    Crossover(CrossoverConfig),
     #[serde(rename = "spreader")]
     Spreader(SpreaderConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WideQuoterConfig {
-    pub spread_in_pct: Decimal,
+pub struct CrossoverConfig {
+    pub fast: String,
+    pub slow: String,
+    pub min_spread: Decimal,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

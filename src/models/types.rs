@@ -195,3 +195,21 @@ impl Div<Quantity> for Notional {
         Price(self.0 / rhs.value())
     }
 }
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Direction(Decimal);
+
+impl Direction {
+    pub fn new(direction: Decimal) -> Result<Self> {
+        // Check if between -1 and 1
+        if direction >= Decimal::from(-1) && direction <= Decimal::from(1) {
+            Ok(Direction(direction))
+        } else {
+            Err(ModelError::DirectionError("must be between -1 and 1".into()).into())
+        }
+    }
+
+    pub fn value(&self) -> Decimal {
+        self.0
+    }
+}

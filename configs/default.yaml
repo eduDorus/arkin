@@ -21,38 +21,24 @@ state:
 
 features:
   - vwap:
-      frequency: 5 # In seconds
+      id: vwap-10-60
+      frequency: 10 # In seconds
       window: 60 # In seconds
   - vwap:
+      id: vwap-10-300
       frequency: 10 # In seconds
       window: 300 # In seconds
-  # - sma:
-  #     window: 50
-  # - sma:
-  #     window: 200
-  # - ema:
-  #     window: 50
-  # - ema:
-  #     window: 200
 
 traders:
-  wide_quoter:
+  crossover:
     strategy:
-      wide_quoter:
-        spread_in_pct: 1.
+      crossover:
+        fast: vwap-10-60
+        slow: vwap-10-300
+        min_spread: 0.005
     allocation:
       limited:
         max_allocation: 0.1
-
-  # spreader:
-  #   strategy:
-  #     spreader:
-  #       front_leg: BTCUSDT
-  #       back_leg: ETHUSDT
-  #       min_spread: 0.1
-  #   allocation:
-  #     limited:
-  #       max_allocation: 0.1
 
 execution:
   # - binance:

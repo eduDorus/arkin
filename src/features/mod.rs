@@ -10,6 +10,7 @@ pub use vwap::VWAP;
 
 #[trait_variant::make(Send)]
 pub trait Feature: Clone {
+    fn id(&self) -> &str;
     async fn start(&self);
 }
 
@@ -31,6 +32,12 @@ impl fmt::Display for FeatureType {
 }
 
 impl Feature for FeatureType {
+    fn id(&self) -> &str {
+        match self {
+            FeatureType::VWAP(f) => f.id(),
+        }
+    }
+
     async fn start(&self) {
         match self {
             FeatureType::VWAP(f) => f.start().await,

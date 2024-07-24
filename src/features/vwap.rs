@@ -15,13 +15,19 @@ use tracing::info;
 #[derive(Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct VWAP {
+    pub id: String,
     pub instrument: Instrument,
     pub event_time: OffsetDateTime,
     pub price: Price,
 }
 
 impl VWAP {
-    pub fn from_trades(instrument: &Instrument, event_time: &OffsetDateTime, trades: &[Event]) -> Result<Self> {
+    pub fn from_trades(
+        id: &str,
+        instrument: &Instrument,
+        event_time: &OffsetDateTime,
+        trades: &[Event],
+    ) -> Result<Self> {
         if trades.is_empty() {
             return Err(anyhow::anyhow!("No trades to calculate VWAP"));
         }
@@ -37,6 +43,7 @@ impl VWAP {
         }
 
         Ok(VWAP {
+            id: id.to_owned(),
             instrument: instrument.to_owned(),
             event_time: event_time.to_owned(),
             price: (total_notional / total_quantity),
@@ -54,6 +61,7 @@ impl fmt::Display for VWAP {
 #[allow(unused)]
 pub struct VWAPFeature {
     state: Arc<StateManager>,
+    id: String,
     frequency: Duration,
     window: Duration,
 }
@@ -64,6 +72,7 @@ impl VWAPFeature {
         let window = Duration::from_secs(config.window);
         VWAPFeature {
             state,
+            id: config.id.to_owned(),
             frequency,
             window,
         }
@@ -71,6 +80,10 @@ impl VWAPFeature {
 }
 
 impl Feature for VWAPFeature {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     async fn start(&self) {
         info!("Starting VWAP feature...");
         let mut rx = self.state.subscribe_frequency(self.frequency);
@@ -84,7 +97,7 @@ impl Feature for VWAPFeature {
                     None
                 });
 
-                if let Ok(vwap) = VWAP::from_trades(&instrument, &tick, &res) {
+                if let Ok(vwap) = VWAP::from_trades(self.id(), &instrument, &tick, &res) {
                     info!(
                         "Calculated VWAP with frequency {:?} and window {:?} for {} at {} is {}",
                         self.frequency,
