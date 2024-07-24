@@ -1,7 +1,7 @@
+pub mod allocation;
 pub mod analytics;
 pub mod config;
 pub mod constants;
-// pub mod db;
 pub mod errors;
 pub mod execution;
 pub mod features;
@@ -11,5 +11,5 @@ pub mod models;
 pub mod server;
 pub mod services;
 pub mod state;
-pub mod trader;
+pub mod strategies;
 pub mod utils;

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env};
+use std::env;
 
 use config::{Config, Environment, File};
 use rust_decimal::Decimal;
@@ -11,7 +11,8 @@ pub struct GlobalConfig {
     pub state: StateConfig,
     pub ingestors: Vec<IngestorConfig>,
     pub features: Vec<FeatureConfig>,
-    pub traders: HashMap<String, TraderConfig>,
+    pub strategies: Vec<StrategyConfig>,
+    pub allocation: AllocationConfig,
     pub execution: Vec<ExecutionConfig>,
     pub tardis: TardisConfig,
     pub clickhouse: ClickhouseConfig,
@@ -98,13 +99,6 @@ pub struct EMAConfig {
     pub window: u64,
 }
 
-// TRADER
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TraderConfig {
-    pub strategy: StrategyConfig,
-    pub allocation: AllocationConfig,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum StrategyConfig {
     #[serde(rename = "crossover")]
@@ -115,6 +109,7 @@ pub enum StrategyConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrossoverConfig {
+    pub id: String,
     pub fast: String,
     pub slow: String,
     pub min_spread: Decimal,
@@ -122,6 +117,7 @@ pub struct CrossoverConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SpreaderConfig {
+    pub id: String,
     pub front_leg: String,
     pub back_leg: String,
     pub min_spread: Decimal,

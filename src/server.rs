@@ -3,12 +3,13 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::{
+    allocation::{Allocation, AllocationFactory, AllocationType},
     config::GlobalConfig,
     execution::{Execution, ExecutionFactory, ExecutionType},
     features::{Feature, FeatureFactory, FeatureType},
     ingestors::{Ingestor, IngestorFactory, IngestorType},
     state::StateManager,
-    trader::{Trader, TraderFactory, TraderType},
+    strategies::{Strategy, StrategyFactory, StrategyType},
 };
 
 pub struct Server {
@@ -22,14 +23,17 @@ impl Server {
     }
 
     pub async fn run(&self) {
-        let ingestors = IngestorFactory::create_ingestors(self.state.clone(), &self.config.ingestors);
+        let ingestors = IngestorFactory::from_config(self.state.clone(), &self.config.ingestors);
         tokio::spawn(Server::ingestor_task(ingestors));
 
-        let features = FeatureFactory::create_features(self.state.clone(), &self.config.features);
+        let features = FeatureFactory::from_config(self.state.clone(), &self.config.features);
         tokio::spawn(Server::feature_task(features));
 
-        let traders = TraderFactory::create_traders(self.state.clone(), &self.config.traders);
-        tokio::spawn(Server::trader_task(traders));
+        let strategies = StrategyFactory::from_config(self.state.clone(), &self.config.strategies);
+        tokio::spawn(Server::strategy_task(strategies));
+
+        let allocation = AllocationFactory::from_config(self.state.clone(), &self.config.allocation);
+        tokio::spawn(Server::allocation_task(allocation));
 
         let execution = ExecutionFactory::from_config(self.state.clone(), &self.config.execution);
         tokio::spawn(Server::execution_task(execution));
@@ -52,11 +56,16 @@ impl Server {
         }
     }
 
-    async fn trader_task(traders: Vec<TraderType>) {
+    async fn strategy_task(strategies: Vec<StrategyType>) {
         info!("Spawning trader tasks...");
-        for trader in traders {
-            tokio::spawn(async move { trader.start().await });
+        for strategy in strategies {
+            tokio::spawn(async move { strategy.start().await });
         }
+    }
+
+    async fn allocation_task(allocation: AllocationType) {
+        info!("Spawning allocation tasks...");
+        tokio::spawn(async move { allocation.start().await });
     }
 
     async fn execution_task(executors: Vec<ExecutionType>) {

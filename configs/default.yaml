@@ -21,24 +21,29 @@ state:
 
 features:
   - vwap:
-      id: vwap-10-60
+      id: vwap_10_60
       frequency: 10 # In seconds
       window: 60 # In seconds
   - vwap:
-      id: vwap-10-300
+      id: vwap_10_300
       frequency: 10 # In seconds
       window: 300 # In seconds
 
-traders:
-  crossover:
-    strategy:
-      crossover:
-        fast: vwap-10-60
-        slow: vwap-10-300
-        min_spread: 0.005
-    allocation:
-      limited:
-        max_allocation: 0.1
+strategies:
+  - crossover:
+      id: crossover_vwap_half_pct
+      fast: vwap_10_60
+      slow: vwap_10_300
+      min_spread: 0.005
+  - crossover:
+      id: crossover_vwap_one_pct
+      fast: vwap_10_60
+      slow: vwap_10_300
+      min_spread: 0.01
+
+allocation:
+  limited:
+    max_allocation: 0.1
 
 execution:
   # - binance:

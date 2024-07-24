@@ -7,7 +7,7 @@ use super::FeatureType;
 pub struct FeatureFactory {}
 
 impl FeatureFactory {
-    pub fn create_features(state: Arc<StateManager>, config: &[FeatureConfig]) -> Vec<FeatureType> {
+    pub fn from_config(state: Arc<StateManager>, config: &[FeatureConfig]) -> Vec<FeatureType> {
         let mut features = Vec::new();
 
         for config in config {

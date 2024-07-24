@@ -36,7 +36,7 @@ impl CrossoverStrategy {
 
 impl Strategy for CrossoverStrategy {
     async fn start(&self) {
-        info!("Starting wide quoter strategy...");
+        info!("Starting crossover strategy...");
         let mut rx = self.state.subscribe_event(EventID::VWAP);
 
         while let Ok(event) = rx.recv().await {

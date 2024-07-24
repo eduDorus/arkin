@@ -1,10 +1,9 @@
-use std::fmt;
-
 use crossover::CrossoverStrategy;
 use spreader::Spreader;
+use std::fmt;
 
 mod crossover;
-pub mod errors;
+mod errors;
 mod factory;
 mod spreader;
 
@@ -17,7 +16,7 @@ pub trait Strategy: Clone {
 
 #[derive(Clone)]
 pub enum StrategyType {
-    WideQuoter(CrossoverStrategy),
+    Crossover(CrossoverStrategy),
     Spreader(Spreader),
 }
 
@@ -25,7 +24,7 @@ impl Strategy for StrategyType {
     async fn start(&self) {
         match self {
             StrategyType::Spreader(s) => s.start().await,
-            StrategyType::WideQuoter(s) => s.start().await,
+            StrategyType::Crossover(s) => s.start().await,
         }
     }
 }
@@ -33,8 +32,8 @@ impl Strategy for StrategyType {
 impl fmt::Display for StrategyType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StrategyType::WideQuoter(_) => write!(f, "WideQuoter"),
-            StrategyType::Spreader(_) => write!(f, "Spreader"),
+            StrategyType::Crossover(_) => write!(f, "crossover"),
+            StrategyType::Spreader(_) => write!(f, "spreader"),
         }
     }
 }

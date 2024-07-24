@@ -7,18 +7,15 @@ use super::{backtest::BacktestIngestor, binance::BinanceIngestor, IngestorType};
 pub struct IngestorFactory {}
 
 impl IngestorFactory {
-    pub fn create_ingestors(state: Arc<StateManager>, config: &[IngestorConfig]) -> Vec<IngestorType> {
+    pub fn from_config(state: Arc<StateManager>, config: &[IngestorConfig]) -> Vec<IngestorType> {
         let mut ingestors = Vec::new();
 
         for config in config {
-            match config {
-                IngestorConfig::Backtest(config) => {
-                    ingestors.push(IngestorType::Backtest(BacktestIngestor::new(state.to_owned(), config)))
-                }
-                IngestorConfig::Binance(config) => {
-                    ingestors.push(IngestorType::Binance(BinanceIngestor::new(state.to_owned(), config)));
-                }
-            }
+            let ingestor = match config {
+                IngestorConfig::Backtest(c) => IngestorType::Backtest(BacktestIngestor::new(state.to_owned(), c)),
+                IngestorConfig::Binance(c) => IngestorType::Binance(BinanceIngestor::new(state.to_owned(), c)),
+            };
+            ingestors.push(ingestor);
         }
 
         ingestors
