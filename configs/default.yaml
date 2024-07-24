@@ -44,15 +44,15 @@ traders:
       limited:
         max_allocation: 0.1
 
-  spreader:
-    strategy:
-      spreader:
-        front_leg: BTCUSDT
-        back_leg: ETHUSDT
-        min_spread: 0.1
-    allocation:
-      limited:
-        max_allocation: 0.1
+  # spreader:
+  #   strategy:
+  #     spreader:
+  #       front_leg: BTCUSDT
+  #       back_leg: ETHUSDT
+  #       min_spread: 0.1
+  #   allocation:
+  #     limited:
+  #       max_allocation: 0.1
 
 execution:
   # - binance:

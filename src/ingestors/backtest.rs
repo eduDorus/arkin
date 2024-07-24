@@ -47,7 +47,7 @@ impl Ingestor for BacktestIngestor {
                 Quantity::new(Decimal::new(1, 0)),
                 IngestorID::Backtest,
             );
-            self.state.market_update(Event::TradeUpdate(trade)).await;
+            self.state.event_update(Event::TradeUpdate(trade)).await;
             trade_id += 1;
         }
     }

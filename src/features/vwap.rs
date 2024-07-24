@@ -93,6 +93,7 @@ impl Feature for VWAPFeature {
                         tick.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp"),
                         vwap.price
                     );
+                    self.state.event_update(Event::VWAP(vwap)).await;
                 }
             }
         }

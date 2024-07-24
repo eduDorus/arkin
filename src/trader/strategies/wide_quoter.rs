@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rust_decimal::Decimal;
 use tracing::info;
 
-use crate::{config::WideQuoterConfig, state::StateManager};
+use crate::{config::WideQuoterConfig, models::EventID, state::StateManager};
 
 use super::Strategy;
 
@@ -26,11 +26,10 @@ impl WideQuoter {
 impl Strategy for WideQuoter {
     async fn start(&self) {
         info!("Starting wide quoter strategy...");
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+        let mut rx = self.state.subscribe_event(EventID::VWAP);
 
-        loop {
-            interval.tick().await;
-            info!("Spreader takes snapshot");
+        while let Ok(event) = rx.recv().await {
+            info!("Wide quoter strategy received event: {}", event);
         }
     }
 }

@@ -1,5 +1,7 @@
 use tracing::info;
 
+use crate::trader::strategies::Strategy;
+
 use super::{allocation::AllocationType, errors::EngineError, strategies::StrategyType, Trader};
 
 #[derive(Clone)]
@@ -20,6 +22,7 @@ impl Trader for DefaultTrader {
             "Starting trader with strategy: {}, allocation: {}",
             self.strategies, self.allocation
         );
+        self.strategies.start().await;
     }
 }
 

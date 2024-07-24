@@ -1,16 +1,23 @@
-use std::{cmp::Ordering, collections::HashSet, time::Duration};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use crate::{
     constants::TIMESTAMP_FORMAT,
-    models::{Event, Instrument, Trade},
+    models::{Event, EventID, Instrument, Trade},
 };
+use parking_lot::RwLock;
 use scc::{ebr::Guard, TreeIndex};
 use time::OffsetDateTime;
-use tracing::{debug, info};
+use tokio::sync::broadcast::{self, Receiver, Sender};
+use tracing::{debug, error, info};
 
 #[derive(Default)]
 pub struct StateData {
     events: TreeIndex<CompositeKey, Event>,
+    pub subscribers: RwLock<HashMap<EventID, Sender<Event>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -52,7 +59,21 @@ impl PartialOrd for CompositeKey {
 }
 
 impl StateData {
+    pub fn subscribe(&self, event_id: EventID) -> Receiver<Event> {
+        info!("Subscribing to events: {}", event_id);
+        if let Some(sender) = self.subscribers.read().get(&event_id) {
+            info!("Found existing subscriber for frequency: {:?}", event_id);
+            return sender.subscribe();
+        }
+
+        info!("Creating new subscriber for events: {}", event_id);
+        let (sender, receiver) = broadcast::channel(1);
+        self.subscribers.write().insert(event_id, sender);
+        receiver
+    }
+
     pub async fn add_event(&self, event: Event) {
+        // Add to state
         let mut key = CompositeKey::new(event.event_time());
         while self.events.insert_async(key.clone(), event.clone()).await.is_err() {
             key.increment();
@@ -62,6 +83,15 @@ impl StateData {
             event.event_type(),
             self.events.len()
         );
+
+        // Notify subscribers
+        for (id, sender) in self.subscribers.read().iter() {
+            if event.event_type() == id {
+                if let Err(e) = sender.send(event.clone()) {
+                    error!("Failed to send event: {}", e);
+                }
+            }
+        }
     }
 
     pub fn list_instruments(&self) -> HashSet<Instrument> {

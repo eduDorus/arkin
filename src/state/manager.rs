@@ -3,10 +3,13 @@ use std::{sync::Arc, time::Duration};
 use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 
-use crate::{config::StateConfig, models::Event};
+use crate::{
+    config::StateConfig,
+    models::{Event, EventID},
+};
 
 use super::{
-    market::StateData,
+    data::StateData,
     order_manager::{OrderManagerType, SingleOrderManager},
     portfolio::{PortfolioType, SinglePortfolio},
     time_component::TimeComponent,
@@ -43,11 +46,15 @@ impl StateManager {
         }
     }
 
-    pub async fn market_update(&self, event: Event) {
+    pub async fn event_update(&self, event: Event) {
         self.data.add_event(event).await;
     }
 
     pub fn subscribe_frequency(&self, frequency: Duration) -> Receiver<OffsetDateTime> {
         self.time_component.subscribe(frequency)
+    }
+
+    pub fn subscribe_event(&self, event_id: EventID) -> Receiver<Event> {
+        self.data.subscribe(event_id)
     }
 }
