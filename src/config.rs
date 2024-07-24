@@ -23,6 +23,7 @@ pub struct StateConfig {
     pub market_state: MarketStateConfig,
     pub portfolio: PortfolioConfig,
     pub order_manager: OrderManagerConfig,
+    pub time_component: TimeComponentConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -38,6 +39,11 @@ pub struct PortfolioConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OrderManagerConfig {
     pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TimeComponentConfig {
+    pub tick_frequency: u64,
 }
 
 // INGESTORS

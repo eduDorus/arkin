@@ -1,3 +1,4 @@
+use tracing::subscriber::set_global_default;
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 pub fn init_tracing() {
@@ -15,7 +16,7 @@ pub fn init_tracing() {
 }
 
 pub fn init_test_tracing() {
-    tracing_subscriber::fmt::Subscriber::builder()
+    let subscriber = tracing_subscriber::fmt::Subscriber::builder()
         .with_env_filter(EnvFilter::from_default_env())
         .with_level(true)
         .with_target(false)
@@ -24,5 +25,6 @@ pub fn init_test_tracing() {
         .with_ansi(true)
         .with_test_writer() // This is the important part
         .compact()
-        .init();
+        .finish();
+    set_global_default(subscriber).expect("Failed to set global default subscriber");
 }

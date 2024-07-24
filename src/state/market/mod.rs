@@ -1,11 +1,11 @@
-use std::{cmp::Ordering, collections::HashSet};
+use std::{cmp::Ordering, collections::HashSet, time::Duration};
 
 use crate::{
     constants::TIMESTAMP_FORMAT,
     models::{Event, Instrument, Trade},
 };
 use scc::{ebr::Guard, TreeIndex};
-use time::{Duration, OffsetDateTime};
+use time::OffsetDateTime;
 use tracing::{debug, info};
 
 #[derive(Default)]
@@ -73,16 +73,17 @@ impl StateData {
     where
         F: Fn(&Event) -> Option<&Event>,
     {
-        let end_time = from - (window + Duration::nanoseconds(1));
+        let from_adjusted = from - Duration::from_nanos(1);
+        let till = from - (window);
 
         info!(
             "Getting data from: {} till: {}",
-            from.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp"),
-            end_time.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp")
+            from_adjusted.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp"),
+            till.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp")
         );
 
-        let from_key = CompositeKey::new_max(&from);
-        let end_key = CompositeKey::new(&end_time);
+        let from_key = CompositeKey::new_max(&from_adjusted);
+        let end_key = CompositeKey::new(&till);
 
         let guard = Guard::new();
 

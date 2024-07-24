@@ -16,6 +16,8 @@ state:
     enabled: true
   order_manager:
     enabled: true
+  time_component:
+    tick_frequency: 1 # In seconds
 
 features:
   - vwap:

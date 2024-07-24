@@ -1,6 +1,7 @@
-use time::Duration;
+use std::{sync::Arc, time::Duration};
+
+use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
-use tracing::error;
 
 use crate::{config::StateConfig, models::Event};
 
@@ -8,6 +9,7 @@ use super::{
     market::StateData,
     order_manager::{OrderManagerType, SingleOrderManager},
     portfolio::{PortfolioType, SinglePortfolio},
+    time_component::TimeComponent,
 };
 
 #[allow(unused)]
@@ -16,14 +18,20 @@ pub struct StateManager {
     order_manager: OrderManagerType,
     portfolio: PortfolioType,
     event_update: Sender<Event>,
+    time_component: Arc<TimeComponent>,
 }
 
 impl StateManager {
-    pub fn new(_config: &StateConfig) -> Self {
+    pub fn new(config: &StateConfig) -> Self {
         let data = StateData::default();
         let order_manager = OrderManagerType::SingleVenue(SingleOrderManager::new());
         let portfolio = PortfolioType::Single(SinglePortfolio::new());
+        let time_component = Arc::new(TimeComponent::new(&config.time_component));
 
+        let time_component_ref = time_component.clone();
+        tokio::spawn(async move {
+            time_component_ref.start().await;
+        });
         let (event_update, _) = broadcast::channel(1024);
 
         StateManager {
@@ -31,6 +39,7 @@ impl StateManager {
             order_manager,
             portfolio,
             event_update,
+            time_component,
         }
     }
 
@@ -38,18 +47,7 @@ impl StateManager {
         self.data.add_event(event).await;
     }
 
-    pub fn listen_feature_frequency(&self, frequency: Duration) -> Receiver<()> {
-        let (sender, receiver) = broadcast::channel(1);
-
-        tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs(frequency.whole_seconds() as u64)).await;
-                if let Err(e) = sender.send(()) {
-                    error!("Error sending feature frequency event: {}", e);
-                }
-            }
-        });
-
-        receiver
+    pub fn subscribe_frequency(&self, frequency: Duration) -> Receiver<OffsetDateTime> {
+        self.time_component.subscribe(frequency)
     }
 }

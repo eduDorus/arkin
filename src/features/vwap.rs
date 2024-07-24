@@ -4,13 +4,12 @@ use crate::{
     constants::TIMESTAMP_FORMAT,
     models::{Event, EventID, Instrument, Notional, Price, Quantity},
     state::StateManager,
-    utils::create_interval,
 };
 use anyhow::Result;
 use rust_decimal::Decimal;
-use std::fmt;
 use std::sync::Arc;
-use time::{Duration, OffsetDateTime};
+use std::{fmt, time::Duration};
+use time::OffsetDateTime;
 use tracing::info;
 
 #[derive(Clone)]
@@ -61,8 +60,8 @@ pub struct VWAPFeature {
 
 impl VWAPFeature {
     pub fn new(state: Arc<StateManager>, config: &VWAPConfig) -> VWAPFeature {
-        let frequency = Duration::seconds(config.frequency as i64);
-        let window = Duration::seconds(config.window as i64);
+        let frequency = Duration::from_secs(config.frequency);
+        let window = Duration::from_secs(config.window);
         VWAPFeature {
             state,
             frequency,
@@ -74,27 +73,24 @@ impl VWAPFeature {
 impl Feature for VWAPFeature {
     async fn start(&self) {
         info!("Starting VWAP feature...");
-        let mut interval = create_interval(self.frequency);
+        let mut rx = self.state.subscribe_frequency(self.frequency);
 
-        loop {
-            interval.tick().await;
-            let now = OffsetDateTime::now_utc();
-
+        while let Ok(tick) = rx.recv().await {
             for instrument in self.state.data.list_instruments() {
-                let res = self.state.data.list_events(now, self.window, |event| {
+                let res = self.state.data.list_events(tick, self.window, |event| {
                     if matches!(event.event_type(), EventID::TradeUpdate) && event.instrument() == &instrument {
                         return Some(event);
                     }
                     None
                 });
 
-                if let Ok(vwap) = VWAP::from_trades(&instrument, &now, &res) {
+                if let Ok(vwap) = VWAP::from_trades(&instrument, &tick, &res) {
                     info!(
-                        "Calculated VWAP with frequency {} and window {} for {} at {} is {}",
+                        "Calculated VWAP with frequency {:?} and window {:?} for {} at {} is {}",
                         self.frequency,
                         self.window,
                         instrument,
-                        now.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp"),
+                        tick.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp"),
                         vwap.price
                     );
                 }

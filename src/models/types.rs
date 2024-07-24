@@ -56,7 +56,7 @@ impl From<Decimal> for Price {
 
 impl fmt::Display for Price {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.round_dp(2))
     }
 }
 
