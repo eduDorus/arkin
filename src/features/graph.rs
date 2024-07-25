@@ -1,7 +1,7 @@
 use petgraph::{algo::toposort, graph::DiGraph};
 use tracing::info;
 
-use super::Feature;
+use super::{Feature, FeatureID};
 
 pub struct FeatureGraph {
     graph: DiGraph<Box<dyn Feature>, ()>,
@@ -24,7 +24,7 @@ impl FeatureGraph {
         self.graph.add_node(Box::new(feature));
     }
 
-    pub fn add_edge(&mut self, source: &str, target: &str) {
+    pub fn add_edge(&mut self, source: &FeatureID, target: &FeatureID) {
         let source_node = self.graph.node_indices().find(|i| self.graph[*i].id() == source).unwrap();
         let target_node = self.graph.node_indices().find(|i| self.graph[*i].id() == target).unwrap();
         self.graph.add_edge(source_node, target_node, ());
@@ -33,9 +33,9 @@ impl FeatureGraph {
     pub fn connect_nodes(&mut self) {
         let mut edges_to_add = vec![];
         for node in self.graph.node_indices() {
-            let node_id = self.graph[node].id().to_string();
+            let node_id = self.graph[node].id();
             for source in self.graph[node].sources() {
-                edges_to_add.push((source.to_string(), node_id.clone()));
+                edges_to_add.push((source.clone(), node_id.clone()));
             }
         }
 
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn test_pipeline_add_node() {
         let mut graph = FeatureGraph::new();
-        let vwap = VWAPGen::new("vwap", Duration::from_secs(60));
+        let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
         graph.add_node(vwap);
         assert_eq!(graph.graph.node_count(), 1);
     }
@@ -80,8 +80,8 @@ mod tests {
     #[test]
     fn test_pipeline_add_edge() {
         let mut graph = FeatureGraph::new();
-        let vwap = VWAPGen::new("vwap", Duration::from_secs(60));
-        let ema = EMAGen::new("ema_vwap_50", "vwap", Duration::from_secs(300));
+        let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
+        let ema = EMAGen::new("ema_vwap_50".into(), "vwap".into(), Duration::from_secs(300));
 
         graph.add_node(vwap);
         graph.add_node(ema);
@@ -98,11 +98,11 @@ mod tests {
         let mut graph = FeatureGraph::new();
 
         // Create features
-        let vwap = VWAPGen::new("vwap", Duration::from_secs(60));
-        let ema = EMAGen::new("ema_vwap_50", "vwap", Duration::from_secs(50));
-        let sma = SMAGen::new("sma_vwap_50", "vwap", Duration::from_secs(50));
-        let spread = SpreadGen::new("spread", "sma_vwap_50", "ema_vwap_50");
-        let volume = VolumeGen::new("volume", Duration::from_secs(60));
+        let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
+        let ema = EMAGen::new("ema_vwap_50".into(), "vwap".into(), Duration::from_secs(50));
+        let sma = SMAGen::new("sma_vwap_50".into(), "vwap".into(), Duration::from_secs(50));
+        let spread = SpreadGen::new("spread".into(), "sma_vwap_50".into(), "ema_vwap_50".into());
+        let volume = VolumeGen::new("volume".into(), Duration::from_secs(60));
 
         // Create nodes
         graph.add_node(vwap);

@@ -3,36 +3,55 @@ mod factory;
 mod graph;
 // mod vwap;
 
+use core::fmt;
 pub use graph::FeatureGraph;
 use std::time::Duration;
 use tracing::info;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FeatureID(String);
+
+impl From<&str> for FeatureID {
+    fn from(id: &str) -> Self {
+        FeatureID(id.to_lowercase())
+    }
+}
+
+impl From<String> for FeatureID {
+    fn from(id: String) -> Self {
+        FeatureID(id.to_lowercase())
+    }
+}
+
+impl fmt::Display for FeatureID {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 pub trait Feature {
-    fn id(&self) -> &str;
-    fn sources(&self) -> Vec<&str>;
+    fn id(&self) -> &FeatureID;
+    fn sources(&self) -> Vec<&FeatureID>;
     fn calculate(&self);
 }
 
 pub struct VWAPGen {
-    id: String,
+    id: FeatureID,
     window: Duration,
 }
 
 impl VWAPGen {
-    pub fn new(id: &str, window: Duration) -> Self {
-        VWAPGen {
-            id: id.to_string(),
-            window,
-        }
+    pub fn new(id: FeatureID, window: Duration) -> Self {
+        VWAPGen { id, window }
     }
 }
 
 impl Feature for VWAPGen {
-    fn id(&self) -> &str {
+    fn id(&self) -> &FeatureID {
         &self.id
     }
 
-    fn sources(&self) -> Vec<&str> {
+    fn sources(&self) -> Vec<&FeatureID> {
         vec![]
     }
 
@@ -42,27 +61,23 @@ impl Feature for VWAPGen {
 }
 
 pub struct SMAGen {
-    id: String,
-    source: String,
+    id: FeatureID,
+    source: FeatureID,
     window: Duration,
 }
 
 impl SMAGen {
-    pub fn new(id: &str, source: &str, window: Duration) -> Self {
-        SMAGen {
-            id: id.to_string(),
-            source: source.to_string(),
-            window,
-        }
+    pub fn new(id: FeatureID, source: FeatureID, window: Duration) -> Self {
+        SMAGen { id, source, window }
     }
 }
 
 impl Feature for SMAGen {
-    fn id(&self) -> &str {
+    fn id(&self) -> &FeatureID {
         &self.id
     }
 
-    fn sources(&self) -> Vec<&str> {
+    fn sources(&self) -> Vec<&FeatureID> {
         vec![&self.source]
     }
 
@@ -72,27 +87,23 @@ impl Feature for SMAGen {
 }
 
 pub struct EMAGen {
-    id: String,
-    source: String,
+    id: FeatureID,
+    source: FeatureID,
     window: Duration,
 }
 
 impl EMAGen {
-    pub fn new(id: &str, source: &str, window: Duration) -> Self {
-        EMAGen {
-            id: id.to_string(),
-            source: source.to_string(),
-            window,
-        }
+    pub fn new(id: FeatureID, source: FeatureID, window: Duration) -> Self {
+        EMAGen { id, source, window }
     }
 }
 
 impl Feature for EMAGen {
-    fn id(&self) -> &str {
+    fn id(&self) -> &FeatureID {
         &self.id
     }
 
-    fn sources(&self) -> Vec<&str> {
+    fn sources(&self) -> Vec<&FeatureID> {
         vec![&self.source]
     }
 
@@ -102,27 +113,27 @@ impl Feature for EMAGen {
 }
 
 pub struct SpreadGen {
-    id: String,
-    leg_one: String,
-    leg_two: String,
+    id: FeatureID,
+    leg_one: FeatureID,
+    leg_two: FeatureID,
 }
 
 impl SpreadGen {
-    pub fn new(id: &str, leg_one: &str, leg_two: &str) -> Self {
+    pub fn new(id: FeatureID, leg_one: FeatureID, leg_two: FeatureID) -> Self {
         SpreadGen {
-            id: id.to_string(),
-            leg_one: leg_one.to_string(),
-            leg_two: leg_two.to_string(),
+            id,
+            leg_one,
+            leg_two,
         }
     }
 }
 
 impl Feature for SpreadGen {
-    fn id(&self) -> &str {
+    fn id(&self) -> &FeatureID {
         &self.id
     }
 
-    fn sources(&self) -> Vec<&str> {
+    fn sources(&self) -> Vec<&FeatureID> {
         vec![&self.leg_one, &self.leg_two]
     }
 
@@ -132,25 +143,22 @@ impl Feature for SpreadGen {
 }
 
 pub struct VolumeGen {
-    id: String,
+    id: FeatureID,
     window: Duration,
 }
 
 impl VolumeGen {
-    pub fn new(id: &str, window: Duration) -> Self {
-        VolumeGen {
-            id: id.to_string(),
-            window,
-        }
+    pub fn new(id: FeatureID, window: Duration) -> Self {
+        VolumeGen { id, window }
     }
 }
 
 impl Feature for VolumeGen {
-    fn id(&self) -> &str {
+    fn id(&self) -> &FeatureID {
         &self.id
     }
 
-    fn sources(&self) -> Vec<&str> {
+    fn sources(&self) -> Vec<&FeatureID> {
         vec![]
     }
 
