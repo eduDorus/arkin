@@ -19,6 +19,48 @@ state:
   time_component:
     tick_frequency: 1 # In seconds
 
+pipelines:
+  seconds_features:
+    frequency: 1
+    features:
+      - vwap:
+          id: vwap_1_60
+          input: trades
+          window: 60 # In seconds
+      - vwap:
+          id: vwap_1_300
+          input: trades
+          window: 300 # In seconds
+      - spread:
+          id: spread
+          input_fast: vwap_1_60
+          input_slow: vwap_1_300
+      - volume:
+          id: volume_1_60
+          input: trades
+          window: 60 # In seconds
+      - correlation:
+          id: correlation_volume
+          input: volume_1_60
+      - pca:
+          id: pca_volume
+          input: volume_1_60, vwap_1_60, vwap_1_300, correlation_volume
+          n_components: 4
+      - normalization:
+          id: normalization_pca_volume
+          input: pca_volume
+
+  trading_features:
+    frequency: 0
+    features:
+      - vwap:
+          id: vwap_10_60
+          window: 60 # In seconds
+      - ema:
+          id: ema_10_60
+          input: vwap_10_60
+          window: 60 # In seconds
+
 features:
   - vwap:
       id: vwap_10_60

@@ -5,19 +5,19 @@ use tokio::sync::broadcast::{self, Receiver, Sender};
 
 use crate::{
     config::StateConfig,
-    models::{Event, EventID},
+    models::{Event, EventType},
 };
 
 use super::{
-    data::StateData,
     order_manager::{OrderManagerType, SingleOrderManager},
     portfolio::{PortfolioType, SinglePortfolio},
+    store::DataStore,
     time_component::TimeComponent,
 };
 
 #[allow(unused)]
 pub struct StateManager {
-    pub data: StateData,
+    pub data: DataStore,
     order_manager: OrderManagerType,
     portfolio: PortfolioType,
     event_update: Sender<Event>,
@@ -26,7 +26,7 @@ pub struct StateManager {
 
 impl StateManager {
     pub fn new(config: &StateConfig) -> Self {
-        let data = StateData::default();
+        let data = DataStore::default();
         let order_manager = OrderManagerType::SingleVenue(SingleOrderManager::new());
         let portfolio = PortfolioType::Single(SinglePortfolio::new());
         let time_component = Arc::new(TimeComponent::new(&config.time_component));
@@ -54,7 +54,7 @@ impl StateManager {
         self.time_component.subscribe(frequency)
     }
 
-    pub fn subscribe_event(&self, event_id: EventID) -> Receiver<Event> {
+    pub fn subscribe_event(&self, event_id: EventType) -> Receiver<Event> {
         self.data.subscribe(event_id)
     }
 }

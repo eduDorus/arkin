@@ -6,7 +6,7 @@ use tracing::{info, warn};
 use crate::{
     config::CrossoverConfig,
     features::VWAP,
-    models::{Event, EventID},
+    models::{Event, EventType},
     state::StateManager,
 };
 
@@ -37,7 +37,7 @@ impl CrossoverStrategy {
 impl Strategy for CrossoverStrategy {
     async fn start(&self) {
         info!("Starting crossover strategy...");
-        let mut rx = self.state.subscribe_event(EventID::VWAP);
+        let mut rx = self.state.subscribe_event(EventType::VWAP);
 
         while let Ok(event) = rx.recv().await {
             info!("Wide quoter strategy received event: {}", event);

@@ -24,11 +24,10 @@ pub enum Event {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumIter)]
-pub enum EventID {
+pub enum EventType {
     // Market
     TickUpdate,
     TradeUpdate,
-    AggTradeUpdate,
     BookUpdate,
 
     // Account
@@ -40,22 +39,21 @@ pub enum EventID {
     VWAP,
 }
 
-impl fmt::Display for EventID {
+impl fmt::Display for EventType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             // Market
-            EventID::TickUpdate => write!(f, "Tick Update"),
-            EventID::TradeUpdate => write!(f, "Trade Update"),
-            EventID::AggTradeUpdate => write!(f, "Agg trade update"),
-            EventID::BookUpdate => write!(f, "Book update"),
+            EventType::TickUpdate => write!(f, "Tick Update"),
+            EventType::TradeUpdate => write!(f, "Trade Update"),
+            EventType::BookUpdate => write!(f, "Book update"),
 
             // Account
-            EventID::PositionUpdate => write!(f, "Position update"),
-            EventID::OrderUpdate => write!(f, "Order update"),
-            EventID::FillUpdate => write!(f, "Fill update"),
+            EventType::PositionUpdate => write!(f, "Position update"),
+            EventType::OrderUpdate => write!(f, "Order update"),
+            EventType::FillUpdate => write!(f, "Fill update"),
 
             // Features
-            EventID::VWAP => write!(f, "VWAP update"),
+            EventType::VWAP => write!(f, "VWAP update"),
         }
     }
 }
@@ -96,20 +94,20 @@ impl Event {
         }
     }
 
-    pub fn event_type(&self) -> &EventID {
+    pub fn event_type(&self) -> &EventType {
         match self {
             // Market
-            Event::TickUpdate(_) => &EventID::TickUpdate,
-            Event::TradeUpdate(_) => &EventID::TradeUpdate,
-            Event::BookUpdate(_) => &EventID::BookUpdate,
+            Event::TickUpdate(_) => &EventType::TickUpdate,
+            Event::TradeUpdate(_) => &EventType::TradeUpdate,
+            Event::BookUpdate(_) => &EventType::BookUpdate,
 
             // Account
-            Event::PositionUpdate(_) => &EventID::PositionUpdate,
-            Event::OrderUpdate(_) => &EventID::OrderUpdate,
-            Event::FillUpdate(_) => &EventID::FillUpdate,
+            Event::PositionUpdate(_) => &EventType::PositionUpdate,
+            Event::OrderUpdate(_) => &EventType::OrderUpdate,
+            Event::FillUpdate(_) => &EventType::FillUpdate,
 
             // Features
-            Event::VWAP(_) => &EventID::VWAP,
+            Event::VWAP(_) => &EventType::VWAP,
         }
     }
 }

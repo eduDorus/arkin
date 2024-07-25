@@ -9,7 +9,7 @@ use vwap::VWAPFeature;
 pub use vwap::VWAP;
 
 #[trait_variant::make(Send)]
-pub trait Feature: Clone {
+pub trait Feature {
     fn id(&self) -> &str;
     async fn start(&self);
 }

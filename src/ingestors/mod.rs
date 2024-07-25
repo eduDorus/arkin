@@ -12,7 +12,7 @@ use binance::BinanceIngestor;
 pub use factory::IngestorFactory;
 
 #[trait_variant::make(Send)]
-pub trait Ingestor: Clone {
+pub trait Ingestor {
     async fn start(&self);
 }
 

@@ -2,7 +2,7 @@ use super::Feature;
 use crate::{
     config::VWAPConfig,
     constants::TIMESTAMP_FORMAT,
-    models::{Event, EventID, Instrument, Notional, Price, Quantity},
+    models::{Event, EventType, Instrument, Notional, Price, Quantity},
     state::StateManager,
 };
 use anyhow::Result;
@@ -89,13 +89,12 @@ impl Feature for VWAPFeature {
         let mut rx = self.state.subscribe_frequency(self.frequency);
 
         while let Ok(tick) = rx.recv().await {
-            for instrument in self.state.data.list_instruments() {
-                let res = self.state.data.list_events(tick, self.window, |event| {
-                    if matches!(event.event_type(), EventID::TradeUpdate) && event.instrument() == &instrument {
-                        return Some(event);
-                    }
-                    None
-                });
+            for instrument in self.state.data.list_instruments().await {
+                let res = self
+                    .state
+                    .data
+                    .list_events(&instrument, EventType::TradeUpdate, tick, self.window)
+                    .await;
 
                 if let Ok(vwap) = VWAP::from_trades(self.id(), &instrument, &tick, &res) {
                     info!(
