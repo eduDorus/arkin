@@ -4,7 +4,7 @@ mod errors;
 mod factory;
 mod ws;
 
-use core::fmt;
+use std::fmt;
 
 use backtest::BacktestIngestor;
 use binance::BinanceIngestor;

@@ -1,4 +1,3 @@
-use super::Feature;
 use crate::{
     config::VWAPConfig,
     constants::TIMESTAMP_FORMAT,
@@ -77,9 +76,7 @@ impl VWAPFeature {
             window,
         }
     }
-}
 
-impl Feature for VWAPFeature {
     fn id(&self) -> &str {
         &self.id
     }

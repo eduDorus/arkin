@@ -74,6 +74,9 @@ mimalloc = {version = "0.1", default-features = false}
 # CLI
 clap = {version = "4.5", features = ["std", "derive", "color", "suggestions"]}
 
+# Graph Library
+petgraph = "0.6"
+
 [profile.release]
 lto = "thin"
 

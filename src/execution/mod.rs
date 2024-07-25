@@ -1,4 +1,4 @@
-use core::fmt;
+use std::fmt;
 
 use backtest::BacktestExecution;
 use binance::BinanceExecution;

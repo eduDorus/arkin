@@ -3,8 +3,6 @@ use std::fmt;
 use strum::EnumIter;
 use time::OffsetDateTime;
 
-use crate::features::VWAP;
-
 use super::{BookUpdate, Fill, Instrument, Order, Position, Tick, Trade};
 
 #[derive(Clone)]
@@ -18,9 +16,8 @@ pub enum Event {
     PositionUpdate(Position),
     OrderUpdate(Order),
     FillUpdate(Fill),
-
     // Features
-    VWAP(VWAP),
+    // VWAP(VWAP),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumIter)]
@@ -34,9 +31,8 @@ pub enum EventType {
     PositionUpdate,
     OrderUpdate,
     FillUpdate,
-
     // Features
-    VWAP,
+    // VWAP,
 }
 
 impl fmt::Display for EventType {
@@ -51,9 +47,8 @@ impl fmt::Display for EventType {
             EventType::PositionUpdate => write!(f, "Position update"),
             EventType::OrderUpdate => write!(f, "Order update"),
             EventType::FillUpdate => write!(f, "Fill update"),
-
             // Features
-            EventType::VWAP => write!(f, "VWAP update"),
+            // EventType::VWAP => write!(f, "VWAP update"),
         }
     }
 }
@@ -71,9 +66,8 @@ impl Event {
             Event::PositionUpdate(e) => &e.event_time,
             Event::OrderUpdate(e) => &e.event_time,
             Event::FillUpdate(e) => &e.event_time,
-
             // Features
-            Event::VWAP(e) => &e.event_time,
+            // Event::VWAP(e) => &e.event_time,
         }
     }
 
@@ -88,9 +82,8 @@ impl Event {
             Event::PositionUpdate(e) => &e.instrument,
             Event::OrderUpdate(e) => &e.instrument,
             Event::FillUpdate(e) => &e.instrument,
-
             // Features
-            Event::VWAP(e) => &e.instrument,
+            // Event::VWAP(e) => &e.instrument,
         }
     }
 
@@ -105,9 +98,8 @@ impl Event {
             Event::PositionUpdate(_) => &EventType::PositionUpdate,
             Event::OrderUpdate(_) => &EventType::OrderUpdate,
             Event::FillUpdate(_) => &EventType::FillUpdate,
-
             // Features
-            Event::VWAP(_) => &EventType::VWAP,
+            // Event::VWAP(_) => &EventType::VWAP,
         }
     }
 }
@@ -121,7 +113,7 @@ impl fmt::Display for Event {
             Event::PositionUpdate(position) => write!(f, "Position update: {}", position),
             Event::OrderUpdate(order) => write!(f, "Order update: {}", order),
             Event::FillUpdate(fill) => write!(f, "Fill update: {}", fill),
-            Event::VWAP(vwap) => write!(f, "VWAP update: {}", vwap),
+            // Event::VWAP(vwap) => write!(f, "VWAP update: {}", vwap),
         }
     }
 }

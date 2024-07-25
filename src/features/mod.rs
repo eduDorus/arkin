@@ -1,46 +1,160 @@
 pub mod errors;
 mod factory;
-mod vwap;
+mod graph;
+// mod vwap;
 
-use core::fmt;
+pub use graph::FeatureGraph;
+use std::time::Duration;
+use tracing::info;
 
-pub use factory::FeatureFactory;
-use vwap::VWAPFeature;
-pub use vwap::VWAP;
-
-#[trait_variant::make(Send)]
 pub trait Feature {
     fn id(&self) -> &str;
-    async fn start(&self);
+    fn sources(&self) -> Vec<&str>;
+    fn calculate(&self);
 }
 
-#[derive(Clone)]
-pub enum FeatureType {
-    VWAP(VWAPFeature),
-    // SMA(SMAFeature),
-    // EMA(EMAFeature),
+pub struct VWAPGen {
+    id: String,
+    window: Duration,
 }
 
-impl fmt::Display for FeatureType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            FeatureType::VWAP(_) => write!(f, "VWAP"),
-            // FeatureType::SMA(sma) => write!(f, "SMA: {}", sma.config),
-            // FeatureType::EMA(ema) => write!(f, "EMA: {}", ema.config),
+impl VWAPGen {
+    pub fn new(id: &str, window: Duration) -> Self {
+        VWAPGen {
+            id: id.to_string(),
+            window,
         }
     }
 }
 
-impl Feature for FeatureType {
+impl Feature for VWAPGen {
     fn id(&self) -> &str {
-        match self {
-            FeatureType::VWAP(f) => f.id(),
-        }
+        &self.id
     }
 
-    async fn start(&self) {
-        match self {
-            FeatureType::VWAP(f) => f.start().await,
+    fn sources(&self) -> Vec<&str> {
+        vec![]
+    }
+
+    fn calculate(&self) {
+        info!("Calculating VWAP with id: {}", self.id);
+    }
+}
+
+pub struct SMAGen {
+    id: String,
+    source: String,
+    window: Duration,
+}
+
+impl SMAGen {
+    pub fn new(id: &str, source: &str, window: Duration) -> Self {
+        SMAGen {
+            id: id.to_string(),
+            source: source.to_string(),
+            window,
         }
+    }
+}
+
+impl Feature for SMAGen {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn sources(&self) -> Vec<&str> {
+        vec![&self.source]
+    }
+
+    fn calculate(&self) {
+        info!("Calculating SMA with id: {}", self.id);
+    }
+}
+
+pub struct EMAGen {
+    id: String,
+    source: String,
+    window: Duration,
+}
+
+impl EMAGen {
+    pub fn new(id: &str, source: &str, window: Duration) -> Self {
+        EMAGen {
+            id: id.to_string(),
+            source: source.to_string(),
+            window,
+        }
+    }
+}
+
+impl Feature for EMAGen {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn sources(&self) -> Vec<&str> {
+        vec![&self.source]
+    }
+
+    fn calculate(&self) {
+        info!("Calculating EMA with id: {}", self.id);
+    }
+}
+
+pub struct SpreadGen {
+    id: String,
+    leg_one: String,
+    leg_two: String,
+}
+
+impl SpreadGen {
+    pub fn new(id: &str, leg_one: &str, leg_two: &str) -> Self {
+        SpreadGen {
+            id: id.to_string(),
+            leg_one: leg_one.to_string(),
+            leg_two: leg_two.to_string(),
+        }
+    }
+}
+
+impl Feature for SpreadGen {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn sources(&self) -> Vec<&str> {
+        vec![&self.leg_one, &self.leg_two]
+    }
+
+    fn calculate(&self) {
+        info!("Calculating Spread with id: {}", self.id);
+    }
+}
+
+pub struct VolumeGen {
+    id: String,
+    window: Duration,
+}
+
+impl VolumeGen {
+    pub fn new(id: &str, window: Duration) -> Self {
+        VolumeGen {
+            id: id.to_string(),
+            window,
+        }
+    }
+}
+
+impl Feature for VolumeGen {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn sources(&self) -> Vec<&str> {
+        vec![]
+    }
+
+    fn calculate(&self) {
+        info!("Calculating Volume with id: {}", self.id);
     }
 }

@@ -1,14 +1,9 @@
 use std::sync::Arc;
 
 use rust_decimal::Decimal;
-use tracing::{info, warn};
+use tracing::info;
 
-use crate::{
-    config::CrossoverConfig,
-    features::VWAP,
-    models::{Event, EventType},
-    state::StateManager,
-};
+use crate::{config::CrossoverConfig, state::StateManager};
 
 use super::Strategy;
 
@@ -30,25 +25,23 @@ impl CrossoverStrategy {
             min_spread: config.min_spread,
         }
     }
-
-    fn calculate_quote(&self, _vwap: VWAP) {}
 }
 
 impl Strategy for CrossoverStrategy {
     async fn start(&self) {
         info!("Starting crossover strategy...");
-        let mut rx = self.state.subscribe_event(EventType::VWAP);
+        // let mut rx = self.state.subscribe_event(EventType::VWAP);
 
-        while let Ok(event) = rx.recv().await {
-            info!("Wide quoter strategy received event: {}", event);
-            match event {
-                Event::VWAP(v) => {
-                    self.calculate_quote(v);
-                }
-                _ => {
-                    warn!("Wide quoter strategy received unused event: {}", event);
-                }
-            }
-        }
+        // while let Ok(event) = rx.recv().await {
+        //     info!("Wide quoter strategy received event: {}", event);
+        //     match event {
+        //         Event::VWAP(v) => {
+        //             self.calculate_quote(v);
+        //         }
+        //         _ => {
+        //             warn!("Wide quoter strategy received unused event: {}", event);
+        //         }
+        //     }
+        // }
     }
 }

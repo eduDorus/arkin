@@ -6,7 +6,6 @@ use crate::{
     allocation::{Allocation, AllocationFactory, AllocationType},
     config::GlobalConfig,
     execution::{Execution, ExecutionFactory, ExecutionType},
-    features::{Feature, FeatureFactory, FeatureType},
     ingestors::{Ingestor, IngestorFactory, IngestorType},
     state::StateManager,
     strategies::{Strategy, StrategyFactory, StrategyType},
@@ -26,8 +25,8 @@ impl Server {
         let ingestors = IngestorFactory::from_config(self.state.clone(), &self.config.ingestors);
         tokio::spawn(Server::ingestor_task(ingestors));
 
-        let features = FeatureFactory::from_config(self.state.clone(), &self.config.features);
-        tokio::spawn(Server::feature_task(features));
+        // let features = FeatureFactory::from_config(self.state.clone(), &self.config.features);
+        // tokio::spawn(Server::feature_task(features));
 
         let strategies = StrategyFactory::from_config(self.state.clone(), &self.config.strategies);
         tokio::spawn(Server::strategy_task(strategies));
@@ -49,12 +48,12 @@ impl Server {
         }
     }
 
-    async fn feature_task(features: Vec<FeatureType>) {
-        info!("Spawning feature tasks...");
-        for feature in features {
-            tokio::spawn(async move { feature.start().await });
-        }
-    }
+    // async fn feature_task(features: Vec<FeatureType>) {
+    //     info!("Spawning feature tasks...");
+    //     for feature in features {
+    //         tokio::spawn(async move { feature.start().await });
+    //     }
+    // }
 
     async fn strategy_task(strategies: Vec<StrategyType>) {
         info!("Spawning trader tasks...");

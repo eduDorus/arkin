@@ -1,25 +1,21 @@
-use std::sync::Arc;
+// use std::sync::Arc;
 
-use crate::{config::FeatureConfig, features::vwap::VWAPFeature, state::StateManager};
+// use crate::{config::FeatureConfig, state::StateManager};
 
-use super::FeatureType;
+// pub struct FeatureFactory {}
 
-pub struct FeatureFactory {}
+// impl FeatureFactory {
+//     pub fn from_config(state: Arc<StateManager>, config: &[FeatureConfig]) -> Vec<FeatureType> {
+//         let mut features = Vec::new();
 
-impl FeatureFactory {
-    pub fn from_config(state: Arc<StateManager>, config: &[FeatureConfig]) -> Vec<FeatureType> {
-        let mut features = Vec::new();
+//         for config in config {
+//             match config {
+//                 FeatureConfig::VWAP(config) => todo!(),
+//                 FeatureConfig::SMA(_) => todo!(),
+//                 FeatureConfig::EMA(_) => todo!(),
+//             }
+//         }
 
-        for config in config {
-            match config {
-                FeatureConfig::VWAP(config) => {
-                    features.push(FeatureType::VWAP(VWAPFeature::new(state.to_owned(), config)));
-                }
-                FeatureConfig::SMA(_) => unimplemented!(),
-                FeatureConfig::EMA(_) => unimplemented!(),
-            }
-        }
-
-        features
-    }
-}
+//         features
+//     }
+// }
