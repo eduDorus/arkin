@@ -1,23 +1,60 @@
-use petgraph::{algo::toposort, graph::DiGraph};
+use std::time::Duration;
+
+use petgraph::{
+    algo::toposort,
+    dot::{Config, Dot},
+    graph::DiGraph,
+};
 use tracing::info;
 
-use super::{Feature, FeatureID};
+use crate::config::{FeatureConfig, PipelineConfig};
 
-pub struct FeatureGraph {
+use super::{EMAGen, Feature, FeatureID, SMAGen, SpreadGen, VWAPGen, VolumeGen};
+
+#[derive(Default)]
+pub struct Pipeline {
     graph: DiGraph<Box<dyn Feature>, ()>,
 }
 
-impl Default for FeatureGraph {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl Pipeline {
+    pub fn from_config(config: &PipelineConfig) -> Self {
+        let mut graph = DiGraph::new();
 
-impl FeatureGraph {
-    pub fn new() -> Self {
-        FeatureGraph {
-            graph: DiGraph::new(),
+        // Create nodes
+        config.features.iter().for_each(|c| {
+            let f: Box<dyn Feature> = match &c {
+                FeatureConfig::Volume(c) => Box::new(VolumeGen::new(c.id.clone(), Duration::from_secs(c.window))),
+                FeatureConfig::VWAP(c) => Box::new(VWAPGen::new(c.id.clone(), Duration::from_secs(c.window))),
+                FeatureConfig::SMA(c) => {
+                    Box::new(SMAGen::new(c.id.clone(), c.source.clone(), Duration::from_secs(c.window)))
+                }
+                FeatureConfig::EMA(c) => {
+                    Box::new(EMAGen::new(c.id.clone(), c.source.clone(), Duration::from_secs(c.window)))
+                }
+                FeatureConfig::Spread(c) => Box::new(SpreadGen::new(
+                    c.id.clone(),
+                    c.front_component.clone(),
+                    c.back_component.clone(),
+                )),
+            };
+            graph.add_node(f);
+        });
+
+        // Add edges automatically
+        let mut edges_to_add = vec![];
+        for target_node in graph.node_indices() {
+            for source in graph[target_node].sources() {
+                let source_node = graph.node_indices().find(|i| graph[*i].id() == source).unwrap();
+                edges_to_add.push((source_node, target_node));
+            }
         }
+        for (source, target) in edges_to_add {
+            graph.add_edge(source, target, ());
+        }
+
+        info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
+
+        Pipeline { graph }
     }
 
     pub fn add_node<F: Feature + 'static>(&mut self, feature: F) {
@@ -64,6 +101,7 @@ impl FeatureGraph {
 mod tests {
     use super::*;
     use crate::{
+        config::{EMAConfig, SMAConfig, SpreadConfig, VWAPConfig, VolumeConfig},
         features::{EMAGen, SMAGen, SpreadGen, VWAPGen, VolumeGen},
         logging,
     };
@@ -71,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_add_node() {
-        let mut graph = FeatureGraph::new();
+        let mut graph = Pipeline::default();
         let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
         graph.add_node(vwap);
         assert_eq!(graph.graph.node_count(), 1);
@@ -79,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_add_edge() {
-        let mut graph = FeatureGraph::new();
+        let mut graph = Pipeline::default();
         let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
         let ema = EMAGen::new("ema_vwap_50".into(), "vwap".into(), Duration::from_secs(300));
 
@@ -95,7 +133,7 @@ mod tests {
         logging::init_test_tracing();
 
         // Create graph
-        let mut graph = FeatureGraph::new();
+        let mut graph = Pipeline::default();
 
         // Create features
         let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
@@ -118,5 +156,43 @@ mod tests {
         graph.calculate().await;
         assert_eq!(graph.graph.node_count(), 5);
         assert_eq!(graph.graph.edge_count(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_from_config() {
+        logging::init_test_tracing();
+
+        let config = PipelineConfig {
+            name: "test_pipeline".to_string(),
+            frequency: 1,
+            features: vec![
+                FeatureConfig::Volume(VolumeConfig {
+                    id: "volume_1_min".into(),
+                    window: 60,
+                }),
+                FeatureConfig::VWAP(VWAPConfig {
+                    id: "vwap_1_min".into(),
+                    window: 60,
+                }),
+                FeatureConfig::SMA(SMAConfig {
+                    id: "sma_10_min".into(),
+                    source: "vwap_1_min".into(),
+                    window: 600,
+                }),
+                FeatureConfig::EMA(EMAConfig {
+                    id: "ema_10_min".into(),
+                    source: "vwap_1_min".into(),
+                    window: 600,
+                }),
+                FeatureConfig::Spread(SpreadConfig {
+                    id: "spread".into(),
+                    front_component: "sma_10_min".into(),
+                    back_component: "ema_10_min".into(),
+                }),
+            ],
+        };
+
+        let pipeline = Pipeline::from_config(&config);
+        pipeline.calculate().await;
     }
 }

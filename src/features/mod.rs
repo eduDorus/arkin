@@ -5,11 +5,12 @@ mod graph;
 
 use async_trait::async_trait;
 use core::fmt;
-pub use graph::FeatureGraph;
-use std::time::Duration;
+pub use graph::Pipeline;
+use serde::{Deserialize, Serialize};
+use std::{fmt::Debug, time::Duration};
 use tracing::info;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct FeatureID(String);
 
 impl From<&str> for FeatureID {
@@ -31,12 +32,13 @@ impl fmt::Display for FeatureID {
 }
 
 #[async_trait]
-pub trait Feature {
+pub trait Feature: Debug {
     fn id(&self) -> &FeatureID;
     fn sources(&self) -> Vec<&FeatureID>;
     async fn calculate(&self);
 }
 
+#[derive(Debug)]
 pub struct VWAPGen {
     id: FeatureID,
     window: Duration,
@@ -63,6 +65,7 @@ impl Feature for VWAPGen {
     }
 }
 
+#[derive(Debug)]
 pub struct SMAGen {
     id: FeatureID,
     source: FeatureID,
@@ -90,6 +93,7 @@ impl Feature for SMAGen {
     }
 }
 
+#[derive(Debug)]
 pub struct EMAGen {
     id: FeatureID,
     source: FeatureID,
@@ -117,18 +121,19 @@ impl Feature for EMAGen {
     }
 }
 
+#[derive(Debug)]
 pub struct SpreadGen {
     id: FeatureID,
-    leg_one: FeatureID,
-    leg_two: FeatureID,
+    front_component: FeatureID,
+    back_component: FeatureID,
 }
 
 impl SpreadGen {
-    pub fn new(id: FeatureID, leg_one: FeatureID, leg_two: FeatureID) -> Self {
+    pub fn new(id: FeatureID, front_component: FeatureID, back_component: FeatureID) -> Self {
         SpreadGen {
             id,
-            leg_one,
-            leg_two,
+            front_component,
+            back_component,
         }
     }
 }
@@ -140,7 +145,7 @@ impl Feature for SpreadGen {
     }
 
     fn sources(&self) -> Vec<&FeatureID> {
-        vec![&self.leg_one, &self.leg_two]
+        vec![&self.front_component, &self.back_component]
     }
 
     async fn calculate(&self) {
@@ -148,6 +153,7 @@ impl Feature for SpreadGen {
     }
 }
 
+#[derive(Debug)]
 pub struct VolumeGen {
     id: FeatureID,
     window: Duration,

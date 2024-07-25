@@ -5,12 +5,14 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
+use crate::features::FeatureID;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalConfig {
     pub name: String,
     pub state: StateConfig,
     pub ingestors: Vec<IngestorConfig>,
-    pub features: Vec<FeatureConfig>,
+    pub pipelines: Vec<PipelineConfig>,
     pub strategies: Vec<StrategyConfig>,
     pub allocation: AllocationConfig,
     pub execution: Vec<ExecutionConfig>,
@@ -71,32 +73,60 @@ pub struct BinanceIngestorConfig {
     pub duplicate_lookback: usize,
 }
 
+// PIPELINES
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PipelineConfig {
+    pub name: String,
+    pub frequency: u64,
+    pub features: Vec<FeatureConfig>,
+}
+
 // FEATURES
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FeatureConfig {
+    #[serde(rename = "volume")]
+    Volume(VolumeConfig),
     #[serde(rename = "vwap")]
     VWAP(VWAPConfig),
     #[serde(rename = "sma")]
     SMA(SMAConfig),
     #[serde(rename = "ema")]
     EMA(EMAConfig),
+    #[serde(rename = "spread")]
+    Spread(SpreadConfig),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VolumeConfig {
+    pub id: FeatureID,
+    pub window: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VWAPConfig {
-    pub id: String,
-    pub frequency: u64,
+    pub id: FeatureID,
     pub window: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SMAConfig {
+    pub id: FeatureID,
+    pub source: FeatureID,
     pub window: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EMAConfig {
+    pub id: FeatureID,
+    pub source: FeatureID,
     pub window: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SpreadConfig {
+    pub id: FeatureID,
+    pub front_component: FeatureID,
+    pub back_component: FeatureID,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -195,5 +225,18 @@ pub fn load() -> GlobalConfig {
             error!("Configuration error: {:?}", e);
             panic!("Failed to load configuration.");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::logging;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_config() {
+        logging::init_test_tracing();
+        load();
     }
 }
