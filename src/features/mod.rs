@@ -3,6 +3,7 @@ mod factory;
 mod graph;
 // mod vwap;
 
+use async_trait::async_trait;
 use core::fmt;
 pub use graph::FeatureGraph;
 use std::time::Duration;
@@ -29,10 +30,11 @@ impl fmt::Display for FeatureID {
     }
 }
 
+#[async_trait]
 pub trait Feature {
     fn id(&self) -> &FeatureID;
     fn sources(&self) -> Vec<&FeatureID>;
-    fn calculate(&self);
+    async fn calculate(&self);
 }
 
 pub struct VWAPGen {
@@ -46,6 +48,7 @@ impl VWAPGen {
     }
 }
 
+#[async_trait]
 impl Feature for VWAPGen {
     fn id(&self) -> &FeatureID {
         &self.id
@@ -55,7 +58,7 @@ impl Feature for VWAPGen {
         vec![]
     }
 
-    fn calculate(&self) {
+    async fn calculate(&self) {
         info!("Calculating VWAP with id: {}", self.id);
     }
 }
@@ -72,6 +75,7 @@ impl SMAGen {
     }
 }
 
+#[async_trait]
 impl Feature for SMAGen {
     fn id(&self) -> &FeatureID {
         &self.id
@@ -81,7 +85,7 @@ impl Feature for SMAGen {
         vec![&self.source]
     }
 
-    fn calculate(&self) {
+    async fn calculate(&self) {
         info!("Calculating SMA with id: {}", self.id);
     }
 }
@@ -98,6 +102,7 @@ impl EMAGen {
     }
 }
 
+#[async_trait]
 impl Feature for EMAGen {
     fn id(&self) -> &FeatureID {
         &self.id
@@ -107,7 +112,7 @@ impl Feature for EMAGen {
         vec![&self.source]
     }
 
-    fn calculate(&self) {
+    async fn calculate(&self) {
         info!("Calculating EMA with id: {}", self.id);
     }
 }
@@ -128,6 +133,7 @@ impl SpreadGen {
     }
 }
 
+#[async_trait]
 impl Feature for SpreadGen {
     fn id(&self) -> &FeatureID {
         &self.id
@@ -137,7 +143,7 @@ impl Feature for SpreadGen {
         vec![&self.leg_one, &self.leg_two]
     }
 
-    fn calculate(&self) {
+    async fn calculate(&self) {
         info!("Calculating Spread with id: {}", self.id);
     }
 }
@@ -153,6 +159,7 @@ impl VolumeGen {
     }
 }
 
+#[async_trait]
 impl Feature for VolumeGen {
     fn id(&self) -> &FeatureID {
         &self.id
@@ -162,7 +169,7 @@ impl Feature for VolumeGen {
         vec![]
     }
 
-    fn calculate(&self) {
+    async fn calculate(&self) {
         info!("Calculating Volume with id: {}", self.id);
     }
 }

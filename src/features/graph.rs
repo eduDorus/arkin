@@ -44,13 +44,13 @@ impl FeatureGraph {
         }
     }
 
-    pub fn calculate(&self) {
+    pub async fn calculate(&self) {
         let res = toposort(&self.graph, None);
         match res {
             Ok(order) => {
                 for node in order {
                     let feature = &self.graph[node];
-                    feature.calculate();
+                    feature.calculate().await;
                 }
             }
             Err(e) => {
@@ -90,8 +90,8 @@ mod tests {
         assert_eq!(graph.graph.edge_count(), 1);
     }
 
-    #[test]
-    fn test_pipeline_calculate() {
+    #[tokio::test]
+    async fn test_pipeline_calculate() {
         logging::init_test_tracing();
 
         // Create graph
@@ -115,7 +115,7 @@ mod tests {
         graph.connect_nodes();
 
         // Calculate
-        graph.calculate();
+        graph.calculate().await;
         assert_eq!(graph.graph.node_count(), 5);
         assert_eq!(graph.graph.edge_count(), 4);
     }
