@@ -2,6 +2,7 @@ use crate::{
     constants::TIMESTAMP_FORMAT,
     models::{Event, EventType, Instrument},
 };
+use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::{
     cmp::Ordering,
@@ -12,7 +13,7 @@ use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{error, info};
 
-type EventMap = RwLock<HashMap<(Instrument, EventType), BTreeMap<CompositeKey, Event>>>;
+type EventMap = DashMap<(Instrument, EventType), BTreeMap<CompositeKey, Event>>;
 type SubscriberMap = RwLock<HashMap<EventType, Sender<Event>>>;
 
 #[derive(Default)]
@@ -82,8 +83,7 @@ impl DataStore {
         let key = (event.instrument().to_owned(), event.event_type().to_owned());
 
         // First acquire a read lock to check if the tree exists
-        let mut events_guard = self.events.write();
-        if let Some(tree) = events_guard.get_mut(&key) {
+        if let Some(mut tree) = self.events.get_mut(&key) {
             // Add to existing tree
             let mut key = CompositeKey::new(event.event_time());
             while tree.get(&key).is_some() {
@@ -95,7 +95,7 @@ impl DataStore {
             let mut new_tree = BTreeMap::new();
             let composite_key = CompositeKey::new(event.event_time());
             new_tree.insert(composite_key, event.to_owned());
-            events_guard.insert(key, new_tree);
+            self.events.insert(key, new_tree);
         }
     }
 
@@ -112,11 +112,7 @@ impl DataStore {
     }
 
     pub async fn list_instruments(&self) -> HashSet<Instrument> {
-        self.events
-            .read()
-            .iter()
-            .map(|((instrument, _), _)| instrument.to_owned())
-            .collect()
+        self.events.iter().map(|k| k.key().0.clone()).collect()
     }
 
     pub async fn list_events(
@@ -140,8 +136,7 @@ impl DataStore {
         let from_key = CompositeKey::new_max(&from_adjusted);
         let end_key = CompositeKey::new(&till);
 
-        let events_guard = self.events.read();
-        if let Some(tree) = events_guard.get(&(instrument.to_owned(), event_type)) {
+        if let Some(tree) = self.events.get(&(instrument.to_owned(), event_type)) {
             tree.range(end_key..=from_key).map(|(_, e)| e).cloned().collect::<Vec<_>>()
         } else {
             Vec::new()
