@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use serde::Serialize;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{error, info, warn};
@@ -36,6 +37,7 @@ impl BinanceIngestor {
     }
 }
 
+#[async_trait]
 impl Ingestor for BinanceIngestor {
     async fn start(&self) {
         info!("Starting binance ingestor...");

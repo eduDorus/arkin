@@ -1,17 +1,18 @@
+use async_trait::async_trait;
+use std::fmt;
+
 mod backtest;
 mod binance;
 mod errors;
 mod factory;
 mod ws;
 
-use std::fmt;
-
 use backtest::BacktestIngestor;
 use binance::BinanceIngestor;
 
 pub use factory::IngestorFactory;
 
-#[trait_variant::make(Send)]
+#[async_trait]
 pub trait Ingestor {
     async fn start(&self);
 }
@@ -22,6 +23,7 @@ pub enum IngestorType {
     Binance(BinanceIngestor),
 }
 
+#[async_trait]
 impl Ingestor for IngestorType {
     async fn start(&self) {
         match self {

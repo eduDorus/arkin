@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::fmt;
 
 use backtest::BacktestExecution;
@@ -12,7 +13,7 @@ mod factory;
 
 pub use factory::ExecutionFactory;
 
-#[trait_variant::make(Send)]
+#[async_trait]
 pub trait Execution: Clone {
     async fn start(&self);
 }
@@ -23,6 +24,7 @@ pub enum ExecutionType {
     Backtest(BacktestExecution),
 }
 
+#[async_trait]
 impl Execution for ExecutionType {
     async fn start(&self) {
         match self {

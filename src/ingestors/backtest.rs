@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tracing::info;
@@ -29,6 +30,7 @@ impl BacktestIngestor {
     }
 }
 
+#[async_trait]
 impl Ingestor for BacktestIngestor {
     async fn start(&self) {
         info!("Starting backtest ingestor...");

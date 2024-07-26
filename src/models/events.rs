@@ -1,6 +1,5 @@
 use std::fmt;
 
-use strum::EnumIter;
 use time::OffsetDateTime;
 
 use super::{BookUpdate, Fill, Instrument, Order, Position, Tick, Trade};
@@ -20,7 +19,7 @@ pub enum Event {
     // VWAP(VWAP),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumIter)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum EventType {
     // Market
     TickUpdate,

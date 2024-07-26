@@ -1,5 +1,6 @@
 use std::fmt;
 
+use async_trait::async_trait;
 use limited::LimitedAllocation;
 
 mod factory;
@@ -7,7 +8,7 @@ mod limited;
 
 pub use factory::AllocationFactory;
 
-#[trait_variant::make(Send)]
+#[async_trait]
 #[allow(unused)]
 pub trait Allocation: Clone {
     async fn start(&self);
@@ -18,6 +19,7 @@ pub enum AllocationType {
     Limited(LimitedAllocation),
 }
 
+#[async_trait]
 impl Allocation for AllocationType {
     async fn start(&self) {
         match self {

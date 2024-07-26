@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use rust_decimal::Decimal;
 use tracing::info;
 
@@ -27,6 +28,7 @@ impl BinanceExecution {
     }
 }
 
+#[async_trait]
 impl Execution for BinanceExecution {
     async fn start(&self) {
         info!("Starting binance execution...");

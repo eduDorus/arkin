@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use rust_decimal::Decimal;
 use tracing::info;
 
@@ -23,6 +24,7 @@ impl LimitedAllocation {
     }
 }
 
+#[async_trait]
 impl Allocation for LimitedAllocation {
     async fn start(&self) {
         info!("Starting limited allocation...");

@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use crossover::CrossoverStrategy;
 use spreader::Spreader;
 use std::fmt;
@@ -9,7 +10,7 @@ mod spreader;
 
 pub use factory::StrategyFactory;
 
-#[trait_variant::make(Send)]
+#[async_trait]
 pub trait Strategy: Clone {
     async fn start(&self);
 }
@@ -20,6 +21,7 @@ pub enum StrategyType {
     Spreader(Spreader),
 }
 
+#[async_trait]
 impl Strategy for StrategyType {
     async fn start(&self) {
         match self {

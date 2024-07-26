@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use rust_decimal::Decimal;
 use tracing::info;
 
@@ -27,6 +28,7 @@ impl BacktestExecution {
     }
 }
 
+#[async_trait]
 impl Execution for BacktestExecution {
     async fn start(&self) {
         info!("Starting backtest execution...");

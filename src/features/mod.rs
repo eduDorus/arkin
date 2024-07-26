@@ -6,9 +6,18 @@ mod graph;
 use async_trait::async_trait;
 use core::fmt;
 pub use graph::Pipeline;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, time::Duration};
 use tracing::info;
+
+fn fibonacci(n: u64) -> u64 {
+    match n {
+        0 => 0,
+        1 => 1,
+        _ => fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct FeatureID(String);
@@ -32,10 +41,94 @@ impl fmt::Display for FeatureID {
 }
 
 #[async_trait]
-pub trait Feature: Debug {
+pub trait Feature: Debug + Send + Sync {
     fn id(&self) -> &FeatureID;
     fn sources(&self) -> Vec<&FeatureID>;
-    async fn calculate(&self);
+    fn calculate(&self);
+    async fn calculate_async(&self);
+}
+
+#[derive(Debug)]
+pub struct BaseGen {
+    id: FeatureID,
+}
+
+impl Default for BaseGen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BaseGen {
+    pub fn new() -> Self {
+        BaseGen {
+            id: FeatureID::from("base"),
+        }
+    }
+}
+
+#[async_trait]
+impl Feature for BaseGen {
+    fn id(&self) -> &FeatureID {
+        &self.id
+    }
+
+    fn sources(&self) -> Vec<&FeatureID> {
+        vec![]
+    }
+
+    fn calculate(&self) {
+        info!("Calculating Base with id: {}", self.id);
+    }
+
+    async fn calculate_async(&self) {
+        info!("Calculating Base with id: {}", self.id);
+    }
+}
+
+#[derive(Debug)]
+pub struct VolumeGen {
+    id: FeatureID,
+    window: Duration,
+}
+
+impl VolumeGen {
+    pub fn new(id: FeatureID, window: Duration) -> Self {
+        VolumeGen { id, window }
+    }
+}
+
+#[async_trait]
+impl Feature for VolumeGen {
+    fn id(&self) -> &FeatureID {
+        &self.id
+    }
+
+    fn sources(&self) -> Vec<&FeatureID> {
+        vec![]
+    }
+
+    fn calculate(&self) {
+        info!("Calculating Volume with id: {}", self.id);
+
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("Volume result for {}: {}", limit, result);
+    }
+
+    async fn calculate_async(&self) {
+        info!("Calculating Volume with id: {}", self.id);
+
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("Volume result for {}: {}", limit, result);
+    }
 }
 
 #[derive(Debug)]
@@ -60,8 +153,24 @@ impl Feature for VWAPGen {
         vec![]
     }
 
-    async fn calculate(&self) {
+    fn calculate(&self) {
         info!("Calculating VWAP with id: {}", self.id);
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("VWAP result for {}: {}", limit, result);
+    }
+
+    async fn calculate_async(&self) {
+        info!("Calculating VWAP with id: {}", self.id);
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("VWAP result for {}: {}", limit, result);
     }
 }
 
@@ -88,8 +197,26 @@ impl Feature for SMAGen {
         vec![&self.source]
     }
 
-    async fn calculate(&self) {
+    fn calculate(&self) {
         info!("Calculating SMA with id: {}", self.id);
+        // Wait a random amount of time between 0 and 1 second
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("SMA result for {}: {}", limit, result);
+    }
+
+    async fn calculate_async(&self) {
+        info!("Calculating SMA with id: {}", self.id);
+        // Wait a random amount of time between 0 and 1 second
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("SMA result for {}: {}", limit, result);
     }
 }
 
@@ -116,8 +243,26 @@ impl Feature for EMAGen {
         vec![&self.source]
     }
 
-    async fn calculate(&self) {
+    fn calculate(&self) {
         info!("Calculating EMA with id: {}", self.id);
+        // Wait a random amount of time between 0 and 1 second
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("EMA result for {}: {}", limit, result);
+    }
+
+    async fn calculate_async(&self) {
+        info!("Calculating EMA with id: {}", self.id);
+        // Wait a random amount of time between 0 and 1 second
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("EMA result for {}: {}", limit, result);
     }
 }
 
@@ -148,34 +293,25 @@ impl Feature for SpreadGen {
         vec![&self.front_component, &self.back_component]
     }
 
-    async fn calculate(&self) {
+    fn calculate(&self) {
         info!("Calculating Spread with id: {}", self.id);
-    }
-}
+        // Wait a random amount of time between 0 and 1 second
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
 
-#[derive(Debug)]
-pub struct VolumeGen {
-    id: FeatureID,
-    window: Duration,
-}
-
-impl VolumeGen {
-    pub fn new(id: FeatureID, window: Duration) -> Self {
-        VolumeGen { id, window }
-    }
-}
-
-#[async_trait]
-impl Feature for VolumeGen {
-    fn id(&self) -> &FeatureID {
-        &self.id
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("Spread result for {}: {}", limit, result);
     }
 
-    fn sources(&self) -> Vec<&FeatureID> {
-        vec![]
-    }
+    async fn calculate_async(&self) {
+        info!("Calculating Spread with id: {}", self.id);
+        // Wait a random amount of time between 0 and 1 second
+        // Generate a random limit for the Fibonacci calculation
+        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
 
-    async fn calculate(&self) {
-        info!("Calculating Volume with id: {}", self.id);
+        // Perform the Fibonacci computation
+        let result = fibonacci(limit);
+        info!("Spread result for {}: {}", limit, result);
     }
 }

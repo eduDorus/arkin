@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use rust_decimal::Decimal;
 use tracing::info;
 
@@ -23,6 +24,7 @@ impl Spreader {
     }
 }
 
+#[async_trait]
 impl Strategy for Spreader {
     async fn start(&self) {
         info!("Starting spreader strategy...");

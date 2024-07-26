@@ -1,19 +1,22 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
+use parking_lot::Mutex;
+use petgraph::graph::NodeIndex;
 use petgraph::{
     algo::toposort,
     dot::{Config, Dot},
     graph::DiGraph,
 };
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::config::{FeatureConfig, PipelineConfig};
 
-use super::{EMAGen, Feature, FeatureID, SMAGen, SpreadGen, VWAPGen, VolumeGen};
+use super::{EMAGen, Feature, SMAGen, SpreadGen, VWAPGen, VolumeGen};
 
 #[derive(Default)]
 pub struct Pipeline {
-    graph: DiGraph<Box<dyn Feature>, ()>,
+    graph: Arc<DiGraph<Box<dyn Feature>, ()>>,
+    order: Vec<NodeIndex>,
 }
 
 impl Pipeline {
@@ -52,48 +55,158 @@ impl Pipeline {
             graph.add_edge(source, target, ());
         }
 
+        let order = toposort(&graph, None).expect("Cycle detected in graph");
+
         info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
 
-        Pipeline { graph }
+        Pipeline {
+            graph: Arc::new(graph),
+            order,
+        }
     }
 
-    pub fn add_node<F: Feature + 'static>(&mut self, feature: F) {
-        self.graph.add_node(Box::new(feature));
-    }
+    // pub fn add_node<F: Feature + 'static>(&mut self, feature: F) {
+    //     self.graph.add_node(Box::new(feature));
+    // }
 
-    pub fn add_edge(&mut self, source: &FeatureID, target: &FeatureID) {
-        let source_node = self.graph.node_indices().find(|i| self.graph[*i].id() == source).unwrap();
-        let target_node = self.graph.node_indices().find(|i| self.graph[*i].id() == target).unwrap();
-        self.graph.add_edge(source_node, target_node, ());
-    }
+    // pub fn add_edge(&mut self, source: &FeatureID, target: &FeatureID) {
+    //     let source_node = self.graph.node_indices().find(|i| self.graph[*i].id() == source).unwrap();
+    //     let target_node = self.graph.node_indices().find(|i| self.graph[*i].id() == target).unwrap();
+    //     self.graph.add_edge(source_node, target_node, ());
+    // }
 
-    pub fn connect_nodes(&mut self) {
-        let mut edges_to_add = vec![];
-        for node in self.graph.node_indices() {
-            let node_id = self.graph[node].id();
-            for source in self.graph[node].sources() {
-                edges_to_add.push((source.clone(), node_id.clone()));
+    // pub fn connect_nodes(&mut self) {
+    //     let mut edges_to_add = vec![];
+    //     for node in self.graph.node_indices() {
+    //         let node_id = self.graph[node].id();
+    //         for source in self.graph[node].sources() {
+    //             edges_to_add.push((source.clone(), node_id.clone()));
+    //         }
+    //     }
+
+    //     for (source, target) in edges_to_add {
+    //         self.add_edge(&source, &target);
+    //     }
+    // }
+
+    // pub fn calculate(&self) {
+    //     let nodes = toposort(&self.graph, None).expect("Cycle detected in graph");
+
+    //     for node in nodes {
+    //         let feature = &self.graph[node];
+    //         feature.calculate();
+    //     }
+    // }
+
+    // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
+    pub fn calculate(&self) {
+        // Step 1: Calculate in-degrees
+        let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
+        for edge in self.graph.edge_indices() {
+            let target = self.graph.edge_endpoints(edge).unwrap().1;
+            in_degrees.lock()[target.index()] += 1;
+        }
+        debug!("In-Degree count: {:?}", in_degrees);
+
+        // Step 2: Enqueue nodes with zero in-degree
+        let (queue_tx, queue_rx) = flume::unbounded();
+        for node in &self.order {
+            if in_degrees.lock()[node.index()] == 0 {
+                debug!("Ready node: {:?}", self.graph[*node]);
+                queue_tx.send(Some(*node)).expect("Failed to send ready node");
             }
         }
 
-        for (source, target) in edges_to_add {
-            self.add_edge(&source, &target);
-        }
+        // Step 3: Parallel processing
+        let pool = rayon::ThreadPoolBuilder::new().build().expect("Failed to create thread pool");
+        pool.scope(|s| {
+            while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
+                let graph = Arc::clone(&self.graph);
+                let in_degrees = Arc::clone(&in_degrees);
+                let queue_tx = queue_tx.clone();
+
+                s.spawn(move |_| {
+                    // Process the node
+                    let feature = &graph[node];
+                    feature.calculate();
+
+                    // Update in-degrees of neighbors and enqueue new zero in-degree nodes
+                    for neighbor in graph.neighbors_directed(node, petgraph::Outgoing) {
+                        let mut in_degrees = in_degrees.lock();
+                        in_degrees[neighbor.index()] -= 1;
+                        if in_degrees[neighbor.index()] == 0 {
+                            debug!("Ready node: {:?}", graph[neighbor]);
+                            queue_tx.send(Some(neighbor)).expect("Failed to send ready node");
+
+                            debug!("Dependency count: {:?}", in_degrees);
+                            if in_degrees.iter().all(|&x| x == 0) {
+                                queue_tx.send(None).expect("Failed to send exit message");
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        info!("Finished graph calculation");
     }
 
-    pub async fn calculate(&self) {
-        let res = toposort(&self.graph, None);
-        match res {
-            Ok(order) => {
-                for node in order {
-                    let feature = &self.graph[node];
-                    feature.calculate().await;
+    pub async fn calculate_async(&self) {
+        // Step 1: Calculate in-degrees
+        let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
+        for edge in self.graph.edge_indices() {
+            let target = self.graph.edge_endpoints(edge).unwrap().1;
+            in_degrees.lock()[target.index()] += 1;
+        }
+        debug!("In-Degree count: {:?}", in_degrees);
+
+        // Step 2: Enqueue nodes with zero in-degree
+        let (queue_tx, queue_rx) = flume::unbounded();
+        for node in &self.order {
+            if in_degrees.lock()[node.index()] == 0 {
+                debug!("Ready node: {:?}", self.graph[*node]);
+                queue_tx.send(Some(*node)).expect("Failed to send ready node");
+            }
+        }
+
+        // Step 3: Parallel processing
+        let mut tasks = Vec::with_capacity(self.graph.node_count());
+        while let Some(node_index) = queue_rx.recv_async().await.expect("Failed to receive ready node") {
+            let graph = Arc::clone(&self.graph);
+            let in_degrees = Arc::clone(&in_degrees);
+            let queue_tx = queue_tx.clone();
+
+            let task = tokio::spawn(async move {
+                // Calculate the feature
+                let feature = &graph[node_index];
+                feature.calculate_async().await;
+
+                // Update dependencies and push ready nodes to the queue
+                for neighbor in graph.neighbors_directed(node_index, petgraph::Outgoing) {
+                    let mut count = in_degrees.lock()[neighbor.index()];
+                    count -= 1;
+                    in_degrees.lock()[neighbor.index()] = count;
+
+                    if count == 0 {
+                        debug!("Ready node: {:?}", graph[neighbor]);
+                        queue_tx.send_async(Some(neighbor)).await.expect("Failed to send ready node");
+
+                        debug!("Dependency count: {:?}", in_degrees);
+                        if in_degrees.lock().iter().all(|&x| x == 0) {
+                            queue_tx.send_async(None).await.expect("Failed to send ready node");
+                        }
+                    }
                 }
-            }
-            Err(e) => {
-                info!("Error: {:?}", e);
-            }
+            });
+            tasks.push(task);
         }
+
+        // Wait on all tasks to finish
+        for task in tasks {
+            let _ = task.await;
+        }
+
+        info!("Finished graph calculation");
     }
 }
 
@@ -102,63 +215,61 @@ mod tests {
     use super::*;
     use crate::{
         config::{EMAConfig, SMAConfig, SpreadConfig, VWAPConfig, VolumeConfig},
-        features::{EMAGen, SMAGen, SpreadGen, VWAPGen, VolumeGen},
         logging,
     };
-    use std::time::Duration;
 
-    #[test]
-    fn test_pipeline_add_node() {
-        let mut graph = Pipeline::default();
-        let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
-        graph.add_node(vwap);
-        assert_eq!(graph.graph.node_count(), 1);
-    }
+    // #[test]
+    // fn test_pipeline_add_node() {
+    //     let mut graph = Pipeline::default();
+    //     let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
+    //     graph.add_node(vwap);
+    //     assert_eq!(graph.graph.node_count(), 1);
+    // }
 
-    #[test]
-    fn test_pipeline_add_edge() {
-        let mut graph = Pipeline::default();
-        let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
-        let ema = EMAGen::new("ema_vwap_50".into(), "vwap".into(), Duration::from_secs(300));
+    // #[test]
+    // fn test_pipeline_add_edge() {
+    //     let mut graph = Pipeline::default();
+    //     let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
+    //     let ema = EMAGen::new("ema_vwap_50".into(), "vwap".into(), Duration::from_secs(300));
 
-        graph.add_node(vwap);
-        graph.add_node(ema);
+    //     graph.add_node(vwap);
+    //     graph.add_node(ema);
 
-        graph.connect_nodes();
-        assert_eq!(graph.graph.edge_count(), 1);
-    }
+    //     graph.connect_nodes();
+    //     assert_eq!(graph.graph.edge_count(), 1);
+    // }
 
-    #[tokio::test]
-    async fn test_pipeline_calculate() {
-        logging::init_test_tracing();
+    // #[tokio::test]
+    // async fn test_pipeline_calculate() {
+    //     logging::init_test_tracing();
 
-        // Create graph
-        let mut graph = Pipeline::default();
+    //     // Create graph
+    //     let mut graph = Pipeline::default();
 
-        // Create features
-        let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
-        let ema = EMAGen::new("ema_vwap_50".into(), "vwap".into(), Duration::from_secs(50));
-        let sma = SMAGen::new("sma_vwap_50".into(), "vwap".into(), Duration::from_secs(50));
-        let spread = SpreadGen::new("spread".into(), "sma_vwap_50".into(), "ema_vwap_50".into());
-        let volume = VolumeGen::new("volume".into(), Duration::from_secs(60));
+    //     // Create features
+    //     let vwap = VWAPGen::new("vwap".into(), Duration::from_secs(60));
+    //     let ema = EMAGen::new("ema_vwap_50".into(), "vwap".into(), Duration::from_secs(50));
+    //     let sma = SMAGen::new("sma_vwap_50".into(), "vwap".into(), Duration::from_secs(50));
+    //     let spread = SpreadGen::new("spread".into(), "sma_vwap_50".into(), "ema_vwap_50".into());
+    //     let volume = VolumeGen::new("volume".into(), Duration::from_secs(60));
 
-        // Create nodes
-        graph.add_node(vwap);
-        graph.add_node(ema);
-        graph.add_node(sma);
-        graph.add_node(spread);
-        graph.add_node(volume);
+    //     // Create nodes
+    //     graph.add_node(vwap);
+    //     graph.add_node(ema);
+    //     graph.add_node(sma);
+    //     graph.add_node(spread);
+    //     graph.add_node(volume);
 
-        // Connect nodes
-        graph.connect_nodes();
+    //     // Connect nodes
+    //     graph.connect_nodes();
 
-        // Calculate
-        graph.calculate().await;
-        assert_eq!(graph.graph.node_count(), 5);
-        assert_eq!(graph.graph.edge_count(), 4);
-    }
+    //     // Calculate
+    //     graph.calculate().await;
+    //     assert_eq!(graph.graph.node_count(), 5);
+    //     assert_eq!(graph.graph.edge_count(), 4);
+    // }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_pipeline_from_config() {
         logging::init_test_tracing();
 
@@ -185,14 +296,31 @@ mod tests {
                     window: 600,
                 }),
                 FeatureConfig::Spread(SpreadConfig {
-                    id: "spread".into(),
+                    id: "spread_vwap".into(),
                     front_component: "sma_10_min".into(),
                     back_component: "ema_10_min".into(),
+                }),
+                FeatureConfig::SMA(SMAConfig {
+                    id: "sma_volume_10_min".into(),
+                    source: "volume_1_min".into(),
+                    window: 600,
+                }),
+                FeatureConfig::Spread(SpreadConfig {
+                    id: "spread_volume".into(),
+                    front_component: "sma_volume_10_min".into(),
+                    back_component: "volume_1_min".into(),
+                }),
+                FeatureConfig::Spread(SpreadConfig {
+                    id: "spread_vwap_volume".into(),
+                    front_component: "spread_vwap".into(),
+                    back_component: "spread_volume".into(),
                 }),
             ],
         };
 
         let pipeline = Pipeline::from_config(&config);
-        pipeline.calculate().await;
+        pipeline.calculate();
+        info!("---------------------");
+        pipeline.calculate_async().await;
     }
 }

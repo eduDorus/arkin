@@ -111,11 +111,11 @@ impl DataStore {
         }
     }
 
-    pub async fn list_instruments(&self) -> HashSet<Instrument> {
+    pub fn list_instruments(&self) -> HashSet<Instrument> {
         self.events.iter().map(|k| k.key().0.clone()).collect()
     }
 
-    pub async fn list_events(
+    pub fn list_events(
         &self,
         instrument: &Instrument,
         event_type: EventType,
