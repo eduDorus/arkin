@@ -1,11 +1,11 @@
 use anyhow::Result;
-use aurelion::config;
-use aurelion::logging;
-use aurelion::services::TardisChannel;
-use aurelion::services::TardisExchange;
-use aurelion::services::TardisModel;
-use aurelion::services::TardisRequest;
-use aurelion::services::TardisService;
+use arkin::config;
+use arkin::logging;
+use arkin::services::TardisChannel;
+use arkin::services::TardisExchange;
+use arkin::services::TardisModel;
+use arkin::services::TardisRequest;
+use arkin::services::TardisService;
 use clap::Parser;
 use clap::Subcommand;
 use futures_util::StreamExt;
@@ -18,7 +18,7 @@ use tracing::info;
 /// CLI application for X
 #[derive(Parser)]
 #[clap(
-    name = "Aurelion Utils",
+    name = "Arkin Utils",
     version = "0.1.0",
     author = "Dorus Janssens",
     about = "This utility downloads data from various exchanges"
@@ -60,7 +60,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
     logging::init_tracing();
-    info!("Starting Aurelion 🚀");
+    info!("Starting Arkin 🚀");
 
     let config = config::load();
     info!("Loaded configuration: {}", serde_json::to_string_pretty(&config)?);

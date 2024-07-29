@@ -1,6 +1,6 @@
 [package]
 authors = ["Dorus Janssens <dorus.janssens@gmail.com>"]
-name = "aurelion"
+name = "arkin"
 version = "0.1.0"
 edition = "2021"
 default-run = "server"
@@ -79,7 +79,7 @@ clap = {version = "4.5", features = ["std", "derive", "color", "suggestions"]}
 petgraph = "0.6"
 
 # Parquet and arrow
-parquet = { version = "52.2.0", features = ["arrow", "async", "zstd"], default-features = false }
+#parquet = { version = "52.2.0", features = ["arrow", "async", "zstd"], default-features = false }
 
 [profile.release]
 lto = "thin"

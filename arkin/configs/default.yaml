@@ -1,4 +1,4 @@
-name: Aurelion
+name: Arkin
 
 ingestors:
   - binance:
@@ -90,5 +90,5 @@ tardis:
 
 clickhouse:
   url: http://127.0.0.1:18123
-  user: aurelion_admin
-  database: aurelion
+  user: arkin_admin
+  database: arkin

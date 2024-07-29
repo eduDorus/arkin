@@ -1,7 +1,7 @@
 use anyhow::Result;
-use aurelion::config;
-use aurelion::logging;
-use aurelion::server::Server;
+use arkin::config;
+use arkin::logging;
+use arkin::server::Server;
 use mimalloc::MiMalloc;
 use tracing::info;
 
@@ -11,7 +11,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
     logging::init_tracing();
-    info!("Starting Aurelion 🚀");
+    info!("Starting Arkin 🚀");
 
     let config = config::load();
     info!("Loaded configuration: {}", serde_json::to_string_pretty(&config)?);

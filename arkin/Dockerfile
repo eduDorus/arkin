@@ -1,9 +1,9 @@
 # DEFAULT ARGUMENTS
-ARG BINARY_NAME=aurelion
+ARG BINARY_NAME=arkin
 ARG PROFILE=maxperf
 
 # BUILD IMAGE
-FROM rust:1.79.0-bookworm as build
+FROM rust:1.80.0-bookworm as build
 # Set arguments
 ARG BINARY_NAME
 ARG PROFILE
