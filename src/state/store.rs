@@ -1,11 +1,11 @@
 use crate::{
     constants::TIMESTAMP_FORMAT,
+    features::FeatureID,
     models::{Event, EventType, Instrument},
 };
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::{
-    cmp::Ordering,
     collections::{BTreeMap, HashMap, HashSet},
     time::Duration,
 };
@@ -13,16 +13,7 @@ use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{error, info};
 
-type EventMap = DashMap<(Instrument, EventType), BTreeMap<CompositeKey, Event>>;
-type SubscriberMap = RwLock<HashMap<EventType, Sender<Event>>>;
-
-#[derive(Default)]
-pub struct DataStore {
-    events: EventMap,
-    subscribers: SubscriberMap,
-}
-
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, PartialOrd, Ord, Eq, PartialEq, Hash)]
 pub struct CompositeKey {
     timestamp: OffsetDateTime,
     index: u64,
@@ -48,16 +39,11 @@ impl CompositeKey {
     }
 }
 
-impl Ord for CompositeKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.timestamp.cmp(&other.timestamp).then_with(|| self.index.cmp(&other.index))
-    }
-}
-
-impl PartialOrd for CompositeKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
+#[derive(Default)]
+pub struct DataStore {
+    events: DashMap<(Instrument, EventType), BTreeMap<CompositeKey, Event>>,
+    _features: DashMap<(Instrument, FeatureID), BTreeMap<CompositeKey, Event>>,
+    subscribers: RwLock<HashMap<EventType, Sender<Event>>>,
 }
 
 impl DataStore {

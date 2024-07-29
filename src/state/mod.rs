@@ -6,3 +6,4 @@ mod store;
 mod time_component;
 
 pub use manager::StateManager;
+pub use store::DataStore;

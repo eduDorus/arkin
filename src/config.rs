@@ -85,45 +85,45 @@ pub struct PipelineConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FeatureConfig {
     #[serde(rename = "volume")]
-    Volume(VolumeConfig),
+    Volume(VolumeFeatureConfig),
     #[serde(rename = "vwap")]
-    VWAP(VWAPConfig),
+    VWAP(VWAPFeatureConfig),
     #[serde(rename = "sma")]
-    SMA(SMAConfig),
+    SMA(SMAFeatureConfig),
     #[serde(rename = "ema")]
-    EMA(EMAConfig),
+    EMA(EMAFeatureConfig),
     #[serde(rename = "spread")]
-    Spread(SpreadConfig),
+    Spread(SpreadFeatureConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VolumeConfig {
+pub struct VolumeFeatureConfig {
     pub id: FeatureID,
     pub window: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VWAPConfig {
+pub struct VWAPFeatureConfig {
     pub id: FeatureID,
     pub window: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SMAConfig {
-    pub id: FeatureID,
-    pub source: FeatureID,
-    pub window: u64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct EMAConfig {
+pub struct SMAFeatureConfig {
     pub id: FeatureID,
     pub source: FeatureID,
-    pub window: u64,
+    pub period: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SpreadConfig {
+pub struct EMAFeatureConfig {
+    pub id: FeatureID,
+    pub source: FeatureID,
+    pub period: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SpreadFeatureConfig {
     pub id: FeatureID,
     pub front_component: FeatureID,
     pub back_component: FeatureID,

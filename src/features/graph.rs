@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 use petgraph::graph::NodeIndex;
@@ -11,7 +11,7 @@ use tracing::{debug, info};
 
 use crate::config::{FeatureConfig, PipelineConfig};
 
-use super::{EMAGen, Feature, SMAGen, SpreadGen, VWAPGen, VolumeGen};
+use super::{EMAFeature, Feature, SMAFeature, SpreadFeature, VWAPFeature, VolumeFeature};
 
 #[derive(Default)]
 pub struct Pipeline {
@@ -26,19 +26,11 @@ impl Pipeline {
         // Create nodes
         config.features.iter().for_each(|c| {
             let f: Box<dyn Feature> = match &c {
-                FeatureConfig::Volume(c) => Box::new(VolumeGen::new(c.id.clone(), Duration::from_secs(c.window))),
-                FeatureConfig::VWAP(c) => Box::new(VWAPGen::new(c.id.clone(), Duration::from_secs(c.window))),
-                FeatureConfig::SMA(c) => {
-                    Box::new(SMAGen::new(c.id.clone(), c.source.clone(), Duration::from_secs(c.window)))
-                }
-                FeatureConfig::EMA(c) => {
-                    Box::new(EMAGen::new(c.id.clone(), c.source.clone(), Duration::from_secs(c.window)))
-                }
-                FeatureConfig::Spread(c) => Box::new(SpreadGen::new(
-                    c.id.clone(),
-                    c.front_component.clone(),
-                    c.back_component.clone(),
-                )),
+                FeatureConfig::Volume(c) => Box::new(VolumeFeature::from_config(c)),
+                FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
+                FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
+                FeatureConfig::EMA(c) => Box::new(EMAFeature::from_config(c)),
+                FeatureConfig::Spread(c) => Box::new(SpreadFeature::from_config(c)),
             };
             graph.add_node(f);
         });
@@ -214,7 +206,7 @@ impl Pipeline {
 mod tests {
     use super::*;
     use crate::{
-        config::{EMAConfig, SMAConfig, SpreadConfig, VWAPConfig, VolumeConfig},
+        config::{EMAFeatureConfig, SMAFeatureConfig, SpreadFeatureConfig, VWAPFeatureConfig, VolumeFeatureConfig},
         logging,
     };
 
@@ -277,40 +269,40 @@ mod tests {
             name: "test_pipeline".to_string(),
             frequency: 1,
             features: vec![
-                FeatureConfig::Volume(VolumeConfig {
+                FeatureConfig::Volume(VolumeFeatureConfig {
                     id: "volume_1_min".into(),
                     window: 60,
                 }),
-                FeatureConfig::VWAP(VWAPConfig {
+                FeatureConfig::VWAP(VWAPFeatureConfig {
                     id: "vwap_1_min".into(),
                     window: 60,
                 }),
-                FeatureConfig::SMA(SMAConfig {
+                FeatureConfig::SMA(SMAFeatureConfig {
                     id: "sma_10_min".into(),
                     source: "vwap_1_min".into(),
-                    window: 600,
+                    period: 10,
                 }),
-                FeatureConfig::EMA(EMAConfig {
+                FeatureConfig::EMA(EMAFeatureConfig {
                     id: "ema_10_min".into(),
                     source: "vwap_1_min".into(),
-                    window: 600,
+                    period: 10,
                 }),
-                FeatureConfig::Spread(SpreadConfig {
+                FeatureConfig::Spread(SpreadFeatureConfig {
                     id: "spread_vwap".into(),
                     front_component: "sma_10_min".into(),
                     back_component: "ema_10_min".into(),
                 }),
-                FeatureConfig::SMA(SMAConfig {
+                FeatureConfig::SMA(SMAFeatureConfig {
                     id: "sma_volume_10_min".into(),
                     source: "volume_1_min".into(),
-                    window: 600,
+                    period: 10,
                 }),
-                FeatureConfig::Spread(SpreadConfig {
+                FeatureConfig::Spread(SpreadFeatureConfig {
                     id: "spread_volume".into(),
                     front_component: "sma_volume_10_min".into(),
                     back_component: "volume_1_min".into(),
                 }),
-                FeatureConfig::Spread(SpreadConfig {
+                FeatureConfig::Spread(SpreadFeatureConfig {
                     id: "spread_vwap_volume".into(),
                     front_component: "spread_vwap".into(),
                     back_component: "spread_volume".into(),

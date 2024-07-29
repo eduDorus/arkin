@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, time::Duration};
 use tracing::info;
 
+use crate::config::{EMAFeatureConfig, SMAFeatureConfig, SpreadFeatureConfig, VWAPFeatureConfig, VolumeFeatureConfig};
+
 fn fibonacci(n: u64) -> u64 {
     match n {
         0 => 0,
@@ -44,62 +46,35 @@ impl fmt::Display for FeatureID {
 pub trait Feature: Debug + Send + Sync {
     fn id(&self) -> &FeatureID;
     fn sources(&self) -> Vec<&FeatureID>;
+    // fn data(&self, store: Arc<DataStore>) -> QueryResult;
     fn calculate(&self);
     async fn calculate_async(&self);
 }
 
 #[derive(Debug)]
-pub struct BaseGen {
+pub struct VolumeFeature {
     id: FeatureID,
+    _window: Duration,
 }
 
-impl Default for BaseGen {
-    fn default() -> Self {
-        Self::new()
+impl VolumeFeature {
+    pub fn new(id: FeatureID, window: Duration) -> Self {
+        VolumeFeature {
+            id,
+            _window: window,
+        }
     }
-}
 
-impl BaseGen {
-    pub fn new() -> Self {
-        BaseGen {
-            id: FeatureID::from("base"),
+    pub fn from_config(config: &VolumeFeatureConfig) -> Self {
+        VolumeFeature {
+            id: config.id.to_owned(),
+            _window: Duration::from_secs(config.window),
         }
     }
 }
 
 #[async_trait]
-impl Feature for BaseGen {
-    fn id(&self) -> &FeatureID {
-        &self.id
-    }
-
-    fn sources(&self) -> Vec<&FeatureID> {
-        vec![]
-    }
-
-    fn calculate(&self) {
-        info!("Calculating Base with id: {}", self.id);
-    }
-
-    async fn calculate_async(&self) {
-        info!("Calculating Base with id: {}", self.id);
-    }
-}
-
-#[derive(Debug)]
-pub struct VolumeGen {
-    id: FeatureID,
-    window: Duration,
-}
-
-impl VolumeGen {
-    pub fn new(id: FeatureID, window: Duration) -> Self {
-        VolumeGen { id, window }
-    }
-}
-
-#[async_trait]
-impl Feature for VolumeGen {
+impl Feature for VolumeFeature {
     fn id(&self) -> &FeatureID {
         &self.id
     }
@@ -120,31 +95,34 @@ impl Feature for VolumeGen {
     }
 
     async fn calculate_async(&self) {
-        info!("Calculating Volume with id: {}", self.id);
-
-        // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
-
-        // Perform the Fibonacci computation
-        let result = fibonacci(limit);
-        info!("Volume result for {}: {}", limit, result);
+        self.calculate();
     }
 }
 
 #[derive(Debug)]
-pub struct VWAPGen {
+pub struct VWAPFeature {
     id: FeatureID,
-    window: Duration,
+    _window: Duration,
 }
 
-impl VWAPGen {
+impl VWAPFeature {
     pub fn new(id: FeatureID, window: Duration) -> Self {
-        VWAPGen { id, window }
+        VWAPFeature {
+            id,
+            _window: window,
+        }
+    }
+
+    pub fn from_config(config: &VWAPFeatureConfig) -> Self {
+        VWAPFeature {
+            id: config.id.to_owned(),
+            _window: Duration::from_secs(config.window),
+        }
     }
 }
 
 #[async_trait]
-impl Feature for VWAPGen {
+impl Feature for VWAPFeature {
     fn id(&self) -> &FeatureID {
         &self.id
     }
@@ -164,31 +142,37 @@ impl Feature for VWAPGen {
     }
 
     async fn calculate_async(&self) {
-        info!("Calculating VWAP with id: {}", self.id);
-        // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
-
-        // Perform the Fibonacci computation
-        let result = fibonacci(limit);
-        info!("VWAP result for {}: {}", limit, result);
+        self.calculate();
     }
 }
 
 #[derive(Debug)]
-pub struct SMAGen {
+pub struct SMAFeature {
     id: FeatureID,
     source: FeatureID,
-    window: Duration,
+    _period: u64,
 }
 
-impl SMAGen {
-    pub fn new(id: FeatureID, source: FeatureID, window: Duration) -> Self {
-        SMAGen { id, source, window }
+impl SMAFeature {
+    pub fn new(id: FeatureID, source: FeatureID, period: u64) -> Self {
+        SMAFeature {
+            id,
+            source,
+            _period: period,
+        }
+    }
+
+    pub fn from_config(config: &SMAFeatureConfig) -> Self {
+        SMAFeature {
+            id: config.id.to_owned(),
+            source: config.source.to_owned(),
+            _period: config.period,
+        }
     }
 }
 
 #[async_trait]
-impl Feature for SMAGen {
+impl Feature for SMAFeature {
     fn id(&self) -> &FeatureID {
         &self.id
     }
@@ -209,32 +193,37 @@ impl Feature for SMAGen {
     }
 
     async fn calculate_async(&self) {
-        info!("Calculating SMA with id: {}", self.id);
-        // Wait a random amount of time between 0 and 1 second
-        // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
-
-        // Perform the Fibonacci computation
-        let result = fibonacci(limit);
-        info!("SMA result for {}: {}", limit, result);
+        self.calculate();
     }
 }
 
 #[derive(Debug)]
-pub struct EMAGen {
+pub struct EMAFeature {
     id: FeatureID,
     source: FeatureID,
-    window: Duration,
+    _period: u64,
 }
 
-impl EMAGen {
-    pub fn new(id: FeatureID, source: FeatureID, window: Duration) -> Self {
-        EMAGen { id, source, window }
+impl EMAFeature {
+    pub fn new(id: FeatureID, source: FeatureID, period: u64) -> Self {
+        EMAFeature {
+            id,
+            source,
+            _period: period,
+        }
+    }
+
+    pub fn from_config(config: &EMAFeatureConfig) -> Self {
+        EMAFeature {
+            id: config.id.to_owned(),
+            source: config.source.to_owned(),
+            _period: config.period,
+        }
     }
 }
 
 #[async_trait]
-impl Feature for EMAGen {
+impl Feature for EMAFeature {
     fn id(&self) -> &FeatureID {
         &self.id
     }
@@ -255,36 +244,37 @@ impl Feature for EMAGen {
     }
 
     async fn calculate_async(&self) {
-        info!("Calculating EMA with id: {}", self.id);
-        // Wait a random amount of time between 0 and 1 second
-        // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
-
-        // Perform the Fibonacci computation
-        let result = fibonacci(limit);
-        info!("EMA result for {}: {}", limit, result);
+        self.calculate();
     }
 }
 
 #[derive(Debug)]
-pub struct SpreadGen {
+pub struct SpreadFeature {
     id: FeatureID,
     front_component: FeatureID,
     back_component: FeatureID,
 }
 
-impl SpreadGen {
+impl SpreadFeature {
     pub fn new(id: FeatureID, front_component: FeatureID, back_component: FeatureID) -> Self {
-        SpreadGen {
+        SpreadFeature {
             id,
             front_component,
             back_component,
         }
     }
+
+    pub fn from_config(config: &SpreadFeatureConfig) -> Self {
+        SpreadFeature {
+            id: config.id.to_owned(),
+            front_component: config.front_component.to_owned(),
+            back_component: config.back_component.to_owned(),
+        }
+    }
 }
 
 #[async_trait]
-impl Feature for SpreadGen {
+impl Feature for SpreadFeature {
     fn id(&self) -> &FeatureID {
         &self.id
     }
@@ -305,13 +295,6 @@ impl Feature for SpreadGen {
     }
 
     async fn calculate_async(&self) {
-        info!("Calculating Spread with id: {}", self.id);
-        // Wait a random amount of time between 0 and 1 second
-        // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
-
-        // Perform the Fibonacci computation
-        let result = fibonacci(limit);
-        info!("Spread result for {}: {}", limit, result);
+        self.calculate();
     }
 }
