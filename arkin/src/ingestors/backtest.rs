@@ -9,7 +9,7 @@ use crate::{
     config::BacktestIngestorConfig,
     ingestors::IngestorID,
     models::{Asset, Event, Instrument, PerpetualContract, Price, Quantity, Trade, Venue},
-    state::StateManager,
+    state::State,
 };
 
 use super::Ingestor;
@@ -17,12 +17,12 @@ use super::Ingestor;
 #[derive(Clone)]
 #[allow(unused)]
 pub struct BacktestIngestor {
-    state: Arc<StateManager>,
+    state: Arc<State>,
     market_data: bool,
 }
 
 impl BacktestIngestor {
-    pub fn new(state: Arc<StateManager>, config: &BacktestIngestorConfig) -> Self {
+    pub fn new(state: Arc<State>, config: &BacktestIngestorConfig) -> Self {
         BacktestIngestor {
             state,
             market_data: config.market_data,
@@ -49,7 +49,7 @@ impl Ingestor for BacktestIngestor {
                 Quantity::new(Decimal::new(1, 0)),
                 IngestorID::Backtest,
             );
-            self.state.event_update(Event::TradeUpdate(trade)).await;
+            self.state.add_event(Event::TradeUpdate(trade));
             trade_id += 1;
         }
     }

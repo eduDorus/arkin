@@ -1,19 +1,20 @@
 use std::sync::Arc;
 
-use crate::{config::IngestorConfig, state::StateManager};
+use crate::{config::IngestorConfig, state::State};
 
 use super::{backtest::BacktestIngestor, binance::BinanceIngestor, IngestorType};
 
 pub struct IngestorFactory {}
 
 impl IngestorFactory {
-    pub fn from_config(state: Arc<StateManager>, config: &[IngestorConfig]) -> Vec<IngestorType> {
+    pub fn from_config(state: Arc<State>, config: &[IngestorConfig]) -> Vec<IngestorType> {
         let mut ingestors = Vec::new();
 
         for config in config {
             let ingestor = match config {
                 IngestorConfig::Backtest(c) => IngestorType::Backtest(BacktestIngestor::new(state.to_owned(), c)),
                 IngestorConfig::Binance(c) => IngestorType::Binance(BinanceIngestor::new(state.to_owned(), c)),
+                IngestorConfig::Tardis(_) => unimplemented!(),
             };
             ingestors.push(ingestor);
         }

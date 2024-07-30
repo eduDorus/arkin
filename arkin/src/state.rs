@@ -1,17 +1,14 @@
 use crate::{
     constants::TIMESTAMP_FORMAT,
-    features::FeatureID,
     models::{Event, EventType, Instrument},
 };
 use dashmap::DashMap;
-use parking_lot::RwLock;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     time::Duration,
 };
 use time::OffsetDateTime;
-use tokio::sync::broadcast::{self, Receiver, Sender};
-use tracing::{error, info};
+use tracing::info;
 
 #[derive(Clone, PartialOrd, Ord, Eq, PartialEq, Hash)]
 pub struct CompositeKey {
@@ -40,32 +37,12 @@ impl CompositeKey {
 }
 
 #[derive(Default)]
-pub struct DataStore {
+pub struct State {
     events: DashMap<(Instrument, EventType), BTreeMap<CompositeKey, Event>>,
-    _features: DashMap<(Instrument, FeatureID), BTreeMap<CompositeKey, Event>>,
-    subscribers: RwLock<HashMap<EventType, Sender<Event>>>,
 }
 
-impl DataStore {
-    pub fn subscribe(&self, event_id: EventType) -> Receiver<Event> {
-        info!("Subscribing to events: {}", event_id);
-        if let Some(sender) = self.subscribers.read().get(&event_id) {
-            info!("Found existing subscriber for frequency: {:?}", event_id);
-            return sender.subscribe();
-        }
-
-        info!("Creating new subscriber for events: {}", event_id);
-        let (sender, receiver) = broadcast::channel(1);
-        self.subscribers.write().insert(event_id, sender);
-        receiver
-    }
-
-    pub async fn add_event(&self, event: Event) {
-        self.update_store(event.clone());
-        self.update_subscribers(event);
-    }
-
-    fn update_store(&self, event: Event) {
+impl State {
+    pub fn add_event(&self, event: Event) {
         let key = (event.instrument().to_owned(), event.event_type().to_owned());
 
         // First acquire a read lock to check if the tree exists
@@ -82,18 +59,6 @@ impl DataStore {
             let composite_key = CompositeKey::new(event.event_time());
             new_tree.insert(composite_key, event.to_owned());
             self.events.insert(key, new_tree);
-        }
-    }
-
-    fn update_subscribers(&self, event: Event) {
-        // Notify subscribers
-        let subscribers_guard = self.subscribers.read();
-        for (id, sender) in subscribers_guard.iter() {
-            if event.event_type() == id {
-                if let Err(e) = sender.send(event.clone()) {
-                    error!("Failed to send event: {}", e);
-                }
-            }
         }
     }
 

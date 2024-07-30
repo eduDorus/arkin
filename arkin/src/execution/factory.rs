@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use crate::{config::ExecutionConfig, state::StateManager};
+use crate::{config::ExecutionConfig, state::State};
 
 use super::{backtest::BacktestExecution, binance::BinanceExecution, ExecutionType};
 
 pub struct ExecutionFactory {}
 
 impl ExecutionFactory {
-    pub fn from_config(state: Arc<StateManager>, configs: &[ExecutionConfig]) -> Vec<ExecutionType> {
+    pub fn from_config(state: Arc<State>, configs: &[ExecutionConfig]) -> Vec<ExecutionType> {
         let mut executors = Vec::new();
 
         for config in configs {

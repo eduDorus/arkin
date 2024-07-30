@@ -1,4 +1,16 @@
-name: Arkin
+server:
+  name: arkin
+
+clock:
+  tick_frequency: 1 # In seconds
+
+state:
+  window: 600 # In seconds
+
+db:
+  url: http://127.0.0.1:18123
+  user: arkin_admin
+  database: arkin
 
 ingestors:
   - binance:
@@ -8,16 +20,18 @@ ingestors:
         - btcusdt@bookTicker
       connections_per_manager: 1
       duplicate_lookback: 100
-
-state:
-  market_state:
-    enabled: true
-  portfolio:
-    enabled: true
-  order_manager:
-    enabled: true
-  time_component:
-    tick_frequency: 1 # In seconds
+  # - tardis:
+  #     base_url: https://api.tardis.dev/v1/data-feeds
+  #     max_concurrent_requests: 1
+  #     subscriptions:
+  #       - exchange: binance_swap
+  #         start: 2024-06-01 00:00:00
+  #         channels:
+  #           - agg_trade
+  #           - ticker
+  #           - book
+  #         symbols:
+  #           - btcusdt
 
 pipelines:
   - name: TA
@@ -38,11 +52,11 @@ pipelines:
       - sma:
           id: sma_10_min
           source: vwap_1_min
-          window: 600 # In seconds
+          period: 10
       - ema:
           id: ema_10_min
           source: vwap_1_min
-          window: 600 # In seconds
+          period: 10
       - spread:
           id: spread_sma_ema_10_minute
           front_component: ema_10_min
@@ -73,22 +87,3 @@ execution:
       max_orders_per_minute: 5
       max_order_size_notional: 1000.
       min_order_size_notional: 100.
-
-tardis:
-  base_url: https://api.tardis.dev/v1/data-feeds
-  max_concurrent_requests: 1
-  subscriptions:
-    - exchange: binance_swap
-      start: 2023-10-01 00:00:00
-      channels:
-        - agg_trade
-        - book
-      symbols:
-        - BTCUSDT
-        - ETHUSDT
-        - SOLUSDT
-
-clickhouse:
-  url: http://127.0.0.1:18123
-  user: arkin_admin
-  database: arkin

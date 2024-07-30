@@ -3,16 +3,17 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::{
-    allocation::{Allocation, AllocationFactory, AllocationType},
+    clock::Clock,
     config::GlobalConfig,
     execution::{Execution, ExecutionFactory, ExecutionType},
     ingestors::{Ingestor, IngestorFactory, IngestorType},
-    state::StateManager,
-    strategies::{Strategy, StrategyFactory, StrategyType},
+    state::State,
 };
 
 pub struct Server {
-    state: Arc<StateManager>,
+    state: Arc<State>,
+    _clock: Arc<Clock>,
+    // _pubsub: Arc<PubSub>,
     config: GlobalConfig,
 }
 
@@ -23,16 +24,16 @@ impl Server {
 
     pub async fn run(&self) {
         let ingestors = IngestorFactory::from_config(self.state.clone(), &self.config.ingestors);
-        tokio::spawn(Server::ingestor_task(ingestors));
+        Server::ingestor_task(ingestors).await;
 
         // let features = FeatureFactory::from_config(self.state.clone(), &self.config.features);
         // tokio::spawn(Server::feature_task(features));
 
-        let strategies = StrategyFactory::from_config(self.state.clone(), &self.config.strategies);
-        tokio::spawn(Server::strategy_task(strategies));
+        // let strategies = StrategyFactory::from_config(self.state.clone(), &self.config.strategies);
+        // tokio::spawn(Server::strategy_task(strategies));
 
-        let allocation = AllocationFactory::from_config(self.state.clone(), &self.config.allocation);
-        tokio::spawn(Server::allocation_task(allocation));
+        // let allocation = AllocationFactory::from_config(self.state.clone(), &self.config.allocation);
+        // tokio::spawn(Server::allocation_task(allocation));
 
         let execution = ExecutionFactory::from_config(self.state.clone(), &self.config.execution);
         tokio::spawn(Server::execution_task(execution));
@@ -55,17 +56,17 @@ impl Server {
     //     }
     // }
 
-    async fn strategy_task(strategies: Vec<StrategyType>) {
-        info!("Spawning trader tasks...");
-        for strategy in strategies {
-            tokio::spawn(async move { strategy.start().await });
-        }
-    }
+    // async fn strategy_task(strategies: Vec<StrategyType>) {
+    //     info!("Spawning trader tasks...");
+    //     for strategy in strategies {
+    //         tokio::spawn(async move { strategy.start().await });
+    //     }
+    // }
 
-    async fn allocation_task(allocation: AllocationType) {
-        info!("Spawning allocation tasks...");
-        tokio::spawn(async move { allocation.start().await });
-    }
+    // async fn allocation_task(allocation: AllocationType) {
+    //     info!("Spawning allocation tasks...");
+    //     tokio::spawn(async move { allocation.start().await });
+    // }
 
     async fn execution_task(executors: Vec<ExecutionType>) {
         info!("Spawning execution tasks...");
@@ -89,7 +90,9 @@ impl ServerBuilder {
     pub fn build(self) -> Server {
         let config = self.config.unwrap();
         Server {
-            state: Arc::new(StateManager::new(&config.state)),
+            state: Arc::new(State::default()),
+            _clock: Arc::new(Clock::from_config(&config.clock)),
+            // _pubsub: Arc::new(PubSub::default()),
             config,
         }
     }

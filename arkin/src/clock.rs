@@ -9,18 +9,18 @@ use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{debug, error, info};
 
-use crate::{config::TimeComponentConfig, constants::TIMESTAMP_FORMAT};
+use crate::{config::ClockConfig, constants::TIMESTAMP_FORMAT};
 
-pub struct TimeComponent {
+pub struct Clock {
     pub subscribers: RwLock<HashMap<Duration, Sender<OffsetDateTime>>>,
     pub tick_frequency: Duration,
 }
 
-impl TimeComponent {
-    pub fn new(config: &TimeComponentConfig) -> Self {
+impl Clock {
+    pub fn from_config(config: &ClockConfig) -> Self {
         let tick_frequency = Duration::from_secs(config.tick_frequency);
         info!("Creating time component with tick frequency: {:?}", tick_frequency);
-        TimeComponent {
+        Clock {
             subscribers: RwLock::new(HashMap::new()),
             tick_frequency,
         }
@@ -95,8 +95,8 @@ mod tests {
     async fn test_time_component() {
         logging::init_test_tracing();
         info!("Starting time component test...");
-        let config = TimeComponentConfig { tick_frequency: 1 };
-        let time_component = TimeComponent::new(&config);
+        let config = ClockConfig { tick_frequency: 1 };
+        let time_component = Clock::from_config(&config);
         let mut rx_5_1 = time_component.subscribe(Duration::from_secs(5));
         let mut rx_5_2 = time_component.subscribe(Duration::from_secs(5));
         let mut rx_10_1 = time_component.subscribe(Duration::from_secs(10));

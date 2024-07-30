@@ -4,21 +4,21 @@ use async_trait::async_trait;
 use rust_decimal::Decimal;
 use tracing::info;
 
-use crate::{config::BinanceExecutionConfig, state::StateManager};
+use crate::{config::BinanceExecutionConfig, state::State};
 
 use super::Execution;
 
 #[derive(Clone)]
 #[allow(unused)]
 pub struct BinanceExecution {
-    state: Arc<StateManager>,
+    state: Arc<State>,
     max_orders_per_minute: u64,
     max_order_size_notional: Decimal,
     min_order_size_notional: Decimal,
 }
 
 impl BinanceExecution {
-    pub fn new(state: Arc<StateManager>, config: &BinanceExecutionConfig) -> Self {
+    pub fn new(state: Arc<State>, config: &BinanceExecutionConfig) -> Self {
         BinanceExecution {
             state,
             max_orders_per_minute: config.max_orders_per_minute,

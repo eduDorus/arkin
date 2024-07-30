@@ -4,19 +4,19 @@ use async_trait::async_trait;
 use rust_decimal::Decimal;
 use tracing::info;
 
-use crate::{config::LimitedAllocationConfig, state::StateManager};
+use crate::{config::LimitedAllocationConfig, state::State};
 
 use super::Allocation;
 
 #[derive(Clone)]
 #[allow(unused)]
 pub struct LimitedAllocation {
-    state: Arc<StateManager>,
+    state: Arc<State>,
     max_allocation: Decimal,
 }
 
 impl LimitedAllocation {
-    pub fn new(state: Arc<StateManager>, config: &LimitedAllocationConfig) -> Self {
+    pub fn new(state: Arc<State>, config: &LimitedAllocationConfig) -> Self {
         LimitedAllocation {
             state,
             max_allocation: config.max_allocation,

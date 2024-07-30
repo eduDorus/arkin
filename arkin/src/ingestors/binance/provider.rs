@@ -9,12 +9,12 @@ use url::Url;
 use crate::{
     config::BinanceIngestorConfig,
     ingestors::{binance::parser::BinanceParser, ws::WebSocketManager, Ingestor},
-    state::StateManager,
+    state::State,
 };
 
 #[derive(Clone)]
 pub struct BinanceIngestor {
-    state: Arc<StateManager>,
+    state: Arc<State>,
     url: Url,
     channels: Vec<String>,
     api_key: Option<String>,
@@ -24,7 +24,7 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    pub fn new(state: Arc<StateManager>, config: &BinanceIngestorConfig) -> Self {
+    pub fn new(state: Arc<State>, config: &BinanceIngestorConfig) -> Self {
         Self {
             state,
             url: config.ws_url.parse().expect("Failed to parse ws binance URL"),
@@ -64,7 +64,7 @@ impl Ingestor for BinanceIngestor {
                     let res = BinanceParser::parse(&data);
                     match res {
                         Ok(event) => {
-                            self.state.event_update(event).await;
+                            self.state.add_event(event);
                         }
                         Err(e) => error!("{}", e),
                     }

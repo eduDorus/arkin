@@ -4,21 +4,21 @@ use async_trait::async_trait;
 use rust_decimal::Decimal;
 use tracing::info;
 
-use crate::{config::CrossoverConfig, state::StateManager};
+use crate::{config::CrossoverConfig, state::State};
 
 use super::Strategy;
 
 #[derive(Clone)]
 #[allow(unused)]
 pub struct CrossoverStrategy {
-    state: Arc<StateManager>,
+    state: Arc<State>,
     fast: String,
     slow: String,
     min_spread: Decimal,
 }
 
 impl CrossoverStrategy {
-    pub fn new(state: Arc<StateManager>, config: &CrossoverConfig) -> Self {
+    pub fn new(state: Arc<State>, config: &CrossoverConfig) -> Self {
         Self {
             state,
             fast: config.fast.to_owned(),

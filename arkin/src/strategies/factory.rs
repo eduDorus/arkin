@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use crate::{config::StrategyConfig, state::StateManager};
+use crate::{config::StrategyConfig, state::State};
 
 use super::{crossover::CrossoverStrategy, spreader::Spreader, StrategyType};
 
 pub struct StrategyFactory {}
 
 impl StrategyFactory {
-    pub fn from_config(state: Arc<StateManager>, configs: &Vec<StrategyConfig>) -> Vec<StrategyType> {
+    pub fn from_config(state: Arc<State>, configs: &Vec<StrategyConfig>) -> Vec<StrategyType> {
         let mut strategies = Vec::new();
 
         for config in configs {
