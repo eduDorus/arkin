@@ -1,5 +1,4 @@
 use std::fmt;
-
 use time::OffsetDateTime;
 
 use super::{BookUpdate, Fill, Instrument, Order, Position, Tick, Trade};

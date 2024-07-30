@@ -20,6 +20,29 @@ impl TardisHttpClient {
     pub fn builder() -> TardisHttpClientBuilder {
         TardisHttpClientBuilder::default()
     }
+
+    pub async fn request(
+        &self,
+        exchange: String,
+        channel: String,
+        symbols: Vec<String>,
+        date: OffsetDateTime,
+        offset: i64,
+    ) -> Result<Bytes> {
+        let url = format!("{}/{}", self.base_url, exchange);
+        let query = QueryParams::new(channel, symbols, date, offset);
+        let res = backoff::future::retry(ExponentialBackoff::default(), || async {
+            let req = self.client.get(&url).query(&query.to_query()).build()?;
+            debug!("URL: {:?}", req.url().to_string());
+            debug!("Request: {:?}", req);
+            let res = self.client.execute(req).await.unwrap();
+            debug!("Response: {:?}", res);
+            let data = res.bytes().await?;
+            Ok(data)
+        })
+        .await?;
+        Ok(res)
+    }
 }
 
 #[derive(Default)]
@@ -97,30 +120,6 @@ impl QueryParams {
             ("offset".to_string(), self.offset.to_string()),
             ("filters".to_string(), serde_json::to_string(&self.filters).unwrap()),
         ]
-    }
-}
-
-impl TardisHttpClient {
-    pub async fn request(
-        &self,
-        exchange: String,
-        channel: String,
-        symbols: Vec<String>,
-        date: OffsetDateTime,
-        offset: i64,
-    ) -> Result<Bytes> {
-        let url = format!("{}/{}", self.base_url, exchange);
-        let query = QueryParams::new(channel, symbols, date, offset);
-        let res = backoff::future::retry(ExponentialBackoff::default(), || async {
-            let req = self.client.get(&url).query(&query.to_query());
-            debug!("Request: {:?}", req);
-            let res = req.send().await?;
-            debug!("Response: {:?}", res);
-            let data = res.bytes().await?;
-            Ok(data)
-        })
-        .await?;
-        Ok(res)
     }
 }
 

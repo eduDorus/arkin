@@ -1,108 +1,118 @@
-// use anyhow::Result;
-// use arkin::config;
-// use arkin::logging;
-// use arkin::services::TardisChannel;
-// use arkin::services::TardisExchange;
-// use arkin::services::TardisModel;
-// use arkin::services::TardisRequest;
-// use arkin::services::TardisService;
-// use clap::Parser;
-// use clap::Subcommand;
-// use futures_util::StreamExt;
-// use mimalloc::MiMalloc;
-// use time::macros::format_description;
-// use time::PrimitiveDateTime;
-// use tokio::pin;
-// use tracing::info;
+use std::io::Write;
 
-// /// CLI application for X
-// #[derive(Parser)]
-// #[clap(
-//     name = "Arkin Utils",
-//     version = "0.1.0",
-//     author = "Dorus Janssens",
-//     about = "This utility downloads data from various exchanges"
-// )]
+use anyhow::Result;
+use arkin::ingestors::TardisChannel;
+use arkin::ingestors::TardisExchange;
+use arkin::ingestors::TardisRequest;
+use arkin::ingestors::TardisService;
+use arkin::logging;
+use clap::Parser;
+use clap::Subcommand;
+use futures_util::StreamExt;
+use mimalloc::MiMalloc;
+use time::macros::format_description;
+use time::PrimitiveDateTime;
+use tokio::pin;
+use tracing::info;
 
-// struct Cli {
-//     #[clap(subcommand)]
-//     command: Commands,
-// }
+/// CLI application for X
+#[derive(Parser)]
+#[clap(
+    name = "Arkin Utils",
+    version = "0.1.0",
+    author = "Dorus Janssens",
+    about = "This utility downloads data from various exchanges"
+)]
 
-// #[derive(Subcommand)]
-// enum Commands {
-//     /// Processes streaming data
-//     Tardis {
-//         /// Sets the exchange to use
-//         #[clap(long)]
-//         exchange: TardisExchange,
+struct Cli {
+    #[clap(subcommand)]
+    command: Commands,
+}
 
-//         /// Type of data to stream
-//         #[clap(long)]
-//         channel: TardisChannel,
+#[derive(Subcommand)]
+enum Commands {
+    /// Processes streaming data
+    Tardis {
+        /// Sets the exchange to use
+        #[clap(long)]
+        exchange: TardisExchange,
 
-//         #[clap(long, value_delimiter = ',')]
-//         instruments: Vec<String>,
+        /// Type of data to stream
+        #[clap(long)]
+        channel: TardisChannel,
 
-//         /// Start date for the data stream
-//         #[clap(long)]
-//         start: String,
+        #[clap(long, value_delimiter = ',')]
+        instruments: Vec<String>,
 
-//         /// End date for the data stream
-//         #[clap(long)]
-//         end: String,
-//     },
-// }
+        /// Start date for the data stream
+        #[clap(long)]
+        start: String,
 
-// #[global_allocator]
-// static GLOBAL: MiMalloc = MiMalloc;
+        /// End date for the data stream
+        #[clap(long)]
+        end: String,
+    },
+}
 
-// #[tokio::main(flavor = "multi_thread")]
-// async fn main() -> Result<()> {
-//     logging::init_tracing();
-//     info!("Starting Arkin 🚀");
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
-//     let config = config::load();
-//     info!("Loaded configuration: {}", serde_json::to_string_pretty(&config)?);
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<()> {
+    logging::init_tracing();
+    info!("Starting Arkin 🚀");
 
-//     let args = Cli::parse();
+    // let _config = config::load();
+    let args = Cli::parse();
 
-//     match args.command {
-//         Commands::Tardis {
-//             exchange,
-//             channel,
-//             instruments,
-//             start,
-//             end,
-//         } => {
-//             let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
-//             let start = PrimitiveDateTime::parse(&start, &format)?.assume_utc();
-//             let end = PrimitiveDateTime::parse(&end, &format)?.assume_utc();
+    match args.command {
+        Commands::Tardis {
+            exchange,
+            channel,
+            instruments,
+            start,
+            end,
+        } => {
+            let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
+            let start = PrimitiveDateTime::parse(&start, &format)?.assume_utc();
+            let end = PrimitiveDateTime::parse(&end, &format)?.assume_utc();
 
-//             info!("Starting data stream");
-//             info!("Exchange: {}", exchange);
-//             info!("Channel: {}", exchange.channel_str(&channel)?);
-//             info!("Instruments: {:?}", instruments);
-//             info!("Start: {}", start);
-//             info!("End: {}", end);
+            info!("Starting data stream");
+            info!("Exchange: {}", exchange);
+            info!("Channel: {}", exchange.channel_str(&channel)?);
+            info!("Instruments: {:?}", instruments);
+            info!("Start: {}", start);
+            info!("End: {}", end);
 
-//             let req = TardisRequest {
-//                 exchange,
-//                 channel,
-//                 instruments,
-//                 start,
-//                 end,
-//             };
+            let req = TardisRequest::new(&exchange, &channel, &instruments, &start, &end);
+            let tardis = TardisService::builder()
+                .base_url("https://api.tardis.dev/v1/data-feeds".into())
+                .max_concurrent_requests(1)
+                .build();
+            let stream = tardis.stream(req);
+            pin!(stream);
 
-//             let tardis = TardisService::builder().config(&config.tardis).build();
-//             let stream = tardis.stream_parsed::<TardisModel>(req);
-//             pin!(stream);
-//             while let Some(data) = stream.next().await {
-//                 info!("{:?}", data);
-//             }
-//         }
-//     }
-//     Ok(())
-// }
+            // Create file in ./tests/data
+            let filename = format!(
+                "./tests/data/{}_{}_{}_{}_{}.json",
+                exchange,
+                channel,
+                instruments.join("_"),
+                start.format(format_description!("[year][month][day][hour][minute]"))?,
+                end.format(format_description!("[year][month][day][hour][minute]"))?
+            );
 
-pub fn main() {}
+            // Open file
+            let file = std::fs::File::create(filename)?;
+            let mut writer = std::io::BufWriter::new(file);
+            while let Some((_ts, json)) = stream.next().await {
+                // let event = BinanceParser::parse_swap(&json)?;
+                // let event_json = serde_json::to_string(&event)?;
+                writer.write_all(&json.into_bytes())?;
+                writer.write_all(b"\n")?;
+            }
+            writer.flush()?;
+        }
+    }
+    Ok(())
+}

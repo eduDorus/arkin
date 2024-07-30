@@ -6,8 +6,8 @@ pub enum IngestorConfig {
     Backtest(BacktestIngestorConfig),
     #[serde(rename = "binance")]
     Binance(BinanceIngestorConfig),
-    #[serde(rename = "tardis")]
-    Tardis(TardisIngestorConfig),
+    // #[serde(rename = "tardis")]
+    // Tardis(TardisIngestorConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

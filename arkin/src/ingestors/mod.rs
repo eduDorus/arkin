@@ -5,12 +5,16 @@ mod backtest;
 mod binance;
 mod errors;
 mod factory;
+mod models;
+mod tardis;
 mod ws;
 
 use backtest::BacktestIngestor;
 use binance::BinanceIngestor;
 
 pub use factory::IngestorFactory;
+pub use models::BinanceParser;
+pub use tardis::*;
 
 #[async_trait]
 pub trait Ingestor {
@@ -46,7 +50,6 @@ impl fmt::Display for IngestorType {
 pub enum IngestorID {
     Backtest,
     Binance,
-    Tardis,
 }
 
 impl fmt::Display for IngestorID {
@@ -54,7 +57,6 @@ impl fmt::Display for IngestorID {
         match self {
             IngestorID::Backtest => write!(f, "backtest"),
             IngestorID::Binance => write!(f, "binance"),
-            IngestorID::Tardis => write!(f, "tardis"),
         }
     }
 }

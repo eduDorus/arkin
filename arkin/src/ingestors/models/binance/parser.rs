@@ -7,7 +7,7 @@ use super::swaps::BinanceSwapsEvent;
 pub struct BinanceParser {}
 
 impl BinanceParser {
-    pub fn parse(data: &str) -> Result<Event> {
+    pub fn parse_swap(data: &str) -> Result<Event> {
         let event = match serde_json::from_str::<BinanceSwapsEvent>(data) {
             Ok(e) => e,
             Err(e) => {
@@ -16,12 +16,7 @@ impl BinanceParser {
                 return Err(e.into());
             }
         };
-        match event {
-            BinanceSwapsEvent::Trade(t) => Ok(t.into()),
-            BinanceSwapsEvent::AggTrade(t) => Ok(t.into()),
-            BinanceSwapsEvent::Tick(t) => Ok(t.into()),
-            BinanceSwapsEvent::Book(t) => Ok(t.into()),
-        }
+        Ok(event.into())
     }
 
     pub fn parse_instrument(instrument: &str) -> Instrument {

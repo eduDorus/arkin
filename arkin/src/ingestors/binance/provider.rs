@@ -8,7 +8,7 @@ use url::Url;
 
 use crate::{
     config::BinanceIngestorConfig,
-    ingestors::{binance::parser::BinanceParser, ws::WebSocketManager, Ingestor},
+    ingestors::{models::BinanceParser, ws::WebSocketManager, Ingestor},
     state::State,
 };
 
@@ -61,7 +61,7 @@ impl Ingestor for BinanceIngestor {
             let res = rx.recv_async().await;
             match res {
                 Ok(data) => {
-                    let res = BinanceParser::parse(&data);
+                    let res = BinanceParser::parse_swap(&data);
                     match res {
                         Ok(event) => {
                             self.state.add_event(event);

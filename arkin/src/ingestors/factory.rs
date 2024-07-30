@@ -14,7 +14,6 @@ impl IngestorFactory {
             let ingestor = match config {
                 IngestorConfig::Backtest(c) => IngestorType::Backtest(BacktestIngestor::new(state.to_owned(), c)),
                 IngestorConfig::Binance(c) => IngestorType::Binance(BinanceIngestor::new(state.to_owned(), c)),
-                IngestorConfig::Tardis(_) => unimplemented!(),
             };
             ingestors.push(ingestor);
         }

@@ -17,7 +17,7 @@ use tokio::io::BufReader;
 use tracing::debug;
 use tracing::error;
 
-use crate::config::TardisConfig;
+use crate::config::TardisIngestorConfig;
 use crate::utils;
 
 use super::http::TardisHttpClient;
@@ -25,8 +25,8 @@ use super::http::TardisHttpClient;
 #[derive(Debug, Clone)]
 pub enum TardisExchange {
     BinanceSpot,
-    BinanceSwaps,
-    BinanceFutures,
+    BinanceUSDM,
+    BinanceCOINM,
     BinanceOptions,
     OkxFutures,
     OkxSwap,
@@ -41,8 +41,8 @@ impl Display for TardisExchange {
             "{}",
             match self {
                 TardisExchange::BinanceSpot => "binance",
-                TardisExchange::BinanceSwaps => "binance-futures",
-                TardisExchange::BinanceFutures => "binance-delivery",
+                TardisExchange::BinanceUSDM => "binance-futures",
+                TardisExchange::BinanceCOINM => "binance-delivery",
                 TardisExchange::BinanceOptions => "binance-european-options",
                 TardisExchange::OkxSpot => "okex-spot",
                 TardisExchange::OkxSwap => "okex-swap",
@@ -59,8 +59,8 @@ impl FromStr for TardisExchange {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "binance-spot" => Ok(TardisExchange::BinanceSpot),
-            "binance-swaps" => Ok(TardisExchange::BinanceSwaps),
-            "binance-futures" => Ok(TardisExchange::BinanceFutures),
+            "binance-usdm" => Ok(TardisExchange::BinanceUSDM),
+            "binance-coinm" => Ok(TardisExchange::BinanceCOINM),
             "binance-options" => Ok(TardisExchange::BinanceOptions),
             "okex-spot" => Ok(TardisExchange::OkxSpot),
             "okex-swaps" => Ok(TardisExchange::OkxSwap),
@@ -74,11 +74,11 @@ impl FromStr for TardisExchange {
 impl TardisExchange {
     pub fn channel_str(&self, channel: &TardisChannel) -> Result<String> {
         match self {
-            TardisExchange::BinanceSwaps => match channel {
+            TardisExchange::BinanceUSDM => match channel {
                 TardisChannel::Book => Ok("depth".to_string()),
                 TardisChannel::Trade => Ok("trade".to_string()),
                 TardisChannel::AggTrade => Ok("aggTrade".to_string()),
-                TardisChannel::Tick => Ok("ticker".to_string()),
+                TardisChannel::Tick => Ok("bookTicker".to_string()),
                 _ => bail!("Channel not supported for Binance exchange"),
             },
             TardisExchange::BinanceOptions => match channel {
@@ -121,18 +121,38 @@ pub enum TardisChannel {
     FundingRate,
 }
 
+impl fmt::Display for TardisChannel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TardisChannel::Book => "book",
+                TardisChannel::Trade => "trades",
+                TardisChannel::AggTrade => "agg-trades",
+                TardisChannel::Perpetual => "perpetual",
+                TardisChannel::Quote => "quotes",
+                TardisChannel::Tick => "ticks",
+                TardisChannel::Snapshot => "snapshots",
+                TardisChannel::OpenInterest => "open-interest",
+                TardisChannel::FundingRate => "funding",
+            }
+        )
+    }
+}
+
 impl FromStr for TardisChannel {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "book" => Ok(TardisChannel::Book),
-            "trade" => Ok(TardisChannel::Trade),
-            "agg-trade" => Ok(TardisChannel::AggTrade),
+            "trades" => Ok(TardisChannel::Trade),
+            "agg-trades" => Ok(TardisChannel::AggTrade),
             "perpetual" => Ok(TardisChannel::Perpetual),
-            "quote" => Ok(TardisChannel::Quote),
-            "tick" => Ok(TardisChannel::Tick),
-            "snapshot" => Ok(TardisChannel::Snapshot),
+            "quotes" => Ok(TardisChannel::Quote),
+            "ticks" => Ok(TardisChannel::Tick),
+            "snapshots" => Ok(TardisChannel::Snapshot),
             "open-interest" => Ok(TardisChannel::OpenInterest),
             "funding" => Ok(TardisChannel::FundingRate),
             _ => Err(Error::msg("invalid channel")),
@@ -160,7 +180,7 @@ pub struct TardisServiceBuilder {
 
 #[allow(clippy::assigning_clones)]
 impl TardisServiceBuilder {
-    pub fn config(mut self, config: &TardisConfig) -> Self {
+    pub fn config(mut self, config: &TardisIngestorConfig) -> Self {
         self.api_secret = config.api_secret.to_owned();
         self.base_url = config.base_url.to_owned();
         self.max_concurrent_requests = config.max_concurrent_requests;
@@ -203,6 +223,24 @@ pub struct TardisRequest {
     pub end: OffsetDateTime,
 }
 
+impl TardisRequest {
+    pub fn new(
+        exchange: &TardisExchange,
+        channel: &TardisChannel,
+        instruments: &Vec<String>,
+        start: &OffsetDateTime,
+        end: &OffsetDateTime,
+    ) -> Self {
+        TardisRequest {
+            exchange: exchange.to_owned(),
+            channel: channel.to_owned(),
+            instruments: instruments.to_owned(),
+            start: start.to_owned(),
+            end: end.to_owned(),
+        }
+    }
+}
+
 impl TardisService {
     pub fn download_stream(
         &self,
@@ -237,6 +275,21 @@ impl TardisService {
                 Ok(values)
             }
         }))
+    }
+
+    pub fn stream(&self, req: TardisRequest) -> impl Stream<Item = (OffsetDateTime, String)> + '_ {
+        self.download_stream(req)
+            .buffer_unordered(self.max_concurrent_requests)
+            .filter_map(|result| async move {
+                match result {
+                    Ok(values) => Some(stream::iter(values)),
+                    Err(e) => {
+                        error!("Error: {}", e);
+                        None
+                    }
+                }
+            })
+            .flat_map(|stream| stream)
     }
 
     pub fn stream_parsed<T: DeserializeOwned + 'static>(

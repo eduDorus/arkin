@@ -1,8 +1,41 @@
+use crate::{
+    ingestors::IngestorID,
+    models::{BookUpdate, BookUpdateSide, Event, Price, Quantity, Tick, Trade},
+    utils::custom_serde,
+};
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use time::OffsetDateTime;
 
-use crate::utils::custom_serde;
+use super::parser::BinanceParser;
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum BinanceSwapsEvent {
+    TradeStream(BinanceSwapsTrade),
+    Trade(BinanceSwapsTradeData),
+    AggTradeStream(BinanceSwapsAggTrade),
+    AggTrade(BinanceSwapsAggTradeData),
+    BookStream(BinanceSwapsBook),
+    Book(BinanceSwapsBookData),
+    TickStream(BinanceSwapsTick),
+    Tick(BinanceSwapsTickData),
+}
+
+impl From<BinanceSwapsEvent> for Event {
+    fn from(event: BinanceSwapsEvent) -> Self {
+        match event {
+            BinanceSwapsEvent::TradeStream(data) => Event::from(data.data),
+            BinanceSwapsEvent::Trade(data) => Event::from(data),
+            BinanceSwapsEvent::AggTradeStream(data) => Event::from(data.data),
+            BinanceSwapsEvent::AggTrade(data) => Event::from(data),
+            BinanceSwapsEvent::BookStream(data) => Event::from(data.data),
+            BinanceSwapsEvent::Book(data) => Event::from(data),
+            BinanceSwapsEvent::TickStream(data) => Event::from(data.data),
+            BinanceSwapsEvent::Tick(data) => Event::from(data),
+        }
+    }
+}
 
 // https://api.tardis.dev/v1/exchanges
 // {
@@ -30,6 +63,7 @@ use crate::utils::custom_serde;
 //     ]
 // },
 #[derive(Debug, Deserialize)]
+#[allow(unused)]
 pub struct BinanceSwapsTrade {
     pub stream: String,
     pub data: BinanceSwapsTradeData,
@@ -57,7 +91,22 @@ pub struct BinanceSwapsTradeData {
     pub maker: bool, // The true = sell, false = buy
 }
 
+impl From<BinanceSwapsTradeData> for Event {
+    fn from(data: BinanceSwapsTradeData) -> Self {
+        let instrument = BinanceParser::parse_instrument(&data.instrument);
+        Event::TradeUpdate(Trade::new(
+            instrument,
+            data.event_time,
+            data.trade_id,
+            Price::new(data.price).unwrap(), // TODO: Fix this
+            Quantity::new(data.quantity),
+            IngestorID::Binance,
+        ))
+    }
+}
+
 #[derive(Debug, Deserialize)]
+#[allow(unused)]
 pub struct BinanceSwapsAggTrade {
     pub stream: String,
     pub data: BinanceSwapsAggTradeData,
@@ -87,7 +136,22 @@ pub struct BinanceSwapsAggTradeData {
     pub maker: bool, // The true = sell, false = buy
 }
 
+impl From<BinanceSwapsAggTradeData> for Event {
+    fn from(data: BinanceSwapsAggTradeData) -> Self {
+        let instrument = BinanceParser::parse_instrument(&data.instrument);
+        Event::TradeUpdate(Trade::new(
+            instrument,
+            data.event_time,
+            data.agg_trade_id,
+            Price::new(data.price).unwrap(), // TODO: Fix this
+            Quantity::new(data.quantity),
+            IngestorID::Binance,
+        ))
+    }
+}
+
 #[derive(Debug, Deserialize)]
+#[allow(unused)]
 pub struct BinanceSwapsBook {
     pub stream: String,
     pub data: BinanceSwapsBookData,
@@ -121,20 +185,61 @@ pub struct BinanceSwapsBookUpdate {
     pub quantity: Decimal,
 }
 
+impl From<BinanceSwapsBookData> for Event {
+    fn from(data: BinanceSwapsBookData) -> Self {
+        let instrument = BinanceParser::parse_instrument(&data.instrument);
+        Event::BookUpdate(BookUpdate::new(
+            data.event_time,
+            instrument,
+            data.bids
+                .iter()
+                .map(|b| BookUpdateSide::new(Price::new(b.price).unwrap(), Quantity::new(b.quantity)))
+                .collect(),
+            data.asks
+                .iter()
+                .map(|a| BookUpdateSide::new(Price::new(a.price).unwrap(), Quantity::new(a.quantity)))
+                .collect(),
+            IngestorID::Binance,
+        ))
+    }
+}
+
+// {
+//     "e": "24hrTicker",  // Event type
+//     "E": 123456789,     // Event time
+//     "s": "BTCUSDT",     // Symbol
+//     "p": "0.0015",      // Price change
+//     "P": "250.00",      // Price change percent
+//     "w": "0.0018",      // Weighted average price
+//     "c": "0.0025",      // Last price
+//     "Q": "10",          // Last quantity
+//     "o": "0.0010",      // Open price
+//     "h": "0.0025",      // High price
+//     "l": "0.0010",      // Low price
+//     "v": "10000",       // Total traded base asset volume
+//     "q": "18",          // Total traded quote asset volume
+//     "O": 0,             // Statistics open time
+//     "C": 86400000,      // Statistics close time
+//     "F": 0,             // First trade ID
+//     "L": 18150,         // Last trade Id
+//     "n": 18151          // Total number of trades
+// }
+
 #[derive(Debug, Deserialize)]
-pub struct BinanceSwapsTicker {
+#[allow(unused)]
+pub struct BinanceSwapsTick {
     pub stream: String,
-    pub data: BinanceSwapsTickerData,
+    pub data: BinanceSwapsTickData,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct BinanceSwapsTickerData {
+pub struct BinanceSwapsTickData {
     #[serde(rename = "e")]
     pub event_type: String,
-    #[serde(rename = "E")]
-    pub event_time: i64,
-    #[serde(rename = "T")]
-    pub transaction_time: i64,
+    #[serde(rename = "E", with = "custom_serde::timestamp")]
+    pub event_time: OffsetDateTime,
+    #[serde(rename = "T", with = "custom_serde::timestamp")]
+    pub transaction_time: OffsetDateTime,
     #[serde(rename = "u")]
     pub update_id: i64,
     #[serde(rename = "s")]
@@ -149,6 +254,21 @@ pub struct BinanceSwapsTickerData {
     pub ask_quantity: Decimal,
 }
 
+impl From<BinanceSwapsTickData> for Event {
+    fn from(data: BinanceSwapsTickData) -> Self {
+        let instrument = BinanceParser::parse_instrument(&data.instrument);
+        Event::TickUpdate(Tick::new(
+            data.event_time,
+            instrument,
+            Price::new(data.bid_price).unwrap(), // TODO: Fix this
+            Quantity::new(data.bid_quantity),
+            Price::new(data.ask_price).unwrap(), // TODO: Fix this
+            Quantity::new(data.ask_quantity),
+            IngestorID::Binance,
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,6 +280,7 @@ mod tests {
     }
 
     #[test]
+
     fn test_binance_futures_agg_trade() {
         let json_data = r#"{"stream":"gasusdt@aggTrade","data":{"e":"aggTrade","E":1698796800043,"a":3863267,"s":"GASUSDT","p":"6.279000","q":"141.2","f":15146241,"l":15146244,"T":1698796799890,"m":false}}"#;
         let _ = serde_json::from_str::<BinanceSwapsAggTrade>(json_data).unwrap();
@@ -174,6 +295,13 @@ mod tests {
     #[test]
     fn test_binance_futures_ticker() {
         let json_data = r#"{"stream":"btcusdt@bookTicker","data":{"e":"bookTicker","u":2487455691211,"s":"BTCUSDT","b":"21840.40","B":"21.292","a":"21840.50","A":"11.169","T":1676026461537,"E":1676026461542}}"#;
-        let _ = serde_json::from_str::<BinanceSwapsTicker>(json_data).unwrap();
+        let _ = serde_json::from_str::<BinanceSwapsTick>(json_data).unwrap();
+    }
+
+    #[test]
+    #[ignore]
+    fn test_binance_futures_ticker_2() {
+        let json_data = r#"{"e":"24hrTicker","E":1720514702587,"s":"BTCUSDT","p":"697.00","P":"1.220","w":"56741.24","c":"57820.20","Q":"0.002","o":"57123.20","h":"58200.00","l":"54890.00","v":"388968.569","q":"22070559902.21","O":1720428300000,"C":1720514702585,"F":5147088255,"L":5151564448,"n":4476166}"#;
+        let _ = serde_json::from_str::<BinanceSwapsTickData>(json_data).unwrap();
     }
 }
