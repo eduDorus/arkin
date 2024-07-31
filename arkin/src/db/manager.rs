@@ -1,4 +1,7 @@
-use crate::{config::DatabaseConfig, models::Trade};
+use crate::{
+    config::DatabaseConfig,
+    models::{Tick, Trade},
+};
 use anyhow::Result;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgSslMode},
@@ -53,7 +56,7 @@ impl DBManager {
     pub async fn insert_trade(&self, trade: Trade) -> Result<()> {
         sqlx::query!(
             r#"
-            insert into trades (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, trade_id, price, quantity, source)
+            INSERT INTO trades (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, trade_id, price, quantity, source)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             "#,
             trade.received_time,
@@ -69,6 +72,33 @@ impl DBManager {
             trade.price.value(),
             trade.quantity.value(),
             trade.source.to_string(),
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn insert_tick(&self, tick: Tick) -> Result<()> {
+        sqlx::query!(
+            r#"
+            insert into ticks (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, bid_price, bid_quantity, ask_price, ask_quantity, source)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            "#,
+            tick.received_time,
+            tick.event_time,
+            tick.instrument.instrument_type().to_string(),
+            tick.instrument.venue().to_string(),
+            tick.instrument.base().to_string(),
+            tick.instrument.quote().to_string(),
+            tick.instrument.maturity().map(|m| m.value()),
+            tick.instrument.strike().map(|s| s.value()),
+            tick.instrument.option_type().map(|ot| ot.to_string()),
+            tick.bid_price.value(),
+            tick.bid_quantity.value(),
+            tick.ask_price.value(),
+            tick.ask_quantity.value(),
+            tick.source.to_string(),
         )
         .execute(&self.pool)
         .await?;
@@ -120,6 +150,37 @@ mod tests {
 
         // Check that the trade was inserted
         let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM trades")
+            .fetch_one(&manager.pool)
+            .await
+            .expect("SQLX failed to fetch row");
+        assert_eq!(row.0, 1)
+    }
+
+    #[tokio::test]
+    async fn test_insert_tick() {
+        let config = config::load();
+        let manager = DBManager::from_config(&config.db).await;
+
+        let tick = Tick {
+            received_time: OffsetDateTime::now_utc(),
+            event_time: OffsetDateTime::now_utc(),
+            instrument: Instrument::Future(FutureContract::new(
+                &Venue::Binance,
+                &Asset::new("BTC"),
+                &Asset::new("USDT"),
+                &Maturity::new(OffsetDateTime::now_utc() + time::Duration::days(30)),
+            )),
+            bid_price: Price::new(Decimal::new(10000, 2)).unwrap(),
+            bid_quantity: Quantity::new(Decimal::new(105, 1)),
+            ask_price: Price::new(Decimal::new(10001, 2)).unwrap(),
+            ask_quantity: Quantity::new(Decimal::new(106, 1)),
+            source: IngestorID::Test,
+        };
+
+        manager.insert_tick(tick).await.unwrap();
+
+        // Check that the tick was inserted
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM ticks")
             .fetch_one(&manager.pool)
             .await
             .expect("SQLX failed to fetch row");
