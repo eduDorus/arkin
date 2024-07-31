@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS ticks (
     ask_price NUMERIC(21, 9) NOT NULL,
     ask_quantity NUMERIC(21, 9) NOT NULL,
     source TEXT NOT NULL,
-    PRIMARY KEY (source, venue, base, quote, event_time)
+    PRIMARY KEY (source, venue, instrument_type, base, quote, event_time)
 );
 -- Convert the table to a hypertable
 SELECT create_hypertable('ticks', 'event_time');
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS trades (
     price NUMERIC(21, 9) NOT NULL,
     quantity NUMERIC(21, 9) NOT NULL,
     source TEXT NOT NULL,
-    PRIMARY KEY (source, venue, base, quote, trade_id, event_time)
+    PRIMARY KEY (source, venue, instrument_type, base, quote, trade_id, event_time)
 );
 -- Convert the table to a hypertable
 SELECT create_hypertable('trades', 'event_time');

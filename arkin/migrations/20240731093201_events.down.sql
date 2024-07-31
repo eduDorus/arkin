@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS fills;
+DROP TABLE IF EXISTS strategy_signals;
+DROP TABLE IF EXISTS allocations;
