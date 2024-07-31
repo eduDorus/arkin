@@ -1,11 +1,11 @@
 CREATE TABLE IF NOT EXISTS ticks (
-    received_time TIMESTAMP(3) WITHOUT TIME ZONE,
-    event_time TIMESTAMP(3) WITHOUT TIME ZONE,
+    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
     venue TEXT NOT NULL,
     base TEXT NOT NULL,
     quote TEXT NOT NULL,
-    maturity DATE, -- Nullable
+    maturity TIMESTAMP(3) WITH TIME ZONE, -- Nullable
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
     bid_price NUMERIC(21, 9) NOT NULL,
@@ -25,13 +25,13 @@ SELECT create_hypertable('ticks', 'event_time');
 
 
 CREATE TABLE IF NOT EXISTS trades (
-    received_time TIMESTAMP(3) WITHOUT TIME ZONE,
-    event_time TIMESTAMP(3) WITHOUT TIME ZONE,
+    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
     venue TEXT NOT NULL,
     base TEXT NOT NULL,
     quote TEXT NOT NULL,
-    maturity DATE, -- Nullable
+    maturity TIMESTAMP(3) WITH TIME ZONE, -- Nullable
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
     trade_id BIGINT NOT NULL,

@@ -10,11 +10,11 @@ use crate::constants;
 use super::errors::ModelError;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Expiry(OffsetDateTime);
+pub struct Maturity(OffsetDateTime);
 
-impl Expiry {
+impl Maturity {
     pub fn new(maturity: OffsetDateTime) -> Self {
-        Expiry(maturity)
+        Maturity(maturity)
     }
 
     pub fn time_to_maturity_in_years(&self) -> f64 {
@@ -22,9 +22,17 @@ impl Expiry {
         let duration = self.0 - now;
         duration.whole_seconds() as f64 / 60.0 / 60.0 / 24.0 / 365.0
     }
+
+    pub fn timestamp_in_ms(&self) -> i64 {
+        self.0.unix_timestamp()
+    }
+
+    pub fn value(&self) -> OffsetDateTime {
+        self.0
+    }
 }
 
-impl fmt::Display for Expiry {
+impl fmt::Display for Maturity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let formatted = self.0.format(constants::TIMESTAMP_FORMAT).expect("Unable to format expiry");
         write!(f, "{}", formatted)

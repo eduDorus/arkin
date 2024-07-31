@@ -1,11 +1,11 @@
 CREATE TABLE IF NOT EXISTS orders (
-    received_time TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL,
-    event_time TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL,
+    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
     venue TEXT NOT NULL,
     base TEXT NOT NULL,
     quote TEXT NOT NULL,
-    maturity DATE, -- Nullable
+    maturity TIMESTAMP(3) WITH TIME ZONE, -- Nullable
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
     order_id BIGINT NOT NULL,
@@ -27,13 +27,13 @@ SELECT create_hypertable('orders', 'event_time');
 
 
 CREATE TABLE IF NOT EXISTS fills (
-    received_time TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL,
-    event_time TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL,
+    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
     venue TEXT NOT NULL,
     base TEXT NOT NULL,
     quote TEXT NOT NULL,
-    maturity DATE, -- Nullable
+    maturity TIMESTAMP(3) WITH TIME ZONE, -- Nullable
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
     order_id BIGINT NOT NULL, -- Reference to order
@@ -51,13 +51,13 @@ SELECT create_hypertable('fills', 'event_time');
 
 
 CREATE TABLE IF NOT EXISTS strategy_signals (
-    received_time TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL,
-    event_time TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL,
+    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
     venue TEXT NOT NULL,
     base TEXT NOT NULL,
     quote TEXT NOT NULL,
-    maturity DATE, -- Nullable
+    maturity TIMESTAMP(3) WITH TIME ZONE, -- Nullable
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
     strategy_id TEXT NOT NULL,
@@ -72,13 +72,13 @@ SELECT create_hypertable('strategy_signals', 'event_time');
 
 
 CREATE TABLE IF NOT EXISTS allocations (
-    received_time TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL,
-    event_time TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL,
+    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
     venue TEXT NOT NULL,
     base TEXT NOT NULL,
     quote TEXT NOT NULL,
-    maturity DATE, -- Nullable
+    maturity TIMESTAMP(3) WITH TIME ZONE, -- Nullable
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
     strategy_id TEXT NOT NULL,

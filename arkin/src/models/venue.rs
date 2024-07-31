@@ -10,7 +10,7 @@ pub enum Venue {
 impl fmt::Display for Venue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Venue::Binance => write!(f, "Binance"),
+            Venue::Binance => write!(f, "binance"),
         }
     }
 }
@@ -20,7 +20,7 @@ impl FromStr for Venue {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Binance" => Ok(Venue::Binance),
+            "binance" => Ok(Venue::Binance),
             _ => Err(ModelError::UnknownVenueError(s.into())),
         }
     }

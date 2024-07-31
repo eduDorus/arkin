@@ -40,8 +40,8 @@ impl Ingestor for IngestorType {
 impl fmt::Display for IngestorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            IngestorType::Backtest(_) => write!(f, "Backtest"),
-            IngestorType::Binance(_) => write!(f, "Binance"),
+            IngestorType::Backtest(_) => write!(f, "backtest"),
+            IngestorType::Binance(_) => write!(f, "binance"),
         }
     }
 }
@@ -50,6 +50,7 @@ impl fmt::Display for IngestorType {
 pub enum IngestorID {
     Backtest,
     Binance,
+    Test,
 }
 
 impl fmt::Display for IngestorID {
@@ -57,6 +58,7 @@ impl fmt::Display for IngestorID {
         match self {
             IngestorID::Backtest => write!(f, "backtest"),
             IngestorID::Binance => write!(f, "binance"),
+            IngestorID::Test => write!(f, "test"),
         }
     }
 }
