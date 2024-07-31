@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use async_tungstenite::tungstenite::Message;
 use serde::Serialize;
-use tokio_tungstenite::tungstenite::Message;
 use tracing::{error, info, warn};
 use url::Url;
 
@@ -69,7 +69,10 @@ impl Ingestor for BinanceIngestor {
                         Err(e) => error!("{}", e),
                     }
                 }
-                Err(e) => error!("{}", e),
+                Err(e) => {
+                    error!("{}", e);
+                    break;
+                }
             }
         }
     }

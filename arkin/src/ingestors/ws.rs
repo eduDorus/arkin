@@ -1,6 +1,12 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
+use async_tungstenite::{
+    stream::Stream,
+    tokio::{connect_async, TokioAdapter},
+    tungstenite::Message,
+    WebSocketStream,
+};
 use flume::Sender;
 use futures_util::{SinkExt, StreamExt};
 use tokio::{
@@ -9,7 +15,7 @@ use tokio::{
     sync::{OwnedSemaphorePermit, Semaphore},
     time::sleep,
 };
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_rustls::client::TlsStream;
 use tracing::{debug, error, info};
 use url::Url;
 
@@ -103,7 +109,7 @@ pub struct Handler {
     /// passed to `Connection::new`, which initializes the associated buffers.
     /// `Connection` allows the handler to operate at the "frame" level and keep
     /// the byte level protocol parsing details encapsulated in `Connection`.
-    stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    stream: WebSocketStream<Stream<TokioAdapter<TcpStream>, TokioAdapter<TlsStream<TcpStream>>>>,
 
     /// Send messages to the WebSocket Manager
     sender: Sender<Message>,
@@ -111,7 +117,11 @@ pub struct Handler {
 
 impl Handler {
     pub async fn new(url: &Url, sender: Sender<Message>, subscription: Subscription) -> Result<Self> {
-        let (stream, _) = connect_async(url.to_string()).await?;
+        let (mut stream, _) = connect_async(url.to_string()).await?;
+        // Send ping
+        let ping = Message::Ping(vec![]);
+        stream.send(ping).await?;
+
         Ok(Self {
             id: 0,
             subscription,

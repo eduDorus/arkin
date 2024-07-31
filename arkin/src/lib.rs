@@ -3,6 +3,7 @@ pub mod analytics;
 pub mod clock;
 pub mod config;
 pub mod constants;
+pub mod db;
 pub mod errors;
 pub mod execution;
 pub mod features;

@@ -27,7 +27,7 @@ pub struct GlobalConfig {
     pub server: ServerConfig,
     pub clock: ClockConfig,
     pub state: StateConfig,
-    pub db: DBConfig,
+    pub db: DatabaseConfig,
     pub ingestors: Vec<IngestorConfig>,
     pub pipelines: Vec<PipelineConfig>,
     pub strategies: Vec<StrategyConfig>,

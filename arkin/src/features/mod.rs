@@ -87,7 +87,7 @@ impl Feature for VolumeFeature {
         info!("Calculating Volume with id: {}", self.id);
 
         // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+        let limit = rand::thread_rng().gen_range(20..25); // Adjust the range as needed
 
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
@@ -134,7 +134,7 @@ impl Feature for VWAPFeature {
     fn calculate(&self) {
         info!("Calculating VWAP with id: {}", self.id);
         // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+        let limit = rand::thread_rng().gen_range(20..25); // Adjust the range as needed
 
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
@@ -185,7 +185,7 @@ impl Feature for SMAFeature {
         info!("Calculating SMA with id: {}", self.id);
         // Wait a random amount of time between 0 and 1 second
         // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+        let limit = rand::thread_rng().gen_range(20..25); // Adjust the range as needed
 
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
@@ -236,7 +236,7 @@ impl Feature for EMAFeature {
         info!("Calculating EMA with id: {}", self.id);
         // Wait a random amount of time between 0 and 1 second
         // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+        let limit = rand::thread_rng().gen_range(20..25); // Adjust the range as needed
 
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
@@ -287,7 +287,7 @@ impl Feature for SpreadFeature {
         info!("Calculating Spread with id: {}", self.id);
         // Wait a random amount of time between 0 and 1 second
         // Generate a random limit for the Fibonacci calculation
-        let limit = rand::thread_rng().gen_range(40..45); // Adjust the range as needed
+        let limit = rand::thread_rng().gen_range(20..25); // Adjust the range as needed
 
         // Perform the Fibonacci computation
         let result = fibonacci(limit);

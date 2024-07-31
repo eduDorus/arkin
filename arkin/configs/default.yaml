@@ -8,9 +8,13 @@ state:
   window: 600 # In seconds
 
 db:
-  url: http://127.0.0.1:18123
+  host: 127.0.0.1
+  port: 5432
   user: arkin_admin
   database: arkin
+  min_connections: 10
+  max_connections: 50
+  idle_timeout: 300
 
 ingestors:
   - binance:

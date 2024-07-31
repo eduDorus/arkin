@@ -8,8 +8,8 @@ pub fn init_tracing() {
         .with_thread_ids(false)
         .with_target(false)
         // .with_span_events(FmtSpan::NONE)
-        .with_line_number(false)
-        .with_file(false)
+        .with_line_number(true)
+        .with_file(true)
         .with_ansi(true)
         .compact()
         .init();

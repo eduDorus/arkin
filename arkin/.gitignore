@@ -3,3 +3,6 @@
 # Environment Configs and Secrets
 /configs/*_config.yaml
 /configs/*_secrets.yaml
+
+# Evironment file
+.env
