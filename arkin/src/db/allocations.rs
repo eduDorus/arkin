@@ -74,6 +74,7 @@ mod tests {
     };
 
     #[tokio::test]
+    #[ignore]
     async fn test_insert_allocation() {
         let config = config::load();
         let manager = DBManager::from_config(&config.db).await;

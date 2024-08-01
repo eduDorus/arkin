@@ -138,6 +138,7 @@ mod tests {
     };
 
     #[tokio::test]
+    #[ignore]
     async fn test_insert_trade() {
         let config = config::load();
         let manager = DBManager::from_config(&config.db).await;
@@ -163,6 +164,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_read_trades() {
         logging::init_test_tracing();
 

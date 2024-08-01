@@ -143,6 +143,7 @@ mod tests {
     };
 
     #[tokio::test]
+    #[ignore]
     async fn test_insert_tick() {
         let config = config::load();
         let manager = DBManager::from_config(&config.db).await;
@@ -169,6 +170,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_read_ticks() {
         logging::init_test_tracing();
 

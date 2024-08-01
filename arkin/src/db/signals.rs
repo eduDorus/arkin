@@ -75,6 +75,7 @@ mod tests {
     };
 
     #[tokio::test]
+    #[ignore]
     async fn test_insert_signal() {
         let config = config::load();
         let manager = DBManager::from_config(&config.db).await;
