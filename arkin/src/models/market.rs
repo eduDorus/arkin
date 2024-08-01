@@ -62,15 +62,16 @@ pub struct Trade {
 
 impl Trade {
     pub fn new(
-        instrument: Instrument,
+        received_time: OffsetDateTime,
         event_time: OffsetDateTime,
+        instrument: Instrument,
         trade_id: u64,
         price: Price,
         quantity: Quantity,
         source: IngestorID,
     ) -> Self {
         Self {
-            received_time: OffsetDateTime::now_utc(),
+            received_time,
             event_time,
             instrument,
             trade_id,

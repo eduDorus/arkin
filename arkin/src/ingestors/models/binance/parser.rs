@@ -1,4 +1,4 @@
-use crate::models::{Asset, Event, Instrument, PerpetualContract, Venue};
+use crate::models::{Event, Instrument, Venue};
 use anyhow::Result;
 use tracing::error;
 
@@ -21,6 +21,6 @@ impl BinanceParser {
 
     pub fn parse_instrument(instrument: &str) -> Instrument {
         let (base, quote) = instrument.split_at(instrument.len() - 4);
-        Instrument::Perpetual(PerpetualContract::new(&Venue::Binance, &Asset::new(base), &Asset::new(quote)))
+        Instrument::perpetual(Venue::Binance, base.into(), quote.into())
     }
 }

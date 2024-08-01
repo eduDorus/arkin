@@ -8,7 +8,7 @@ use tracing::info;
 use crate::{
     config::BacktestIngestorConfig,
     ingestors::IngestorID,
-    models::{Asset, Event, Instrument, PerpetualContract, Price, Quantity, Trade, Venue},
+    models::{Event, Instrument, Trade, Venue},
     state::State,
 };
 
@@ -40,13 +40,13 @@ impl Ingestor for BacktestIngestor {
 
         loop {
             interval.tick().await;
-            let perp = PerpetualContract::new(&Venue::Binance, &Asset::new("BTC"), &Asset::new("USDT"));
             let trade = Trade::new(
-                Instrument::Perpetual(perp),
                 OffsetDateTime::now_utc(),
+                OffsetDateTime::now_utc(),
+                Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
                 trade_id,
-                Price::new(Decimal::new(50000, 0)).unwrap(),
-                Quantity::new(Decimal::new(1, 0)),
+                Decimal::new(50000, 0).into(),
+                Decimal::new(1, 0).into(),
                 IngestorID::Backtest,
             );
             self.state.add_event(Event::Trade(trade));

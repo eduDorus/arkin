@@ -1,5 +1,6 @@
+use anyhow::anyhow;
 use async_trait::async_trait;
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 mod backtest;
 mod binance;
@@ -51,6 +52,19 @@ pub enum IngestorID {
     Backtest,
     Binance,
     Test,
+}
+
+impl FromStr for IngestorID {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "backtest" => Ok(IngestorID::Backtest),
+            "binance" => Ok(IngestorID::Binance),
+            "test" => Ok(IngestorID::Test),
+            _ => Err(anyhow!("Unknown ingestor ID: {}", s)),
+        }
+    }
 }
 
 impl fmt::Display for IngestorID {

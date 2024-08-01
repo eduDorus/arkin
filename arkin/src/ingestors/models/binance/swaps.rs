@@ -1,6 +1,6 @@
 use crate::{
     ingestors::IngestorID,
-    models::{BookUpdate, BookUpdateSide, Event, Price, Quantity, Tick, Trade},
+    models::{BookUpdate, BookUpdateSide, Event, Tick, Trade},
     utils::custom_serde,
 };
 use rust_decimal::Decimal;
@@ -95,11 +95,12 @@ impl From<BinanceSwapsTradeData> for Event {
     fn from(data: BinanceSwapsTradeData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
         Event::Trade(Trade::new(
-            instrument,
+            OffsetDateTime::now_utc(),
             data.event_time,
+            instrument,
             data.trade_id,
-            Price::new(data.price).unwrap(), // TODO: Fix this
-            Quantity::new(data.quantity),
+            data.price.into(), // TODO: Fix this
+            data.quantity.into(),
             IngestorID::Binance,
         ))
     }
@@ -140,11 +141,12 @@ impl From<BinanceSwapsAggTradeData> for Event {
     fn from(data: BinanceSwapsAggTradeData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
         Event::Trade(Trade::new(
-            instrument,
+            OffsetDateTime::now_utc(),
             data.event_time,
+            instrument,
             data.agg_trade_id,
-            Price::new(data.price).unwrap(), // TODO: Fix this
-            Quantity::new(data.quantity),
+            data.price.into(), // TODO: Fix this
+            data.quantity.into(),
             IngestorID::Binance,
         ))
     }
@@ -193,11 +195,11 @@ impl From<BinanceSwapsBookData> for Event {
             instrument,
             data.bids
                 .iter()
-                .map(|b| BookUpdateSide::new(Price::new(b.price).unwrap(), Quantity::new(b.quantity)))
+                .map(|b| BookUpdateSide::new(b.price.into(), b.quantity.into()))
                 .collect(),
             data.asks
                 .iter()
-                .map(|a| BookUpdateSide::new(Price::new(a.price).unwrap(), Quantity::new(a.quantity)))
+                .map(|a| BookUpdateSide::new(a.price.into(), a.quantity.into()))
                 .collect(),
             IngestorID::Binance,
         ))
@@ -260,10 +262,10 @@ impl From<BinanceSwapsTickData> for Event {
         Event::Tick(Tick::new(
             data.event_time,
             instrument,
-            Price::new(data.bid_price).unwrap(), // TODO: Fix this
-            Quantity::new(data.bid_quantity),
-            Price::new(data.ask_price).unwrap(), // TODO: Fix this
-            Quantity::new(data.ask_quantity),
+            data.bid_price.into(), // TODO: Fix this
+            data.bid_quantity.into(),
+            data.ask_price.into(), // TODO: Fix this
+            data.ask_quantity.into(),
             IngestorID::Binance,
         ))
     }

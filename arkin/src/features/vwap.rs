@@ -31,8 +31,8 @@ impl VWAP {
             return Err(anyhow::anyhow!("No trades to calculate VWAP"));
         }
 
-        let mut total_quantity = Quantity::new(Decimal::ZERO);
-        let mut total_notional = Notional::new(Decimal::ZERO);
+        let mut total_quantity = Decimal::ZERO.into();
+        let mut total_notional = Decimal::ZERO.into();
 
         for trade in trades {
             if let Event::TradeUpdate(trade) = trade {

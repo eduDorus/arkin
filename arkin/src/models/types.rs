@@ -1,22 +1,14 @@
+use rust_decimal::prelude::*;
 use std::fmt;
 use std::ops::{Add, AddAssign, Div, Mul};
-
-use anyhow::Result;
-use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
 use crate::constants;
-
-use super::errors::ModelError;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Maturity(OffsetDateTime);
 
 impl Maturity {
-    pub fn new(maturity: OffsetDateTime) -> Self {
-        Maturity(maturity)
-    }
-
     pub fn time_to_maturity_in_years(&self) -> f64 {
         let now = OffsetDateTime::now_utc();
         let duration = self.0 - now;
@@ -32,6 +24,12 @@ impl Maturity {
     }
 }
 
+impl From<OffsetDateTime> for Maturity {
+    fn from(maturity: OffsetDateTime) -> Self {
+        Maturity(maturity)
+    }
+}
+
 impl fmt::Display for Maturity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let formatted = self.0.format(constants::TIMESTAMP_FORMAT).expect("Unable to format expiry");
@@ -43,14 +41,6 @@ impl fmt::Display for Maturity {
 pub struct Price(Decimal);
 
 impl Price {
-    pub fn new(price: Decimal) -> Result<Self> {
-        if price >= Decimal::ZERO {
-            Ok(Price(price))
-        } else {
-            Err(ModelError::PriceError("Price cannot be negative".into()).into())
-        }
-    }
-
     pub fn value(&self) -> Decimal {
         self.0
     }
@@ -110,10 +100,6 @@ impl Div<Quantity> for Price {
 pub struct Quantity(Decimal);
 
 impl Quantity {
-    pub fn new(quantity: Decimal) -> Self {
-        Quantity(quantity)
-    }
-
     pub fn value(&self) -> Decimal {
         self.0
     }
@@ -169,10 +155,6 @@ impl Div<Price> for Quantity {
 pub struct Notional(Decimal);
 
 impl Notional {
-    pub fn new(notional: Decimal) -> Self {
-        Notional(notional)
-    }
-
     pub fn value(&self) -> Decimal {
         self.0
     }
@@ -208,17 +190,18 @@ impl Div<Quantity> for Notional {
 pub struct Weight(Decimal);
 
 impl Weight {
-    pub fn new(weight: Decimal) -> Self {
-        // Check if between -1 and 1 else clip
+    pub fn value(&self) -> Decimal {
+        self.0
+    }
+}
+
+impl From<Decimal> for Weight {
+    fn from(weight: Decimal) -> Self {
         match weight {
             weight if weight < Decimal::from(-1) => Weight(Decimal::from(-1)),
             weight if weight > Decimal::from(1) => Weight(Decimal::from(1)),
             _ => Weight(weight),
         }
-    }
-
-    pub fn value(&self) -> Decimal {
-        self.0
     }
 }
 
