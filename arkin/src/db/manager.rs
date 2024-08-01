@@ -1,6 +1,6 @@
 use crate::{
     config::DatabaseConfig,
-    models::{Tick, Trade},
+    models::{Order, Tick, Trade},
 };
 use anyhow::Result;
 use sqlx::{
@@ -82,7 +82,7 @@ impl DBManager {
     pub async fn insert_tick(&self, tick: Tick) -> Result<()> {
         sqlx::query!(
             r#"
-            insert into ticks (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, bid_price, bid_quantity, ask_price, ask_quantity, source)
+            INSERT INTO ticks (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, bid_price, bid_quantity, ask_price, ask_quantity, source)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             tick.received_time,
@@ -105,6 +105,36 @@ impl DBManager {
 
         Ok(())
     }
+
+    pub async fn insert_order(&self, order: Order) -> Result<()> {
+        sqlx::query!(
+            r#"
+            INSERT INTO orders (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, order_id, strategy_id, order_type, price, avg_fill_price, quantity, quantity_filled, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            "#,
+            order.received_time,
+            order.event_time,
+            order.instrument.instrument_type().to_string(),
+            order.instrument.venue().to_string(),
+            order.instrument.base().to_string(),
+            order.instrument.quote().to_string(),
+            order.instrument.maturity().map(|m| m.value()),
+            order.instrument.strike().map(|s| s.value()),
+            order.instrument.option_type().map(|ot| ot.to_string()),
+            order.order_id as i64,
+            order.strategy_id,
+            order.order_type.to_string(),
+            order.price.map(|p| p.value()), 
+            order.avg_fill_price.map(|p| p.value()),
+            order.quantity.value(),
+            order.quantity_filled.value(),
+            order.status.to_string(),
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -116,7 +146,7 @@ mod tests {
     use crate::{
         config,
         ingestors::IngestorID,
-        models::{Asset, FutureContract, Instrument, Maturity, Price, Quantity, Venue},
+        models::{Asset, FutureContract, Instrument, Maturity, OrderStatus, OrderType, Price, Quantity, Venue},
     };
 
     #[tokio::test]
@@ -181,6 +211,40 @@ mod tests {
 
         // Check that the tick was inserted
         let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM ticks")
+            .fetch_one(&manager.pool)
+            .await
+            .expect("SQLX failed to fetch row");
+        assert_eq!(row.0, 1)
+    }
+
+    #[tokio::test]
+    async fn test_insert_order() {
+        let config = config::load();
+        let manager = DBManager::from_config(&config.db).await;
+
+        let order = Order {
+            received_time: OffsetDateTime::now_utc(),
+            event_time: OffsetDateTime::now_utc(),
+            instrument: Instrument::Future(FutureContract::new(
+                &Venue::Binance,
+                &Asset::new("BTC"),
+                &Asset::new("USDT"),
+                &Maturity::new(OffsetDateTime::now_utc() + time::Duration::days(30)),
+            )),
+            order_id: 1,
+            strategy_id: "test".to_string(),
+            order_type: OrderType::Limit,
+            price: Some(Price::new(Decimal::new(10000, 2)).unwrap()),
+            avg_fill_price: Some(Price::new(Decimal::new(9990, 2)).unwrap()),
+            quantity: Quantity::new(Decimal::new(105, 1)),
+            quantity_filled: Quantity::new(Decimal::new(105, 1)),
+            status: OrderStatus::Filled,
+        };
+
+        manager.insert_order(order).await.unwrap();
+
+        // Check that the order was inserted
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM orders")
             .fetch_one(&manager.pool)
             .await
             .expect("SQLX failed to fetch row");

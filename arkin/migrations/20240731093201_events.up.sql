@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS orders (
     order_id BIGINT NOT NULL,
     strategy_id TEXT NOT NULL, -- Reference to strategy
     order_type TEXT NOT NULL, -- e.g., market, limit
-    side TEXT NOT NULL, -- e.g., buy, sell
     price NUMERIC(21, 9), -- Nullable for market orders
     avg_fill_price NUMERIC(21, 9), -- Nullable for new orders
     quantity NUMERIC(21, 9) NOT NULL,

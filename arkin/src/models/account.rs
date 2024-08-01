@@ -23,26 +23,61 @@ impl fmt::Display for Position {
 
 #[derive(Clone)]
 pub struct Order {
-    pub instrument: Instrument,
+    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
-    pub state: OrderState,
-    pub filled_quantity: Quantity,
-    pub open_quantity: Quantity,
-    pub average_fill_price: Price,
+    pub instrument: Instrument,
+    pub order_id: u64,
+    pub strategy_id: String,
+    pub order_type: OrderType,
+    pub price: Option<Price>,
+    pub avg_fill_price: Option<Price>,
+    pub quantity: Quantity,
+    pub quantity_filled: Quantity,
+    pub status: OrderStatus,
 }
 
 impl fmt::Display for Order {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} filled {} of {} with avg price {}",
-            self.instrument, self.state, self.filled_quantity, self.open_quantity, self.average_fill_price
-        )
+        match self.status {
+            OrderStatus::PartiallyFilled | OrderStatus::Filled => {
+                return write!(
+                    f,
+                    "{} {} filled {} of {} with avg price {}",
+                    self.instrument,
+                    self.status,
+                    self.quantity_filled,
+                    self.quantity,
+                    self.avg_fill_price.expect("No fill price"),
+                );
+            }
+            _ => {
+                write!(f, "{} {} {} {}", self.instrument, self.order_id, self.order_type, self.status)
+            }
+        }
     }
 }
 
 #[derive(Clone)]
-pub enum OrderState {
+pub enum OrderType {
+    Market,
+    Limit,
+    Stop,
+    StopLimit,
+}
+
+impl fmt::Display for OrderType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OrderType::Market => write!(f, "market"),
+            OrderType::Limit => write!(f, "limit"),
+            OrderType::Stop => write!(f, "stop"),
+            OrderType::StopLimit => write!(f, "stop_limit"),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum OrderStatus {
     Send,
     Open,
     PartiallyFilled,
@@ -51,15 +86,15 @@ pub enum OrderState {
     Rejected,
 }
 
-impl fmt::Display for OrderState {
+impl fmt::Display for OrderStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            OrderState::Send => write!(f, "SEND"),
-            OrderState::Open => write!(f, "OPEN"),
-            OrderState::PartiallyFilled => write!(f, "PARTIALLY FILLED"),
-            OrderState::Filled => write!(f, "FILLED"),
-            OrderState::Canceled => write!(f, "CANCELED"),
-            OrderState::Rejected => write!(f, "REJECTED"),
+            OrderStatus::Send => write!(f, "send"),
+            OrderStatus::Open => write!(f, "open"),
+            OrderStatus::PartiallyFilled => write!(f, "partially_filled"),
+            OrderStatus::Filled => write!(f, "filled"),
+            OrderStatus::Canceled => write!(f, "canceled"),
+            OrderStatus::Rejected => write!(f, "rejected"),
         }
     }
 }
