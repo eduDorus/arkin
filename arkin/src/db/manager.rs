@@ -1,10 +1,11 @@
-use crate::config::DatabaseConfig;
+use crate::{config::DatabaseConfig, models::Event};
+use anyhow::Result;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgSslMode},
     PgPool,
 };
 use std::time::Duration;
-use tracing::info;
+use tracing::{error, info};
 
 pub struct DBManager {
     pub pool: PgPool,
@@ -47,6 +48,21 @@ impl DBManager {
             .expect("SQLX failed to fetch row");
 
         assert_eq!(row.0, 150);
+    }
+
+    pub async fn add_event(&self, event: Event) -> Result<()> {
+        match event {
+            Event::Tick(t) => self.insert_tick(t).await?,
+            Event::Trade(t) => self.insert_trade(t).await?,
+            Event::Order(o) => self.insert_order(o).await?,
+            Event::Fill(f) => self.insert_fill(f).await?,
+            Event::Signal(s) => self.insert_signal(s).await?,
+            Event::Allocation(a) => self.insert_allocation(a).await?,
+            _ => {
+                error!("Event type not supported: {}", event.event_type());
+            }
+        }
+        Ok(())
     }
 }
 

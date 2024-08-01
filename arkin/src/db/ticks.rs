@@ -18,6 +18,7 @@ struct TickRow {
     maturity: Option<OffsetDateTime>,
     strike: Option<Decimal>,
     option_type: Option<String>,
+    tick_id: i64,
     bid_price: Decimal,
     bid_quantity: Decimal,
     ask_price: Decimal,
@@ -37,6 +38,7 @@ impl From<Tick> for TickRow {
             maturity: tick.instrument.maturity().map(|m| m.value()),
             strike: tick.instrument.strike().map(|s| s.value()),
             option_type: tick.instrument.option_type().map(|ot| ot.to_string()),
+            tick_id: tick.tick_id as i64,
             bid_price: tick.bid_price.value(),
             bid_quantity: tick.bid_quantity.value(),
             ask_price: tick.ask_price.value(),
@@ -62,6 +64,7 @@ impl From<TickRow> for Tick {
         Tick::new(
             db_tick.event_time,
             instrument,
+            db_tick.tick_id as u64,
             db_tick.bid_price.into(),
             db_tick.bid_quantity.into(),
             db_tick.ask_price.into(),
@@ -76,8 +79,8 @@ impl DBManager {
         let tick = TickRow::from(tick);
         sqlx::query!(
             r#"
-            INSERT INTO ticks (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, bid_price, bid_quantity, ask_price, ask_quantity, source)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            INSERT INTO ticks (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, tick_id, bid_price, bid_quantity, ask_price, ask_quantity, source)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
             tick.received_time,
             tick.event_time,
@@ -88,6 +91,7 @@ impl DBManager {
             tick.maturity,
             tick.strike,
             tick.option_type,
+            tick.tick_id,
             tick.bid_price,
             tick.bid_quantity,
             tick.ask_price,
@@ -148,16 +152,16 @@ mod tests {
         let config = config::load();
         let manager = DBManager::from_config(&config.db).await;
 
-        let tick = Tick {
-            received_time: OffsetDateTime::now_utc(),
-            event_time: OffsetDateTime::now_utc(),
-            instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
-            bid_price: Decimal::new(10000, 2).into(),
-            bid_quantity: Decimal::new(105, 1).into(),
-            ask_price: Decimal::new(10001, 2).into(),
-            ask_quantity: Decimal::new(106, 1).into(),
-            source: IngestorID::Test,
-        };
+        let tick = Tick::new(
+            OffsetDateTime::now_utc(),
+            Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
+            1,
+            Decimal::new(10000, 2).into(),
+            Decimal::new(105, 1).into(),
+            Decimal::new(10001, 2).into(),
+            Decimal::new(106, 1).into(),
+            IngestorID::Test,
+        );
 
         manager.insert_tick(tick).await.unwrap();
 

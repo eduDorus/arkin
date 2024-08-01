@@ -207,25 +207,16 @@ impl From<BinanceSwapsBookData> for Event {
 }
 
 // {
-//     "e": "24hrTicker",  // Event type
-//     "E": 123456789,     // Event time
-//     "s": "BTCUSDT",     // Symbol
-//     "p": "0.0015",      // Price change
-//     "P": "250.00",      // Price change percent
-//     "w": "0.0018",      // Weighted average price
-//     "c": "0.0025",      // Last price
-//     "Q": "10",          // Last quantity
-//     "o": "0.0010",      // Open price
-//     "h": "0.0025",      // High price
-//     "l": "0.0010",      // Low price
-//     "v": "10000",       // Total traded base asset volume
-//     "q": "18",          // Total traded quote asset volume
-//     "O": 0,             // Statistics open time
-//     "C": 86400000,      // Statistics close time
-//     "F": 0,             // First trade ID
-//     "L": 18150,         // Last trade Id
-//     "n": 18151          // Total number of trades
-// }
+//     "e":"bookTicker",         // event type
+//     "u":400900217,            // order book updateId
+//     "E": 1568014460893,       // event time
+//     "T": 1568014460891,       // transaction time
+//     "s":"BNBUSDT",            // symbol
+//     "b":"25.35190000",        // best bid price
+//     "B":"31.21000000",        // best bid qty
+//     "a":"25.36520000",        // best ask price
+//     "A":"40.66000000"         // best ask qty
+//   }
 
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
@@ -243,7 +234,7 @@ pub struct BinanceSwapsTickData {
     #[serde(rename = "T", with = "custom_serde::timestamp")]
     pub transaction_time: OffsetDateTime,
     #[serde(rename = "u")]
-    pub update_id: i64,
+    pub update_id: u64,
     #[serde(rename = "s")]
     pub instrument: String,
     #[serde(rename = "b")]
@@ -262,6 +253,7 @@ impl From<BinanceSwapsTickData> for Event {
         Event::Tick(Tick::new(
             data.event_time,
             instrument,
+            data.update_id,
             data.bid_price.into(), // TODO: Fix this
             data.bid_quantity.into(),
             data.ask_price.into(), // TODO: Fix this

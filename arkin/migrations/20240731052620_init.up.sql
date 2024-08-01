@@ -8,12 +8,13 @@ CREATE TABLE IF NOT EXISTS ticks (
     maturity TIMESTAMP(3) WITH TIME ZONE, -- Nullable
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
+    tick_id BIGINT NOT NULL,
     bid_price NUMERIC(21, 9) NOT NULL,
     bid_quantity NUMERIC(21, 9) NOT NULL,
     ask_price NUMERIC(21, 9) NOT NULL,
     ask_quantity NUMERIC(21, 9) NOT NULL,
     source TEXT NOT NULL,
-    PRIMARY KEY (source, venue, instrument_type, base, quote, event_time)
+    PRIMARY KEY (source, venue, instrument_type, base, quote, tick_id, event_time)
 );
 -- Convert the table to a hypertable
 SELECT create_hypertable('ticks', 'event_time');

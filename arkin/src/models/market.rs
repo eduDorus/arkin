@@ -9,6 +9,7 @@ pub struct Tick {
     pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
+    pub tick_id: u64,
     pub bid_price: Price,
     pub bid_quantity: Quantity,
     pub ask_price: Price,
@@ -20,6 +21,7 @@ impl Tick {
     pub fn new(
         event_time: OffsetDateTime,
         instrument: Instrument,
+        tick_id: u64,
         bid_price: Price,
         bid_quantity: Quantity,
         ask_price: Price,
@@ -30,6 +32,7 @@ impl Tick {
             received_time: OffsetDateTime::now_utc(),
             event_time,
             instrument,
+            tick_id,
             bid_price,
             bid_quantity,
             ask_price,
