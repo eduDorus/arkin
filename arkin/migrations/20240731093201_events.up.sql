@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS fills (
     maturity TIMESTAMP(3) WITH TIME ZONE, -- Nullable
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
-    order_id BIGINT NOT NULL, -- Reference to order
+    order_id BIGINT, -- Reference to order / can be null for reconsiliation
     strategy_id TEXT NOT NULL, -- Reference to strategy
     price NUMERIC(21, 9) NOT NULL,
     quantity NUMERIC(21, 9) NOT NULL,
@@ -49,7 +49,7 @@ SELECT create_hypertable('fills', 'event_time');
 
 
 
-CREATE TABLE IF NOT EXISTS strategy_signals (
+CREATE TABLE IF NOT EXISTS signals (
     received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
@@ -60,11 +60,11 @@ CREATE TABLE IF NOT EXISTS strategy_signals (
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
     strategy_id TEXT NOT NULL,
-    signal_weight NUMERIC(3, 2) NOT NULL CHECK (signal_weight >= -1 AND signal_weight <= 1),
+    signal NUMERIC(3, 2) NOT NULL CHECK (signal >= -1 AND signal <= 1),
     PRIMARY KEY (venue, instrument_type, base, quote, strategy_id, event_time)
 );
 -- Convert the table to a hypertable
-SELECT create_hypertable('strategy_signals', 'event_time');
+SELECT create_hypertable('signals', 'event_time');
 -- Create index
 -- CREATE INDEX ix_strategy_signals_instrument_type_venue_base_quote_time ON strategy_signals (instrument_type, venue, base, quote, event_time DESC);
 
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS allocations (
     strike NUMERIC(21, 9), -- Nullable
     option_type TEXT, -- Nullable
     strategy_id TEXT NOT NULL,
-    allocated_notional NUMERIC(21, 9) NOT NULL,
+    notional NUMERIC(21, 9) NOT NULL,
     PRIMARY KEY (venue, instrument_type, base, quote, strategy_id, event_time)
 );
 -- Convert the table to a hypertable

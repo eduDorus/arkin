@@ -205,19 +205,25 @@ impl Div<Quantity> for Notional {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Direction(Decimal);
+pub struct Weight(Decimal);
 
-impl Direction {
-    pub fn new(direction: Decimal) -> Result<Self> {
-        // Check if between -1 and 1
-        if direction >= Decimal::from(-1) && direction <= Decimal::from(1) {
-            Ok(Direction(direction))
-        } else {
-            Err(ModelError::DirectionError("must be between -1 and 1".into()).into())
+impl Weight {
+    pub fn new(weight: Decimal) -> Self {
+        // Check if between -1 and 1 else clip
+        match weight {
+            weight if weight < Decimal::from(-1) => Weight(Decimal::from(-1)),
+            weight if weight > Decimal::from(1) => Weight(Decimal::from(1)),
+            _ => Weight(weight),
         }
     }
 
     pub fn value(&self) -> Decimal {
         self.0
+    }
+}
+
+impl fmt::Display for Weight {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0.round_dp(2))
     }
 }

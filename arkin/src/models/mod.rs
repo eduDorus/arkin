@@ -1,6 +1,7 @@
 pub mod errors;
 
 mod account;
+mod allocation;
 mod events;
 mod instrument;
 mod market;
@@ -9,6 +10,7 @@ mod types;
 mod venue;
 
 pub use account::*;
+pub use allocation::*;
 pub use events::*;
 pub use instrument::*;
 pub use market::*;

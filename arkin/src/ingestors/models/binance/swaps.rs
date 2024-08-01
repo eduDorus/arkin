@@ -94,7 +94,7 @@ pub struct BinanceSwapsTradeData {
 impl From<BinanceSwapsTradeData> for Event {
     fn from(data: BinanceSwapsTradeData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::TradeUpdate(Trade::new(
+        Event::Trade(Trade::new(
             instrument,
             data.event_time,
             data.trade_id,
@@ -139,7 +139,7 @@ pub struct BinanceSwapsAggTradeData {
 impl From<BinanceSwapsAggTradeData> for Event {
     fn from(data: BinanceSwapsAggTradeData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::TradeUpdate(Trade::new(
+        Event::Trade(Trade::new(
             instrument,
             data.event_time,
             data.agg_trade_id,
@@ -188,7 +188,7 @@ pub struct BinanceSwapsBookUpdate {
 impl From<BinanceSwapsBookData> for Event {
     fn from(data: BinanceSwapsBookData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::BookUpdate(BookUpdate::new(
+        Event::Book(BookUpdate::new(
             data.event_time,
             instrument,
             data.bids
@@ -257,7 +257,7 @@ pub struct BinanceSwapsTickData {
 impl From<BinanceSwapsTickData> for Event {
     fn from(data: BinanceSwapsTickData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::TickUpdate(Tick::new(
+        Event::Tick(Tick::new(
             data.event_time,
             instrument,
             Price::new(data.bid_price).unwrap(), // TODO: Fix this

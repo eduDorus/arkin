@@ -40,7 +40,7 @@ impl fmt::Display for Order {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.status {
             OrderStatus::PartiallyFilled | OrderStatus::Filled => {
-                return write!(
+                write!(
                     f,
                     "{} {} filled {} of {} with avg price {}",
                     self.instrument,
@@ -48,7 +48,7 @@ impl fmt::Display for Order {
                     self.quantity_filled,
                     self.quantity,
                     self.avg_fill_price.expect("No fill price"),
-                );
+                )
             }
             _ => {
                 write!(f, "{} {} {} {}", self.instrument, self.order_id, self.order_type, self.status)
@@ -101,10 +101,14 @@ impl fmt::Display for OrderStatus {
 
 #[derive(Clone)]
 pub struct Fill {
-    pub instrument: Instrument,
+    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
+    pub instrument: Instrument,
+    pub order_id: Option<u64>,
+    pub strategy_id: String,
     pub price: Price,
     pub quantity: Quantity,
+    pub commission: Price,
 }
 
 impl fmt::Display for Fill {
