@@ -7,7 +7,7 @@ use tracing::error;
 
 use super::DBManager;
 
-#[derive(sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow)]
 struct TickRow {
     received_time: OffsetDateTime,
     event_time: OffsetDateTime,
@@ -79,8 +79,32 @@ impl DBManager {
         let tick = TickRow::from(tick);
         sqlx::query!(
             r#"
-            INSERT INTO ticks (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, tick_id, bid_price, bid_quantity, ask_price, ask_quantity, source)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            WITH existing_instrument AS (
+                SELECT instrument_id
+                FROM instruments
+                WHERE instrument_type = $3
+                AND venue = $4
+                AND base = $5
+                AND quote = $6
+                AND maturity IS NOT DISTINCT FROM $7
+                AND strike IS NOT DISTINCT FROM $8
+                AND option_type IS NOT DISTINCT FROM $9
+            ), insert_instrument AS (
+                INSERT INTO instruments (instrument_type, venue, base, quote, maturity, strike, option_type)
+                SELECT $3, $4, $5, $6, $7, $8, $9
+                WHERE NOT EXISTS (SELECT 1 FROM existing_instrument)
+                RETURNING instrument_id
+            )
+            INSERT INTO ticks (
+                received_time, event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity, source
+            )
+            SELECT 
+                $1, $2, COALESCE(ei.instrument_id, ii.instrument_id), $10, $11, $12, $13, $14, $15
+            FROM 
+                existing_instrument ei
+            FULL OUTER JOIN 
+                insert_instrument ii ON true
+            LIMIT 1
             "#,
             tick.received_time,
             tick.event_time,
@@ -104,13 +128,84 @@ impl DBManager {
         Ok(())
     }
 
+    pub async fn insert_ticks_batch(&self, ticks: Vec<Tick>) -> Result<()> {
+        let ticks = ticks.into_iter().map(TickRow::from).collect::<Vec<_>>();
+
+        let mut tx = self.pool.begin().await?;
+        for tick in ticks {
+            sqlx::query(
+                r#"
+                WITH existing_instrument AS (
+                    SELECT instrument_id
+                    FROM instruments
+                    WHERE instrument_type = $3
+                    AND venue = $4
+                    AND base = $5
+                    AND quote = $6
+                    AND maturity IS NOT DISTINCT FROM $7
+                    AND strike IS NOT DISTINCT FROM $8
+                    AND option_type IS NOT DISTINCT FROM $9
+                ), insert_instrument AS (
+                    INSERT INTO instruments (instrument_type, venue, base, quote, maturity, strike, option_type)
+                    SELECT $3, $4, $5, $6, $7, $8, $9
+                    WHERE NOT EXISTS (SELECT 1 FROM existing_instrument)
+                    RETURNING instrument_id
+                )
+                INSERT INTO ticks (
+                    received_time, event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity, source
+                )
+                SELECT 
+                    $1, $2, COALESCE(ei.instrument_id, ii.instrument_id), $10, $11, $12, $13, $14, $15
+                FROM 
+                    existing_instrument ei
+                FULL OUTER JOIN 
+                    insert_instrument ii ON true
+                LIMIT 1
+                "#)
+                .bind(tick.received_time)
+                .bind(tick.event_time)
+                .bind(tick.instrument_type)
+                .bind(tick.venue)
+                .bind(tick.base)
+                .bind(tick.quote)
+                .bind(tick.maturity)
+                .bind(tick.strike)
+                .bind(tick.option_type)
+                .bind(tick.tick_id)
+                .bind(tick.bid_price)
+                .bind(tick.bid_quantity)
+                .bind(tick.ask_price)
+                .bind(tick.ask_quantity)
+                .bind(tick.source)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        Ok(())
+    }
+
     pub async fn read_ticks(&self, from: OffsetDateTime, till: OffsetDateTime) -> Vec<Tick> {
         let stream = sqlx::query_as::<_, TickRow>(
             r#"
-            SELECT received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type,
-                   bid_price, bid_quantity, ask_price, ask_quantity, source
+            SELECT 
+                ticks.received_time, 
+                ticks.event_time, 
+                instruments.instrument_type, 
+                instruments.venue, 
+                instruments.base, 
+                instruments.quote, 
+                instruments.maturity, 
+                instruments.strike, 
+                instruments.option_type, 
+                ticks.bid_price, 
+                ticks.bid_quantity, 
+                ticks.ask_price, 
+                ticks.ask_quantity, 
+                ticks.source
             FROM ticks
-            WHERE event_time >= $1 AND event_time < $2
+            JOIN instruments ON ticks.instrument_id = instruments.instrument_id
+            WHERE ticks.event_time >= $1 AND ticks.event_time < $2
             "#,
         )
         .bind(from)

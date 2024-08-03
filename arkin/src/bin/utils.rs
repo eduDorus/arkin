@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use arkin::config;
 use arkin::db::DBManager;
@@ -9,12 +11,13 @@ use arkin::ingestors::TardisService;
 use arkin::logging;
 use clap::Parser;
 use clap::Subcommand;
+use futures_util::Stream;
 use futures_util::StreamExt;
 use mimalloc::MiMalloc;
 use time::macros::format_description;
+use time::OffsetDateTime;
 use time::PrimitiveDateTime;
 use tokio::pin;
-use tracing::debug;
 use tracing::error;
 use tracing::info;
 
@@ -66,7 +69,7 @@ async fn main() -> Result<()> {
     info!("Starting Arkin 🚀");
 
     let config = config::load();
-    let manager = DBManager::from_config(&config.db).await;
+    let manager = Arc::new(DBManager::from_config(&config.db).await);
 
     let args = Cli::parse();
 
@@ -96,13 +99,20 @@ async fn main() -> Result<()> {
                 .build();
             let stream = tardis.stream(req);
             pin!(stream);
+            // process_stream_concurrently(stream, manager.clone(), 10).await;
 
+            // batch insert 5000 events
+            let mut events = Vec::with_capacity(10000);
             while let Some((_ts, json)) = stream.next().await {
-                debug!("{}", json);
                 let event = BinanceParser::parse_swap(&json)?;
-                debug!("{}", event);
-                if let Err(e) = manager.add_event(event).await {
-                    error!("Failed to add event: {}", e);
+                events.push(event);
+
+                if events.len() >= 10000 {
+                    if let Err(e) = manager.insert_events_batch(&events).await {
+                        error!("Failed to add events: {}", e);
+                    }
+                    info!("Inserted 10000 events");
+                    events.clear();
                 }
             }
 
@@ -129,4 +139,34 @@ async fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+async fn _process_stream_concurrently(
+    stream: impl Stream<Item = (OffsetDateTime, String)>,
+    manager: Arc<DBManager>,
+    concurrency: usize,
+) {
+    stream
+        .for_each_concurrent(concurrency, |(_, json)| {
+            let manager_clone = manager.clone(); // Clone manager for each concurrent operation
+            async move {
+                // Attempt to parse the JSON
+                let res = BinanceParser::parse_swap(&json);
+                match res {
+                    Ok(event) => {
+                        // On success, clone manager and add the event
+                        let manager_clone = manager_clone.clone();
+                        if let Err(e) = manager_clone.add_event(event).await {
+                            // Log error if adding event fails
+                            error!("Failed to add event: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        // Log error if parsing fails
+                        error!("Failed to parse event: {}", e);
+                    }
+                }
+            }
+        })
+        .await; // Await the completion of the concurrent operations
 }

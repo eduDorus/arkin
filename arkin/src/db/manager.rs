@@ -64,6 +64,19 @@ impl DBManager {
         }
         Ok(())
     }
+
+    pub async fn insert_events_batch(&self, events: &[Event]) -> Result<()> {
+        let ticks = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Tick(t) => Some(t),
+                _ => None,
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        self.insert_ticks_batch(ticks).await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

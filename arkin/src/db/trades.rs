@@ -72,26 +72,50 @@ impl From<TradeRow> for Trade {
 impl DBManager {
     pub async fn insert_trade(&self, trade: Trade) -> Result<()> {
         sqlx::query!(
-        r#"
-        INSERT INTO trades (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, trade_id, price, quantity, source)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        "#,
-        trade.received_time,
-        trade.event_time,
-        trade.instrument.instrument_type().to_string(),
-        trade.instrument.venue().to_string(),
-        trade.instrument.base().to_string(),
-        trade.instrument.quote().to_string(),
-        trade.instrument.maturity().map(|m| m.value()),
-        trade.instrument.strike().map(|s| s.value()),
-        trade.instrument.option_type().map(|ot| ot.to_string()),
-        trade.trade_id as i64,
-        trade.price.value(),
-        trade.quantity.value(),
-        trade.source.to_string(),
-    )
-    .execute(&self.pool)
-    .await?;
+            r#"
+            WITH existing_instrument AS (
+                SELECT instrument_id
+                FROM instruments
+                WHERE instrument_type = $3
+                AND venue = $4
+                AND base = $5
+                AND quote = $6
+                AND maturity IS NOT DISTINCT FROM $7
+                AND strike IS NOT DISTINCT FROM $8
+                AND option_type IS NOT DISTINCT FROM $9
+            ), insert_instrument AS (
+                INSERT INTO instruments (instrument_type, venue, base, quote, maturity, strike, option_type)
+                SELECT $3, $4, $5, $6, $7, $8, $9
+                WHERE NOT EXISTS (SELECT 1 FROM existing_instrument)
+                RETURNING instrument_id
+            )
+            INSERT INTO trades (
+                received_time, event_time, instrument_id, trade_id, price, quantity, source
+            )
+            SELECT 
+                $1, $2, COALESCE(ei.instrument_id, ii.instrument_id), $10, $11, $12, $13
+            FROM 
+                existing_instrument ei
+            FULL OUTER JOIN 
+                insert_instrument ii ON true
+            LIMIT 1
+            "#,
+            trade.received_time,
+            trade.event_time,
+            trade.instrument.instrument_type().to_string(),
+            trade.instrument.venue().to_string(),
+            trade.instrument.base().to_string(),
+            trade.instrument.quote().to_string(),
+            trade.instrument.maturity().map(|m| m.value()),
+            trade.instrument.strike().map(|s| s.value()),
+            trade.instrument.option_type().map(|ot| ot.to_string()),
+            trade.trade_id as i64,
+            trade.price.value(),
+            trade.quantity.value(),
+            trade.source.to_string(),
+        )
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
@@ -100,8 +124,23 @@ impl DBManager {
         let stream = sqlx::query_as!(
             TradeRow,
             r#"
-            SELECT * FROM trades
-            WHERE event_time >= $1 AND event_time < $2
+            SELECT 
+                trades.received_time, 
+                trades.event_time, 
+                instruments.instrument_type, 
+                instruments.venue, 
+                instruments.base, 
+                instruments.quote, 
+                instruments.maturity, 
+                instruments.strike, 
+                instruments.option_type, 
+                trades.trade_id, 
+                trades.price, 
+                trades.quantity, 
+                trades.source
+            FROM trades
+            JOIN instruments ON trades.instrument_id = instruments.instrument_id
+            WHERE trades.event_time >= $1 AND trades.event_time < $2
             "#,
             from,
             to

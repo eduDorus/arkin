@@ -35,7 +35,7 @@ impl TardisHttpClient {
             let req = self.client.get(&url).query(&query.to_query()).build()?;
             debug!("URL: {:?}", req.url().to_string());
             debug!("Request: {:?}", req);
-            let res = self.client.execute(req).await.unwrap();
+            let res = self.client.execute(req).await?;
             debug!("Response: {:?}", res);
             let data = res.bytes().await?;
             Ok(data)
