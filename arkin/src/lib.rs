@@ -10,6 +10,7 @@ pub mod features;
 pub mod ingestors;
 pub mod logging;
 pub mod models;
+pub mod pipeline;
 pub mod pubsub;
 pub mod server;
 pub mod state;

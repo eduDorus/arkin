@@ -1,11 +1,5 @@
-pub mod errors;
-mod factory;
-mod graph;
-// mod vwap;
-
 use async_trait::async_trait;
 use core::fmt;
-pub use graph::Pipeline;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, time::Duration};
@@ -13,12 +7,25 @@ use tracing::info;
 
 use crate::config::{EMAFeatureConfig, SMAFeatureConfig, SpreadFeatureConfig, VWAPFeatureConfig, VolumeFeatureConfig};
 
+pub mod errors;
+mod factory;
+
+pub use factory::FeatureFactory;
+
 fn fibonacci(n: u64) -> u64 {
     match n {
         0 => 0,
         1 => 1,
         _ => fibonacci(n - 1) + fibonacci(n - 2),
     }
+}
+
+pub enum FeatureEvent {
+    Volume(f64),
+    VWAP(f64),
+    SMA(f64),
+    EMA(f64),
+    Spread(f64),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
@@ -47,8 +54,8 @@ pub trait Feature: Debug + Send + Sync {
     fn id(&self) -> &FeatureID;
     fn sources(&self) -> Vec<&FeatureID>;
     // fn data(&self, store: Arc<DataStore>) -> QueryResult;
-    fn calculate(&self);
-    async fn calculate_async(&self);
+    fn calculate(&self) -> FeatureEvent;
+    // async fn calculate_async(&self) -> FeatureEvent;
 }
 
 #[derive(Debug)]
@@ -83,7 +90,7 @@ impl Feature for VolumeFeature {
         vec![]
     }
 
-    fn calculate(&self) {
+    fn calculate(&self) -> FeatureEvent {
         info!("Calculating Volume with id: {}", self.id);
 
         // Generate a random limit for the Fibonacci calculation
@@ -92,10 +99,7 @@ impl Feature for VolumeFeature {
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
         info!("Volume result for {}: {}", limit, result);
-    }
-
-    async fn calculate_async(&self) {
-        self.calculate();
+        FeatureEvent::Volume(result as f64)
     }
 }
 
@@ -131,7 +135,7 @@ impl Feature for VWAPFeature {
         vec![]
     }
 
-    fn calculate(&self) {
+    fn calculate(&self) -> FeatureEvent {
         info!("Calculating VWAP with id: {}", self.id);
         // Generate a random limit for the Fibonacci calculation
         let limit = rand::thread_rng().gen_range(20..25); // Adjust the range as needed
@@ -139,10 +143,7 @@ impl Feature for VWAPFeature {
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
         info!("VWAP result for {}: {}", limit, result);
-    }
-
-    async fn calculate_async(&self) {
-        self.calculate();
+        FeatureEvent::VWAP(result as f64)
     }
 }
 
@@ -181,7 +182,7 @@ impl Feature for SMAFeature {
         vec![&self.source]
     }
 
-    fn calculate(&self) {
+    fn calculate(&self) -> FeatureEvent {
         info!("Calculating SMA with id: {}", self.id);
         // Wait a random amount of time between 0 and 1 second
         // Generate a random limit for the Fibonacci calculation
@@ -190,10 +191,7 @@ impl Feature for SMAFeature {
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
         info!("SMA result for {}: {}", limit, result);
-    }
-
-    async fn calculate_async(&self) {
-        self.calculate();
+        FeatureEvent::SMA(result as f64)
     }
 }
 
@@ -232,7 +230,7 @@ impl Feature for EMAFeature {
         vec![&self.source]
     }
 
-    fn calculate(&self) {
+    fn calculate(&self) -> FeatureEvent {
         info!("Calculating EMA with id: {}", self.id);
         // Wait a random amount of time between 0 and 1 second
         // Generate a random limit for the Fibonacci calculation
@@ -241,10 +239,7 @@ impl Feature for EMAFeature {
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
         info!("EMA result for {}: {}", limit, result);
-    }
-
-    async fn calculate_async(&self) {
-        self.calculate();
+        FeatureEvent::EMA(result as f64)
     }
 }
 
@@ -283,7 +278,7 @@ impl Feature for SpreadFeature {
         vec![&self.front_component, &self.back_component]
     }
 
-    fn calculate(&self) {
+    fn calculate(&self) -> FeatureEvent {
         info!("Calculating Spread with id: {}", self.id);
         // Wait a random amount of time between 0 and 1 second
         // Generate a random limit for the Fibonacci calculation
@@ -292,9 +287,6 @@ impl Feature for SpreadFeature {
         // Perform the Fibonacci computation
         let result = fibonacci(limit);
         info!("Spread result for {}: {}", limit, result);
-    }
-
-    async fn calculate_async(&self) {
-        self.calculate();
+        FeatureEvent::Spread(result as f64)
     }
 }

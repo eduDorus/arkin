@@ -29,7 +29,7 @@ pub struct GlobalConfig {
     pub state: StateConfig,
     pub db: DatabaseConfig,
     pub ingestors: Vec<IngestorConfig>,
-    pub pipelines: Vec<PipelineConfig>,
+    pub pipeline: PipelineConfig,
     pub strategies: Vec<StrategyConfig>,
     pub allocation: AllocationConfig,
     pub execution: Vec<ExecutionConfig>,

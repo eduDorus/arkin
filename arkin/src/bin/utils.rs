@@ -9,6 +9,7 @@ use arkin::ingestors::TardisExchange;
 use arkin::ingestors::TardisRequest;
 use arkin::ingestors::TardisService;
 use arkin::logging;
+use arkin::pipeline::Pipeline;
 use clap::Parser;
 use clap::Subcommand;
 use futures_util::Stream;
@@ -55,6 +56,24 @@ enum Commands {
         start: String,
 
         /// End date for the data stream
+        #[clap(long)]
+        end: String,
+    },
+
+    /// Run pipeline
+    Pipeline {
+        // /// Filter by exchange
+        // #[clap(long)]
+        // exchange: Option<String>,
+
+        // /// Filter on instruments
+        // #[clap(long)]
+        // instrument: Vec<String>,
+        /// Filter on start date
+        #[clap(long)]
+        start: String,
+
+        /// Filter on end date
         #[clap(long)]
         end: String,
     },
@@ -115,27 +134,19 @@ async fn main() -> Result<()> {
                     events.clear();
                 }
             }
+        }
+        Commands::Pipeline { start, end } => {
+            let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
+            let start = PrimitiveDateTime::parse(&start, &format)?.assume_utc();
+            let end = PrimitiveDateTime::parse(&end, &format)?.assume_utc();
 
-            // Create file in ./tests/data
-            // let filename = format!(
-            //     "./tests/data/{}_{}_{}_{}_{}.json",
-            //     exchange,
-            //     channel,
-            //     instruments.join("_"),
-            //     start.format(format_description!("[year][month][day][hour][minute]"))?,
-            //     end.format(format_description!("[year][month][day][hour][minute]"))?
-            // );
-
-            // Open file
-            // let file = std::fs::File::create(filename)?;
-            // let mut writer = std::io::BufWriter::new(file);
-            // while let Some((_ts, json)) = stream.next().await {
-            //     // let event = BinanceParser::parse_swap(&json)?;
-            //     // let event_json = serde_json::to_string(&event)?;
-            //     writer.write_all(&json.into_bytes())?;
-            //     writer.write_all(b"\n")?;
-            // }
-            // writer.flush()?;
+            info!(
+                "Starting pipeline from {} to {}",
+                start.format(&format).expect("Failed to format date"),
+                end.format(&format).expect("Failed to format date")
+            );
+            let pipeline = Pipeline::from_config(&config.pipeline);
+            pipeline.calculate();
         }
     }
     Ok(())
@@ -170,3 +181,26 @@ async fn _process_stream_concurrently(
         })
         .await; // Await the completion of the concurrent operations
 }
+
+// async fn write_to_file(stream: impl Stream<Item = (OffsetDateTime, String)>) {
+//     // Create file in ./tests/data
+//     let filename = format!(
+//         "./tests/data/{}_{}_{}_{}_{}.json",
+//         exchange,
+//         channel,
+//         instruments.join("_"),
+//         start.format(format_description!("[year][month][day][hour][minute]"))?,
+//         end.format(format_description!("[year][month][day][hour][minute]"))?
+//     );
+
+//     //   Open file
+//     let file = std::fs::File::create(filename)?;
+//     let mut writer = std::io::BufWriter::new(file);
+//     while let Some((_ts, json)) = stream.next().await {
+//         // let event = BinanceParser::parse_swap(&json)?;
+//         // let event_json = serde_json::to_string(&event)?;
+//         writer.write_all(&json.into_bytes())?;
+//         writer.write_all(b"\n")?;
+//     }
+//     writer.flush()?;
+// }

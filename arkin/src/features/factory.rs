@@ -1,21 +1,24 @@
-// use std::sync::Arc;
+use crate::config::FeatureConfig;
 
-// use crate::{config::FeatureConfig, state::StateManager};
+use super::{EMAFeature, Feature, SMAFeature, SpreadFeature, VWAPFeature, VolumeFeature};
 
-// pub struct FeatureFactory {}
+pub struct FeatureFactory {}
 
-// impl FeatureFactory {
-//     pub fn from_config(state: Arc<StateManager>, config: &[FeatureConfig]) -> Vec<FeatureType> {
-//         let mut features = Vec::new();
+impl FeatureFactory {
+    pub fn from_config(config: &[FeatureConfig]) -> Vec<Box<dyn Feature>> {
+        let mut features = Vec::with_capacity(config.len());
 
-//         for config in config {
-//             match config {
-//                 FeatureConfig::VWAP(config) => todo!(),
-//                 FeatureConfig::SMA(_) => todo!(),
-//                 FeatureConfig::EMA(_) => todo!(),
-//             }
-//         }
-
-//         features
-//     }
-// }
+        // Create nodes
+        config.iter().for_each(|c| {
+            let f: Box<dyn Feature> = match &c {
+                FeatureConfig::Volume(c) => Box::new(VolumeFeature::from_config(c)),
+                FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
+                FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
+                FeatureConfig::EMA(c) => Box::new(EMAFeature::from_config(c)),
+                FeatureConfig::Spread(c) => Box::new(SpreadFeature::from_config(c)),
+            };
+            features.push(f);
+        });
+        features
+    }
+}

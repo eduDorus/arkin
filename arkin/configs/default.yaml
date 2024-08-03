@@ -37,34 +37,34 @@ ingestors:
   #         symbols:
   #           - btcusdt
 
-pipelines:
-  - name: TA
-    frequency: 1 # In seconds
-    features:
-      - vwap:
-          id: vwap_1_min
-          window: 60 # In seconds
-      - vwap:
-          id: vwap_1_h
-          window: 3600 # In seconds
-      - volume:
-          id: volume_1_min
-          window: 60 # In seconds
-      - volume:
-          id: volume_1_h
-          window: 3600 # In seconds
-      - sma:
-          id: sma_10_min
-          source: vwap_1_min
-          period: 10
-      - ema:
-          id: ema_10_min
-          source: vwap_1_min
-          period: 10
-      - spread:
-          id: spread_sma_ema_10_minute
-          front_component: ema_10_min
-          back_component: sma_10_min
+pipeline:
+  name: TA
+  frequency: 1 # In seconds
+  features:
+    - vwap:
+        id: vwap_1_min
+        window: 60 # In seconds
+    - vwap:
+        id: vwap_1_h
+        window: 3600 # In seconds
+    - volume:
+        id: volume_1_min
+        window: 60 # In seconds
+    - volume:
+        id: volume_1_h
+        window: 3600 # In seconds
+    - sma:
+        id: sma_10_min
+        source: vwap_1_min
+        period: 10
+    - ema:
+        id: ema_10_min
+        source: vwap_1_min
+        period: 10
+    - spread:
+        id: spread_sma_ema_10_minute
+        front_component: ema_10_min
+        back_component: sma_10_min
 
 strategies:
   - crossover:

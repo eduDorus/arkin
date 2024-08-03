@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use dashmap::DashMap;
 use parking_lot::Mutex;
 use petgraph::graph::NodeIndex;
 use petgraph::{
@@ -7,15 +9,18 @@ use petgraph::{
     dot::{Config, Dot},
     graph::DiGraph,
 };
+use rayon::ThreadPoolBuilder;
+use time::OffsetDateTime;
 use tracing::{debug, info};
 
-use crate::config::{FeatureConfig, PipelineConfig};
-
-use super::{EMAFeature, Feature, SMAFeature, SpreadFeature, VWAPFeature, VolumeFeature};
+use crate::config::PipelineConfig;
+use crate::features::{Feature, FeatureEvent, FeatureFactory, FeatureID};
+use crate::models::Instrument;
 
 #[derive(Default)]
 pub struct Pipeline {
     graph: Arc<DiGraph<Box<dyn Feature>, ()>>,
+    _events: DashMap<(Instrument, FeatureID), BTreeMap<OffsetDateTime, FeatureEvent>>,
     order: Vec<NodeIndex>,
 }
 
@@ -23,15 +28,11 @@ impl Pipeline {
     pub fn from_config(config: &PipelineConfig) -> Self {
         let mut graph = DiGraph::new();
 
-        // Create nodes
-        config.features.iter().for_each(|c| {
-            let f: Box<dyn Feature> = match &c {
-                FeatureConfig::Volume(c) => Box::new(VolumeFeature::from_config(c)),
-                FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
-                FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
-                FeatureConfig::EMA(c) => Box::new(EMAFeature::from_config(c)),
-                FeatureConfig::Spread(c) => Box::new(SpreadFeature::from_config(c)),
-            };
+        // Create features
+        let features = FeatureFactory::from_config(&config.features);
+
+        // Add features as nodes
+        features.into_iter().for_each(|f| {
             graph.add_node(f);
         });
 
@@ -47,48 +48,16 @@ impl Pipeline {
             graph.add_edge(source, target, ());
         }
 
+        // Save down the topological order for parallel processing
         let order = toposort(&graph, None).expect("Cycle detected in graph");
 
         info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
-
         Pipeline {
             graph: Arc::new(graph),
+            _events: DashMap::new(),
             order,
         }
     }
-
-    // pub fn add_node<F: Feature + 'static>(&mut self, feature: F) {
-    //     self.graph.add_node(Box::new(feature));
-    // }
-
-    // pub fn add_edge(&mut self, source: &FeatureID, target: &FeatureID) {
-    //     let source_node = self.graph.node_indices().find(|i| self.graph[*i].id() == source).unwrap();
-    //     let target_node = self.graph.node_indices().find(|i| self.graph[*i].id() == target).unwrap();
-    //     self.graph.add_edge(source_node, target_node, ());
-    // }
-
-    // pub fn connect_nodes(&mut self) {
-    //     let mut edges_to_add = vec![];
-    //     for node in self.graph.node_indices() {
-    //         let node_id = self.graph[node].id();
-    //         for source in self.graph[node].sources() {
-    //             edges_to_add.push((source.clone(), node_id.clone()));
-    //         }
-    //     }
-
-    //     for (source, target) in edges_to_add {
-    //         self.add_edge(&source, &target);
-    //     }
-    // }
-
-    // pub fn calculate(&self) {
-    //     let nodes = toposort(&self.graph, None).expect("Cycle detected in graph");
-
-    //     for node in nodes {
-    //         let feature = &self.graph[node];
-    //         feature.calculate();
-    //     }
-    // }
 
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
     pub fn calculate(&self) {
@@ -110,7 +79,7 @@ impl Pipeline {
         }
 
         // Step 3: Parallel processing
-        let pool = rayon::ThreadPoolBuilder::new().build().expect("Failed to create thread pool");
+        let pool = ThreadPoolBuilder::new().build().expect("Failed to create thread pool");
         pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
                 let graph = Arc::clone(&self.graph);
@@ -143,70 +112,74 @@ impl Pipeline {
         info!("Finished graph calculation");
     }
 
-    pub async fn calculate_async(&self) {
-        // Step 1: Calculate in-degrees
-        let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
-        for edge in self.graph.edge_indices() {
-            let target = self.graph.edge_endpoints(edge).unwrap().1;
-            in_degrees.lock()[target.index()] += 1;
-        }
-        debug!("In-Degree count: {:?}", in_degrees);
+    // cOULD BE USED IN THE FUTURE IF WE HAVE ASYNC FEATURES
+    // pub async fn calculate_async(&self) {
+    //     // Step 1: Calculate in-degrees
+    //     let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
+    //     for edge in self.graph.edge_indices() {
+    //         let target = self.graph.edge_endpoints(edge).unwrap().1;
+    //         in_degrees.lock()[target.index()] += 1;
+    //     }
+    //     debug!("In-Degree count: {:?}", in_degrees);
 
-        // Step 2: Enqueue nodes with zero in-degree
-        let (queue_tx, queue_rx) = flume::unbounded();
-        for node in &self.order {
-            if in_degrees.lock()[node.index()] == 0 {
-                debug!("Ready node: {:?}", self.graph[*node]);
-                queue_tx.send(Some(*node)).expect("Failed to send ready node");
-            }
-        }
+    //     // Step 2: Enqueue nodes with zero in-degree
+    //     let (queue_tx, queue_rx) = flume::unbounded();
+    //     for node in &self.order {
+    //         if in_degrees.lock()[node.index()] == 0 {
+    //             debug!("Ready node: {:?}", self.graph[*node]);
+    //             queue_tx.send(Some(*node)).expect("Failed to send ready node");
+    //         }
+    //     }
 
-        // Step 3: Parallel processing
-        let mut tasks = Vec::with_capacity(self.graph.node_count());
-        while let Some(node_index) = queue_rx.recv_async().await.expect("Failed to receive ready node") {
-            let graph = Arc::clone(&self.graph);
-            let in_degrees = Arc::clone(&in_degrees);
-            let queue_tx = queue_tx.clone();
+    //     // Step 3: Parallel processing
+    //     let mut tasks = Vec::with_capacity(self.graph.node_count());
+    //     while let Some(node_index) = queue_rx.recv_async().await.expect("Failed to receive ready node") {
+    //         let graph = Arc::clone(&self.graph);
+    //         let in_degrees = Arc::clone(&in_degrees);
+    //         let queue_tx = queue_tx.clone();
 
-            let task = tokio::spawn(async move {
-                // Calculate the feature
-                let feature = &graph[node_index];
-                feature.calculate_async().await;
+    //         let task = tokio::spawn(async move {
+    //             // Calculate the feature
+    //             let feature = &graph[node_index];
+    //             feature.calculate_async().await;
 
-                // Update dependencies and push ready nodes to the queue
-                for neighbor in graph.neighbors_directed(node_index, petgraph::Outgoing) {
-                    let mut count = in_degrees.lock()[neighbor.index()];
-                    count -= 1;
-                    in_degrees.lock()[neighbor.index()] = count;
+    //             // Update dependencies and push ready nodes to the queue
+    //             for neighbor in graph.neighbors_directed(node_index, petgraph::Outgoing) {
+    //                 let mut count = in_degrees.lock()[neighbor.index()];
+    //                 count -= 1;
+    //                 in_degrees.lock()[neighbor.index()] = count;
 
-                    if count == 0 {
-                        debug!("Ready node: {:?}", graph[neighbor]);
-                        queue_tx.send_async(Some(neighbor)).await.expect("Failed to send ready node");
+    //                 if count == 0 {
+    //                     debug!("Ready node: {:?}", graph[neighbor]);
+    //                     queue_tx.send_async(Some(neighbor)).await.expect("Failed to send ready node");
 
-                        debug!("Dependency count: {:?}", in_degrees);
-                        if in_degrees.lock().iter().all(|&x| x == 0) {
-                            queue_tx.send_async(None).await.expect("Failed to send ready node");
-                        }
-                    }
-                }
-            });
-            tasks.push(task);
-        }
+    //                     debug!("Dependency count: {:?}", in_degrees);
+    //                     if in_degrees.lock().iter().all(|&x| x == 0) {
+    //                         queue_tx.send_async(None).await.expect("Failed to send ready node");
+    //                     }
+    //                 }
+    //             }
+    //         });
+    //         tasks.push(task);
+    //     }
 
-        // Wait on all tasks to finish
-        for task in tasks {
-            let _ = task.await;
-        }
+    //     // Wait on all tasks to finish
+    //     for task in tasks {
+    //         let _ = task.await;
+    //     }
 
-        info!("Finished graph calculation");
-    }
+    //     info!("Finished graph calculation");
+    // }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        config::{EMAFeatureConfig, SMAFeatureConfig, SpreadFeatureConfig, VWAPFeatureConfig, VolumeFeatureConfig},
+        config::{
+            EMAFeatureConfig, FeatureConfig, SMAFeatureConfig, SpreadFeatureConfig, VWAPFeatureConfig,
+            VolumeFeatureConfig,
+        },
         logging,
     };
 
@@ -312,7 +285,5 @@ mod tests {
 
         let pipeline = Pipeline::from_config(&config);
         pipeline.calculate();
-        info!("---------------------");
-        pipeline.calculate_async().await;
     }
 }
