@@ -54,17 +54,17 @@ pipeline:
         id: volume_1_h
         window: 3600 # In seconds
     - sma:
-        id: sma_10_min
+        id: sma_5
         source: vwap_1_min
         period: 10
     - sma:
-        id: sma_60_min
+        id: sma_10
         source: vwap_1_min
         period: 60
     - spread:
         id: spread_sma
-        front_component: sma_10_min
-        back_component: sma_60_min
+        front_component: sma_5
+        back_component: sma_10
 
 strategies:
   - crossover:

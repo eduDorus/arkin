@@ -40,7 +40,7 @@ pub struct VWAPFeatureConfig {
 pub struct SMAFeatureConfig {
     pub id: FeatureID,
     pub source: FeatureID,
-    pub period: u64,
+    pub period: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
+use std::time::Duration;
 use time::OffsetDateTime;
 
 pub mod errors;
@@ -68,6 +69,14 @@ impl fmt::Display for FeatureID {
 #[async_trait]
 pub trait Feature: Debug + Send + Sync {
     fn id(&self) -> &FeatureID;
-    fn sources(&self) -> Vec<&FeatureID>;
+    fn sources(&self) -> Vec<FeatureID>;
+    fn data_type(&self) -> DataType;
     fn calculate(&self, data: HashMap<FeatureID, Vec<f64>>) -> Result<HashMap<FeatureID, f64>>;
+}
+
+#[derive(Debug)]
+pub enum DataType {
+    Latest,
+    Window(Duration),
+    Period(usize),
 }

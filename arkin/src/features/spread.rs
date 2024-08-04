@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use super::{Feature, FeatureID};
+use super::{DataType, Feature, FeatureID};
 use crate::config::SpreadFeatureConfig;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use tracing::info;
+use tracing::debug;
 
 #[derive(Debug)]
 pub struct SpreadFeature {
@@ -37,14 +37,18 @@ impl Feature for SpreadFeature {
         &self.id
     }
 
-    fn sources(&self) -> Vec<&FeatureID> {
-        vec![&self.front_component, &self.back_component]
+    fn sources(&self) -> Vec<FeatureID> {
+        vec![self.front_component.clone(), self.back_component.clone()]
+    }
+
+    fn data_type(&self) -> DataType {
+        DataType::Latest
     }
 
     fn calculate(&self, data: HashMap<FeatureID, Vec<f64>>) -> Result<HashMap<FeatureID, f64>> {
-        info!("Calculating Spread with id: {}", self.id);
+        debug!("Calculating Spread with id: {}", self.id);
         let front = data.get(&self.front_component).ok_or(anyhow!("Missing front_component"))?;
-        let back = data.get(&self.front_component).ok_or(anyhow!("Missing back_component"))?;
+        let back = data.get(&self.back_component).ok_or(anyhow!("Missing back_component"))?;
 
         let front_value = front.last().ok_or(anyhow!("Missing front_component value"))?;
         let back_value = back.last().ok_or(anyhow!("Missing back_component value"))?;

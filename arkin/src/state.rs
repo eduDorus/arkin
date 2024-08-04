@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 use time::OffsetDateTime;
-use tracing::info;
+use tracing::debug;
 
 #[derive(Default)]
 pub struct State {
@@ -42,7 +42,7 @@ impl State {
         let from_adjusted = from - Duration::from_nanos(1);
         let till = from - (window);
 
-        info!(
+        debug!(
             "Getting {} for {} from: {} till: {}",
             event_type,
             instrument,

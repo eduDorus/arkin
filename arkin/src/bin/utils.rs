@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use arkin::config;
 use arkin::db::DBManager;
@@ -19,10 +17,14 @@ use futures_util::Stream;
 use futures_util::StreamExt;
 use mimalloc::MiMalloc;
 use rust_decimal::prelude::*;
+use std::sync::Arc;
+use std::time::Duration;
+use std::time::Instant;
 use time::macros::format_description;
 use time::OffsetDateTime;
 use time::PrimitiveDateTime;
 use tokio::pin;
+use tracing::debug;
 use tracing::error;
 use tracing::info;
 
@@ -172,11 +174,25 @@ async fn main() -> Result<()> {
                 pipeline.insert(event);
             }
             let instrument = Instrument::perpetual(Venue::Binance, "btc".into(), "usdt".into());
-            info!("Timestamp: {:?}", end);
-            let latest_price = pipeline.get_latest(&instrument, &"trade_price".into(), &end);
-            info!("Latest price: {:?}", latest_price);
-            let latest_quantity = pipeline.get_latest(&instrument, &"trade_quantity".into(), &end);
-            info!("Latest quantity: {:?}", latest_quantity);
+
+            let interval = 60 * 60 * 3;
+            let mut timestamp = end - Duration::from_secs(interval);
+            let timer = Instant::now();
+            for _ in 0..interval {
+                debug!("----------------- {:?} -----------------", timestamp);
+                pipeline.calculate(instrument.clone(), timestamp);
+                timestamp += Duration::from_secs(1);
+            }
+            info!("Elapsed time: {:?}", timer.elapsed());
+            // info!("Timestamp: {:?}", end);
+            // let latest_price = pipeline.get_latest(&instrument, &"trade_price".into(), &end);
+            // info!("Latest price: {:?}", latest_price);
+            // let latest_quantity = pipeline.get_latest(&instrument, &"trade_quantity".into(), &end);
+            // info!("Latest quantity: {:?}", latest_quantity);
+            // let range_price = pipeline.get_range(&instrument, &"trade_price".into(), &end, &Duration::from_secs(1));
+            // info!("Range price: {:?}", range_price);
+            // let periods = pipeline.get_periods(&instrument, &"trade_price".into(), &end, 5);
+            // info!("Periods: {:?}", periods);
             // pipeline.calculate();
         }
     }

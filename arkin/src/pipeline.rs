@@ -1,5 +1,5 @@
 use crate::config::PipelineConfig;
-use crate::features::{Feature, FeatureEvent, FeatureFactory, FeatureID};
+use crate::features::{DataType, Feature, FeatureEvent, FeatureFactory, FeatureID};
 use crate::models::Instrument;
 use crate::utils::CompositeKey;
 use dashmap::DashMap;
@@ -10,8 +10,9 @@ use petgraph::{
     dot::{Config, Dot},
     graph::DiGraph,
 };
+use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::time::Duration;
 use time::OffsetDateTime;
@@ -19,7 +20,7 @@ use tracing::{debug, info};
 
 #[derive(Default)]
 pub struct Pipeline {
-    events: DashMap<(Instrument, FeatureID), BTreeMap<CompositeKey, f64>>,
+    state: Arc<PipelineState>,
     graph: Arc<DiGraph<Box<dyn Feature>, ()>>,
     order: Vec<NodeIndex>,
 }
@@ -39,7 +40,7 @@ impl Pipeline {
         // Add edges automatically
         let mut edges_to_add = vec![];
         for target_node in graph.node_indices() {
-            for source in graph[target_node].sources() {
+            for source in &graph[target_node].sources() {
                 if source == &"trade_price".into() || source == &"trade_quantity".into() {
                     continue;
                 }
@@ -56,71 +57,18 @@ impl Pipeline {
 
         info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
         Pipeline {
-            events: DashMap::new(),
+            state: Arc::new(PipelineState::default()),
             graph: Arc::new(graph),
             order,
         }
     }
 
     pub fn insert(&self, event: FeatureEvent) {
-        let key = (event.instrument, event.id);
-        let mut composit_key = CompositeKey::new(&event.event_time);
-
-        let mut entry = self.events.entry(key).or_default();
-        while entry.get(&composit_key).is_some() {
-            composit_key.increment();
-        }
-        entry.insert(composit_key, event.value);
-    }
-
-    pub fn get_latest(&self, instrument: &Instrument, feature_id: &FeatureID, from: &OffsetDateTime) -> Vec<f64> {
-        let key = (instrument.clone(), feature_id.clone());
-        let from_key = CompositeKey::new_max(from);
-
-        if let Some(tree) = self.events.get(&key) {
-            tree.value().range(..from_key).rev().take(1).map(|(_, v)| *v).collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    pub fn get_range(
-        &self,
-        instrument: &Instrument,
-        feature_id: &FeatureID,
-        from: &OffsetDateTime,
-        window: &Duration,
-    ) -> Vec<f64> {
-        let key = (instrument.clone(), feature_id.clone());
-        let from_key = CompositeKey::new(from);
-        let end_key = CompositeKey::new(&(*from - *window));
-
-        if let Some(tree) = self.events.get(&key) {
-            tree.value().range(end_key..from_key).map(|(_, v)| *v).collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    pub fn get_periods(
-        &self,
-        instrument: &Instrument,
-        feature_id: &FeatureID,
-        from: &OffsetDateTime,
-        periods: usize,
-    ) -> Vec<f64> {
-        let key = (instrument.clone(), feature_id.clone());
-        let from_key = CompositeKey::new_max(from);
-
-        if let Some(tree) = self.events.get(&key) {
-            tree.value().range(..=from_key).rev().take(periods).map(|(_, v)| *v).collect()
-        } else {
-            Vec::new()
-        }
+        self.state.insert(event);
     }
 
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
-    pub fn calculate(&self) {
+    pub fn calculate(&self, instrument: Instrument, timestamp: OffsetDateTime) {
         // Step 1: Calculate in-degrees
         let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
         for edge in self.graph.edge_indices() {
@@ -142,21 +90,35 @@ impl Pipeline {
         let pool = ThreadPoolBuilder::new().build().expect("Failed to create thread pool");
         pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
-                let _events = self.events.clone();
+                let state = self.state.clone();
+                let instrument = instrument.clone();
                 let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);
                 let queue_tx = queue_tx.clone();
 
                 s.spawn(move |_| {
                     // Process the node
-                    let _feature = &graph[node];
+                    let feature = &graph[node];
 
-                    // TODO: Query the data from the data source
-                    // Not sure how we do this since we have the feature events in the state but the base data in the db
-                    // let data = state.get_source(&feature.id());
+                    // Query the data
+                    let data = state.query(&instrument, feature.sources(), &timestamp, feature.data_type());
 
                     // Calculate the feature
-                    // feature.calculate();
+                    let res = feature.calculate(data);
+                    match res {
+                        Ok(res) => {
+                            debug!("Calculated: {:?}", res);
+                            state.insert(FeatureEvent::new(
+                                feature.id().clone(),
+                                instrument.clone(),
+                                timestamp,
+                                res[feature.id()].to_owned(),
+                            ));
+                        }
+                        Err(e) => {
+                            info!("Failed to calculate: {:?}", e);
+                        }
+                    }
 
                     // Update in-degrees of neighbors and enqueue new zero in-degree nodes
                     for neighbor in graph.neighbors_directed(node, petgraph::Outgoing) {
@@ -176,7 +138,7 @@ impl Pipeline {
             }
         });
 
-        info!("Finished graph calculation");
+        debug!("Finished graph calculation");
     }
 
     // COULD BE USED IN THE FUTURE IF WE HAVE ASYNC FEATURES
@@ -237,6 +199,123 @@ impl Pipeline {
 
     //     info!("Finished graph calculation");
     // }
+}
+
+#[derive(Default)]
+struct PipelineState {
+    events: DashMap<(Instrument, FeatureID), BTreeMap<CompositeKey, f64>>,
+}
+
+impl PipelineState {
+    pub fn insert(&self, event: FeatureEvent) {
+        let key = (event.instrument, event.id);
+        let mut composit_key = CompositeKey::new(&event.event_time);
+
+        let mut entry = self.events.entry(key).or_default();
+        while entry.get(&composit_key).is_some() {
+            composit_key.increment();
+        }
+        entry.insert(composit_key, event.value);
+    }
+
+    pub fn query(
+        &self,
+        instrument: &Instrument,
+        feature_ids: Vec<FeatureID>,
+        from: &OffsetDateTime,
+        data_type: DataType,
+    ) -> HashMap<FeatureID, Vec<f64>> {
+        feature_ids
+            .par_iter()
+            .map(|id| match data_type {
+                DataType::Latest => {
+                    let data = self.get_latest(instrument, id, from);
+                    (id.clone(), data)
+                }
+                DataType::Window(window) => {
+                    let data = self.get_range(instrument, id, from, &window);
+                    (id.clone(), data)
+                }
+                DataType::Period(periods) => {
+                    let data = self.get_periods(instrument, id, from, periods);
+                    (id.clone(), data)
+                }
+            })
+            .collect()
+    }
+
+    fn get_latest(&self, instrument: &Instrument, feature_id: &FeatureID, from: &OffsetDateTime) -> Vec<f64> {
+        let key = (instrument.clone(), feature_id.clone());
+        let from_key = CompositeKey::new_max(from);
+
+        if let Some(tree) = self.events.get(&key) {
+            tree.value()
+                .range(..=from_key)
+                .rev()
+                .take(1)
+                .map(|(k, v)| {
+                    debug!("Found: {} => {}", k, v);
+                    *v
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn get_range(
+        &self,
+        instrument: &Instrument,
+        feature_id: &FeatureID,
+        from: &OffsetDateTime,
+        window: &Duration,
+    ) -> Vec<f64> {
+        let key = (instrument.clone(), feature_id.clone());
+        let from_key = CompositeKey::new(from);
+        let end_key = CompositeKey::new(&(*from - *window));
+
+        debug!("Getting {} for {} from: {} till: {}", feature_id, instrument, from_key, end_key);
+
+        if let Some(tree) = self.events.get(&key) {
+            tree.value()
+                .range(end_key..from_key)
+                .map(|(k, v)| {
+                    debug!("Found: {} => {}", k, v);
+                    *v
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn get_periods(
+        &self,
+        instrument: &Instrument,
+        feature_id: &FeatureID,
+        from: &OffsetDateTime,
+        periods: usize,
+    ) -> Vec<f64> {
+        let key = (instrument.clone(), feature_id.clone());
+        let from_key = CompositeKey::new_max(from);
+
+        if let Some(tree) = self.events.get(&key) {
+            let mut res = tree
+                .value()
+                .range(..from_key)
+                .rev()
+                .take(periods)
+                .map(|(k, v)| {
+                    debug!("Found: {} => {}", k, v);
+                    *v
+                })
+                .collect::<Vec<_>>();
+            res.reverse();
+            res
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 // #[cfg(test)]

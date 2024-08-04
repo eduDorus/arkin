@@ -1,15 +1,15 @@
-use super::{Feature, FeatureID};
+use super::{DataType, Feature, FeatureID};
 use crate::config::VolumeFeatureConfig;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use std::{collections::HashMap, time::Duration};
-use tracing::info;
+use tracing::debug;
 
 #[derive(Debug)]
 pub struct VolumeFeature {
     id: FeatureID,
     trade_quantity: FeatureID,
-    _window: Duration,
+    window: Duration,
 }
 
 impl VolumeFeature {
@@ -17,7 +17,7 @@ impl VolumeFeature {
         VolumeFeature {
             id,
             trade_quantity: "trade_quantity".into(),
-            _window: window,
+            window,
         }
     }
 
@@ -25,7 +25,7 @@ impl VolumeFeature {
         VolumeFeature {
             id: config.id.to_owned(),
             trade_quantity: "trade_quantity".into(),
-            _window: Duration::from_secs(config.window),
+            window: Duration::from_secs(config.window),
         }
     }
 }
@@ -36,12 +36,16 @@ impl Feature for VolumeFeature {
         &self.id
     }
 
-    fn sources(&self) -> Vec<&FeatureID> {
-        vec![&self.trade_quantity]
+    fn sources(&self) -> Vec<FeatureID> {
+        vec![self.trade_quantity.clone()]
+    }
+
+    fn data_type(&self) -> DataType {
+        DataType::Window(self.window)
     }
 
     fn calculate(&self, data: HashMap<FeatureID, Vec<f64>>) -> Result<HashMap<FeatureID, f64>> {
-        info!("Calculating Volume with id: {}", self.id);
+        debug!("Calculating Volume with id: {}", self.id);
         let quantity = data.get(&self.trade_quantity).ok_or(anyhow!("Missing trade_quantity"))?;
 
         let sum = quantity.iter().sum::<f64>();
