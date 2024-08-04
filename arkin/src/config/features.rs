@@ -18,8 +18,8 @@ pub enum FeatureConfig {
     VWAP(VWAPFeatureConfig),
     #[serde(rename = "sma")]
     SMA(SMAFeatureConfig),
-    #[serde(rename = "ema")]
-    EMA(EMAFeatureConfig),
+    // #[serde(rename = "ema")]
+    // EMA(EMAFeatureConfig),
     #[serde(rename = "spread")]
     Spread(SpreadFeatureConfig),
 }

@@ -1,6 +1,7 @@
 use crate::{
     constants::TIMESTAMP_FORMAT,
     models::{Event, EventType, Instrument},
+    utils::CompositeKey,
 };
 use dashmap::DashMap;
 use std::{
@@ -10,32 +11,6 @@ use std::{
 use time::OffsetDateTime;
 use tracing::info;
 
-#[derive(Clone, PartialOrd, Ord, Eq, PartialEq, Hash)]
-pub struct CompositeKey {
-    timestamp: OffsetDateTime,
-    index: u64,
-}
-
-impl CompositeKey {
-    pub fn new(timestamp: &OffsetDateTime) -> Self {
-        CompositeKey {
-            timestamp: timestamp.to_owned(),
-            index: 0,
-        }
-    }
-
-    pub fn new_max(timestamp: &OffsetDateTime) -> Self {
-        CompositeKey {
-            timestamp: timestamp.to_owned(),
-            index: u64::MAX,
-        }
-    }
-
-    pub fn increment(&mut self) {
-        self.index += 1;
-    }
-}
-
 #[derive(Default)]
 pub struct State {
     events: DashMap<(Instrument, EventType), BTreeMap<CompositeKey, Event>>,
@@ -43,23 +18,14 @@ pub struct State {
 
 impl State {
     pub fn add_event(&self, event: Event) {
-        let key = (event.instrument().to_owned(), event.event_type().to_owned());
+        let key = (event.instrument().clone(), event.event_type().clone());
+        let mut composit_key = CompositeKey::new(event.event_time());
 
-        // First acquire a read lock to check if the tree exists
-        if let Some(mut tree) = self.events.get_mut(&key) {
-            // Add to existing tree
-            let mut key = CompositeKey::new(event.event_time());
-            while tree.get(&key).is_some() {
-                key.increment();
-            }
-            tree.insert(key, event.to_owned());
-        } else {
-            // Tree doesn't exist, so create and insert a new one
-            let mut new_tree = BTreeMap::new();
-            let composite_key = CompositeKey::new(event.event_time());
-            new_tree.insert(composite_key, event.to_owned());
-            self.events.insert(key, new_tree);
+        let mut entry = self.events.entry(key).or_default();
+        while entry.get(&composit_key).is_some() {
+            composit_key.increment();
         }
+        entry.insert(composit_key, event);
     }
 
     pub fn list_instruments(&self) -> HashSet<Instrument> {

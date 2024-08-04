@@ -1,110 +1,72 @@
-use crate::{
-    config::VWAPConfig,
-    constants::TIMESTAMP_FORMAT,
-    models::{Event, EventType, Instrument, Notional, Price, Quantity},
-    state::StateManager,
-};
-use anyhow::Result;
-use rust_decimal::Decimal;
-use std::sync::Arc;
-use std::{fmt, time::Duration};
-use time::OffsetDateTime;
+use super::{Feature, FeatureID};
+use crate::config::VWAPFeatureConfig;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use rust_decimal::prelude::*;
+use std::{collections::HashMap, time::Duration};
 use tracing::info;
 
-#[derive(Clone)]
-#[allow(clippy::upper_case_acronyms)]
-pub struct VWAP {
-    pub id: String,
-    pub instrument: Instrument,
-    pub event_time: OffsetDateTime,
-    pub price: Price,
-}
-
-impl VWAP {
-    pub fn from_trades(
-        id: &str,
-        instrument: &Instrument,
-        event_time: &OffsetDateTime,
-        trades: &[Event],
-    ) -> Result<Self> {
-        if trades.is_empty() {
-            return Err(anyhow::anyhow!("No trades to calculate VWAP"));
-        }
-
-        let mut total_quantity = Decimal::ZERO.into();
-        let mut total_notional = Decimal::ZERO.into();
-
-        for trade in trades {
-            if let Event::TradeUpdate(trade) = trade {
-                total_quantity += trade.quantity;
-                total_notional += trade.price * trade.quantity.abs();
-            }
-        }
-
-        Ok(VWAP {
-            id: id.to_owned(),
-            instrument: instrument.to_owned(),
-            event_time: event_time.to_owned(),
-            price: (total_notional / total_quantity),
-        })
-    }
-}
-
-impl fmt::Display for VWAP {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {}", self.instrument, self.event_time, self.price)
-    }
-}
-
-#[derive(Clone)]
-#[allow(unused)]
+#[derive(Debug)]
 pub struct VWAPFeature {
-    state: Arc<StateManager>,
-    id: String,
-    frequency: Duration,
-    window: Duration,
+    id: FeatureID,
+    trade_price: FeatureID,
+    trade_quantity: FeatureID,
+    _window: Duration,
 }
 
 impl VWAPFeature {
-    pub fn new(state: Arc<StateManager>, config: &VWAPConfig) -> VWAPFeature {
-        let frequency = Duration::from_secs(config.frequency);
-        let window = Duration::from_secs(config.window);
+    pub fn new(id: FeatureID, window: Duration) -> Self {
         VWAPFeature {
-            state,
-            id: config.id.to_owned(),
-            frequency,
-            window,
+            id,
+            trade_price: "trade_price".into(),
+            trade_quantity: "trade_quantity".into(),
+            _window: window,
         }
     }
 
-    fn id(&self) -> &str {
+    pub fn from_config(config: &VWAPFeatureConfig) -> Self {
+        VWAPFeature {
+            id: config.id.to_owned(),
+            trade_price: "trade_price".into(),
+            trade_quantity: "trade_quantity".into(),
+            _window: Duration::from_secs(config.window),
+        }
+    }
+}
+
+#[async_trait]
+impl Feature for VWAPFeature {
+    fn id(&self) -> &FeatureID {
         &self.id
     }
 
-    async fn start(&self) {
-        info!("Starting VWAP feature...");
-        let mut rx = self.state.subscribe_frequency(self.frequency);
+    fn sources(&self) -> Vec<&FeatureID> {
+        vec![&self.trade_price, &self.trade_quantity]
+    }
 
-        while let Ok(tick) = rx.recv().await {
-            for instrument in self.state.data.list_instruments().await {
-                let res = self
-                    .state
-                    .data
-                    .list_events(&instrument, EventType::TradeUpdate, tick, self.window)
-                    .await;
+    fn calculate(&self, data: HashMap<FeatureID, Vec<f64>>) -> Result<HashMap<FeatureID, f64>> {
+        info!("Calculating VWAP with id: {}", self.id);
+        // Check if both trade_price and trade_quantity are present
+        let price = data.get(&self.trade_price).ok_or(anyhow!("Missing trade_price"))?;
+        let quantity = data.get(&self.trade_quantity).ok_or(anyhow!("Missing trade_quantity"))?;
+        assert_eq!(price.len(), quantity.len());
 
-                if let Ok(vwap) = VWAP::from_trades(self.id(), &instrument, &tick, &res) {
-                    info!(
-                        "Calculated VWAP with frequency {:?} and window {:?} for {} at {} is {}",
-                        self.frequency,
-                        self.window,
-                        instrument,
-                        tick.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp"),
-                        vwap.price
-                    );
-                    self.state.event_update(Event::VWAP(vwap)).await;
-                }
-            }
-        }
+        let mut total_quantity = f64::zero();
+        let mut total_notional = f64::zero();
+
+        price.iter().zip(quantity).for_each(|(p, q)| {
+            total_quantity += q;
+            total_notional += p * q.abs();
+        });
+
+        let vwap = if total_quantity.is_zero() {
+            f64::NAN
+        } else {
+            total_notional / total_quantity
+        };
+
+        let mut res = HashMap::new();
+        res.insert(self.id.clone(), vwap);
+        Ok(res)
     }
 }

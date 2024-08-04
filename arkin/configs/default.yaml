@@ -57,14 +57,14 @@ pipeline:
         id: sma_10_min
         source: vwap_1_min
         period: 10
-    - ema:
-        id: ema_10_min
+    - sma:
+        id: sma_60_min
         source: vwap_1_min
-        period: 10
+        period: 60
     - spread:
-        id: spread_sma_ema_10_minute
-        front_component: ema_10_min
-        back_component: sma_10_min
+        id: spread_sma
+        front_component: sma_10_min
+        back_component: sma_60_min
 
 strategies:
   - crossover:

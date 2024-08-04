@@ -3,18 +3,22 @@ use std::sync::Arc;
 use anyhow::Result;
 use arkin::config;
 use arkin::db::DBManager;
+use arkin::features::FeatureEvent;
 use arkin::ingestors::BinanceParser;
 use arkin::ingestors::TardisChannel;
 use arkin::ingestors::TardisExchange;
 use arkin::ingestors::TardisRequest;
 use arkin::ingestors::TardisService;
 use arkin::logging;
+use arkin::models::Instrument;
+use arkin::models::Venue;
 use arkin::pipeline::Pipeline;
 use clap::Parser;
 use clap::Subcommand;
 use futures_util::Stream;
 use futures_util::StreamExt;
 use mimalloc::MiMalloc;
+use rust_decimal::prelude::*;
 use time::macros::format_description;
 use time::OffsetDateTime;
 use time::PrimitiveDateTime;
@@ -145,8 +149,35 @@ async fn main() -> Result<()> {
                 start.format(&format).expect("Failed to format date"),
                 end.format(&format).expect("Failed to format date")
             );
+            let db = DBManager::from_config(&config.db).await;
+            let trades = db.read_trades(start, end).await;
+            // split trades to feature events
+            let events = trades.into_iter().fold(Vec::new(), |mut x, t| {
+                x.push(FeatureEvent::new(
+                    "trade_price".into(),
+                    t.instrument.clone(),
+                    t.event_time,
+                    t.price.value().to_f64().unwrap(),
+                ));
+                x.push(FeatureEvent::new(
+                    "trade_quantity".into(),
+                    t.instrument,
+                    t.event_time,
+                    t.quantity.value().to_f64().unwrap(),
+                ));
+                x
+            });
             let pipeline = Pipeline::from_config(&config.pipeline);
-            pipeline.calculate();
+            for event in events {
+                pipeline.insert(event);
+            }
+            let instrument = Instrument::perpetual(Venue::Binance, "btc".into(), "usdt".into());
+            info!("Timestamp: {:?}", end);
+            let latest_price = pipeline.get_latest(&instrument, &"trade_price".into(), &end);
+            info!("Latest price: {:?}", latest_price);
+            let latest_quantity = pipeline.get_latest(&instrument, &"trade_quantity".into(), &end);
+            info!("Latest quantity: {:?}", latest_quantity);
+            // pipeline.calculate();
         }
     }
     Ok(())
