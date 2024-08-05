@@ -1,7 +1,6 @@
-use std::env;
-
 use config::{Config, Environment, File};
 use serde::{Deserialize, Serialize};
+use std::env;
 use tracing::error;
 
 mod allocation;
@@ -12,6 +11,7 @@ mod features;
 mod ingestors;
 mod server;
 mod state;
+mod strategy;
 
 pub use allocation::*;
 pub use clock::*;
@@ -21,6 +21,7 @@ pub use features::*;
 pub use ingestors::*;
 pub use server::*;
 pub use state::*;
+pub use strategy::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalConfig {
@@ -30,7 +31,7 @@ pub struct GlobalConfig {
     pub db: DatabaseConfig,
     pub ingestors: Vec<IngestorConfig>,
     pub pipeline: PipelineConfig,
-    pub strategies: Vec<StrategyConfig>,
+    pub strategy_manager: StrategyManagerConfig,
     pub allocation: AllocationConfig,
     pub execution: Vec<ExecutionConfig>,
 }

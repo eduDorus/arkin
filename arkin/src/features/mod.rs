@@ -1,5 +1,6 @@
+use crate::constants::TIMESTAMP_FORMAT;
+use crate::models::Instrument;
 use anyhow::Result;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -16,19 +17,16 @@ mod vwap;
 
 pub use factory::FeatureFactory;
 
-use crate::constants::TIMESTAMP_FORMAT;
-use crate::models::Instrument;
-
 #[derive(Clone)]
 pub struct FeatureEvent {
-    pub id: FeatureID,
+    pub id: FeatureId,
     pub instrument: Instrument,
     pub event_time: OffsetDateTime,
     pub value: f64,
 }
 
 impl FeatureEvent {
-    pub fn new(id: FeatureID, instrument: Instrument, event_time: OffsetDateTime, value: f64) -> Self {
+    pub fn new(id: FeatureId, instrument: Instrument, event_time: OffsetDateTime, value: f64) -> Self {
         FeatureEvent {
             id,
             instrument,
@@ -46,32 +44,31 @@ impl fmt::Display for FeatureEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
-pub struct FeatureID(String);
+pub struct FeatureId(String);
 
-impl From<&str> for FeatureID {
+impl From<&str> for FeatureId {
     fn from(id: &str) -> Self {
-        FeatureID(id.to_lowercase())
+        FeatureId(id.to_lowercase())
     }
 }
 
-impl From<String> for FeatureID {
+impl From<String> for FeatureId {
     fn from(id: String) -> Self {
-        FeatureID(id.to_lowercase())
+        FeatureId(id.to_lowercase())
     }
 }
 
-impl fmt::Display for FeatureID {
+impl fmt::Display for FeatureId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-#[async_trait]
 pub trait Feature: Debug + Send + Sync {
-    fn id(&self) -> &FeatureID;
-    fn sources(&self) -> Vec<FeatureID>;
+    fn id(&self) -> &FeatureId;
+    fn sources(&self) -> Vec<FeatureId>;
     fn data_type(&self) -> DataType;
-    fn calculate(&self, data: HashMap<FeatureID, Vec<f64>>) -> Result<HashMap<FeatureID, f64>>;
+    fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>>;
 }
 
 #[derive(Debug)]

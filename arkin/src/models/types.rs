@@ -195,6 +195,16 @@ impl Weight {
     }
 }
 
+impl From<f64> for Weight {
+    fn from(weight: f64) -> Self {
+        match weight {
+            weight if weight < -1.0 => Weight((-1).into()),
+            weight if weight > 1.0 => Weight(1.into()),
+            _ => Weight(Decimal::from_f64(weight).expect("Failed to convert f64 to Decimal")),
+        }
+    }
+}
+
 impl From<Decimal> for Weight {
     fn from(weight: Decimal) -> Self {
         match weight {

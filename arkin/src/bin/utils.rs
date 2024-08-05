@@ -11,6 +11,7 @@ use arkin::logging;
 use arkin::models::Instrument;
 use arkin::models::Venue;
 use arkin::pipeline::Pipeline;
+use arkin::strategies::StrategyManager;
 use clap::Parser;
 use clap::Subcommand;
 use futures_util::Stream;
@@ -76,12 +77,16 @@ enum Commands {
         // #[clap(long)]
         // instrument: Vec<String>,
         /// Filter on start date
-        #[clap(long)]
+        #[clap(long, short)]
         start: String,
 
         /// Filter on end date
-        #[clap(long)]
+        #[clap(long, short)]
         end: String,
+
+        /// Frequency
+        #[clap(long, short)]
+        frequency: u64,
     },
 }
 
@@ -141,7 +146,11 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Pipeline { start, end } => {
+        Commands::Pipeline {
+            start,
+            end,
+            frequency,
+        } => {
             let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
             let start = PrimitiveDateTime::parse(&start, &format)?.assume_utc();
             let end = PrimitiveDateTime::parse(&end, &format)?.assume_utc();
@@ -169,20 +178,33 @@ async fn main() -> Result<()> {
                 ));
                 x
             });
+
+            // INITIALIZE
             let pipeline = Pipeline::from_config(&config.pipeline);
             for event in events {
                 pipeline.insert(event);
             }
-            let instrument = Instrument::perpetual(Venue::Binance, "btc".into(), "usdt".into());
+            let strategy_manager = StrategyManager::from_config(&config.strategy_manager);
 
-            let interval = 60 * 60 * 3;
-            let mut timestamp = end - Duration::from_secs(interval);
+            // RUN
             let timer = Instant::now();
-            for _ in 0..interval {
+            let instrument = Instrument::perpetual(Venue::Binance, "btc".into(), "usdt".into());
+            let mut timestamp = start;
+            let intervals = (end - start).whole_seconds() / frequency as i64;
+
+            for _ in 0..intervals {
                 debug!("----------------- {:?} -----------------", timestamp);
-                pipeline.calculate(instrument.clone(), timestamp);
-                timestamp += Duration::from_secs(1);
+                let features = pipeline.calculate(instrument.clone(), timestamp);
+                for feature in &features {
+                    debug!("Feature: {}", feature);
+                }
+                let signals = strategy_manager.calculate(features);
+                for signal in &signals {
+                    info!("Signal: {}", signal);
+                }
+                timestamp += Duration::from_secs(frequency);
             }
+
             info!("Elapsed time: {:?}", timer.elapsed());
             // info!("Timestamp: {:?}", end);
             // let latest_price = pipeline.get_latest(&instrument, &"trade_price".into(), &end);

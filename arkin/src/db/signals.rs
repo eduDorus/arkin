@@ -6,7 +6,6 @@ use time::OffsetDateTime;
 
 #[derive(sqlx::FromRow)]
 struct SignalRow {
-    received_time: OffsetDateTime,
     event_time: OffsetDateTime,
     instrument_type: String,
     venue: String,
@@ -22,7 +21,6 @@ struct SignalRow {
 impl From<Signal> for SignalRow {
     fn from(signal: Signal) -> Self {
         Self {
-            received_time: signal.received_time,
             event_time: signal.event_time,
             instrument_type: signal.instrument.instrument_type().to_string(),
             venue: signal.instrument.venue().to_string(),
@@ -31,7 +29,7 @@ impl From<Signal> for SignalRow {
             maturity: signal.instrument.maturity().map(|m| m.value()),
             strike: signal.instrument.strike().map(|s| s.value()),
             option_type: signal.instrument.option_type().map(|ot| ot.to_string()),
-            strategy_id: signal.strategy_id,
+            strategy_id: signal.strategy_id.to_string(),
             signal: signal.signal.value(),
         }
     }
@@ -41,10 +39,9 @@ impl DBManager {
         let signal = SignalRow::from(signal);
         sqlx::query!(
             r#"
-            INSERT INTO signals (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, strategy_id, signal)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            INSERT INTO signals (event_time, instrument_type, venue, base, quote, maturity, strike, option_type, strategy_id, signal)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
-            signal.received_time,
             signal.event_time,
             signal.instrument_type,
             signal.venue,
@@ -81,10 +78,9 @@ mod tests {
         let manager = DBManager::from_config(&config.db).await;
 
         let signal = Signal {
-            received_time: OffsetDateTime::now_utc(),
             event_time: OffsetDateTime::now_utc(),
             instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
-            strategy_id: "test".to_string(),
+            strategy_id: "test".into(),
             signal: Decimal::new(1, 0).into(),
         };
 

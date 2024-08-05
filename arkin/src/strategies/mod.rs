@@ -1,41 +1,41 @@
-use async_trait::async_trait;
-use crossover::CrossoverStrategy;
-use spreader::Spreader;
-use std::fmt;
+use serde::{Deserialize, Serialize};
+use std::fmt::{self, Debug};
 
 mod crossover;
 mod errors;
 mod factory;
-mod spreader;
+mod manager;
 
-pub use factory::StrategyFactory;
+pub use manager::StrategyManager;
 
-#[async_trait]
-pub trait Strategy: Clone {
-    async fn start(&self);
-}
+use crate::{
+    features::{FeatureEvent, FeatureId},
+    models::Signal,
+};
 
-#[derive(Clone)]
-pub enum StrategyType {
-    Crossover(CrossoverStrategy),
-    Spreader(Spreader),
-}
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+pub struct StrategyId(String);
 
-#[async_trait]
-impl Strategy for StrategyType {
-    async fn start(&self) {
-        match self {
-            StrategyType::Spreader(s) => s.start().await,
-            StrategyType::Crossover(s) => s.start().await,
-        }
+impl From<&str> for StrategyId {
+    fn from(id: &str) -> Self {
+        StrategyId(id.to_lowercase())
     }
 }
 
-impl fmt::Display for StrategyType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StrategyType::Crossover(_) => write!(f, "crossover"),
-            StrategyType::Spreader(_) => write!(f, "spreader"),
-        }
+impl From<String> for StrategyId {
+    fn from(id: String) -> Self {
+        StrategyId(id.to_lowercase())
     }
+}
+
+impl fmt::Display for StrategyId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+pub trait Strategy: Debug + Send + Sync {
+    fn id(&self) -> &StrategyId;
+    fn sources(&self) -> Vec<FeatureId>;
+    fn calculate(&self, data: Vec<FeatureEvent>) -> Vec<Signal>;
 }

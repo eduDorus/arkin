@@ -50,7 +50,6 @@ SELECT create_hypertable('fills', 'event_time');
 
 
 CREATE TABLE IF NOT EXISTS signals (
-    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
     venue TEXT NOT NULL,
@@ -71,7 +70,6 @@ SELECT create_hypertable('signals', 'event_time');
 
 
 CREATE TABLE IF NOT EXISTS allocations (
-    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_type TEXT NOT NULL,
     venue TEXT NOT NULL,

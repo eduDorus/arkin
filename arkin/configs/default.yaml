@@ -41,42 +41,45 @@ pipeline:
   name: TA
   frequency: 1 # In seconds
   features:
-    - vwap:
-        id: vwap_1_min
-        window: 60 # In seconds
-    - vwap:
-        id: vwap_1_h
-        window: 3600 # In seconds
+    # Volume
     - volume:
         id: volume_1_min
         window: 60 # In seconds
-    - volume:
-        id: volume_1_h
-        window: 3600 # In seconds
     - sma:
-        id: sma_5
+        id: sma_5_volume
+        source: volume_1_min
+        period: 5
+    - sma:
+        id: sma_60_volume
+        source: volume_1_min
+        period: 60
+    - spread:
+        id: spread_sma_volume
+        front_component: sma_5_volume
+        back_component: sma_60_volume
+    # VWAP
+    - vwap:
+        id: vwap_1_min
+        window: 60 # In seconds
+    - sma:
+        id: sma_5_vwap
         source: vwap_1_min
-        period: 10
+        period: 5
     - sma:
-        id: sma_10
+        id: sma_60_vwap
         source: vwap_1_min
         period: 60
     - spread:
-        id: spread_sma
-        front_component: sma_5
-        back_component: sma_10
+        id: spread_sma_vwap
+        front_component: sma_5_vwap
+        back_component: sma_60_vwap
 
-strategies:
-  - crossover:
-      id: crossover_vwap_half_pct
-      fast: vwap_10_60
-      slow: vwap_10_300
-      min_spread: 0.005
-  - crossover:
-      id: crossover_vwap_one_pct
-      fast: vwap_10_60
-      slow: vwap_10_300
-      min_spread: 0.01
+strategy_manager:
+  strategies:
+    - crossover:
+        id: crossover
+        price_spread_id: spread_sma_vwap
+        volume_spread_id: spread_sma_volume
 
 allocation:
   limited:

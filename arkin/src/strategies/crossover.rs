@@ -1,49 +1,68 @@
-use std::sync::Arc;
+use super::{Strategy, StrategyId};
+use crate::{
+    config::CrossoverConfig,
+    features::{FeatureEvent, FeatureId},
+    models::{Signal, Weight},
+};
 
-use async_trait::async_trait;
-use rust_decimal::Decimal;
-use tracing::info;
-
-use crate::{config::CrossoverConfig, state::State};
-
-use super::Strategy;
-
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 #[allow(unused)]
 pub struct CrossoverStrategy {
-    state: Arc<State>,
-    fast: String,
-    slow: String,
-    min_spread: Decimal,
+    id: StrategyId,
+    price_spread_id: FeatureId,
+    volume_spread_id: FeatureId,
 }
 
 impl CrossoverStrategy {
-    pub fn new(state: Arc<State>, config: &CrossoverConfig) -> Self {
+    pub fn from_config(config: &CrossoverConfig) -> Self {
         Self {
-            state,
-            fast: config.fast.to_owned(),
-            slow: config.slow.to_owned(),
-            min_spread: config.min_spread,
+            id: config.id.clone(),
+            price_spread_id: config.price_spread_id.to_owned(),
+            volume_spread_id: config.volume_spread_id.to_owned(),
         }
     }
 }
 
-#[async_trait]
 impl Strategy for CrossoverStrategy {
-    async fn start(&self) {
-        info!("Starting crossover strategy...");
-        // let mut rx = self.state.subscribe_event(EventType::VWAP);
+    fn id(&self) -> &StrategyId {
+        &self.id
+    }
 
-        // while let Ok(event) = rx.recv().await {
-        //     info!("Wide quoter strategy received event: {}", event);
-        //     match event {
-        //         Event::VWAP(v) => {
-        //             self.calculate_quote(v);
-        //         }
-        //         _ => {
-        //             warn!("Wide quoter strategy received unused event: {}", event);
-        //         }
-        //     }
-        // }
+    fn sources(&self) -> Vec<FeatureId> {
+        vec![self.price_spread_id.clone(), self.volume_spread_id.clone()]
+    }
+
+    fn calculate(&self, data: Vec<FeatureEvent>) -> Vec<Signal> {
+        let price_spread = data
+            .iter()
+            .find(|d| d.id == self.price_spread_id)
+            .expect("Missing price spread");
+        let volume_spread = data
+            .iter()
+            .find(|d| d.id == self.volume_spread_id)
+            .expect("Missing volume spread");
+
+        // If price is high and volume is high we want to sell
+        // If price is low and volume is high we want to buy
+        match (price_spread.value, volume_spread.value) {
+            (p, v) if p > 0. && v > 0. => vec![Signal::new(
+                price_spread.event_time,
+                price_spread.instrument.clone(),
+                self.id.clone(),
+                Weight::from(-1.),
+            )],
+            (p, v) if p < 0. && v > 0. => vec![Signal::new(
+                price_spread.event_time,
+                price_spread.instrument.clone(),
+                self.id.clone(),
+                Weight::from(1.),
+            )],
+            _ => vec![Signal::new(
+                price_spread.event_time,
+                price_spread.instrument.clone(),
+                self.id.clone(),
+                Weight::from(0.),
+            )],
+        }
     }
 }

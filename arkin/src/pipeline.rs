@@ -1,5 +1,5 @@
 use crate::config::PipelineConfig;
-use crate::features::{DataType, Feature, FeatureEvent, FeatureFactory, FeatureID};
+use crate::features::{DataType, Feature, FeatureEvent, FeatureFactory, FeatureId};
 use crate::models::Instrument;
 use crate::utils::CompositeKey;
 use dashmap::DashMap;
@@ -68,7 +68,7 @@ impl Pipeline {
     }
 
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
-    pub fn calculate(&self, instrument: Instrument, timestamp: OffsetDateTime) {
+    pub fn calculate(&self, instrument: Instrument, timestamp: OffsetDateTime) -> Vec<FeatureEvent> {
         // Step 1: Calculate in-degrees
         let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
         for edge in self.graph.edge_indices() {
@@ -87,6 +87,7 @@ impl Pipeline {
         }
 
         // Step 3: Parallel processing
+        let pipeline_result = Arc::new(Mutex::new(Vec::new()));
         let pool = ThreadPoolBuilder::new().build().expect("Failed to create thread pool");
         pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
@@ -95,6 +96,7 @@ impl Pipeline {
                 let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);
                 let queue_tx = queue_tx.clone();
+                let pipeline_result = Arc::clone(&pipeline_result);
 
                 s.spawn(move |_| {
                     // Process the node
@@ -106,14 +108,15 @@ impl Pipeline {
                     // Calculate the feature
                     let res = feature.calculate(data);
                     match res {
-                        Ok(res) => {
-                            debug!("Calculated: {:?}", res);
-                            state.insert(FeatureEvent::new(
-                                feature.id().clone(),
-                                instrument.clone(),
-                                timestamp,
-                                res[feature.id()].to_owned(),
-                            ));
+                        Ok(data) => {
+                            debug!("Calculated: {:?}", data);
+
+                            // Save data to state and result set
+                            data.into_iter().for_each(|(id, value)| {
+                                let event = FeatureEvent::new(id.clone(), instrument.clone(), timestamp, value);
+                                state.insert(event.clone());
+                                pipeline_result.lock().push(event);
+                            });
                         }
                         Err(e) => {
                             info!("Failed to calculate: {:?}", e);
@@ -137,8 +140,9 @@ impl Pipeline {
                 });
             }
         });
-
         debug!("Finished graph calculation");
+        let x = pipeline_result.lock().iter().cloned().collect();
+        x
     }
 
     // COULD BE USED IN THE FUTURE IF WE HAVE ASYNC FEATURES
@@ -203,7 +207,7 @@ impl Pipeline {
 
 #[derive(Default)]
 struct PipelineState {
-    events: DashMap<(Instrument, FeatureID), BTreeMap<CompositeKey, f64>>,
+    events: DashMap<(Instrument, FeatureId), BTreeMap<CompositeKey, f64>>,
 }
 
 impl PipelineState {
@@ -221,10 +225,10 @@ impl PipelineState {
     pub fn query(
         &self,
         instrument: &Instrument,
-        feature_ids: Vec<FeatureID>,
+        feature_ids: Vec<FeatureId>,
         from: &OffsetDateTime,
         data_type: DataType,
-    ) -> HashMap<FeatureID, Vec<f64>> {
+    ) -> HashMap<FeatureId, Vec<f64>> {
         feature_ids
             .par_iter()
             .map(|id| match data_type {
@@ -244,7 +248,7 @@ impl PipelineState {
             .collect()
     }
 
-    fn get_latest(&self, instrument: &Instrument, feature_id: &FeatureID, from: &OffsetDateTime) -> Vec<f64> {
+    fn get_latest(&self, instrument: &Instrument, feature_id: &FeatureId, from: &OffsetDateTime) -> Vec<f64> {
         let key = (instrument.clone(), feature_id.clone());
         let from_key = CompositeKey::new_max(from);
 
@@ -266,7 +270,7 @@ impl PipelineState {
     fn get_range(
         &self,
         instrument: &Instrument,
-        feature_id: &FeatureID,
+        feature_id: &FeatureId,
         from: &OffsetDateTime,
         window: &Duration,
     ) -> Vec<f64> {
@@ -292,7 +296,7 @@ impl PipelineState {
     fn get_periods(
         &self,
         instrument: &Instrument,
-        feature_id: &FeatureID,
+        feature_id: &FeatureId,
         from: &OffsetDateTime,
         periods: usize,
     ) -> Vec<f64> {

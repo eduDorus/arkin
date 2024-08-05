@@ -1,21 +1,20 @@
-use super::{DataType, Feature, FeatureID};
+use super::{DataType, Feature, FeatureId};
 use crate::config::VWAPFeatureConfig;
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use std::{collections::HashMap, time::Duration};
 use tracing::debug;
 
 #[derive(Debug)]
 pub struct VWAPFeature {
-    id: FeatureID,
-    trade_price: FeatureID,
-    trade_quantity: FeatureID,
+    id: FeatureId,
+    trade_price: FeatureId,
+    trade_quantity: FeatureId,
     window: Duration,
 }
 
 impl VWAPFeature {
-    pub fn new(id: FeatureID, window: Duration) -> Self {
+    pub fn new(id: FeatureId, window: Duration) -> Self {
         VWAPFeature {
             id,
             trade_price: "trade_price".into(),
@@ -34,13 +33,12 @@ impl VWAPFeature {
     }
 }
 
-#[async_trait]
 impl Feature for VWAPFeature {
-    fn id(&self) -> &FeatureID {
+    fn id(&self) -> &FeatureId {
         &self.id
     }
 
-    fn sources(&self) -> Vec<FeatureID> {
+    fn sources(&self) -> Vec<FeatureId> {
         vec![self.trade_price.clone(), self.trade_quantity.clone()]
     }
 
@@ -48,7 +46,7 @@ impl Feature for VWAPFeature {
         DataType::Window(self.window)
     }
 
-    fn calculate(&self, data: HashMap<FeatureID, Vec<f64>>) -> Result<HashMap<FeatureID, f64>> {
+    fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating VWAP with id: {}", self.id);
         // Check if both trade_price and trade_quantity are present
         let price = data.get(&self.trade_price).ok_or(anyhow!("Missing trade_price"))?;
