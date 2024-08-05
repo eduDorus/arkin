@@ -151,7 +151,7 @@ impl Div<Price> for Quantity {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Notional(Decimal);
 
 impl Notional {

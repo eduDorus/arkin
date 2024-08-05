@@ -1,7 +1,6 @@
+use super::{factory::StrategyFactory, Strategy};
 use crate::{config::StrategyManagerConfig, features::FeatureEvent, models::Signal};
 use rayon::prelude::*;
-
-use super::{factory::StrategyFactory, Strategy};
 
 pub struct StrategyManager {
     strategies: Vec<Box<dyn Strategy>>,
@@ -18,9 +17,9 @@ impl StrategyManager {
         self.strategies
             .par_iter()
             .map(|s| {
-                // Filter data
+                // Filter features
                 let data = data.iter().filter(|d| s.sources().contains(&d.id)).cloned().collect::<Vec<_>>();
-                
+
                 s.calculate(data)
             })
             .flat_map(|s| s)

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use arkin::allocation::AllocationManager;
 use arkin::config;
 use arkin::db::DBManager;
 use arkin::features::FeatureEvent;
@@ -185,6 +186,7 @@ async fn main() -> Result<()> {
                 pipeline.insert(event);
             }
             let strategy_manager = StrategyManager::from_config(&config.strategy_manager);
+            let allocation_manager = AllocationManager::from_config(&config.allocation_manager);
 
             // RUN
             let timer = Instant::now();
@@ -194,13 +196,22 @@ async fn main() -> Result<()> {
 
             for _ in 0..intervals {
                 debug!("----------------- {:?} -----------------", timestamp);
+                // Run pipeline
                 let features = pipeline.calculate(instrument.clone(), timestamp);
                 for feature in &features {
                     debug!("Feature: {}", feature);
                 }
+
+                // Run strategies
                 let signals = strategy_manager.calculate(features);
                 for signal in &signals {
-                    info!("Signal: {}", signal);
+                    debug!("Signal: {}", signal);
+                }
+
+                // Run allocation
+                let allocations = allocation_manager.calculate(signals);
+                for allocation in &allocations {
+                    info!("Allocation: {}", allocation);
                 }
                 timestamp += Duration::from_secs(frequency);
             }

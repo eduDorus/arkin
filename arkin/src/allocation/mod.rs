@@ -1,37 +1,17 @@
-use std::fmt;
+use std::fmt::Debug;
 
-use async_trait::async_trait;
-use limited::LimitedAllocation;
-
+mod equal;
 mod factory;
-mod limited;
+mod manager;
 
-pub use factory::AllocationFactory;
+pub use manager::AllocationManager;
 
-#[async_trait]
-#[allow(unused)]
-pub trait Allocation: Clone {
-    async fn start(&self);
-}
+use crate::{
+    models::{AllocationEvent, Signal},
+    strategies::StrategyId,
+};
 
-#[derive(Clone)]
-pub enum AllocationType {
-    Limited(LimitedAllocation),
-}
-
-#[async_trait]
-impl Allocation for AllocationType {
-    async fn start(&self) {
-        match self {
-            AllocationType::Limited(l) => l.start().await,
-        }
-    }
-}
-
-impl fmt::Display for AllocationType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AllocationType::Limited(_) => write!(f, "Limit"),
-        }
-    }
+pub trait Allocation: Debug + Send + Sync {
+    fn strategies(&self) -> Vec<StrategyId>;
+    fn calculate(&self, signals: Vec<Signal>) -> Vec<AllocationEvent>;
 }

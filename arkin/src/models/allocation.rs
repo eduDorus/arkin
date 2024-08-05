@@ -1,19 +1,33 @@
+use super::{Instrument, Notional};
+use crate::strategies::StrategyId;
 use std::fmt;
-
 use time::OffsetDateTime;
 
-use super::{Instrument, Notional};
-
 #[derive(Clone)]
-pub struct Allocation {
-    pub received_time: OffsetDateTime,
+pub struct AllocationEvent {
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
-    pub strategy_id: String,
+    pub strategy_id: StrategyId,
     pub notional: Notional,
 }
 
-impl fmt::Display for Allocation {
+impl AllocationEvent {
+    pub fn new(
+        event_time: OffsetDateTime,
+        instrument: Instrument,
+        strategy_id: StrategyId,
+        notional: Notional,
+    ) -> Self {
+        Self {
+            event_time,
+            instrument,
+            strategy_id,
+            notional,
+        }
+    }
+}
+
+impl fmt::Display for AllocationEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

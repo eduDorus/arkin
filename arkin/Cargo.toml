@@ -16,7 +16,7 @@ path = "src/bin/utils.rs"
 [dependencies]
 # Utiliy
 # strum = { version = "0.26", features = ["derive"] }
-rand = "0.8.5"
+# rand = "0.8.5"
 url = {version = "2.5"}
 
 # Multi-threading

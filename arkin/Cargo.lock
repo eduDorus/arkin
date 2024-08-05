@@ -127,7 +127,6 @@ dependencies = [
  "mimalloc",
  "parking_lot 0.12.3",
  "petgraph",
- "rand",
  "rayon",
  "reqwest",
  "rust_decimal",

@@ -32,7 +32,7 @@ pub struct GlobalConfig {
     pub ingestors: Vec<IngestorConfig>,
     pub pipeline: PipelineConfig,
     pub strategy_manager: StrategyManagerConfig,
-    pub allocation: AllocationConfig,
+    pub allocation_manager: AllocationManagerConfig,
     pub execution: Vec<ExecutionConfig>,
 }
 
