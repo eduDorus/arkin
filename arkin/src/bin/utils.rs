@@ -12,6 +12,7 @@ use arkin::logging;
 use arkin::models::Instrument;
 use arkin::models::Venue;
 use arkin::pipeline::Pipeline;
+use arkin::state::State;
 use arkin::strategies::StrategyManager;
 use clap::Parser;
 use clap::Subcommand;
@@ -162,29 +163,26 @@ async fn main() -> Result<()> {
                 end.format(&format).expect("Failed to format date")
             );
             let db = DBManager::from_config(&config.db).await;
+            let state = Arc::new(State::default());
             let trades = db.read_trades(start, end).await;
             // split trades to feature events
-            let events = trades.into_iter().fold(Vec::new(), |mut x, t| {
-                x.push(FeatureEvent::new(
+            trades.into_iter().for_each(|t| {
+                state.add_feature(FeatureEvent::new(
                     "trade_price".into(),
                     t.instrument.clone(),
                     t.event_time,
                     t.price.value().to_f64().unwrap(),
                 ));
-                x.push(FeatureEvent::new(
+                state.add_feature(FeatureEvent::new(
                     "trade_quantity".into(),
                     t.instrument,
                     t.event_time,
                     t.quantity.value().to_f64().unwrap(),
                 ));
-                x
             });
 
             // INITIALIZE
-            let pipeline = Pipeline::from_config(&config.pipeline);
-            for event in events {
-                pipeline.insert(event);
-            }
+            let pipeline = Pipeline::from_config(state.clone(), &config.pipeline);
             let strategy_manager = StrategyManager::from_config(&config.strategy_manager);
             let allocation_manager = AllocationManager::from_config(&config.allocation_manager);
 
@@ -203,15 +201,15 @@ async fn main() -> Result<()> {
                 }
 
                 // Run strategies
-                let signals = strategy_manager.calculate(features);
+                let signals = strategy_manager.calculate(&features);
                 for signal in &signals {
                     debug!("Signal: {}", signal);
                 }
 
                 // Run allocation
-                let allocations = allocation_manager.calculate(signals);
+                let allocations = allocation_manager.calculate(&signals);
                 for allocation in &allocations {
-                    info!("Allocation: {}", allocation);
+                    debug!("Allocation: {}", allocation);
                 }
                 timestamp += Duration::from_secs(frequency);
             }

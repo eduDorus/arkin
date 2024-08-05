@@ -9,16 +9,14 @@ use crate::{
 #[allow(unused)]
 pub struct CrossoverStrategy {
     id: StrategyId,
-    price_spread_id: FeatureId,
-    volume_spread_id: FeatureId,
+    source: Vec<FeatureId>,
 }
 
 impl CrossoverStrategy {
     pub fn from_config(config: &CrossoverConfig) -> Self {
         Self {
             id: config.id.clone(),
-            price_spread_id: config.price_spread_id.to_owned(),
-            volume_spread_id: config.volume_spread_id.to_owned(),
+            source: vec![config.price_spread_id.to_owned(), config.volume_spread_id.to_owned()],
         }
     }
 }
@@ -28,19 +26,13 @@ impl Strategy for CrossoverStrategy {
         &self.id
     }
 
-    fn sources(&self) -> Vec<FeatureId> {
-        vec![self.price_spread_id.clone(), self.volume_spread_id.clone()]
+    fn sources(&self) -> &[FeatureId] {
+        &self.source
     }
 
-    fn calculate(&self, data: Vec<FeatureEvent>) -> Vec<Signal> {
-        let price_spread = data
-            .iter()
-            .find(|d| d.id == self.price_spread_id)
-            .expect("Missing price spread");
-        let volume_spread = data
-            .iter()
-            .find(|d| d.id == self.volume_spread_id)
-            .expect("Missing volume spread");
+    fn calculate(&self, data: &[FeatureEvent]) -> Vec<Signal> {
+        let price_spread = data.iter().find(|d| d.id == self.source[0]).expect("Missing price spread");
+        let volume_spread = data.iter().find(|d| d.id == self.source[1]).expect("Missing volume spread");
 
         // If price is high and volume is high we want to sell
         // If price is low and volume is high we want to buy

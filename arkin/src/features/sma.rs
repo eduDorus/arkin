@@ -1,4 +1,4 @@
-use super::{DataType, Feature, FeatureId};
+use super::{Feature, FeatureId, QueryType};
 use crate::config::SMAFeatureConfig;
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -7,20 +7,16 @@ use tracing::debug;
 #[derive(Debug)]
 pub struct SMAFeature {
     id: FeatureId,
-    source: FeatureId,
-    period: usize,
+    source: Vec<FeatureId>,
+    data_type: QueryType,
 }
 
 impl SMAFeature {
-    pub fn new(id: FeatureId, source: FeatureId, period: usize) -> Self {
-        SMAFeature { id, source, period }
-    }
-
     pub fn from_config(config: &SMAFeatureConfig) -> Self {
         SMAFeature {
             id: config.id.to_owned(),
-            source: config.source.to_owned(),
-            period: config.period,
+            source: vec![config.source.to_owned()],
+            data_type: QueryType::Period(config.period),
         }
     }
 }
@@ -30,17 +26,17 @@ impl Feature for SMAFeature {
         &self.id
     }
 
-    fn sources(&self) -> Vec<FeatureId> {
-        vec![self.source.clone()]
+    fn sources(&self) -> &[FeatureId] {
+        &self.source
     }
 
-    fn data_type(&self) -> DataType {
-        DataType::Period(self.period)
+    fn data_type(&self) -> &QueryType {
+        &self.data_type
     }
 
     fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating SMA with id: {}", self.id);
-        let values = data.get(&self.source).ok_or(anyhow!("Missing {}", self.source))?;
+        let values = data.get(&self.source[0]).ok_or(anyhow!("Missing {}", self.source[0]))?;
 
         let sum = values.iter().sum::<f64>();
         let count = values.len() as f64;

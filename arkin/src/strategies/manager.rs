@@ -13,15 +13,10 @@ impl StrategyManager {
         }
     }
 
-    pub fn calculate(&self, data: Vec<FeatureEvent>) -> Vec<Signal> {
+    pub fn calculate(&self, data: &[FeatureEvent]) -> Vec<Signal> {
         self.strategies
             .par_iter()
-            .map(|s| {
-                // Filter features
-                let data = data.iter().filter(|d| s.sources().contains(&d.id)).cloned().collect::<Vec<_>>();
-
-                s.calculate(data)
-            })
+            .map(|s| s.calculate(data))
             .flat_map(|s| s)
             .collect::<Vec<_>>()
     }

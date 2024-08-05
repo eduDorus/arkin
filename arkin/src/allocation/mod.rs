@@ -12,6 +12,6 @@ use crate::{
 };
 
 pub trait Allocation: Debug + Send + Sync {
-    fn strategies(&self) -> Vec<StrategyId>;
-    fn calculate(&self, signals: Vec<Signal>) -> Vec<AllocationEvent>;
+    fn strategies(&self) -> &[StrategyId];
+    fn calculate(&self, signals: &[Signal]) -> Vec<AllocationEvent>;
 }

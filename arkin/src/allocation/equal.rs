@@ -26,11 +26,11 @@ impl EqualAllocation {
 }
 
 impl Allocation for EqualAllocation {
-    fn strategies(&self) -> Vec<StrategyId> {
-        self.strategies.clone()
+    fn strategies(&self) -> &[StrategyId] {
+        &self.strategies
     }
 
-    fn calculate(&self, signals: Vec<Signal>) -> Vec<AllocationEvent> {
+    fn calculate(&self, signals: &[Signal]) -> Vec<AllocationEvent> {
         let action_signals = signals.iter().filter(|s| s.signal != Weight::from(0.)).count();
 
         let allocation_per_instrument = self.max_allocation
@@ -42,12 +42,12 @@ impl Allocation for EqualAllocation {
         let allocation_notional = self.capital * allocation;
 
         signals
-            .into_iter()
+            .iter()
             .map(|s| {
                 AllocationEvent::new(
                     s.event_time,
-                    s.instrument,
-                    s.strategy_id,
+                    s.instrument.clone(),
+                    s.strategy_id.clone(),
                     (s.signal.value() * allocation_notional).into(),
                 )
             })

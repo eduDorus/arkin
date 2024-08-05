@@ -66,13 +66,13 @@ impl fmt::Display for FeatureId {
 
 pub trait Feature: Debug + Send + Sync {
     fn id(&self) -> &FeatureId;
-    fn sources(&self) -> Vec<FeatureId>;
-    fn data_type(&self) -> DataType;
+    fn sources(&self) -> &[FeatureId];
+    fn data_type(&self) -> &QueryType;
     fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>>;
 }
 
 #[derive(Debug)]
-pub enum DataType {
+pub enum QueryType {
     Latest,
     Window(Duration),
     Period(usize),

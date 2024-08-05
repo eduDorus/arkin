@@ -16,19 +16,10 @@ impl AllocationManager {
         }
     }
 
-    pub fn calculate(&self, signals: Vec<Signal>) -> Vec<AllocationEvent> {
+    pub fn calculate(&self, signals: &[Signal]) -> Vec<AllocationEvent> {
         self.allocations
             .par_iter()
-            .map(|a| {
-                // Filter signals
-                let signals = signals
-                    .iter()
-                    .filter(|s| a.strategies().contains(&s.strategy_id))
-                    .cloned()
-                    .collect::<Vec<_>>();
-
-                a.calculate(signals)
-            })
+            .map(|a| a.calculate(signals))
             .flat_map(|a| a)
             .collect::<Vec<_>>()
     }

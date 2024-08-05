@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use std::fmt;
 
-use backtest::BacktestExecution;
 use binance::BinanceExecution;
 
 use crate::models::{Instrument, Price, Quantity};
@@ -21,7 +20,7 @@ pub trait Execution: Clone {
 #[derive(Clone)]
 pub enum ExecutionType {
     Binance(BinanceExecution),
-    Backtest(BacktestExecution),
+    // Backtest(BacktestExecution),
 }
 
 #[async_trait]
@@ -29,7 +28,7 @@ impl Execution for ExecutionType {
     async fn start(&self) {
         match self {
             ExecutionType::Binance(exec) => exec.start().await,
-            ExecutionType::Backtest(exec) => exec.start().await,
+            // ExecutionType::Backtest(exec) => exec.start().await,
         }
     }
 }
@@ -38,7 +37,7 @@ impl fmt::Display for ExecutionType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ExecutionType::Binance(_) => write!(f, "Binance"),
-            ExecutionType::Backtest(_) => write!(f, "Backtest"),
+            // ExecutionType::Backtest(_) => write!(f, "Backtest"),
         }
     }
 }

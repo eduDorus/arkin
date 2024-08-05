@@ -1,4 +1,4 @@
-use super::{DataType, Feature, FeatureId};
+use super::{Feature, FeatureId, QueryType};
 use crate::config::VWAPFeatureConfig;
 use anyhow::{anyhow, Result};
 use rust_decimal::prelude::*;
@@ -8,27 +8,16 @@ use tracing::debug;
 #[derive(Debug)]
 pub struct VWAPFeature {
     id: FeatureId,
-    trade_price: FeatureId,
-    trade_quantity: FeatureId,
-    window: Duration,
+    source: Vec<FeatureId>,
+    data_type: QueryType,
 }
 
 impl VWAPFeature {
-    pub fn new(id: FeatureId, window: Duration) -> Self {
-        VWAPFeature {
-            id,
-            trade_price: "trade_price".into(),
-            trade_quantity: "trade_quantity".into(),
-            window,
-        }
-    }
-
     pub fn from_config(config: &VWAPFeatureConfig) -> Self {
         VWAPFeature {
             id: config.id.to_owned(),
-            trade_price: "trade_price".into(),
-            trade_quantity: "trade_quantity".into(),
-            window: Duration::from_secs(config.window),
+            source: vec!["trade_price".into(), "trade_quantity".into()],
+            data_type: QueryType::Window(Duration::from_secs(config.window)),
         }
     }
 }
@@ -38,19 +27,19 @@ impl Feature for VWAPFeature {
         &self.id
     }
 
-    fn sources(&self) -> Vec<FeatureId> {
-        vec![self.trade_price.clone(), self.trade_quantity.clone()]
+    fn sources(&self) -> &[FeatureId] {
+        &self.source
     }
 
-    fn data_type(&self) -> DataType {
-        DataType::Window(self.window)
+    fn data_type(&self) -> &QueryType {
+        &self.data_type
     }
 
     fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating VWAP with id: {}", self.id);
         // Check if both trade_price and trade_quantity are present
-        let price = data.get(&self.trade_price).ok_or(anyhow!("Missing trade_price"))?;
-        let quantity = data.get(&self.trade_quantity).ok_or(anyhow!("Missing trade_quantity"))?;
+        let price = data.get(&self.source[0]).ok_or(anyhow!("Missing trade_price"))?;
+        let quantity = data.get(&self.source[1]).ok_or(anyhow!("Missing trade_quantity"))?;
         assert_eq!(price.len(), quantity.len());
 
         let mut total_quantity = f64::zero();

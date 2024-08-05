@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{DataType, Feature, FeatureId};
+use super::{Feature, FeatureId, QueryType};
 use crate::config::SpreadFeatureConfig;
 use anyhow::{anyhow, Result};
 use tracing::debug;
@@ -8,24 +8,16 @@ use tracing::debug;
 #[derive(Debug)]
 pub struct SpreadFeature {
     id: FeatureId,
-    front_component: FeatureId,
-    back_component: FeatureId,
+    source: Vec<FeatureId>,
+    data_type: QueryType,
 }
 
 impl SpreadFeature {
-    pub fn new(id: FeatureId, front_component: FeatureId, back_component: FeatureId) -> Self {
-        SpreadFeature {
-            id,
-            front_component,
-            back_component,
-        }
-    }
-
     pub fn from_config(config: &SpreadFeatureConfig) -> Self {
         SpreadFeature {
             id: config.id.to_owned(),
-            front_component: config.front_component.to_owned(),
-            back_component: config.back_component.to_owned(),
+            source: vec![config.front_component.to_owned(), config.back_component.to_owned()],
+            data_type: QueryType::Latest,
         }
     }
 }
@@ -35,18 +27,18 @@ impl Feature for SpreadFeature {
         &self.id
     }
 
-    fn sources(&self) -> Vec<FeatureId> {
-        vec![self.front_component.clone(), self.back_component.clone()]
+    fn sources(&self) -> &[FeatureId] {
+        &self.source
     }
 
-    fn data_type(&self) -> DataType {
-        DataType::Latest
+    fn data_type(&self) -> &QueryType {
+        &self.data_type
     }
 
     fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating Spread with id: {}", self.id);
-        let front = data.get(&self.front_component).ok_or(anyhow!("Missing front_component"))?;
-        let back = data.get(&self.back_component).ok_or(anyhow!("Missing back_component"))?;
+        let front = data.get(&self.source[0]).ok_or(anyhow!("Missing front_component"))?;
+        let back = data.get(&self.source[1]).ok_or(anyhow!("Missing back_component"))?;
 
         let front_value = front.last().ok_or(anyhow!("Missing front_component value"))?;
         let back_value = back.last().ok_or(anyhow!("Missing back_component value"))?;

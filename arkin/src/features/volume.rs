@@ -1,4 +1,4 @@
-use super::{DataType, Feature, FeatureId};
+use super::{Feature, FeatureId, QueryType};
 use crate::config::VolumeFeatureConfig;
 use anyhow::{anyhow, Result};
 use std::{collections::HashMap, time::Duration};
@@ -7,24 +7,16 @@ use tracing::debug;
 #[derive(Debug)]
 pub struct VolumeFeature {
     id: FeatureId,
-    trade_quantity: FeatureId,
-    window: Duration,
+    source: Vec<FeatureId>,
+    data_type: QueryType,
 }
 
 impl VolumeFeature {
-    pub fn new(id: FeatureId, window: Duration) -> Self {
-        VolumeFeature {
-            id,
-            trade_quantity: "trade_quantity".into(),
-            window,
-        }
-    }
-
     pub fn from_config(config: &VolumeFeatureConfig) -> Self {
         VolumeFeature {
             id: config.id.to_owned(),
-            trade_quantity: "trade_quantity".into(),
-            window: Duration::from_secs(config.window),
+            source: vec!["trade_quantity".into()],
+            data_type: QueryType::Window(Duration::from_secs(config.window)),
         }
     }
 }
@@ -34,17 +26,17 @@ impl Feature for VolumeFeature {
         &self.id
     }
 
-    fn sources(&self) -> Vec<FeatureId> {
-        vec![self.trade_quantity.clone()]
+    fn sources(&self) -> &[FeatureId] {
+        &self.source
     }
 
-    fn data_type(&self) -> DataType {
-        DataType::Window(self.window)
+    fn data_type(&self) -> &QueryType {
+        &self.data_type
     }
 
     fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating Volume with id: {}", self.id);
-        let quantity = data.get(&self.trade_quantity).ok_or(anyhow!("Missing trade_quantity"))?;
+        let quantity = data.get(&self.source[0]).ok_or(anyhow!("Missing trade_quantity"))?;
 
         let sum = quantity.iter().sum::<f64>();
         let mut res = HashMap::new();

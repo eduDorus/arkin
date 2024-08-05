@@ -36,6 +36,6 @@ impl fmt::Display for StrategyId {
 
 pub trait Strategy: Debug + Send + Sync {
     fn id(&self) -> &StrategyId;
-    fn sources(&self) -> Vec<FeatureId>;
-    fn calculate(&self, data: Vec<FeatureEvent>) -> Vec<Signal>;
+    fn sources(&self) -> &[FeatureId];
+    fn calculate(&self, data: &[FeatureEvent]) -> Vec<Signal>;
 }
