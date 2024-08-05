@@ -2,6 +2,7 @@ use anyhow::Result;
 use arkin::allocation::AllocationManager;
 use arkin::config;
 use arkin::db::DBManager;
+use arkin::execution::SimulationExecution;
 use arkin::features::FeatureEvent;
 use arkin::ingestors::BinanceParser;
 use arkin::ingestors::TardisChannel;
@@ -185,6 +186,7 @@ async fn main() -> Result<()> {
             let pipeline = Pipeline::from_config(state.clone(), &config.pipeline);
             let strategy_manager = StrategyManager::from_config(&config.strategy_manager);
             let allocation_manager = AllocationManager::from_config(&config.allocation_manager);
+            let simulation = SimulationExecution::from_config(state.clone(), &config.simulation);
 
             // RUN
             let timer = Instant::now();
@@ -211,6 +213,9 @@ async fn main() -> Result<()> {
                 for allocation in &allocations {
                     debug!("Allocation: {}", allocation);
                 }
+
+                // Run simulation
+                simulation.allocate(&allocations);
                 timestamp += Duration::from_secs(frequency);
             }
 

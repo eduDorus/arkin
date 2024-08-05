@@ -5,12 +5,13 @@ use binance::BinanceExecution;
 
 use crate::models::{Instrument, Price, Quantity};
 
-mod backtest;
 mod binance;
 pub mod errors;
 mod factory;
+mod simulation;
 
 pub use factory::ExecutionFactory;
+pub use simulation::SimulationExecution;
 
 #[async_trait]
 pub trait Execution: Clone {

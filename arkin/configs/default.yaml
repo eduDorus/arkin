@@ -91,11 +91,13 @@ allocation_manager:
           - crossover
 
 execution:
-  # - binance:
-  #     max_orders_per_minute: 5
-  #     max_order_size_notional: 1000.
-  #     min_order_size_notional: 100.
-  - backtest:
+  - binance:
       max_orders_per_minute: 5
       max_order_size_notional: 1000.
       min_order_size_notional: 100.
+
+simulation:
+  latency: 5 # In ms
+  max_orders_per_minute: 5
+  max_order_size_notional: 1000.
+  min_order_size_notional: 100.

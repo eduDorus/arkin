@@ -46,6 +46,12 @@ impl Price {
     }
 }
 
+impl From<f64> for Price {
+    fn from(price: f64) -> Self {
+        Price(Decimal::from_f64(price).expect("Failed to convert f64 to Decimal"))
+    }
+}
+
 impl From<Decimal> for Price {
     fn from(price: Decimal) -> Self {
         Price(price)
@@ -106,6 +112,12 @@ impl Quantity {
 
     pub fn abs(&self) -> Self {
         self.0.abs().into()
+    }
+}
+
+impl From<f64> for Quantity {
+    fn from(quantity: f64) -> Self {
+        Quantity(Decimal::from_f64(quantity).expect("Failed to convert f64 to Decimal"))
     }
 }
 
@@ -183,6 +195,14 @@ impl Div<Quantity> for Notional {
 
     fn div(self, rhs: Quantity) -> Price {
         Price(self.0 / rhs.value())
+    }
+}
+
+impl Div<Price> for Notional {
+    type Output = Quantity;
+
+    fn div(self, rhs: Price) -> Quantity {
+        Quantity(self.0 / rhs.value())
     }
 }
 

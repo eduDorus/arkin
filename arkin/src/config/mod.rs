@@ -1,4 +1,5 @@
 use config::{Config, Environment, File};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::env;
 use tracing::error;
@@ -34,6 +35,15 @@ pub struct GlobalConfig {
     pub strategy_manager: StrategyManagerConfig,
     pub allocation_manager: AllocationManagerConfig,
     pub execution: Vec<ExecutionConfig>,
+    pub simulation: SimulationConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SimulationConfig {
+    pub latency: u64, // in milliseconds
+    pub max_orders_per_minute: u64,
+    pub max_order_size_notional: Decimal,
+    pub min_order_size_notional: Decimal,
 }
 
 pub fn load() -> GlobalConfig {

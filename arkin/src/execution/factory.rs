@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
-use crate::{config::ExecutionConfig, state::State};
-
 use super::{binance::BinanceExecution, ExecutionType};
+use crate::{config::ExecutionConfig, state::State};
+use std::sync::Arc;
 
 pub struct ExecutionFactory {}
 
@@ -15,7 +13,6 @@ impl ExecutionFactory {
                 ExecutionConfig::Binance(config) => {
                     executors.push(ExecutionType::Binance(BinanceExecution::new(state.to_owned(), config)))
                 }
-                _ => unimplemented!(),
             }
         }
 
