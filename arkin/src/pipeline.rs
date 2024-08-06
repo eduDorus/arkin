@@ -1,5 +1,5 @@
 use crate::config::PipelineConfig;
-use crate::constants::TRADE_PRICE_ID;
+use crate::constants::BASE_IDS;
 use crate::features::{Feature, FeatureEvent, FeatureFactory};
 use crate::models::Instrument;
 use crate::state::State;
@@ -38,7 +38,7 @@ impl Pipeline {
         let mut edges_to_add = vec![];
         for target_node in graph.node_indices() {
             for source in graph[target_node].sources() {
-                if *source == *TRADE_PRICE_ID || source == &"trade_quantity".into() {
+                if BASE_IDS.contains(source) {
                     continue;
                 }
                 let source_node = graph.node_indices().find(|i| graph[*i].id() == source).unwrap();
@@ -106,6 +106,7 @@ impl Pipeline {
 
                             // Save data to state and result set
                             data.into_iter().for_each(|(id, value)| {
+                                debug!("Saving: {} => {}", id, value);
                                 let event = FeatureEvent::new(id, instrument.to_owned(), event_time, value);
                                 state.add_feature(event.clone());
                                 pipeline_result.lock().push(event);
@@ -123,12 +124,12 @@ impl Pipeline {
                         if in_degrees[neighbor.index()] == 0 {
                             debug!("Ready node: {:?}", graph[neighbor]);
                             queue_tx.send(Some(neighbor)).expect("Failed to send ready node");
-
-                            debug!("Dependency count: {:?}", in_degrees);
-                            if in_degrees.iter().all(|&x| x == 0) {
-                                queue_tx.send(None).expect("Failed to send exit message");
-                            }
                         }
+                    }
+                    debug!("Dependency count: {:?}", in_degrees);
+                    if in_degrees.lock().iter().all(|&x| x == 0) {
+                        debug!("All nodes processed");
+                        queue_tx.send(None).expect("Failed to send exit message");
                     }
                 });
             }

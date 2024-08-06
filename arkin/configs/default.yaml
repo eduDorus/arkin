@@ -37,8 +37,8 @@ ingestors:
   #         symbols:
   #           - btcusdt
 
-pipeline:
-  name: TA
+feature_pipeline:
+  name: feature
   frequency: 1 # In seconds
   features:
     # Volume
@@ -73,6 +73,12 @@ pipeline:
         id: spread_sma_vwap
         front_component: sma_5_vwap
         back_component: sma_60_vwap
+
+analytics_pipeline:
+  name: analytics
+  frequency: 1 # In seconds
+  features:
+    - position
 
 strategy_manager:
   strategies:

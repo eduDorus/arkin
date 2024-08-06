@@ -1,22 +1,24 @@
-use crate::config::PositionConfig;
-use crate::constants::{FILL_PRICE_ID, FILL_QUANTITY_ID, POSITIONS_ID};
+use crate::constants::{FILL_PRICE_ID, FILL_QUANTITY_ID, POSITION_PRICE_ID, POSITION_QUANTITY_ID};
 use crate::features::{Feature, FeatureId, QueryType};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::collections::HashMap;
 use tracing::debug;
 
 #[derive(Debug)]
 pub struct PositionFeature {
-    id: FeatureId,
     source: Vec<FeatureId>,
     data_type: QueryType,
 }
 
 impl PositionFeature {
-    pub fn from_config(_config: &PositionConfig) -> Self {
+    pub fn from_config() -> Self {
         PositionFeature {
-            id: POSITIONS_ID.to_owned(),
-            source: vec![FILL_PRICE_ID.to_owned(), FILL_QUANTITY_ID.to_owned()],
+            source: vec![
+                POSITION_PRICE_ID.clone(),
+                POSITION_QUANTITY_ID.clone(),
+                FILL_PRICE_ID.to_owned(),
+                FILL_QUANTITY_ID.to_owned(),
+            ],
             data_type: QueryType::Latest,
         }
     }
@@ -24,7 +26,7 @@ impl PositionFeature {
 
 impl Feature for PositionFeature {
     fn id(&self) -> &FeatureId {
-        &self.id
+        &self.source[0]
     }
 
     fn sources(&self) -> &[FeatureId] {
@@ -36,17 +38,37 @@ impl Feature for PositionFeature {
     }
 
     fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>> {
-        debug!("Calculating Spread with id: {}", self.id);
-        let front = data.get(&self.source[0]).ok_or(anyhow!("Missing front_component"))?;
-        let back = data.get(&self.source[1]).ok_or(anyhow!("Missing back_component"))?;
+        debug!("Calculating Position");
+        let (position_price, position_quantity) =
+            if !data.get(&self.source[0]).unwrap().is_empty() && !data.get(&self.source[1]).unwrap().is_empty() {
+                (
+                    *data.get(&self.source[0]).unwrap().clone().last().unwrap(),
+                    *data.get(&self.source[1]).unwrap().clone().last().unwrap(),
+                )
+            } else {
+                (0.0, 0.0)
+            };
 
-        let front_value = front.last().ok_or(anyhow!("Missing front_component value"))?;
-        let back_value = back.last().ok_or(anyhow!("Missing back_component value"))?;
+        let fill_price = data.get(&self.source[2]).unwrap();
+        let fill_quantity = data.get(&self.source[3]).unwrap();
 
-        let spread = front_value - back_value;
+        let mut position_price_sum = position_price * position_quantity;
+        let mut position_quantity_sum = position_quantity;
+
+        for (price, quantity) in fill_price.iter().zip(fill_quantity) {
+            position_price_sum += price * quantity;
+            position_quantity_sum += quantity;
+        }
+
+        let position_price = if position_quantity_sum == 0.0 {
+            0.0
+        } else {
+            position_price_sum / position_quantity_sum
+        };
 
         let mut res = HashMap::new();
-        res.insert(self.id.clone(), spread);
+        res.insert(self.source[0].clone(), position_price);
+        res.insert(self.source[1].clone(), position_quantity_sum);
         Ok(res)
     }
 }

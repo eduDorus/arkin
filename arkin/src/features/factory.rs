@@ -15,7 +15,7 @@ impl FeatureFactory {
                 FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
                 FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
                 FeatureConfig::Spread(c) => Box::new(SpreadFeature::from_config(c)),
-                FeatureConfig::Position(c) => Box::new(PositionFeature::from_config(c)),
+                FeatureConfig::Position => Box::new(PositionFeature::from_config()),
             };
             features.push(f);
         });

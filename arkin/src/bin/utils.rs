@@ -6,7 +6,6 @@ use arkin::constants::TRADE_QUANTITY_ID;
 use arkin::db::DBManager;
 use arkin::execution::SimulationExecution;
 use arkin::features::FeatureEvent;
-use arkin::features::QueryType;
 use arkin::ingestors::BinanceParser;
 use arkin::ingestors::TardisChannel;
 use arkin::ingestors::TardisExchange;
@@ -186,7 +185,8 @@ async fn main() -> Result<()> {
             });
 
             // INITIALIZE
-            let pipeline = Pipeline::from_config(state.clone(), &config.pipeline);
+            let feature_pipeline = Pipeline::from_config(state.clone(), &config.feature_pipeline);
+            let analytics_pipeline = Pipeline::from_config(state.clone(), &config.analytics_pipeline);
             let strategy_manager = StrategyManager::from_config(&config.strategy_manager);
             let allocation_manager = AllocationManager::from_config(&config.allocation_manager);
             let simulation = SimulationExecution::from_config(state.clone(), &config.simulation);
@@ -200,7 +200,7 @@ async fn main() -> Result<()> {
             for _ in 0..intervals {
                 debug!("----------------- {:?} -----------------", timestamp);
                 // Run pipeline
-                let features = pipeline.calculate(instrument.clone(), timestamp);
+                let features = feature_pipeline.calculate(instrument.clone(), timestamp);
                 for feature in &features {
                     debug!("Feature: {}", feature);
                 }
@@ -211,6 +211,12 @@ async fn main() -> Result<()> {
                     debug!("Signal: {}", signal);
                 }
 
+                // Run analytics
+                let analytics = analytics_pipeline.calculate(instrument.clone(), timestamp);
+                for analytic in &analytics {
+                    info!("Analytic: {}", analytic);
+                }
+
                 // Run allocation
                 let allocations = allocation_manager.calculate(&signals);
                 for allocation in &allocations {
@@ -219,16 +225,10 @@ async fn main() -> Result<()> {
 
                 // Run simulation
                 simulation.allocate(&allocations);
+
+                // Run analytics
+
                 timestamp += Duration::from_secs(frequency);
-            }
-            let fills = state.read_features(
-                &instrument,
-                &["fill_price".into()],
-                &end,
-                &QueryType::Window(Duration::from_secs(intervals as u64 * frequency)),
-            );
-            for fill in fills {
-                info!("Fill: {:?}", fill);
             }
 
             info!("Elapsed time: {:?}", timer.elapsed());

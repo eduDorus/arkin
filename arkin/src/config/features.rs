@@ -23,7 +23,7 @@ pub enum FeatureConfig {
     Spread(SpreadFeatureConfig),
 
     #[serde(rename = "position")]
-    Position(PositionConfig),
+    Position,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
