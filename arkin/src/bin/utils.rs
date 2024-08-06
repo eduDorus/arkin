@@ -1,9 +1,12 @@
 use anyhow::Result;
 use arkin::allocation::AllocationManager;
 use arkin::config;
+use arkin::constants::TRADE_PRICE_ID;
+use arkin::constants::TRADE_QUANTITY_ID;
 use arkin::db::DBManager;
 use arkin::execution::SimulationExecution;
 use arkin::features::FeatureEvent;
+use arkin::features::QueryType;
 use arkin::ingestors::BinanceParser;
 use arkin::ingestors::TardisChannel;
 use arkin::ingestors::TardisExchange;
@@ -169,13 +172,13 @@ async fn main() -> Result<()> {
             // split trades to feature events
             trades.into_iter().for_each(|t| {
                 state.add_feature(FeatureEvent::new(
-                    "trade_price".into(),
+                    TRADE_PRICE_ID.to_owned(),
                     t.instrument.clone(),
                     t.event_time,
                     t.price.value().to_f64().unwrap(),
                 ));
                 state.add_feature(FeatureEvent::new(
-                    "trade_quantity".into(),
+                    TRADE_QUANTITY_ID.to_owned(),
                     t.instrument,
                     t.event_time,
                     t.quantity.value().to_f64().unwrap(),
@@ -217,6 +220,15 @@ async fn main() -> Result<()> {
                 // Run simulation
                 simulation.allocate(&allocations);
                 timestamp += Duration::from_secs(frequency);
+            }
+            let fills = state.read_features(
+                &instrument,
+                &["fill_price".into()],
+                &end,
+                &QueryType::Window(Duration::from_secs(intervals as u64 * frequency)),
+            );
+            for fill in fills {
+                info!("Fill: {:?}", fill);
             }
 
             info!("Elapsed time: {:?}", timer.elapsed());

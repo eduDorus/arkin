@@ -94,15 +94,15 @@ pub struct BinanceSwapsTradeData {
 impl From<BinanceSwapsTradeData> for Event {
     fn from(data: BinanceSwapsTradeData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::Trade(Trade::new(
-            OffsetDateTime::now_utc(),
-            data.event_time,
+        Event::Trade(Trade {
+            received_time: OffsetDateTime::now_utc(),
+            event_time: data.event_time,
             instrument,
-            data.trade_id,
-            data.price.into(), // TODO: Fix this
-            data.quantity.into(),
-            IngestorID::Binance,
-        ))
+            trade_id: data.trade_id,
+            price: data.price.into(), // TODO: Fix this
+            quantity: data.quantity.into(),
+            source: IngestorID::Binance,
+        })
     }
 }
 
@@ -250,16 +250,17 @@ pub struct BinanceSwapsTickData {
 impl From<BinanceSwapsTickData> for Event {
     fn from(data: BinanceSwapsTickData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::Tick(Tick::new(
-            data.event_time,
+        Event::Tick(Tick {
+            received_time: OffsetDateTime::now_utc(),
+            event_time: data.event_time,
             instrument,
-            data.update_id,
-            data.bid_price.into(), // TODO: Fix this
-            data.bid_quantity.into(),
-            data.ask_price.into(), // TODO: Fix this
-            data.ask_quantity.into(),
-            IngestorID::Binance,
-        ))
+            tick_id: data.update_id,
+            bid_price: data.bid_price.into(), // TODO: Fix this
+            bid_quantity: data.bid_quantity.into(),
+            ask_price: data.ask_price.into(), // TODO: Fix this
+            ask_quantity: data.ask_quantity.into(),
+            source: IngestorID::Binance,
+        })
     }
 }
 

@@ -21,6 +21,9 @@ pub enum FeatureConfig {
     // EMA(EMAFeatureConfig),
     #[serde(rename = "spread")]
     Spread(SpreadFeatureConfig),
+
+    #[serde(rename = "position")]
+    Position(PositionConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -55,3 +58,6 @@ pub struct SpreadFeatureConfig {
     pub front_component: FeatureId,
     pub back_component: FeatureId,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PositionConfig {}

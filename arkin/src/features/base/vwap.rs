@@ -1,5 +1,6 @@
-use super::{Feature, FeatureId, QueryType};
 use crate::config::VWAPFeatureConfig;
+use crate::constants::{TRADE_PRICE_ID, TRADE_QUANTITY_ID};
+use crate::features::{Feature, FeatureId, QueryType};
 use anyhow::{anyhow, Result};
 use rust_decimal::prelude::*;
 use std::{collections::HashMap, time::Duration};
@@ -16,7 +17,7 @@ impl VWAPFeature {
     pub fn from_config(config: &VWAPFeatureConfig) -> Self {
         VWAPFeature {
             id: config.id.to_owned(),
-            source: vec!["trade_price".into(), "trade_quantity".into()],
+            source: vec![TRADE_PRICE_ID.clone(), TRADE_QUANTITY_ID.clone()],
             data_type: QueryType::Window(Duration::from_secs(config.window)),
         }
     }

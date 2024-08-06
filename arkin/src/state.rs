@@ -73,7 +73,7 @@ impl State {
         entry.insert(composit_key, event.value);
     }
 
-    pub fn query(
+    pub fn read_features(
         &self,
         instrument: &Instrument,
         feature_ids: &[FeatureId],

@@ -1,4 +1,5 @@
 use crate::config::PipelineConfig;
+use crate::constants::TRADE_PRICE_ID;
 use crate::features::{Feature, FeatureEvent, FeatureFactory};
 use crate::models::Instrument;
 use crate::state::State;
@@ -37,7 +38,7 @@ impl Pipeline {
         let mut edges_to_add = vec![];
         for target_node in graph.node_indices() {
             for source in graph[target_node].sources() {
-                if source == &"trade_price".into() || source == &"trade_quantity".into() {
+                if *source == *TRADE_PRICE_ID || source == &"trade_quantity".into() {
                     continue;
                 }
                 let source_node = graph.node_indices().find(|i| graph[*i].id() == source).unwrap();
@@ -95,7 +96,7 @@ impl Pipeline {
                     let feature = &graph[node];
 
                     // Query the data
-                    let data = state.query(&instrument, feature.sources(), &event_time, feature.data_type());
+                    let data = state.read_features(&instrument, feature.sources(), &event_time, feature.data_type());
 
                     // Calculate the feature
                     let res = feature.calculate(data);

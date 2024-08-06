@@ -127,6 +127,12 @@ impl From<Decimal> for Quantity {
     }
 }
 
+impl From<Quantity> for f64 {
+    fn from(quantity: Quantity) -> f64 {
+        quantity.0.to_f64().expect("Failed to convert Decimal to f64")
+    }
+}
+
 impl fmt::Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)

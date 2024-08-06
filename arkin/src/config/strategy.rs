@@ -25,8 +25,8 @@ pub struct CrossoverConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SpreaderConfig {
-    pub id: String,
-    pub front_leg: String,
-    pub back_leg: String,
+    pub id: StrategyId,
+    pub front_leg: FeatureId,
+    pub back_leg: FeatureId,
     pub min_spread: Decimal,
 }

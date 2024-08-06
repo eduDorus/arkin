@@ -59,18 +59,19 @@ impl From<TickRow> for Tick {
             db_tick.strike.map(|s| s.into()),
             db_tick.option_type.map(|ot| ot.parse().unwrap()),
         )
-        .unwrap();
+        .expect("Failed to create instrument");
 
-        Tick::new(
-            db_tick.event_time,
+        Tick {
+            received_time: db_tick.received_time,
+            event_time: db_tick.event_time,
             instrument,
-            db_tick.tick_id as u64,
-            db_tick.bid_price.into(),
-            db_tick.bid_quantity.into(),
-            db_tick.ask_price.into(),
-            db_tick.ask_quantity.into(),
-            db_tick.source.parse().expect("Invalid source"),
-        )
+            tick_id: db_tick.tick_id as u64,
+            bid_price: db_tick.bid_price.into(),
+            bid_quantity: db_tick.bid_quantity.into(),
+            ask_price: db_tick.ask_price.into(),
+            ask_quantity: db_tick.ask_quantity.into(),
+            source: db_tick.source.parse().expect("Invalid source"),
+        }
     }
 }
 
@@ -247,16 +248,17 @@ mod tests {
         let config = config::load();
         let manager = DBManager::from_config(&config.db).await;
 
-        let tick = Tick::new(
-            OffsetDateTime::now_utc(),
-            Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
-            1,
-            Decimal::new(10000, 2).into(),
-            Decimal::new(105, 1).into(),
-            Decimal::new(10001, 2).into(),
-            Decimal::new(106, 1).into(),
-            IngestorID::Test,
-        );
+        let tick = Tick {
+            received_time: OffsetDateTime::now_utc(),
+            event_time: OffsetDateTime::now_utc(),
+            instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
+            tick_id: 1,
+            bid_price: Decimal::new(10000, 2).into(),
+            bid_quantity: Decimal::new(105, 1).into(),
+            ask_price: Decimal::new(10001, 2).into(),
+            ask_quantity: Decimal::new(106, 1).into(),
+            source: IngestorID::Test,
+        };
 
         manager.insert_tick(tick).await.unwrap();
 

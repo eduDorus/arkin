@@ -26,7 +26,6 @@ impl Tick {
         bid_quantity: Quantity,
         ask_price: Price,
         ask_quantity: Quantity,
-        source: IngestorID,
     ) -> Self {
         Self {
             received_time: OffsetDateTime::now_utc(),
@@ -37,7 +36,7 @@ impl Tick {
             bid_quantity,
             ask_price,
             ask_quantity,
-            source,
+            source: IngestorID::Test,
         }
     }
 }

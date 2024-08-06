@@ -41,6 +41,8 @@ pub struct GlobalConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SimulationConfig {
     pub latency: u64, // in milliseconds
+    pub commission_maker: Decimal,
+    pub commission_taker: Decimal,
     pub max_orders_per_minute: u64,
     pub max_order_size_notional: Decimal,
     pub min_order_size_notional: Decimal,

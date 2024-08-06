@@ -1,5 +1,5 @@
-use super::{Feature, FeatureId, QueryType};
 use crate::config::VolumeFeatureConfig;
+use crate::features::{Feature, FeatureId, QueryType};
 use anyhow::{anyhow, Result};
 use std::{collections::HashMap, time::Duration};
 use tracing::debug;

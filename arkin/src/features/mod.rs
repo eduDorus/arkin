@@ -8,12 +8,15 @@ use std::fmt::Debug;
 use std::time::Duration;
 use time::OffsetDateTime;
 
-pub mod errors;
+mod base;
 mod factory;
-mod sma;
-mod spread;
-mod volume;
-mod vwap;
+mod performance;
+mod risk;
+mod ta;
+
+use base::*;
+use performance::*;
+use ta::*;
 
 pub use factory::FeatureFactory;
 
@@ -48,12 +51,6 @@ pub struct FeatureId(String);
 
 impl From<&str> for FeatureId {
     fn from(id: &str) -> Self {
-        FeatureId(id.to_lowercase())
-    }
-}
-
-impl From<String> for FeatureId {
-    fn from(id: String) -> Self {
         FeatureId(id.to_lowercase())
     }
 }

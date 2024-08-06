@@ -1,5 +1,4 @@
 pub mod allocation;
-pub mod analytics;
 pub mod clock;
 pub mod config;
 pub mod constants;

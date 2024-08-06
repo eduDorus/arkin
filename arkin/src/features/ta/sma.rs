@@ -1,5 +1,8 @@
-use super::{Feature, FeatureId, QueryType};
-use crate::config::SMAFeatureConfig;
+use crate::{
+    config::SMAFeatureConfig,
+    features::{Feature, FeatureId, QueryType},
+};
+// Import FeatureId and QueryType from src/features/base/mod.rs
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use tracing::debug;
