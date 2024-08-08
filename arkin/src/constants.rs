@@ -19,8 +19,6 @@ pub static FILL_QUANTITY_ID: LazyLock<FeatureId> = LazyLock::new(|| FeatureId::f
 
 pub static BASE_IDS: LazyLock<Vec<FeatureId>> = LazyLock::new(|| {
     vec![
-        POSITION_PRICE_ID.clone(),
-        POSITION_QUANTITY_ID.clone(),
         TRADE_PRICE_ID.clone(),
         TRADE_QUANTITY_ID.clone(),
         FILL_PRICE_ID.clone(),

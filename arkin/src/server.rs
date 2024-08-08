@@ -5,7 +5,6 @@ use tracing::info;
 use crate::{
     clock::Clock,
     config::GlobalConfig,
-    execution::{Execution, ExecutionFactory, ExecutionType},
     ingestors::{Ingestor, IngestorFactory, IngestorType},
     state::State,
 };
@@ -35,8 +34,8 @@ impl Server {
         // let allocation = AllocationFactory::from_config(self.state.clone(), &self.config.allocation);
         // tokio::spawn(Server::allocation_task(allocation));
 
-        let execution = ExecutionFactory::from_config(self.state.clone(), &self.config.execution);
-        tokio::spawn(Server::execution_task(execution));
+        // let execution = ExecutionEndpointFactory::from_config(self.state.clone(), &self.config.execution);
+        // tokio::spawn(Server::execution_task(execution));
 
         // Wait for interrupt signal
         tokio::signal::ctrl_c().await.expect("Failed to listen for event");
@@ -68,12 +67,12 @@ impl Server {
     //     tokio::spawn(async move { allocation.start().await });
     // }
 
-    async fn execution_task(executors: Vec<ExecutionType>) {
-        info!("Spawning execution tasks...");
-        for executor in executors {
-            tokio::spawn(async move { executor.start().await });
-        }
-    }
+    // async fn execution_task(executors: Vec<ExecutionType>) {
+    //     info!("Spawning execution tasks...");
+    //     for executor in executors {
+    //         tokio::spawn(async move { executor.start().await });
+    //     }
+    // }
 }
 
 #[derive(Default)]

@@ -1,12 +1,12 @@
 use crate::ingestors::IngestorID;
 
 use super::{Instrument, Price, Quantity};
+use rust_decimal::Decimal;
 use std::fmt;
 use time::OffsetDateTime;
 
 #[derive(Clone)]
 pub struct Tick {
-    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
     pub tick_id: u64,
@@ -28,7 +28,6 @@ impl Tick {
         ask_quantity: Quantity,
     ) -> Self {
         Self {
-            received_time: OffsetDateTime::now_utc(),
             event_time,
             instrument,
             tick_id,
@@ -38,6 +37,14 @@ impl Tick {
             ask_quantity,
             source: IngestorID::Test,
         }
+    }
+
+    pub fn spread(&self) -> Decimal {
+        self.ask_price - self.bid_price
+    }
+
+    pub fn mid_price(&self) -> Price {
+        ((self.bid_price + self.ask_price).value() / Decimal::from(2)).into()
     }
 }
 

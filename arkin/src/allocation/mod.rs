@@ -7,11 +7,11 @@ mod manager;
 pub use manager::AllocationManager;
 
 use crate::{
-    models::{AllocationEvent, Signal},
+    models::{Allocation, Signal},
     strategies::StrategyId,
 };
 
-pub trait Allocation: Debug + Send + Sync {
+pub trait AllocationModule: Debug + Send + Sync {
     fn strategies(&self) -> &[StrategyId];
-    fn calculate(&self, signals: &[Signal]) -> Vec<AllocationEvent>;
+    fn calculate(&self, signals: &[Signal]) -> Vec<Allocation>;
 }

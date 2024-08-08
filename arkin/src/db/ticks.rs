@@ -9,7 +9,6 @@ use super::DBManager;
 
 #[derive(Debug, sqlx::FromRow)]
 struct TickRow {
-    received_time: OffsetDateTime,
     event_time: OffsetDateTime,
     instrument_type: String,
     venue: String,
@@ -29,7 +28,6 @@ struct TickRow {
 impl From<Tick> for TickRow {
     fn from(tick: Tick) -> Self {
         Self {
-            received_time: tick.received_time,
             event_time: tick.event_time,
             instrument_type: tick.instrument.instrument_type().to_string(),
             venue: tick.instrument.venue().to_string(),
@@ -62,7 +60,6 @@ impl From<TickRow> for Tick {
         .expect("Failed to create instrument");
 
         Tick {
-            received_time: db_tick.received_time,
             event_time: db_tick.event_time,
             instrument,
             tick_id: db_tick.tick_id as u64,
@@ -83,31 +80,30 @@ impl DBManager {
             WITH existing_instrument AS (
                 SELECT instrument_id
                 FROM instruments
-                WHERE instrument_type = $3
-                AND venue = $4
-                AND base = $5
-                AND quote = $6
-                AND maturity IS NOT DISTINCT FROM $7
-                AND strike IS NOT DISTINCT FROM $8
-                AND option_type IS NOT DISTINCT FROM $9
+                WHERE instrument_type = $2
+                AND venue = $3
+                AND base = $4
+                AND quote = $5
+                AND maturity IS NOT DISTINCT FROM $6
+                AND strike IS NOT DISTINCT FROM $7
+                AND option_type IS NOT DISTINCT FROM $8
             ), insert_instrument AS (
                 INSERT INTO instruments (instrument_type, venue, base, quote, maturity, strike, option_type)
-                SELECT $3, $4, $5, $6, $7, $8, $9
+                SELECT $2, $3, $4, $5, $6, $7, $8
                 WHERE NOT EXISTS (SELECT 1 FROM existing_instrument)
                 RETURNING instrument_id
             )
             INSERT INTO ticks (
-                received_time, event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity, source
+                event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity, source
             )
             SELECT 
-                $1, $2, COALESCE(ei.instrument_id, ii.instrument_id), $10, $11, $12, $13, $14, $15
+                $1, COALESCE(ei.instrument_id, ii.instrument_id), $9, $10, $11, $12, $13, $14
             FROM 
                 existing_instrument ei
             FULL OUTER JOIN 
                 insert_instrument ii ON true
             LIMIT 1
             "#,
-            tick.received_time,
             tick.event_time,
             tick.instrument_type,
             tick.venue,
@@ -139,16 +135,16 @@ impl DBManager {
                 WITH existing_instrument AS (
                     SELECT instrument_id
                     FROM instruments
-                    WHERE instrument_type = $3
-                    AND venue = $4
-                    AND base = $5
-                    AND quote = $6
-                    AND maturity IS NOT DISTINCT FROM $7
-                    AND strike IS NOT DISTINCT FROM $8
-                    AND option_type IS NOT DISTINCT FROM $9
+                    WHERE instrument_type = $2
+                    AND venue = $3
+                    AND base = $4
+                    AND quote = $5
+                    AND maturity IS NOT DISTINCT FROM $6
+                    AND strike IS NOT DISTINCT FROM $7
+                    AND option_type IS NOT DISTINCT FROM $8
                 ), insert_instrument AS (
                     INSERT INTO instruments (instrument_type, venue, base, quote, maturity, strike, option_type)
-                    SELECT $3, $4, $5, $6, $7, $8, $9
+                    SELECT $2, $3, $4, $5, $6, $7, $8
                     WHERE NOT EXISTS (SELECT 1 FROM existing_instrument)
                     RETURNING instrument_id
                 )
@@ -156,14 +152,13 @@ impl DBManager {
                     received_time, event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity, source
                 )
                 SELECT 
-                    $1, $2, COALESCE(ei.instrument_id, ii.instrument_id), $10, $11, $12, $13, $14, $15
+                    $1, COALESCE(ei.instrument_id, ii.instrument_id), $9, $10, $11, $12, $13, $14
                 FROM 
                     existing_instrument ei
                 FULL OUTER JOIN 
                     insert_instrument ii ON true
                 LIMIT 1
                 "#)
-                .bind(tick.received_time)
                 .bind(tick.event_time)
                 .bind(tick.instrument_type)
                 .bind(tick.venue)
@@ -190,7 +185,6 @@ impl DBManager {
         let stream = sqlx::query_as::<_, TickRow>(
             r#"
             SELECT 
-                ticks.received_time, 
                 ticks.event_time, 
                 instruments.instrument_type, 
                 instruments.venue, 
@@ -199,6 +193,7 @@ impl DBManager {
                 instruments.maturity, 
                 instruments.strike, 
                 instruments.option_type, 
+                ticks.tick_id,
                 ticks.bid_price, 
                 ticks.bid_quantity, 
                 ticks.ask_price, 
@@ -249,7 +244,6 @@ mod tests {
         let manager = DBManager::from_config(&config.db).await;
 
         let tick = Tick {
-            received_time: OffsetDateTime::now_utc(),
             event_time: OffsetDateTime::now_utc(),
             instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
             tick_id: 1,

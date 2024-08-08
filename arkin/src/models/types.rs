@@ -1,6 +1,7 @@
 use rust_decimal::prelude::*;
 use std::fmt;
-use std::ops::{Add, AddAssign, Div, Mul};
+use std::iter::Sum;
+use std::ops::{Add, AddAssign, Div, Mul, Sub};
 use time::OffsetDateTime;
 
 use crate::constants;
@@ -37,7 +38,7 @@ impl fmt::Display for Maturity {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Price(Decimal);
 
 impl Price {
@@ -72,6 +73,14 @@ impl Add<Price> for Price {
     }
 }
 
+impl Sub<Price> for Price {
+    type Output = Decimal;
+
+    fn sub(self, rhs: Price) -> Decimal {
+        self.0 - rhs.0
+    }
+}
+
 impl AddAssign<Price> for Price {
     fn add_assign(&mut self, rhs: Price) {
         self.0 += rhs.0;
@@ -102,7 +111,7 @@ impl Div<Quantity> for Price {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Quantity(Decimal);
 
 impl Quantity {
@@ -139,6 +148,22 @@ impl fmt::Display for Quantity {
     }
 }
 
+impl Add<Quantity> for Quantity {
+    type Output = Quantity;
+
+    fn add(self, rhs: Quantity) -> Quantity {
+        Quantity(self.0 + rhs.0)
+    }
+}
+
+impl Sub<Quantity> for Quantity {
+    type Output = Quantity;
+
+    fn sub(self, rhs: Quantity) -> Quantity {
+        Quantity(self.0 - rhs.0)
+    }
+}
+
 impl AddAssign<Quantity> for Quantity {
     fn add_assign(&mut self, rhs: Quantity) {
         self.0 += rhs.0;
@@ -169,18 +194,37 @@ impl Div<Price> for Quantity {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct Notional(Decimal);
 
 impl Notional {
     pub fn value(&self) -> Decimal {
         self.0
     }
+
+    pub fn to_f64(&self) -> f64 {
+        self.0.to_f64().expect("Failed to convert Decimal to f64")
+    }
+
+    pub fn abs(&self) -> Self {
+        Self::from(self.0.abs())
+    }
+
+    fn round_to_two_decimal_places(decimal: Decimal) -> Decimal {
+        decimal.round_dp(2)
+    }
+}
+
+impl From<f64> for Notional {
+    fn from(notional: f64) -> Self {
+        let decimal = Decimal::from_f64(notional).expect("Failed to convert f64 to Decimal");
+        Notional(Self::round_to_two_decimal_places(decimal))
+    }
 }
 
 impl From<Decimal> for Notional {
     fn from(notional: Decimal) -> Self {
-        Notional(notional)
+        Notional(Self::round_to_two_decimal_places(notional))
     }
 }
 
@@ -190,9 +234,25 @@ impl fmt::Display for Notional {
     }
 }
 
+impl Add<Notional> for Notional {
+    type Output = Notional;
+
+    fn add(self, rhs: Notional) -> Notional {
+        Notional::from(self.0 + rhs.0)
+    }
+}
+
 impl AddAssign<Notional> for Notional {
     fn add_assign(&mut self, rhs: Notional) {
-        self.0 += rhs.0;
+        self.0 = Self::round_to_two_decimal_places(self.0 + rhs.0);
+    }
+}
+
+impl Mul<Decimal> for Notional {
+    type Output = Notional;
+
+    fn mul(self, rhs: Decimal) -> Notional {
+        Notional::from(self.0 * rhs)
     }
 }
 
@@ -209,6 +269,28 @@ impl Div<Price> for Notional {
 
     fn div(self, rhs: Price) -> Quantity {
         Quantity(self.0 / rhs.value())
+    }
+}
+
+impl Div<Notional> for Notional {
+    type Output = Quantity;
+
+    fn div(self, rhs: Notional) -> Quantity {
+        Quantity(self.0 / rhs.0)
+    }
+}
+
+impl Sub<Notional> for Notional {
+    type Output = Notional;
+
+    fn sub(self, rhs: Notional) -> Notional {
+        Notional::from(self.0 - rhs.0)
+    }
+}
+
+impl Sum<Notional> for Notional {
+    fn sum<I: Iterator<Item = Notional>>(iter: I) -> Notional {
+        iter.fold(Notional(Decimal::from(0)), |acc, x| acc + x)
     }
 }
 

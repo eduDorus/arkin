@@ -1,5 +1,5 @@
 use super::DBManager;
-use crate::models::AllocationEvent;
+use crate::models::Allocation;
 use anyhow::Result;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
@@ -18,8 +18,8 @@ struct AllocationRow {
     notional: Decimal,
 }
 
-impl From<AllocationEvent> for AllocationRow {
-    fn from(allocation: AllocationEvent) -> Self {
+impl From<Allocation> for AllocationRow {
+    fn from(allocation: Allocation) -> Self {
         Self {
             event_time: allocation.event_time,
             instrument_type: allocation.instrument.instrument_type().to_string(),
@@ -36,7 +36,7 @@ impl From<AllocationEvent> for AllocationRow {
 }
 
 impl DBManager {
-    pub async fn insert_allocation(&self, allocation: AllocationEvent) -> Result<()> {
+    pub async fn insert_allocation(&self, allocation: Allocation) -> Result<()> {
         let allocation = AllocationRow::from(allocation);
         sqlx::query!(
             r#"
@@ -76,7 +76,7 @@ mod tests {
         let config = config::load();
         let manager = DBManager::from_config(&config.db).await;
 
-        let allocation = AllocationEvent {
+        let allocation = Allocation {
             event_time: OffsetDateTime::now_utc(),
             instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
             strategy_id: "test".into(),

@@ -6,7 +6,6 @@ use time::OffsetDateTime;
 
 #[derive(sqlx::FromRow)]
 struct OrderRow {
-    received_time: OffsetDateTime,
     event_time: OffsetDateTime,
     instrument_type: String,
     venue: String,
@@ -28,7 +27,6 @@ struct OrderRow {
 impl From<Order> for OrderRow {
     fn from(order: Order) -> Self {
         Self {
-            received_time: order.received_time,
             event_time: order.event_time,
             instrument_type: order.instrument.instrument_type().to_string(),
             venue: order.instrument.venue().to_string(),
@@ -38,7 +36,7 @@ impl From<Order> for OrderRow {
             strike: order.instrument.strike().map(|s| s.value()),
             option_type: order.instrument.option_type().map(|ot| ot.to_string()),
             order_id: order.order_id as i64,
-            strategy_id: order.strategy_id,
+            strategy_id: order.strategy_id.to_string(),
             order_type: order.order_type.to_string(),
             price: order.price.map(|p| p.value()),
             avg_fill_price: order.avg_fill_price.map(|p| p.value()),
@@ -54,10 +52,9 @@ impl DBManager {
         let order = OrderRow::from(order);
         sqlx::query!(
             r#"
-            INSERT INTO orders (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, order_id, strategy_id, order_type, price, avg_fill_price, quantity, quantity_filled, status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            INSERT INTO orders (event_time, instrument_type, venue, base, quote, maturity, strike, option_type, order_id, strategy_id, order_type, price, avg_fill_price, quantity, quantity_filled, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             "#,
-            order.received_time,
             order.event_time,
             order.instrument_type,
             order.venue,
@@ -100,11 +97,10 @@ mod tests {
         let manager = DBManager::from_config(&config.db).await;
 
         let order = Order {
-            received_time: OffsetDateTime::now_utc(),
             event_time: OffsetDateTime::now_utc(),
             instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
             order_id: 1,
-            strategy_id: "test".to_string(),
+            strategy_id: "test".into(),
             order_type: OrderType::Limit,
             price: Some(Decimal::new(10000, 2).into()),
             avg_fill_price: Some(Decimal::new(9990, 2).into()),

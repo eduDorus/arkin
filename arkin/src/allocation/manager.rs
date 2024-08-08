@@ -1,12 +1,12 @@
-use super::{factory::AllocationFactory, Allocation};
+use super::{factory::AllocationFactory, AllocationModule};
 use crate::{
     config::AllocationManagerConfig,
-    models::{AllocationEvent, Signal},
+    models::{Allocation, Signal},
 };
 use rayon::prelude::*;
 
 pub struct AllocationManager {
-    allocations: Vec<Box<dyn Allocation>>,
+    allocations: Vec<Box<dyn AllocationModule>>,
 }
 
 impl AllocationManager {
@@ -16,7 +16,7 @@ impl AllocationManager {
         }
     }
 
-    pub fn calculate(&self, signals: &[Signal]) -> Vec<AllocationEvent> {
+    pub fn calculate(&self, signals: &[Signal]) -> Vec<Allocation> {
         self.allocations
             .par_iter()
             .map(|a| a.calculate(signals))

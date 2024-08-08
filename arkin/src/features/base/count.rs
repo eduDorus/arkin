@@ -1,25 +1,25 @@
 use crate::{
-    config::SMAFeatureConfig,
-    features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, NodeId, Period},
+    config::CountFeatureConfig,
+    features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, NodeId, Window},
 };
 use anyhow::Result;
 use std::collections::HashMap;
 use tracing::debug;
 
 #[derive(Debug)]
-pub struct SMAFeature {
+pub struct CountFeature {
     id: NodeId,
     sources: Vec<NodeId>,
     data: Vec<FeatureDataRequest>,
-    input: Period,
+    input: Window,
     output: FeatureId,
 }
 
-impl SMAFeature {
-    pub fn from_config(config: &SMAFeatureConfig) -> Self {
+impl CountFeature {
+    pub fn from_config(config: &CountFeatureConfig) -> Self {
         let sources = vec![config.input.from.clone()];
         let data = vec![config.input.to_owned().into()];
-        SMAFeature {
+        CountFeature {
             id: config.id.to_owned(),
             sources,
             data,
@@ -29,7 +29,7 @@ impl SMAFeature {
     }
 }
 
-impl Feature for SMAFeature {
+impl Feature for CountFeature {
     fn id(&self) -> &NodeId {
         &self.id
     }
@@ -43,13 +43,10 @@ impl Feature for SMAFeature {
     }
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
-        debug!("Calculating mean with id: {}", self.id);
-        let sum = data.mean(&self.input.feature_id).unwrap_or(0.);
+        debug!("Calculating count with id: {}", self.id);
         let count = data.count(&self.input.feature_id).unwrap_or(0.);
-
-        let mean = if count == 0. { f64::NAN } else { sum / count };
         let mut res = HashMap::new();
-        res.insert(self.output.clone(), mean);
+        res.insert(self.output.clone(), count);
         Ok(res)
     }
 }

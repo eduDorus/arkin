@@ -251,7 +251,6 @@ impl From<BinanceSwapsTickData> for Event {
     fn from(data: BinanceSwapsTickData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
         Event::Tick(Tick {
-            received_time: OffsetDateTime::now_utc(),
             event_time: data.event_time,
             instrument,
             tick_id: data.update_id,

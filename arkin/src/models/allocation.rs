@@ -4,14 +4,14 @@ use std::fmt;
 use time::OffsetDateTime;
 
 #[derive(Clone)]
-pub struct AllocationEvent {
+pub struct Allocation {
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
     pub strategy_id: StrategyId,
     pub notional: Notional,
 }
 
-impl AllocationEvent {
+impl Allocation {
     pub fn new(
         event_time: OffsetDateTime,
         instrument: Instrument,
@@ -27,7 +27,7 @@ impl AllocationEvent {
     }
 }
 
-impl fmt::Display for AllocationEvent {
+impl fmt::Display for Allocation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

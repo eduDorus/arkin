@@ -6,7 +6,6 @@ use time::OffsetDateTime;
 
 #[derive(sqlx::FromRow)]
 struct FillRow {
-    received_time: OffsetDateTime,
     event_time: OffsetDateTime,
     instrument_type: String,
     venue: String,
@@ -25,7 +24,6 @@ struct FillRow {
 impl From<Fill> for FillRow {
     fn from(fill: Fill) -> Self {
         Self {
-            received_time: fill.received_time,
             event_time: fill.event_time,
             instrument_type: fill.instrument.instrument_type().to_string(),
             venue: fill.instrument.venue().to_string(),
@@ -35,7 +33,7 @@ impl From<Fill> for FillRow {
             strike: fill.instrument.strike().map(|s| s.value()),
             option_type: fill.instrument.option_type().map(|ot| ot.to_string()),
             order_id: fill.order_id.map(|o| o as i64),
-            strategy_id: fill.strategy_id,
+            strategy_id: fill.strategy_id.to_string(),
             price: fill.price.value(),
             quantity: fill.quantity.value(),
             commission: fill.commission.value(),
@@ -48,10 +46,9 @@ impl DBManager {
         let fill = FillRow::from(fill);
         sqlx::query!(
             r#"
-            INSERT INTO fills (received_time, event_time, instrument_type, venue, base, quote, maturity, strike, option_type, order_id, strategy_id, price, quantity, commission)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            INSERT INTO fills (event_time, instrument_type, venue, base, quote, maturity, strike, option_type, order_id, strategy_id, price, quantity, commission)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             "#,
-            fill.received_time,
             fill.event_time,
             fill.instrument_type,
             fill.venue,
@@ -90,11 +87,10 @@ mod tests {
         let manager = DBManager::from_config(&config.db).await;
 
         let fill = Fill {
-            received_time: OffsetDateTime::now_utc(),
             event_time: OffsetDateTime::now_utc(),
             instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
             order_id: Some(1),
-            strategy_id: "test".to_string(),
+            strategy_id: "test".into(),
             price: Decimal::new(10000, 2).into(),
             quantity: Decimal::new(105, 1).into(),
             commission: Decimal::new(10, 2).into(),

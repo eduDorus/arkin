@@ -42,43 +42,96 @@ feature_pipeline:
   frequency: 1 # In seconds
   features:
     # Volume
-    - volume:
-        id: volume_1_min
-        window: 60 # In seconds
+    - sum:
+        id: volume
+        input:
+          from: base
+          feature: trade_quantity
+          window: 1
+        output: volume
     - sma:
         id: sma_5_volume
-        source: volume_1_min
-        period: 5
+        input:
+          from: volume
+          feature: volume
+          periods: 5
+        output: sma_5_volume
     - sma:
         id: sma_60_volume
-        source: volume_1_min
-        period: 60
+        input:
+          from: volume
+          feature: volume
+          periods: 60
+        output: sma_60_volume
     - spread:
         id: spread_sma_volume
-        front_component: sma_5_volume
-        back_component: sma_60_volume
+        input_front:
+          from: sma_5_volume
+          feature: sma_5_volume
+        input_back:
+          from: sma_60_volume
+          feature: sma_60_volume
+        output: spread_sma_volume
+        absolute: false
     # VWAP
     - vwap:
-        id: vwap_1_min
-        window: 60 # In seconds
+        id: vwap
+        input_price:
+          from: base
+          feature: trade_price
+          window: 1
+        input_quantity:
+          from: base
+          feature: trade_quantity
+          window: 1
+        output: vwap
     - sma:
         id: sma_5_vwap
-        source: vwap_1_min
-        period: 5
+        input:
+          from: vwap
+          feature: vwap
+          periods: 5
+        output: sma_5_vwap
     - sma:
         id: sma_60_vwap
-        source: vwap_1_min
-        period: 60
+        input:
+          from: vwap
+          feature: vwap
+          periods: 60
+        output: sma_60_vwap
     - spread:
         id: spread_sma_vwap
-        front_component: sma_5_vwap
-        back_component: sma_60_vwap
+        input_front:
+          from: sma_5_vwap
+          feature: sma_5_vwap
+        input_back:
+          from: sma_60_vwap
+          feature: sma_60_vwap
+        output: spread_sma_vwap
+        absolute: false
 
 analytics_pipeline:
   name: analytics
-  frequency: 1 # In seconds
+  frequency: 5 # In seconds
   features:
-    - position
+    - position:
+        id: position
+        input_position_price:
+          from: self
+          feature: position_price
+        input_position_quantity:
+          from: self
+          feature: position_quantity
+        input_fill_price:
+          from: base
+          feature: fill_price
+          window: 5
+        input_fill_quantity:
+          from: base
+          feature: fill_quantity
+          window: 5
+        output_price: position_price
+        output_quantity: position_quantity
 
 strategy_manager:
   strategies:
@@ -96,14 +149,24 @@ allocation_manager:
         strategies:
           - crossover
 
-execution:
-  - binance:
-      max_orders_per_minute: 5
-      max_order_size_notional: 1000.
-      min_order_size_notional: 100.
+execution_manager:
+  default_endpoint: simulation
+  rebalance_threshold: 50 # In percentage of allocation
+  endpoints:
+    - simulation:
+        latency: 500 # In ms
+        commission_maker: 0.00012
+        commission_taker: 0.0003
+        max_orders_per_minute: 5
+        max_order_size_notional: 10000.
+        min_order_size_notional: 200.
+    # - binance:
+    #     max_orders_per_minute: 5
+    #     max_order_size_notional: 1000.
+    #     min_order_size_notional: 100.
 
 simulation:
-  latency: 5 # In ms
+  latency: 200 # In ms
   commission_maker: 0.00012
   commission_taker: 0.0003
   max_orders_per_minute: 5

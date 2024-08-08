@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::features::FeatureId;
+use crate::features::{FeatureId, Latest, NodeId, Period, Window};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PipelineConfig {
@@ -11,53 +11,74 @@ pub struct PipelineConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FeatureConfig {
-    #[serde(rename = "volume")]
-    Volume(VolumeFeatureConfig),
+    #[serde(rename = "count")]
+    Count(CountFeatureConfig),
+    #[serde(rename = "sum")]
+    Sum(SumFeatureConfig),
+    #[serde(rename = "mean")]
+    Mean(MeanFeatureConfig),
     #[serde(rename = "vwap")]
     VWAP(VWAPFeatureConfig),
     #[serde(rename = "sma")]
     SMA(SMAFeatureConfig),
-    // #[serde(rename = "ema")]
-    // EMA(EMAFeatureConfig),
     #[serde(rename = "spread")]
     Spread(SpreadFeatureConfig),
-
     #[serde(rename = "position")]
-    Position,
+    Position(PositionConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VolumeFeatureConfig {
-    pub id: FeatureId,
-    pub window: u64,
+pub struct CountFeatureConfig {
+    pub id: NodeId,
+    pub input: Window,
+    pub output: FeatureId,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SumFeatureConfig {
+    pub id: NodeId,
+    pub input: Window,
+    pub output: FeatureId,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MeanFeatureConfig {
+    pub id: NodeId,
+    pub input: Window,
+    pub output: FeatureId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VWAPFeatureConfig {
-    pub id: FeatureId,
-    pub window: u64,
+    pub id: NodeId,
+    pub input_price: Window,
+    pub input_quantity: Window,
+    pub output: FeatureId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SMAFeatureConfig {
-    pub id: FeatureId,
-    pub source: FeatureId,
-    pub period: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct EMAFeatureConfig {
-    pub id: FeatureId,
-    pub source: FeatureId,
-    pub period: u64,
+    pub id: NodeId,
+    pub input: Period,
+    pub output: FeatureId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SpreadFeatureConfig {
-    pub id: FeatureId,
-    pub front_component: FeatureId,
-    pub back_component: FeatureId,
+    pub id: NodeId,
+    pub input_front: Latest,
+    pub input_back: Latest,
+    pub output: FeatureId,
+    pub absolute: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PositionConfig {}
+pub struct PositionConfig {
+    pub id: NodeId,
+    pub input_position_price: Latest,
+    pub input_position_quantity: Latest,
+    pub input_fill_price: Window,
+    pub input_fill_quantity: Window,
+    pub output_price: FeatureId,
+    pub output_quantity: FeatureId,
+}

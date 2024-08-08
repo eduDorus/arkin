@@ -1,84 +1,19 @@
-use async_trait::async_trait;
-use std::fmt;
-
-use binance::BinanceExecution;
-
-use crate::models::{Instrument, Price, Quantity};
-
 mod binance;
-pub mod errors;
 mod factory;
+mod manager;
 mod simulation;
 
-pub use factory::ExecutionFactory;
-pub use simulation::SimulationExecution;
+pub use factory::ExecutionEndpointFactory;
+pub use manager::ExecutionManager;
+pub use simulation::SimulationEndpoint;
 
-#[async_trait]
-pub trait Execution: Clone {
-    async fn start(&self);
+use crate::models::{Allocation, Fill, Order, Venue};
+
+pub trait Execution: Send + Sync {
+    fn allocate(&self, allocation: &[Allocation]);
 }
 
-#[derive(Clone)]
-pub enum ExecutionType {
-    Binance(BinanceExecution),
-    // Backtest(BacktestExecution),
-}
-
-#[async_trait]
-impl Execution for ExecutionType {
-    async fn start(&self) {
-        match self {
-            ExecutionType::Binance(exec) => exec.start().await,
-            // ExecutionType::Backtest(exec) => exec.start().await,
-        }
-    }
-}
-
-impl fmt::Display for ExecutionType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ExecutionType::Binance(_) => write!(f, "Binance"),
-            // ExecutionType::Backtest(_) => write!(f, "Backtest"),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum ExecutionEvent {
-    Limit(Limit),
-    Market(Market),
-}
-
-impl fmt::Display for ExecutionEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ExecutionEvent::Limit(e) => write!(f, "Limit: {}", e),
-            ExecutionEvent::Market(e) => write!(f, "Market: {}", e),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct Limit {
-    instrument: Instrument,
-    price: Price,
-    quantity: Quantity,
-}
-
-impl fmt::Display for Limit {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} at {} quantity {}", self.instrument, self.price, self.quantity)
-    }
-}
-
-#[derive(Clone)]
-pub struct Market {
-    instrument: Instrument,
-    quantity: Quantity,
-}
-
-impl fmt::Display for Market {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} quantity {}", self.instrument, self.quantity)
-    }
+pub trait ExecutionEndpoint: Send + Sync {
+    fn venue(&self) -> &Venue;
+    fn place_orders(&self, order: Vec<Order>) -> Vec<Fill>;
 }

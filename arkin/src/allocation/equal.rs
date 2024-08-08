@@ -1,7 +1,7 @@
-use super::Allocation;
+use super::AllocationModule;
 use crate::{
     config::EqualConfig,
-    models::{AllocationEvent, Signal, Weight},
+    models::{Allocation, Signal, Weight},
     strategies::StrategyId,
 };
 use rust_decimal::prelude::*;
@@ -25,12 +25,12 @@ impl EqualAllocation {
     }
 }
 
-impl Allocation for EqualAllocation {
+impl AllocationModule for EqualAllocation {
     fn strategies(&self) -> &[StrategyId] {
         &self.strategies
     }
 
-    fn calculate(&self, signals: &[Signal]) -> Vec<AllocationEvent> {
+    fn calculate(&self, signals: &[Signal]) -> Vec<Allocation> {
         let action_signals = signals.iter().filter(|s| s.signal != Weight::from(0.)).count();
 
         let allocation_per_instrument = self.max_allocation
@@ -44,7 +44,7 @@ impl Allocation for EqualAllocation {
         signals
             .iter()
             .map(|s| {
-                AllocationEvent::new(
+                Allocation::new(
                     s.event_time,
                     s.instrument.clone(),
                     s.strategy_id.clone(),

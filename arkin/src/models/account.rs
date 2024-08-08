@@ -1,4 +1,6 @@
-use super::{Instrument, Price, Quantity, Venue};
+use crate::{constants::TIMESTAMP_FORMAT, strategies::StrategyId};
+
+use super::{Instrument, Notional, Price, Quantity, Venue};
 use std::fmt;
 use time::OffsetDateTime;
 
@@ -12,22 +14,40 @@ pub struct Account {
 pub struct Position {
     pub instrument: Instrument,
     pub event_time: OffsetDateTime,
+    pub avg_price: Price,
     pub quantity: Quantity,
+}
+
+impl Position {
+    pub fn new(instrument: Instrument, event_time: OffsetDateTime) -> Self {
+        Self {
+            instrument,
+            event_time,
+            avg_price: Price::from(0.),
+            quantity: Quantity::from(0.),
+        }
+    }
 }
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.instrument, self.quantity)
+        write!(
+            f,
+            "POSITION {} {} avg price: {} quantity: {}",
+            self.event_time.format(TIMESTAMP_FORMAT).unwrap(),
+            self.instrument,
+            self.avg_price,
+            self.quantity
+        )
     }
 }
 
 #[derive(Clone)]
 pub struct Order {
-    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
     pub order_id: u64,
-    pub strategy_id: String,
+    pub strategy_id: StrategyId,
     pub order_type: OrderType,
     pub price: Option<Price>,
     pub avg_fill_price: Option<Price>,
@@ -36,22 +56,55 @@ pub struct Order {
     pub status: OrderStatus,
 }
 
+impl Order {
+    pub fn new_market(
+        event_time: OffsetDateTime,
+        instrument: Instrument,
+        strategy_id: StrategyId,
+        quantity: Quantity,
+    ) -> Self {
+        Self {
+            event_time,
+            instrument,
+            order_id: 0,
+            strategy_id,
+            order_type: OrderType::Market,
+            price: None,
+            avg_fill_price: None,
+            quantity,
+            quantity_filled: Quantity::from(0.),
+            status: OrderStatus::New,
+        }
+    }
+}
+
 impl fmt::Display for Order {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.status {
             OrderStatus::PartiallyFilled | OrderStatus::Filled => {
                 write!(
                     f,
-                    "{} {} filled {} of {} with avg price {}",
+                    "ORDER {} {} type: {} avg price: {} quantity: {}/{} status: {}",
+                    self.event_time,
                     self.instrument,
-                    self.status,
+                    self.order_type,
+                    self.avg_fill_price.expect("No fill price"),
                     self.quantity_filled,
                     self.quantity,
-                    self.avg_fill_price.expect("No fill price"),
+                    self.status,
                 )
             }
             _ => {
-                write!(f, "{} {} {} {}", self.instrument, self.order_id, self.order_type, self.status)
+                write!(
+                    f,
+                    "ORDER {} {} type: {} price: {} quantity: {} status: {}",
+                    self.event_time.format(TIMESTAMP_FORMAT).unwrap(),
+                    self.instrument,
+                    self.order_type,
+                    self.price.unwrap_or(Price::from(0.)),
+                    self.quantity,
+                    self.status
+                )
             }
         }
     }
@@ -78,6 +131,7 @@ impl fmt::Display for OrderType {
 
 #[derive(Clone)]
 pub enum OrderStatus {
+    New,
     Send,
     Open,
     PartiallyFilled,
@@ -89,6 +143,7 @@ pub enum OrderStatus {
 impl fmt::Display for OrderStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            OrderStatus::New => write!(f, "new"),
             OrderStatus::Send => write!(f, "send"),
             OrderStatus::Open => write!(f, "open"),
             OrderStatus::PartiallyFilled => write!(f, "partially_filled"),
@@ -101,18 +156,48 @@ impl fmt::Display for OrderStatus {
 
 #[derive(Clone)]
 pub struct Fill {
-    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
     pub order_id: Option<u64>,
-    pub strategy_id: String,
+    pub strategy_id: StrategyId,
     pub price: Price,
     pub quantity: Quantity,
-    pub commission: Price,
+    pub commission: Notional,
+}
+
+impl Fill {
+    pub fn new(
+        event_time: OffsetDateTime,
+        instrument: Instrument,
+        order_id: Option<u64>,
+        strategy_id: StrategyId,
+        price: Price,
+        quantity: Quantity,
+        commission: Notional,
+    ) -> Self {
+        Self {
+            event_time,
+            instrument,
+            order_id,
+            strategy_id,
+            price,
+            quantity,
+            commission,
+        }
+    }
 }
 
 impl fmt::Display for Fill {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} at {}", self.instrument, self.quantity, self.price)
+        write!(
+            f,
+            "FILL {} {} strategy: {} avg price: {} quantity: {} commission: {}",
+            self.event_time.format(TIMESTAMP_FORMAT).unwrap(),
+            self.instrument,
+            self.strategy_id,
+            self.price,
+            self.quantity,
+            self.commission
+        )
     }
 }

@@ -1,5 +1,4 @@
 use crate::config::PipelineConfig;
-use crate::constants::BASE_IDS;
 use crate::features::{Feature, FeatureEvent, FeatureFactory};
 use crate::models::Instrument;
 use crate::state::State;
@@ -38,10 +37,13 @@ impl Pipeline {
         let mut edges_to_add = vec![];
         for target_node in graph.node_indices() {
             for source in graph[target_node].sources() {
-                if BASE_IDS.contains(source) {
+                if source == &"base".into() || source == &"self".into() {
                     continue;
                 }
-                let source_node = graph.node_indices().find(|i| graph[*i].id() == source).unwrap();
+                let source_node = graph
+                    .node_indices()
+                    .find(|i| graph[*i].id() == source)
+                    .expect("Failed to find node from config");
                 edges_to_add.push((source_node, target_node));
             }
         }
@@ -96,7 +98,7 @@ impl Pipeline {
                     let feature = &graph[node];
 
                     // Query the data
-                    let data = state.read_features(&instrument, feature.sources(), &event_time, feature.data_type());
+                    let data = state.read_features(&instrument, &event_time, feature.data());
 
                     // Calculate the feature
                     let res = feature.calculate(data);

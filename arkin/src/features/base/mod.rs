@@ -1,7 +1,11 @@
+mod count;
+mod mean;
 mod spread;
-mod volume;
+mod sum;
 mod vwap;
 
+pub use count::CountFeature;
+pub use mean::MeanFeature;
 pub use spread::SpreadFeature;
-pub use volume::VolumeFeature;
+pub use sum::SumFeature;
 pub use vwap::VWAPFeature;

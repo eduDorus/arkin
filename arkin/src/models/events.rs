@@ -1,7 +1,7 @@
 use std::fmt;
 use time::OffsetDateTime;
 
-use super::{AllocationEvent, BookUpdate, Fill, Instrument, Order, Position, Signal, Tick, Trade};
+use super::{Allocation, BookUpdate, Fill, Instrument, Order, Position, Signal, Tick, Trade};
 
 #[derive(Clone)]
 pub enum Event {
@@ -12,7 +12,7 @@ pub enum Event {
     Order(Order),
     Fill(Fill),
     Signal(Signal),
-    Allocation(AllocationEvent),
+    Allocation(Allocation),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]

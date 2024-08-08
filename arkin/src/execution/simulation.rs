@@ -2,69 +2,67 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{
     config::SimulationConfig,
-    constants::TRADE_PRICE_ID,
-    features::{FeatureEvent, QueryType},
-    models::{AllocationEvent, Price},
+    models::{Fill, Order, Venue},
     state::State,
 };
 use rust_decimal::prelude::*;
-use tracing::{debug, warn};
+use tracing::{info, warn};
 
-pub struct SimulationExecution {
+use super::ExecutionEndpoint;
+
+pub struct SimulationEndpoint {
     state: Arc<State>,
     latency: Duration,
     _commission_maker: Decimal,
-    _commission_taker: Decimal,
+    commission_taker: Decimal,
     _max_orders_per_minute: u64,
-    _max_order_size_notional: Decimal,
-    _min_order_size_notional: Decimal,
 }
 
-impl SimulationExecution {
+impl SimulationEndpoint {
     pub fn from_config(state: Arc<State>, config: &SimulationConfig) -> Self {
-        SimulationExecution {
+        SimulationEndpoint {
             state,
             latency: Duration::from_millis(config.latency),
             _commission_maker: config.commission_maker,
-            _commission_taker: config.commission_taker,
+            commission_taker: config.commission_taker,
             _max_orders_per_minute: config.max_orders_per_minute,
-            _max_order_size_notional: config.max_order_size_notional,
-            _min_order_size_notional: config.min_order_size_notional,
         }
     }
 }
 
-impl SimulationExecution {
-    pub fn allocate(&self, allocations: &[AllocationEvent]) {
-        allocations.iter().for_each(|a| {
-            let execution_time = a.event_time + self.latency;
-            let res =
-                self.state
-                    .read_features(&a.instrument, &[TRADE_PRICE_ID.clone()], &execution_time, &QueryType::Latest);
+impl ExecutionEndpoint for SimulationEndpoint {
+    fn venue(&self) -> &Venue {
+        &Venue::Simulation
+    }
 
-            if let Some(price) = res.get(&TRADE_PRICE_ID) {
-                if let Some(price) = price.last() {
-                    let quantity = a.notional / Price::from(*price);
-                    debug!(
-                        "Allocating {} {} at price: {} quantity: {} notional: {}",
-                        a.instrument, a.notional, price, quantity, a.notional
-                    );
-                    self.state.add_feature(FeatureEvent::new(
-                        "fill_price".into(),
-                        a.instrument.to_owned(),
-                        execution_time,
-                        *price,
-                    ));
-                    self.state.add_feature(FeatureEvent::new(
-                        "fill_quantity".into(),
-                        a.instrument.to_owned(),
-                        execution_time,
-                        quantity.into(),
-                    ));
+    fn place_orders(&self, orders: Vec<Order>) -> Vec<Fill> {
+        // Simulate order placement
+        orders
+            .into_iter()
+            .filter_map(|o| {
+                if let Some(price) = self.state.latest_price(&o.instrument, &(o.event_time + self.latency)) {
+                    info!("Placing order: {}", o);
+                    Some((o, price))
                 } else {
-                    warn!("No price data found for {}", a.instrument);
+                    warn!("Order rejected: {}", o);
+                    None
                 }
-            };
-        });
+            })
+            .map(|(o, p)| {
+                Fill::new(
+                    o.event_time,
+                    o.instrument,
+                    Some(o.order_id),
+                    o.strategy_id,
+                    p,
+                    o.quantity,
+                    (p * o.quantity) * self.commission_taker,
+                )
+            })
+            .map(|f| {
+                info!("Order filled: {}", f);
+                f
+            })
+            .collect()
     }
 }

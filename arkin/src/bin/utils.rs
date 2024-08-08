@@ -4,7 +4,8 @@ use arkin::config;
 use arkin::constants::TRADE_PRICE_ID;
 use arkin::constants::TRADE_QUANTITY_ID;
 use arkin::db::DBManager;
-use arkin::execution::SimulationExecution;
+use arkin::execution::Execution;
+use arkin::execution::ExecutionManager;
 use arkin::features::FeatureEvent;
 use arkin::ingestors::BinanceParser;
 use arkin::ingestors::TardisChannel;
@@ -12,9 +13,11 @@ use arkin::ingestors::TardisExchange;
 use arkin::ingestors::TardisRequest;
 use arkin::ingestors::TardisService;
 use arkin::logging;
+use arkin::models::Event;
 use arkin::models::Instrument;
 use arkin::models::Venue;
 use arkin::pipeline::Pipeline;
+use arkin::portfolio::Portfolio;
 use arkin::state::State;
 use arkin::strategies::StrategyManager;
 use clap::Parser;
@@ -167,9 +170,12 @@ async fn main() -> Result<()> {
             );
             let db = DBManager::from_config(&config.db).await;
             let state = Arc::new(State::default());
+
+            // Load trades
             let trades = db.read_trades(start, end).await;
             // split trades to feature events
             trades.into_iter().for_each(|t| {
+                state.add_event(Event::Trade(t.clone()));
                 state.add_feature(FeatureEvent::new(
                     TRADE_PRICE_ID.to_owned(),
                     t.instrument.clone(),
@@ -184,21 +190,29 @@ async fn main() -> Result<()> {
                 ));
             });
 
+            // Load ticks
+            let ticks = db.read_ticks(start, end).await;
+            ticks.into_iter().for_each(|t| {
+                state.add_event(Event::Tick(t));
+            });
+
             // INITIALIZE
             let feature_pipeline = Pipeline::from_config(state.clone(), &config.feature_pipeline);
-            let analytics_pipeline = Pipeline::from_config(state.clone(), &config.analytics_pipeline);
+            // let analytics_pipeline = Pipeline::from_config(state.clone(), &config.analytics_pipeline);
             let strategy_manager = StrategyManager::from_config(&config.strategy_manager);
             let allocation_manager = AllocationManager::from_config(&config.allocation_manager);
-            let simulation = SimulationExecution::from_config(state.clone(), &config.simulation);
+
+            let portfolio = Arc::new(Portfolio::new(state.clone(), 10000.0.into()));
+            let execution_manager = ExecutionManager::from_config(state.clone(), portfolio, &config.execution_manager);
 
             // RUN
             let timer = Instant::now();
             let instrument = Instrument::perpetual(Venue::Binance, "btc".into(), "usdt".into());
-            let mut timestamp = start;
-            let intervals = (end - start).whole_seconds() / frequency as i64;
+            let mut timestamp = start + Duration::from_secs(frequency);
+            let intervals = ((end - start).whole_seconds() / frequency as i64) - 1;
 
             for _ in 0..intervals {
-                debug!("----------------- {:?} -----------------", timestamp);
+                info!("----------------- {:?} -----------------", timestamp);
                 // Run pipeline
                 let features = feature_pipeline.calculate(instrument.clone(), timestamp);
                 for feature in &features {
@@ -212,10 +226,10 @@ async fn main() -> Result<()> {
                 }
 
                 // Run analytics
-                let analytics = analytics_pipeline.calculate(instrument.clone(), timestamp);
-                for analytic in &analytics {
-                    info!("Analytic: {}", analytic);
-                }
+                // let analytics = analytics_pipeline.calculate(instrument.clone(), timestamp);
+                // for analytic in &analytics {
+                //     debug!("Analytic: {}", analytic);
+                // }
 
                 // Run allocation
                 let allocations = allocation_manager.calculate(&signals);
@@ -224,8 +238,7 @@ async fn main() -> Result<()> {
                 }
 
                 // Run simulation
-                simulation.allocate(&allocations);
-
+                execution_manager.allocate(&allocations);
                 // Run analytics
 
                 timestamp += Duration::from_secs(frequency);

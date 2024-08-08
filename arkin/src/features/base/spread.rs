@@ -1,51 +1,63 @@
 use crate::config::SpreadFeatureConfig;
-use crate::features::{Feature, FeatureId, QueryType};
-use anyhow::{anyhow, Result};
+use crate::features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, Latest, NodeId};
+use anyhow::Result;
 use std::collections::HashMap;
 use tracing::debug;
 
 #[derive(Debug)]
 pub struct SpreadFeature {
-    id: FeatureId,
-    source: Vec<FeatureId>,
-    data_type: QueryType,
+    id: NodeId,
+    sources: Vec<NodeId>,
+    data: Vec<FeatureDataRequest>,
+    input_front: Latest,
+    input_back: Latest,
+    output: FeatureId,
+    absolute: bool,
 }
 
 impl SpreadFeature {
     pub fn from_config(config: &SpreadFeatureConfig) -> Self {
+        let mut sources = vec![config.input_front.from.clone(), config.input_back.from.clone()];
+        sources.dedup();
+        let data = vec![config.input_front.to_owned().into(), config.input_back.to_owned().into()];
         SpreadFeature {
             id: config.id.to_owned(),
-            source: vec![config.front_component.to_owned(), config.back_component.to_owned()],
-            data_type: QueryType::Latest,
+            sources,
+            data,
+            input_front: config.input_front.to_owned(),
+            input_back: config.input_back.to_owned(),
+            output: config.output.to_owned(),
+            absolute: config.absolute,
         }
     }
 }
 
 impl Feature for SpreadFeature {
-    fn id(&self) -> &FeatureId {
+    fn id(&self) -> &NodeId {
         &self.id
     }
 
-    fn sources(&self) -> &[FeatureId] {
-        &self.source
+    fn sources(&self) -> &[NodeId] {
+        &self.sources
     }
 
-    fn data_type(&self) -> &QueryType {
-        &self.data_type
+    fn data(&self) -> &[FeatureDataRequest] {
+        &self.data
     }
 
-    fn calculate(&self, data: HashMap<FeatureId, Vec<f64>>) -> Result<HashMap<FeatureId, f64>> {
-        debug!("Calculating Spread with id: {}", self.id);
-        let front = data.get(&self.source[0]).ok_or(anyhow!("Missing front_component"))?;
-        let back = data.get(&self.source[1]).ok_or(anyhow!("Missing back_component"))?;
+    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
+        debug!("Calculating spread with id: {}", self.id);
+        let front = data.last(&self.input_front.feature_id).unwrap_or(0.);
+        let back = data.last(&self.input_back.feature_id).unwrap_or(0.);
 
-        let front_value = front.last().ok_or(anyhow!("Missing front_component value"))?;
-        let back_value = back.last().ok_or(anyhow!("Missing back_component value"))?;
+        let mut spread = front - back;
 
-        let spread = front_value - back_value;
+        if self.absolute {
+            spread = spread.abs();
+        }
 
         let mut res = HashMap::new();
-        res.insert(self.id.clone(), spread);
+        res.insert(self.output.clone(), spread);
         Ok(res)
     }
 }
