@@ -6,7 +6,7 @@ use crate::{
     state::State,
 };
 use rust_decimal::prelude::*;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use super::ExecutionEndpoint;
 
@@ -41,7 +41,7 @@ impl ExecutionEndpoint for SimulationEndpoint {
             .into_iter()
             .filter_map(|o| {
                 if let Some(price) = self.state.latest_price(&o.instrument, &(o.event_time + self.latency)) {
-                    info!("Placing order: {}", o);
+                    debug!("Placing order: {}", o);
                     Some((o, price))
                 } else {
                     warn!("Order rejected: {}", o);

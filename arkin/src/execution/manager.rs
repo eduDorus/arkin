@@ -1,4 +1,4 @@
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 use super::{Execution, ExecutionEndpoint, ExecutionEndpointFactory};
 use crate::{
@@ -77,7 +77,7 @@ impl Execution for ExecutionManager {
             .collect::<Vec<_>>();
 
         for a in &filtered_allocations {
-            info!("Final allocation: {}", a);
+            debug!("Final allocation: {}", a);
         }
 
         // Create orders

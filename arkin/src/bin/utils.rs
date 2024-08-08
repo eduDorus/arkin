@@ -212,7 +212,7 @@ async fn main() -> Result<()> {
             let intervals = ((end - start).whole_seconds() / frequency as i64) - 1;
 
             for _ in 0..intervals {
-                info!("----------------- {:?} -----------------", timestamp);
+                debug!("----------------- {:?} -----------------", timestamp);
                 // Run pipeline
                 let features = feature_pipeline.calculate(instrument.clone(), timestamp);
                 for feature in &features {

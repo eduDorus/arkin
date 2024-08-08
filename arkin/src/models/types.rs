@@ -120,19 +120,24 @@ impl Quantity {
     }
 
     pub fn abs(&self) -> Self {
-        self.0.abs().into()
+        Self::from(self.0.abs())
+    }
+
+    fn round(decimal: Decimal) -> Decimal {
+        decimal.round_dp(8)
     }
 }
 
 impl From<f64> for Quantity {
     fn from(quantity: f64) -> Self {
-        Quantity(Decimal::from_f64(quantity).expect("Failed to convert f64 to Decimal"))
+        let decimal = Decimal::from_f64(quantity).expect("Failed to convert f64 to Decimal");
+        Quantity(Self::round(decimal))
     }
 }
 
 impl From<Decimal> for Quantity {
     fn from(quantity: Decimal) -> Self {
-        Quantity(quantity)
+        Quantity(Self::round(quantity))
     }
 }
 
@@ -152,7 +157,7 @@ impl Add<Quantity> for Quantity {
     type Output = Quantity;
 
     fn add(self, rhs: Quantity) -> Quantity {
-        Quantity(self.0 + rhs.0)
+        Quantity::from(self.0 + rhs.0)
     }
 }
 
@@ -160,13 +165,13 @@ impl Sub<Quantity> for Quantity {
     type Output = Quantity;
 
     fn sub(self, rhs: Quantity) -> Quantity {
-        Quantity(self.0 - rhs.0)
+        Quantity::from(self.0 - rhs.0)
     }
 }
 
 impl AddAssign<Quantity> for Quantity {
     fn add_assign(&mut self, rhs: Quantity) {
-        self.0 += rhs.0;
+        self.0 = Self::round(self.0 + rhs.0);
     }
 }
 
@@ -174,7 +179,7 @@ impl Mul<Price> for Quantity {
     type Output = Notional;
 
     fn mul(self, rhs: Price) -> Notional {
-        Notional(self.0 * rhs.value())
+        Notional::from(self.0 * rhs.value())
     }
 }
 
@@ -190,7 +195,7 @@ impl Div<Price> for Quantity {
     type Output = Notional;
 
     fn div(self, rhs: Price) -> Notional {
-        Notional(self.0 / rhs.value())
+        Notional::from(self.0 / rhs.value())
     }
 }
 
@@ -210,7 +215,7 @@ impl Notional {
         Self::from(self.0.abs())
     }
 
-    fn round_to_two_decimal_places(decimal: Decimal) -> Decimal {
+    fn round(decimal: Decimal) -> Decimal {
         decimal.round_dp(2)
     }
 }
@@ -218,13 +223,13 @@ impl Notional {
 impl From<f64> for Notional {
     fn from(notional: f64) -> Self {
         let decimal = Decimal::from_f64(notional).expect("Failed to convert f64 to Decimal");
-        Notional(Self::round_to_two_decimal_places(decimal))
+        Notional(Self::round(decimal))
     }
 }
 
 impl From<Decimal> for Notional {
     fn from(notional: Decimal) -> Self {
-        Notional(Self::round_to_two_decimal_places(notional))
+        Notional(Self::round(notional))
     }
 }
 
@@ -244,7 +249,7 @@ impl Add<Notional> for Notional {
 
 impl AddAssign<Notional> for Notional {
     fn add_assign(&mut self, rhs: Notional) {
-        self.0 = Self::round_to_two_decimal_places(self.0 + rhs.0);
+        self.0 = Self::round(self.0 + rhs.0);
     }
 }
 
