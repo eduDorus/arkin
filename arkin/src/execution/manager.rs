@@ -3,15 +3,15 @@ use tracing::{debug, warn};
 use super::{Execution, ExecutionEndpoint, ExecutionEndpointFactory};
 use crate::{
     config::ExecutionManagerConfig,
-    models::{Allocation, Event, Notional, Order, Position, Price, Venue},
+    models::{Allocation, Event, Notional, Order, Position, Price, Tick, Venue},
     portfolio::Portfolio,
-    state::State,
+    state::StateManager,
 };
 use core::fmt;
 use std::{collections::HashMap, sync::Arc};
 
 pub struct ExecutionManager {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     portfolio: Arc<Portfolio>,
     endpoints: HashMap<Venue, Box<dyn ExecutionEndpoint>>,
     default_endpoint: Venue,
@@ -19,7 +19,7 @@ pub struct ExecutionManager {
 }
 
 impl ExecutionManager {
-    pub fn from_config(state: Arc<State>, portfolio: Arc<Portfolio>, config: &ExecutionManagerConfig) -> Self {
+    pub fn from_config(state: Arc<StateManager>, portfolio: Arc<Portfolio>, config: &ExecutionManagerConfig) -> Self {
         let endpoints = ExecutionEndpointFactory::from_config(state.clone(), &config.endpoints)
             .into_iter()
             .map(|endpoint| (endpoint.venue().clone(), endpoint))
@@ -40,8 +40,8 @@ impl ExecutionManager {
             .iter()
             .filter_map(|a| {
                 let pos = self.portfolio.position(&a.instrument, &a.event_time);
-                if let Some(price) = self.state.latest_price(&a.instrument, &a.event_time) {
-                    let current_exporsure = price * pos.quantity;
+                if let Some(tick) = self.state.latest_event::<Tick>(&a.instrument, &a.event_time) {
+                    let current_exporsure = tick.mid_price() * pos.quantity;
                     let diff_notional = a.notional - current_exporsure;
                     Some(Allocation::new(
                         a.event_time,

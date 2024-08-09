@@ -3,7 +3,7 @@ use time::OffsetDateTime;
 
 use crate::strategies::StrategyId;
 
-use super::{Instrument, Weight};
+use super::{Event, EventType, EventTypeOf, Instrument, Weight};
 
 #[derive(Clone)]
 pub struct Signal {
@@ -31,5 +31,23 @@ impl fmt::Display for Signal {
             "{} {} {} {}",
             self.event_time, self.strategy_id, self.instrument, self.signal
         )
+    }
+}
+
+impl EventTypeOf for Signal {
+    fn event_type() -> EventType {
+        EventType::Signal
+    }
+}
+
+impl TryFrom<Event> for Signal {
+    type Error = ();
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        if let Event::Signal(tick) = event {
+            Ok(tick)
+        } else {
+            Err(())
+        }
     }
 }

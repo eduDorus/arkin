@@ -115,6 +115,18 @@ impl Div<Quantity> for Price {
 pub struct Quantity(Decimal);
 
 impl Quantity {
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+
+    pub fn is_positive(&self) -> bool {
+        self.0.is_sign_positive()
+    }
+
+    pub fn is_negative(&self) -> bool {
+        self.0.is_sign_negative()
+    }
+
     pub fn value(&self) -> Decimal {
         self.0
     }
@@ -196,6 +208,14 @@ impl Div<Price> for Quantity {
 
     fn div(self, rhs: Price) -> Notional {
         Notional::from(self.0 / rhs.value())
+    }
+}
+
+impl Div<Quantity> for Quantity {
+    type Output = Decimal;
+
+    fn div(self, rhs: Quantity) -> Decimal {
+        self.0 / rhs.0
     }
 }
 

@@ -18,7 +18,7 @@ use arkin::models::Instrument;
 use arkin::models::Venue;
 use arkin::pipeline::Pipeline;
 use arkin::portfolio::Portfolio;
-use arkin::state::State;
+use arkin::state::StateManager;
 use arkin::strategies::StrategyManager;
 use clap::Parser;
 use clap::Subcommand;
@@ -169,7 +169,7 @@ async fn main() -> Result<()> {
                 end.format(&format).expect("Failed to format date")
             );
             let db = DBManager::from_config(&config.db).await;
-            let state = Arc::new(State::default());
+            let state = Arc::new(StateManager::default());
 
             // Load trades
             let trades = db.read_trades(start, end).await;

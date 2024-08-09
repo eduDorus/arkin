@@ -1,6 +1,6 @@
 use crate::{constants::TIMESTAMP_FORMAT, strategies::StrategyId};
 
-use super::{Instrument, Notional, Price, Quantity, Venue};
+use super::{Event, EventType, EventTypeOf, Instrument, Notional, Price, Quantity, Venue};
 use std::fmt;
 use time::OffsetDateTime;
 
@@ -12,20 +12,90 @@ pub struct Account {
 
 #[derive(Clone)]
 pub struct Position {
+    pub strategy_id: StrategyId,
     pub instrument: Instrument,
-    pub event_time: OffsetDateTime,
+    pub start_time: OffsetDateTime,
+    pub exit_time: Option<OffsetDateTime>,
+    pub entry_price: Price,
+    pub exit_price: Option<Price>,
     pub avg_price: Price,
     pub quantity: Quantity,
+    pub commission: Notional,
 }
 
 impl Position {
-    pub fn new(instrument: Instrument, event_time: OffsetDateTime) -> Self {
+    pub fn new(
+        strategy_id: StrategyId,
+        instrument: Instrument,
+        start_time: OffsetDateTime,
+        entry_price: Price,
+        quantity: Quantity,
+    ) -> Self {
         Self {
+            strategy_id,
             instrument,
-            event_time,
-            avg_price: Price::from(0.),
-            quantity: Quantity::from(0.),
+            start_time,
+            exit_time: None,
+            entry_price,
+            exit_price: None,
+            avg_price: entry_price,
+            quantity,
+            commission: Notional::from(0.),
         }
+    }
+
+    pub fn from_fill(fill: &Fill) -> Self {
+        Self {
+            strategy_id: fill.strategy_id.clone(),
+            instrument: fill.instrument.clone(),
+            start_time: fill.event_time,
+            exit_time: None,
+            entry_price: fill.price,
+            exit_price: None,
+            avg_price: fill.price,
+            quantity: fill.quantity,
+            commission: fill.commission,
+        }
+    }
+    pub fn update(&mut self, fill: &Fill) -> Option<Fill> {
+        let new_quantity = self.quantity + fill.quantity;
+        self.commission += fill.commission;
+
+        match (new_quantity.is_zero(), self.quantity.is_positive(), new_quantity.is_negative()) {
+            // Quantity is zero so we close the position
+            (true, _, _) => {
+                self.avg_price = (self.notional() + fill.notional()) / (self.quantity + fill.quantity.abs());
+                self.exit_price = Some(fill.price);
+                self.exit_time = Some(fill.event_time);
+                None
+            }
+            // Position flips
+            (_, true, false) | (_, false, true) => {
+                let fillable = self.quantity - (fill.quantity - self.quantity);
+                self.avg_price = (self.notional() + fill.price * fillable) / (self.quantity + fillable.abs());
+                self.exit_price = Some(fill.price);
+                self.exit_time = Some(fill.event_time);
+                Some(Fill::new(
+                    fill.event_time,
+                    fill.instrument.clone(),
+                    fill.order_id,
+                    fill.strategy_id.clone(),
+                    fill.price,
+                    fill.quantity - fillable,
+                    fill.commission * (fillable / fill.quantity),
+                ))
+            }
+            // Position is still open
+            _ => {
+                self.avg_price = (self.notional() + fill.notional()) / (self.quantity + fill.quantity.abs());
+                self.quantity = self.quantity + fill.quantity;
+                None
+            }
+        }
+    }
+
+    pub fn notional(&self) -> Notional {
+        self.avg_price * self.quantity
     }
 }
 
@@ -34,12 +104,18 @@ impl fmt::Display for Position {
         write!(
             f,
             "POSITION {} {} avg price: {} quantity: {}",
-            self.event_time.format(TIMESTAMP_FORMAT).unwrap(),
+            self.start_time.format(TIMESTAMP_FORMAT).unwrap(),
             self.instrument,
             self.avg_price,
             self.quantity
         )
     }
+}
+
+#[derive(Clone)]
+pub enum PositionStatus {
+    Open,
+    Closed,
 }
 
 #[derive(Clone)]
@@ -74,6 +150,24 @@ impl Order {
             quantity,
             quantity_filled: Quantity::from(0.),
             status: OrderStatus::New,
+        }
+    }
+}
+
+impl EventTypeOf for Order {
+    fn event_type() -> EventType {
+        EventType::Order
+    }
+}
+
+impl TryFrom<Event> for Order {
+    type Error = ();
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        if let Event::Order(order) = event {
+            Ok(order)
+        } else {
+            Err(())
         }
     }
 }
@@ -158,7 +252,7 @@ impl fmt::Display for OrderStatus {
 pub struct Fill {
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
-    pub order_id: Option<u64>,
+    pub order_id: u64,
     pub strategy_id: StrategyId,
     pub price: Price,
     pub quantity: Quantity,
@@ -169,7 +263,7 @@ impl Fill {
     pub fn new(
         event_time: OffsetDateTime,
         instrument: Instrument,
-        order_id: Option<u64>,
+        order_id: u64,
         strategy_id: StrategyId,
         price: Price,
         quantity: Quantity,
@@ -183,6 +277,28 @@ impl Fill {
             price,
             quantity,
             commission,
+        }
+    }
+
+    pub fn notional(&self) -> Notional {
+        self.price * self.quantity
+    }
+}
+
+impl EventTypeOf for Fill {
+    fn event_type() -> EventType {
+        EventType::Fill
+    }
+}
+
+impl TryFrom<Event> for Fill {
+    type Error = ();
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        if let Event::Fill(fill) = event {
+            Ok(fill)
+        } else {
+            Err(())
         }
     }
 }

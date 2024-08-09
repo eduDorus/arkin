@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use crate::{
     config::SimulationConfig,
     models::{Fill, Order, Venue},
-    state::State,
+    state::StateManager,
 };
 use rust_decimal::prelude::*;
 use tracing::{debug, info, warn};
@@ -11,7 +11,7 @@ use tracing::{debug, info, warn};
 use super::ExecutionEndpoint;
 
 pub struct SimulationEndpoint {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     latency: Duration,
     _commission_maker: Decimal,
     commission_taker: Decimal,
@@ -19,7 +19,7 @@ pub struct SimulationEndpoint {
 }
 
 impl SimulationEndpoint {
-    pub fn from_config(state: Arc<State>, config: &SimulationConfig) -> Self {
+    pub fn from_config(state: Arc<StateManager>, config: &SimulationConfig) -> Self {
         SimulationEndpoint {
             state,
             latency: Duration::from_millis(config.latency),

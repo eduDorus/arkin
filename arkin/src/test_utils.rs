@@ -4,7 +4,7 @@ use time::macros::datetime;
 
 use crate::{
     models::{Allocation, Event, Fill, Instrument, Notional, Price, Quantity, Tick, Venue},
-    state::State,
+    state::StateManager,
 };
 pub fn test_perp_instrument() -> Instrument {
     // Create an instrument
@@ -21,7 +21,7 @@ pub fn test_multi_perp_instrument() -> Vec<Instrument> {
 
 #[derive(Default)]
 pub struct TestStateBuilder {
-    state: Arc<State>,
+    state: Arc<StateManager>,
 }
 
 impl TestStateBuilder {
@@ -30,7 +30,7 @@ impl TestStateBuilder {
         self.state.add_event(Event::Fill(Fill {
             event_time: datetime!(2024-01-01 00:00:00).assume_utc(),
             instrument: instrument.clone(),
-            order_id: Some(0),
+            order_id: 0,
             strategy_id: "test_strategy".into(),
             price: Price::from(80.),
             quantity: Quantity::from(10.),
@@ -39,7 +39,7 @@ impl TestStateBuilder {
         self.state.add_event(Event::Fill(Fill {
             event_time: datetime!(2024-01-01 00:01:00).assume_utc(),
             instrument: instrument.clone(),
-            order_id: Some(1),
+            order_id: 1,
             strategy_id: "test_strategy".into(),
             price: Price::from(120.),
             quantity: Quantity::from(10.),
@@ -48,7 +48,7 @@ impl TestStateBuilder {
         self.state.add_event(Event::Fill(Fill {
             event_time: datetime!(2024-01-01 00:02:00).assume_utc(),
             instrument: instrument.clone(),
-            order_id: Some(2),
+            order_id: 2,
             strategy_id: "test_strategy".into(),
             price: Price::from(100.),
             quantity: Quantity::from(-10.),
@@ -57,7 +57,7 @@ impl TestStateBuilder {
         self.state.add_event(Event::Fill(Fill {
             event_time: datetime!(2024-01-01 00:03:00).assume_utc(),
             instrument: instrument.clone(),
-            order_id: Some(3),
+            order_id: 3,
             strategy_id: "test_strategy".into(),
             price: Price::from(100.),
             quantity: Quantity::from(-20.),
@@ -66,7 +66,7 @@ impl TestStateBuilder {
         self.state.add_event(Event::Fill(Fill {
             event_time: datetime!(2024-01-01 00:04:00).assume_utc(),
             instrument: instrument.clone(),
-            order_id: Some(3),
+            order_id: 3,
             strategy_id: "test_strategy".into(),
             price: Price::from(50.),
             quantity: Quantity::from(10.),
@@ -121,7 +121,7 @@ impl TestStateBuilder {
         self
     }
 
-    pub fn build(self) -> Arc<State> {
+    pub fn build(self) -> Arc<StateManager> {
         self.state
     }
 }

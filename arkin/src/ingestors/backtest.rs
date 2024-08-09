@@ -9,7 +9,7 @@ use crate::{
     config::BacktestIngestorConfig,
     ingestors::IngestorID,
     models::{Event, Instrument, Trade, Venue},
-    state::State,
+    state::StateManager,
 };
 
 use super::Ingestor;
@@ -17,12 +17,12 @@ use super::Ingestor;
 #[derive(Clone)]
 #[allow(unused)]
 pub struct BacktestIngestor {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     market_data: bool,
 }
 
 impl BacktestIngestor {
-    pub fn new(state: Arc<State>, config: &BacktestIngestorConfig) -> Self {
+    pub fn new(state: Arc<StateManager>, config: &BacktestIngestorConfig) -> Self {
         BacktestIngestor {
             state,
             market_data: config.market_data,

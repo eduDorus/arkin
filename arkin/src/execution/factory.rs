@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
-use crate::{config::ExecutionEndpointConfig, state::State};
+use crate::{config::ExecutionEndpointConfig, state::StateManager};
 
 use super::{binance::BinanceEndpoint, ExecutionEndpoint, SimulationEndpoint};
 
 pub struct ExecutionEndpointFactory {}
 
 impl ExecutionEndpointFactory {
-    pub fn from_config(state: Arc<State>, configs: &[ExecutionEndpointConfig]) -> Vec<Box<dyn ExecutionEndpoint>> {
+    pub fn from_config(
+        state: Arc<StateManager>,
+        configs: &[ExecutionEndpointConfig],
+    ) -> Vec<Box<dyn ExecutionEndpoint>> {
         configs
             .iter()
             .map(|config| {

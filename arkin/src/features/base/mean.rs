@@ -1,6 +1,6 @@
 use crate::{
     config::MeanFeatureConfig,
-    features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, NodeId, Window},
+    features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, NodeId},
 };
 use anyhow::Result;
 use std::collections::HashMap;
@@ -10,20 +10,16 @@ use tracing::debug;
 pub struct MeanFeature {
     id: NodeId,
     sources: Vec<NodeId>,
-    data: Vec<FeatureDataRequest>,
-    input: Window,
+    inputs: Vec<FeatureDataRequest>,
     output: FeatureId,
 }
 
 impl MeanFeature {
     pub fn from_config(config: &MeanFeatureConfig) -> Self {
-        let sources = vec![config.input.from.clone()];
-        let data = vec![config.input.to_owned().into()];
         MeanFeature {
             id: config.id.to_owned(),
-            sources,
-            data,
-            input: config.input.to_owned(),
+            sources: vec![config.input.from.clone()],
+            inputs: vec![config.input.to_owned().into()],
             output: config.output.to_owned(),
         }
     }
@@ -39,12 +35,12 @@ impl Feature for MeanFeature {
     }
 
     fn data(&self) -> &[FeatureDataRequest] {
-        &self.data
+        &self.inputs
     }
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating mean with id: {}", self.id);
-        let mean = data.mean(&self.input.feature_id).unwrap_or(0.);
+        let mean = data.mean(&self.inputs[0].feature_id()).unwrap_or(0.);
         let mut res = HashMap::new();
         res.insert(self.output.clone(), mean);
         Ok(res)

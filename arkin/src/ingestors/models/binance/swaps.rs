@@ -1,6 +1,6 @@
 use crate::{
     ingestors::IngestorID,
-    models::{BookUpdate, BookUpdateSide, Event, Tick, Trade},
+    models::{Book, BookUpdateSide, Event, Tick, Trade},
     utils::custom_serde,
 };
 use rust_decimal::Decimal;
@@ -190,7 +190,7 @@ pub struct BinanceSwapsBookUpdate {
 impl From<BinanceSwapsBookData> for Event {
     fn from(data: BinanceSwapsBookData) -> Self {
         let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::Book(BookUpdate::new(
+        Event::Book(Book::new(
             data.event_time,
             instrument,
             data.bids

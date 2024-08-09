@@ -6,11 +6,11 @@ use crate::{
     clock::Clock,
     config::GlobalConfig,
     ingestors::{Ingestor, IngestorFactory, IngestorType},
-    state::State,
+    state::StateManager,
 };
 
 pub struct Server {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     _clock: Arc<Clock>,
     // _pubsub: Arc<PubSub>,
     config: GlobalConfig,
@@ -89,7 +89,7 @@ impl ServerBuilder {
     pub fn build(self) -> Server {
         let config = self.config.unwrap();
         Server {
-            state: Arc::new(State::default()),
+            state: Arc::new(StateManager::default()),
             _clock: Arc::new(Clock::from_config(&config.clock)),
             // _pubsub: Arc::new(PubSub::default()),
             config,

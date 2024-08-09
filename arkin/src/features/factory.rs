@@ -1,6 +1,6 @@
 use crate::config::FeatureConfig;
 
-use super::{CountFeature, Feature, MeanFeature, PositionFeature, SMAFeature, SpreadFeature, SumFeature, VWAPFeature};
+use super::{CountFeature, Feature, MeanFeature, SMAFeature, SpreadFeature, SumFeature, VWAPFeature};
 
 pub struct FeatureFactory {}
 
@@ -17,7 +17,6 @@ impl FeatureFactory {
                 FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
                 FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
                 FeatureConfig::Spread(c) => Box::new(SpreadFeature::from_config(c)),
-                FeatureConfig::Position(c) => Box::new(PositionFeature::from_config(c)),
             };
             features.push(f);
         });

@@ -3,17 +3,20 @@ use std::{collections::HashMap, sync::Arc};
 use time::OffsetDateTime;
 
 use crate::{
-    models::{Event, EventType, Instrument, Notional, Position, Price, Quantity},
-    state::State,
+    models::{Fill, Instrument, Notional, Position, Price, Quantity},
+    state::StateManager,
+    strategies::StrategyId,
 };
 
+// The hirarchy for positions is as followed:
+
 pub struct Portfolio {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     capital: Notional,
 }
 
 impl Portfolio {
-    pub fn new(state: Arc<State>, capital: Notional) -> Self {
+    pub fn new(state: Arc<StateManager>, capital: Notional) -> Self {
         Self { state, capital }
     }
 }
@@ -38,24 +41,29 @@ impl Portfolio {
         self.positions(event_time).values().map(|p| p.avg_price * p.quantity).sum()
     }
 
-    pub fn position(&self, instrument: &Instrument, event_time: &OffsetDateTime) -> Position {
-        self.state
-            .list_events_since_beginning(instrument, &EventType::Fill, event_time)
+    pub fn position(&self, strategy_id: &StrategyId, instrument: &Instrument, timestamp: &OffsetDateTime) -> Position {
+        let fills = self
+            .state
+            .list_events_since_beginning::<Fill>(instrument, timestamp)
             .into_iter()
-            .fold(Position::new(instrument.clone(), *event_time), |mut acc, x| {
-                if let Event::Fill(f) = x {
-                    let price_sum = acc.avg_price * acc.quantity + f.price * f.quantity.abs();
-                    let quantity_sum = acc.quantity + f.quantity.abs();
-                    let quantity_real = acc.quantity + f.quantity;
-                    if quantity_real == Quantity::from(0.) {
-                        acc.avg_price = Price::from(0.);
-                        acc.quantity = quantity_real;
-                    } else {
-                        acc.avg_price = price_sum / quantity_sum;
-                        acc.quantity = quantity_real;
-                    }
-                }
-                acc
+            .filter(|fill| fill.strategy_id == *strategy_id)
+            .collect::<Vec<_>>();
+
+        fills
+            .into_iter()
+            .fold(None, |position: Option<Position>, fill| {
+                let mut position = position.unwrap_or_else(|| Position::from_fill(&fill));
+                position.update(&fill);
+                Some(position)
+            })
+            .unwrap_or_else(|| {
+                Position::new(
+                    strategy_id.clone(),
+                    instrument.clone(),
+                    *timestamp,
+                    Price::from(0.),
+                    Quantity::from(0.),
+                )
             })
     }
 

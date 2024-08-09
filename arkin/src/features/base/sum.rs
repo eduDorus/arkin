@@ -1,6 +1,6 @@
 use crate::{
     config::SumFeatureConfig,
-    features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, NodeId, Window},
+    features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, NodeId},
 };
 use anyhow::Result;
 use std::collections::HashMap;
@@ -10,20 +10,16 @@ use tracing::debug;
 pub struct SumFeature {
     id: NodeId,
     sources: Vec<NodeId>,
-    data: Vec<FeatureDataRequest>,
-    input: Window,
+    inputs: Vec<FeatureDataRequest>,
     output: FeatureId,
 }
 
 impl SumFeature {
     pub fn from_config(config: &SumFeatureConfig) -> Self {
-        let sources = vec![config.input.from.clone()];
-        let data = vec![config.input.to_owned().into()];
         SumFeature {
             id: config.id.to_owned(),
-            sources,
-            data,
-            input: config.input.to_owned(),
+            sources: vec![config.input.from.clone()],
+            inputs: vec![config.input.to_owned().into()],
             output: config.output.to_owned(),
         }
     }
@@ -39,12 +35,12 @@ impl Feature for SumFeature {
     }
 
     fn data(&self) -> &[FeatureDataRequest] {
-        &self.data
+        &self.inputs
     }
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating sum with id: {}", self.id);
-        let sum = data.sum(&self.input.feature_id).unwrap_or(0.);
+        let sum = data.sum(&self.inputs[0].feature_id()).unwrap_or(0.);
         let mut res = HashMap::new();
         res.insert(self.output.clone(), sum);
         Ok(res)

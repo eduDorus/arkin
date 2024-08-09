@@ -1,6 +1,6 @@
 use crate::ingestors::IngestorID;
 
-use super::{Instrument, Price, Quantity};
+use super::{Event, EventType, EventTypeOf, Instrument, Price, Quantity};
 use rust_decimal::Decimal;
 use std::fmt;
 use time::OffsetDateTime;
@@ -48,6 +48,24 @@ impl Tick {
     }
 }
 
+impl EventTypeOf for Tick {
+    fn event_type() -> EventType {
+        EventType::Tick
+    }
+}
+
+impl TryFrom<Event> for Tick {
+    type Error = ();
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        if let Event::Tick(tick) = event {
+            Ok(tick)
+        } else {
+            Err(())
+        }
+    }
+}
+
 impl fmt::Display for Tick {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -91,6 +109,24 @@ impl Trade {
     }
 }
 
+impl EventTypeOf for Trade {
+    fn event_type() -> EventType {
+        EventType::Trade
+    }
+}
+
+impl TryFrom<Event> for Trade {
+    type Error = ();
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        if let Event::Trade(trade) = event {
+            Ok(trade)
+        } else {
+            Err(())
+        }
+    }
+}
+
 impl fmt::Display for Trade {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {} {} {}", self.instrument, self.event_time, self.price, self.quantity)
@@ -98,7 +134,7 @@ impl fmt::Display for Trade {
 }
 
 #[derive(Clone)]
-pub struct BookUpdate {
+pub struct Book {
     pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
@@ -107,7 +143,7 @@ pub struct BookUpdate {
     pub source: IngestorID,
 }
 
-impl BookUpdate {
+impl Book {
     pub fn new(
         event_time: OffsetDateTime,
         instrument: Instrument,
@@ -126,7 +162,25 @@ impl BookUpdate {
     }
 }
 
-impl fmt::Display for BookUpdate {
+impl EventTypeOf for Book {
+    fn event_type() -> EventType {
+        EventType::Book
+    }
+}
+
+impl TryFrom<Event> for Book {
+    type Error = ();
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        if let Event::Book(book) = event {
+            Ok(book)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl fmt::Display for Book {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

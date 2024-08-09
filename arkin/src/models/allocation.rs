@@ -1,4 +1,4 @@
-use super::{Instrument, Notional};
+use super::{Event, EventType, EventTypeOf, Instrument, Notional};
 use crate::strategies::StrategyId;
 use std::fmt;
 use time::OffsetDateTime;
@@ -23,6 +23,24 @@ impl Allocation {
             instrument,
             strategy_id,
             notional,
+        }
+    }
+}
+
+impl EventTypeOf for Allocation {
+    fn event_type() -> EventType {
+        EventType::Tick
+    }
+}
+
+impl TryFrom<Event> for Allocation {
+    type Error = ();
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        if let Event::Allocation(allocation) = event {
+            Ok(allocation)
+        } else {
+            Err(())
         }
     }
 }

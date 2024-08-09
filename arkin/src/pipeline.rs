@@ -1,7 +1,7 @@
 use crate::config::PipelineConfig;
 use crate::features::{Feature, FeatureEvent, FeatureFactory};
 use crate::models::Instrument;
-use crate::state::State;
+use crate::state::StateManager;
 use parking_lot::Mutex;
 use petgraph::graph::NodeIndex;
 use petgraph::{
@@ -16,13 +16,13 @@ use tracing::{debug, info};
 
 #[derive(Default)]
 pub struct Pipeline {
-    state: Arc<State>,
+    state: Arc<StateManager>,
     graph: Arc<DiGraph<Box<dyn Feature>, ()>>,
     order: Vec<NodeIndex>,
 }
 
 impl Pipeline {
-    pub fn from_config(state: Arc<State>, config: &PipelineConfig) -> Self {
+    pub fn from_config(state: Arc<StateManager>, config: &PipelineConfig) -> Self {
         let mut graph = DiGraph::new();
 
         // Create features
@@ -37,7 +37,7 @@ impl Pipeline {
         let mut edges_to_add = vec![];
         for target_node in graph.node_indices() {
             for source in graph[target_node].sources() {
-                if source == &"base".into() || source == &"self".into() {
+                if source == &"base" || source == &"self" {
                     continue;
                 }
                 let source_node = graph
@@ -200,123 +200,6 @@ impl Pipeline {
     //     info!("Finished graph calculation");
     // }
 }
-
-// #[derive(Default)]
-// struct PipelineState {
-//     events: DashMap<(Instrument, FeatureId), BTreeMap<CompositeKey, f64>>,
-// }
-
-// impl PipelineState {
-//     pub fn insert(&self, event: FeatureEvent) {
-//         let key = (event.instrument, event.id);
-//         let mut composit_key = CompositeKey::new(&event.event_time);
-
-//         let mut entry = self.events.entry(key).or_default();
-//         while entry.get(&composit_key).is_some() {
-//             composit_key.increment();
-//         }
-//         entry.insert(composit_key, event.value);
-//     }
-
-//     pub fn query(
-//         &self,
-//         instrument: &Instrument,
-//         feature_ids: Vec<FeatureId>,
-//         from: &OffsetDateTime,
-//         data_type: QueryType,
-//     ) -> HashMap<FeatureId, Vec<f64>> {
-//         feature_ids
-//             .par_iter()
-//             .map(|id| match data_type {
-//                 QueryType::Latest => {
-//                     let data = self.get_latest(instrument, id, from);
-//                     (id.clone(), data)
-//                 }
-//                 QueryType::Window(window) => {
-//                     let data = self.get_range(instrument, id, from, &window);
-//                     (id.clone(), data)
-//                 }
-//                 QueryType::Period(periods) => {
-//                     let data = self.get_periods(instrument, id, from, periods);
-//                     (id.clone(), data)
-//                 }
-//             })
-//             .collect()
-//     }
-
-//     fn get_latest(&self, instrument: &Instrument, feature_id: &FeatureId, from: &OffsetDateTime) -> Vec<f64> {
-//         let key = (instrument.clone(), feature_id.clone());
-//         let from_key = CompositeKey::new_max(from);
-
-//         if let Some(tree) = self.events.get(&key) {
-//             tree.value()
-//                 .range(..=from_key)
-//                 .rev()
-//                 .take(1)
-//                 .map(|(k, v)| {
-//                     debug!("Found: {} => {}", k, v);
-//                     *v
-//                 })
-//                 .collect()
-//         } else {
-//             Vec::new()
-//         }
-//     }
-
-//     fn get_range(
-//         &self,
-//         instrument: &Instrument,
-//         feature_id: &FeatureId,
-//         from: &OffsetDateTime,
-//         window: &Duration,
-//     ) -> Vec<f64> {
-//         let key = (instrument.clone(), feature_id.clone());
-//         let from_key = CompositeKey::new(from);
-//         let end_key = CompositeKey::new(&(*from - *window));
-
-//         debug!("Getting {} for {} from: {} till: {}", feature_id, instrument, from_key, end_key);
-
-//         if let Some(tree) = self.events.get(&key) {
-//             tree.value()
-//                 .range(end_key..from_key)
-//                 .map(|(k, v)| {
-//                     debug!("Found: {} => {}", k, v);
-//                     *v
-//                 })
-//                 .collect()
-//         } else {
-//             Vec::new()
-//         }
-//     }
-
-//     fn get_periods(
-//         &self,
-//         instrument: &Instrument,
-//         feature_id: &FeatureId,
-//         from: &OffsetDateTime,
-//         periods: usize,
-//     ) -> Vec<f64> {
-//         let key = (instrument.clone(), feature_id.clone());
-//         let from_key = CompositeKey::new_max(from);
-
-//         if let Some(tree) = self.events.get(&key) {
-//             let mut res = tree
-//                 .value()
-//                 .range(..from_key)
-//                 .rev()
-//                 .take(periods)
-//                 .map(|(k, v)| {
-//                     debug!("Found: {} => {}", k, v);
-//                     *v
-//                 })
-//                 .collect::<Vec<_>>();
-//             res.reverse();
-//             res
-//         } else {
-//             Vec::new()
-//         }
-//     }
-// }
 
 // #[cfg(test)]
 // mod tests {

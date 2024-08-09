@@ -5,21 +5,21 @@ use time::OffsetDateTime;
 use crate::constants::TIMESTAMP_FORMAT;
 
 #[derive(Clone, PartialOrd, Ord, Eq, PartialEq, Hash)]
-pub struct CompositeKey {
+pub struct CompositeIndex {
     timestamp: OffsetDateTime,
     index: u64,
 }
 
-impl CompositeKey {
+impl CompositeIndex {
     pub fn new(timestamp: &OffsetDateTime) -> Self {
-        CompositeKey {
+        CompositeIndex {
             timestamp: timestamp.to_owned(),
             index: 0,
         }
     }
 
     pub fn new_max(timestamp: &OffsetDateTime) -> Self {
-        CompositeKey {
+        CompositeIndex {
             timestamp: timestamp.to_owned(),
             index: u64::MAX,
         }
@@ -30,7 +30,7 @@ impl CompositeKey {
     }
 }
 
-impl fmt::Display for CompositeKey {
+impl fmt::Display for CompositeIndex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

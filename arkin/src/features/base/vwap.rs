@@ -1,5 +1,5 @@
 use crate::config::VWAPFeatureConfig;
-use crate::features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, NodeId, Window};
+use crate::features::{Feature, FeatureDataRequest, FeatureDataResponse, FeatureId, NodeId};
 use anyhow::Result;
 use rust_decimal::prelude::*;
 use std::collections::HashMap;
@@ -9,23 +9,16 @@ use tracing::debug;
 pub struct VWAPFeature {
     id: NodeId,
     sources: Vec<NodeId>,
-    data: Vec<FeatureDataRequest>,
-    input_price: Window,
-    input_quantity: Window,
+    inputs: Vec<FeatureDataRequest>,
     output: FeatureId,
 }
 
 impl VWAPFeature {
     pub fn from_config(config: &VWAPFeatureConfig) -> Self {
-        let mut sources = vec![config.input_price.from.clone(), config.input_quantity.from.clone()];
-        sources.dedup();
-        let data = vec![config.input_price.to_owned().into(), config.input_quantity.to_owned().into()];
         VWAPFeature {
             id: config.id.to_owned(),
-            sources,
-            data,
-            input_price: config.input_price.to_owned(),
-            input_quantity: config.input_quantity.to_owned(),
+            sources: vec![config.input_price.from.clone(), config.input_quantity.from.clone()],
+            inputs: vec![config.input_price.to_owned().into(), config.input_quantity.to_owned().into()],
             output: config.output.to_owned(),
         }
     }
@@ -41,14 +34,14 @@ impl Feature for VWAPFeature {
     }
 
     fn data(&self) -> &[FeatureDataRequest] {
-        &self.data
+        &self.inputs
     }
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating VWAP with id: {}", self.id);
         // Check if both trade_price and trade_quantity are present
-        let price = data.get(&self.input_price.feature_id);
-        let quantity = data.get(&self.input_quantity.feature_id);
+        let price = data.get(&self.inputs[0].feature_id());
+        let quantity = data.get(&self.inputs[1].feature_id());
         assert_eq!(price.len(), quantity.len());
 
         let mut total_quantity = f64::zero();

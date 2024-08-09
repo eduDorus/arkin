@@ -11,7 +11,6 @@ pub mod logging;
 pub mod models;
 pub mod pipeline;
 pub mod portfolio;
-pub mod pubsub;
 pub mod server;
 pub mod state;
 pub mod strategies;
