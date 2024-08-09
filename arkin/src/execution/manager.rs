@@ -34,36 +34,22 @@ impl ExecutionManager {
     }
 }
 
-impl ExecutionManager {
-    pub fn difference_to_position(&self, allocations: &[Allocation]) -> Vec<Allocation> {
-        allocations
-            .iter()
-            .filter_map(|a| {
-                let pos = self.portfolio.position(&a.instrument, &a.event_time);
-                if let Some(tick) = self.state.latest_event::<Tick>(&a.instrument, &a.event_time) {
-                    let current_exporsure = tick.mid_price() * pos.quantity;
-                    let diff_notional = a.notional - current_exporsure;
-                    Some(Allocation::new(
-                        a.event_time,
-                        a.instrument.clone(),
-                        a.strategy_id.clone(),
-                        diff_notional,
-                    ))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-}
-
 impl Execution for ExecutionManager {
     fn allocate(&self, allocations: &[Allocation]) {
+        if allocations.is_empty() {
+            warn!("No allocations to execute");
+            return;
+        }
+
+        let positions = self.portfolio.positions(&allocations[0].event_time);
+
         // Difference between current position and allocation
         let new_allocations = allocations.iter().filter_map(|a| {
-            let pos = self.portfolio.position(&a.instrument, &a.event_time);
-            if let Some(current_price) = self.state.latest_price(&a.instrument, &a.event_time) {
-                Some(EnrichedAllocation::new(current_price, a.clone(), pos))
+            let pos = positions
+                .get(&(a.strategy_id.clone(), a.instrument.clone()))
+                .expect("There should be a position");
+            if let Some(tick) = self.state.latest_event_by_instrument::<Tick>(&a.instrument, &a.event_time) {
+                Some(EnrichedAllocation::new(tick.mid_price(), a.clone(), pos.clone()))
             } else {
                 warn!("No price found for instrument: {}", a.instrument);
                 None

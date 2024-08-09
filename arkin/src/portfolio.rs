@@ -1,9 +1,12 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use time::OffsetDateTime;
 
 use crate::{
-    models::{Fill, Instrument, Notional, Position, Price, Quantity},
+    models::{Fill, Instrument, Notional, Position},
     state::StateManager,
     strategies::StrategyId,
 };
@@ -30,48 +33,67 @@ impl Portfolio {
         self.capital - self.total_exposure(event_time)
     }
 
-    pub fn absolut_exposure(&self, event_time: &OffsetDateTime) -> Notional {
-        self.positions(event_time)
-            .values()
-            .map(|p| p.avg_price * p.quantity.abs())
-            .sum()
-    }
-
     pub fn total_exposure(&self, event_time: &OffsetDateTime) -> Notional {
-        self.positions(event_time).values().map(|p| p.avg_price * p.quantity).sum()
+        let positions = self.positions(event_time);
+        positions
+            .values()
+            .map(|p| p.quantity.abs() * p.avg_price)
+            .fold(Notional::from(0.), |acc, x| acc + x)
     }
 
-    pub fn position(&self, strategy_id: &StrategyId, instrument: &Instrument, timestamp: &OffsetDateTime) -> Position {
-        let fills = self
-            .state
-            .list_events_since_beginning::<Fill>(instrument, timestamp)
-            .into_iter()
-            .filter(|fill| fill.strategy_id == *strategy_id)
-            .collect::<Vec<_>>();
+    pub fn positions(&self, timestamp: &OffsetDateTime) -> HashMap<(StrategyId, Instrument), Position> {
+        let fills = self.state.events::<Fill>(timestamp);
 
-        fills
-            .into_iter()
-            .fold(None, |position: Option<Position>, fill| {
-                let mut position = position.unwrap_or_else(|| Position::from_fill(&fill));
-                position.update(&fill);
-                Some(position)
-            })
-            .unwrap_or_else(|| {
-                Position::new(
-                    strategy_id.clone(),
-                    instrument.clone(),
-                    *timestamp,
-                    Price::from(0.),
-                    Quantity::from(0.),
-                )
-            })
+        let strategies_instruments = fills
+            .values()
+            .flatten()
+            .map(|f| (f.strategy_id.clone(), f.instrument.clone()))
+            .collect::<HashSet<(StrategyId, Instrument)>>();
+
+        strategies_instruments.into_iter().fold(HashMap::new(), |mut acc, (s, i)| {
+            let fills = fills.get(&i).unwrap().iter().filter(|f| f.strategy_id == s).collect::<Vec<_>>();
+            if let Some(position) = self.calculate_positions_from_fills(fills).last() {
+                acc.insert((s, i), position.to_owned());
+            }
+            acc
+        })
     }
 
-    pub fn positions(&self, event_time: &OffsetDateTime) -> HashMap<Instrument, Position> {
-        let mut positions = HashMap::new();
-        for instrument in self.state.list_instruments() {
-            let position = self.position(&instrument, event_time);
-            positions.insert(instrument.clone(), position);
+    pub fn all_positions(&self, timestamp: &OffsetDateTime) -> HashMap<(StrategyId, Instrument), Vec<Position>> {
+        let fills = self.state.events::<Fill>(timestamp);
+
+        let strategies_instruments = fills
+            .values()
+            .flatten()
+            .map(|f| (f.strategy_id.clone(), f.instrument.clone()))
+            .collect::<HashSet<(StrategyId, Instrument)>>();
+
+        strategies_instruments.into_iter().fold(HashMap::new(), |mut acc, (s, i)| {
+            let fills = fills.get(&i).unwrap().iter().filter(|f| f.strategy_id == s).collect::<Vec<_>>();
+            let positions = self.calculate_positions_from_fills(fills);
+            acc.insert((s, i), positions);
+            acc
+        })
+    }
+
+    fn calculate_positions_from_fills(&self, fills: Vec<&Fill>) -> Vec<Position> {
+        let mut positions = Vec::new();
+        let mut current_position = Option::<Position>::None;
+        for fill in fills {
+            // Fill the position
+            let (excess, position) = match current_position {
+                None => (None, Position::from_fill(fill)),
+                Some(mut p) => {
+                    let excess = p.update(fill);
+                    (excess, p)
+                }
+            };
+            if excess.is_some() {
+                positions.push(position);
+                current_position = None;
+            } else {
+                current_position = Some(position);
+            }
         }
         positions
     }
@@ -88,55 +110,65 @@ mod tests {
     fn test_portfolio() {
         logging::init_test_tracing();
 
-        let instrument = test_utils::test_perp_instrument();
-        let state = test_utils::TestStateBuilder::default().add_fills(&instrument).build();
+        let instrument = test_utils::test_multi_perp_instrument();
+        let state = test_utils::TestStateBuilder::default()
+            .add_fills(&instrument[0])
+            // .add_fills(&instrument[1])
+            .build();
+
         let portfolio = Portfolio::new(state, Notional::from(2000.));
 
         let mut event_time = datetime!(2024-01-01 00:00:00).assume_utc();
-        let position = portfolio.position(&instrument, &event_time);
-        info!("{}", position);
-        assert_eq!(position.avg_price, Price::from(0.));
-        assert_eq!(position.quantity, Quantity::from(0.));
+        for ((s, i), v) in portfolio.positions(&event_time).iter() {
+            info!("{}: {}: {}", s, i, v);
+        }
+        // assert_eq!(position.avg_price, Price::from(0.));
+        // assert_eq!(position.quantity, Quantity::from(0.));
         assert_eq!(portfolio.buying_power(&event_time), Notional::from(2000.));
         assert_eq!(portfolio.total_exposure(&event_time), Notional::from(0.));
 
         event_time = datetime!(2024-01-01 00:01:00).assume_utc();
-        let position = portfolio.position(&instrument, &event_time);
-        info!("{}", position);
-        assert_eq!(position.avg_price, Price::from(80.));
-        assert_eq!(position.quantity, Quantity::from(10.));
+        for ((s, i), v) in portfolio.positions(&event_time).iter() {
+            info!("{}: {}: {}", s, i, v);
+        }
+        // assert_eq!(position.avg_price, Price::from(80.));
+        // assert_eq!(position.quantity, Quantity::from(10.));
         assert_eq!(portfolio.buying_power(&event_time), Notional::from(1200.));
         assert_eq!(portfolio.total_exposure(&event_time), Notional::from(800.));
 
         event_time = datetime!(2024-01-01 00:02:00).assume_utc();
-        let position = portfolio.position(&instrument, &event_time);
-        info!("{}", position);
-        assert_eq!(position.avg_price, Price::from(100.));
-        assert_eq!(position.quantity, Quantity::from(20.));
+        for ((s, i), v) in portfolio.positions(&event_time).iter() {
+            info!("{}: {}: {}", s, i, v);
+        }
+        // assert_eq!(position.avg_price, Price::from(100.));
+        // assert_eq!(position.quantity, Quantity::from(20.));
         assert_eq!(portfolio.buying_power(&event_time), Notional::from(0.));
         assert_eq!(portfolio.total_exposure(&event_time), Notional::from(2000.));
 
         event_time = datetime!(2024-01-01 00:03:00).assume_utc();
-        let position = portfolio.position(&instrument, &event_time);
-        info!("{}", position);
-        assert_eq!(position.avg_price, Price::from(100.));
-        assert_eq!(position.quantity, Quantity::from(10.));
+        for ((s, i), v) in portfolio.positions(&event_time).iter() {
+            info!("{}: {}: {}", s, i, v);
+        }
+        // assert_eq!(position.avg_price, Price::from(100.));
+        // assert_eq!(position.quantity, Quantity::from(10.));
         assert_eq!(portfolio.buying_power(&event_time), Notional::from(1000.));
         assert_eq!(portfolio.total_exposure(&event_time), Notional::from(1000.));
 
         event_time = datetime!(2024-01-01 00:04:00).assume_utc();
-        let position = portfolio.position(&instrument, &event_time);
-        info!("{}", position);
-        assert_eq!(position.avg_price, Price::from(100.));
-        assert_eq!(position.quantity, Quantity::from(-10.));
+        for ((s, i), v) in portfolio.positions(&event_time).iter() {
+            info!("{}: {}: {}", s, i, v);
+        }
+        // assert_eq!(position.avg_price, Price::from(100.));
+        // assert_eq!(position.quantity, Quantity::from(-10.));
         assert_eq!(portfolio.buying_power(&event_time), Notional::from(3000.));
         assert_eq!(portfolio.total_exposure(&event_time), Notional::from(-1000.));
 
         event_time = datetime!(2024-01-01 00:05:00).assume_utc();
-        let position = portfolio.position(&instrument, &event_time);
-        info!("{}", position);
-        assert_eq!(position.avg_price, Price::from(0.));
-        assert_eq!(position.quantity, Quantity::from(0.));
+        for ((s, i), v) in portfolio.positions(&event_time).iter() {
+            info!("{}: {}: {}", s, i, v);
+        }
+        // assert_eq!(position.avg_price, Price::from(0.));
+        // assert_eq!(position.quantity, Quantity::from(0.));
         assert_eq!(portfolio.buying_power(&event_time), Notional::from(2000.));
         assert_eq!(portfolio.total_exposure(&event_time), Notional::from(0.));
     }

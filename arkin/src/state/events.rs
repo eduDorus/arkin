@@ -18,7 +18,7 @@ pub struct EventState {
 
 impl EventState {
     pub fn add_event(&self, event: Event) {
-        let key = (event.instrument().clone(), event.event_type().clone());
+        let key = (event.instrument().clone(), event.event_type());
         let mut composit_key = CompositeIndex::new(event.event_time());
 
         let mut entry = self.events.entry(key).or_default();
@@ -49,13 +49,7 @@ impl EventState {
         let index = CompositeIndex::new_max(timestamp);
         self.events
             .get(&(instrument.clone(), event_type))
-            .and_then(|tree| {
-                if let Some(entry) = tree.value().range(..=index).rev().next() {
-                    Some(entry.1.clone())
-                } else {
-                    None
-                }
-            })
+            .and_then(|tree| tree.value().range(..index).next_back().map(|entry| entry.1.clone()))
             .and_then(|event| event.try_into().ok())
     }
 
@@ -70,7 +64,7 @@ impl EventState {
             .get(&(instrument.clone(), event_type))
             .map(|set| {
                 // Perform a range query up to the maximum key
-                set.range(..=index)
+                set.range(..index)
                     .filter_map(|(_, entry)| entry.clone().try_into().ok())
                     .collect()
             })
@@ -94,7 +88,7 @@ impl EventState {
             .get(&(instrument.clone(), event_type))
             .map(|set| {
                 // Perform a range query up to the maximum key
-                set.range(end_index..=index)
+                set.range(end_index..index)
                     .filter_map(|(_, entry)| entry.clone().try_into().ok())
                     .collect()
             })

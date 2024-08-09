@@ -40,8 +40,8 @@ impl Feature for VWAPFeature {
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating VWAP with id: {}", self.id);
         // Check if both trade_price and trade_quantity are present
-        let price = data.get(&self.inputs[0].feature_id());
-        let quantity = data.get(&self.inputs[1].feature_id());
+        let price = data.get(self.inputs[0].feature_id());
+        let quantity = data.get(self.inputs[1].feature_id());
         assert_eq!(price.len(), quantity.len());
 
         let mut total_quantity = f64::zero();

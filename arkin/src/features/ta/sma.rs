@@ -43,8 +43,8 @@ impl Feature for SMAFeature {
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating mean with id: {}", self.id);
-        let sum = data.mean(&self.inputs[0].feature_id()).unwrap_or(0.);
-        let count = data.count(&self.inputs[0].feature_id()).unwrap_or(0.);
+        let sum = data.mean(self.inputs[0].feature_id()).unwrap_or(0.);
+        let count = data.count(self.inputs[0].feature_id()).unwrap_or(0.);
 
         let mean = if count == 0. { f64::NAN } else { sum / count };
         let mut res = HashMap::new();

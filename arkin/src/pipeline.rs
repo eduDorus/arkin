@@ -37,7 +37,7 @@ impl Pipeline {
         let mut edges_to_add = vec![];
         for target_node in graph.node_indices() {
             for source in graph[target_node].sources() {
-                if source == &"base" || source == &"self" {
+                if source == "base" || source == "self" {
                     continue;
                 }
                 let source_node = graph

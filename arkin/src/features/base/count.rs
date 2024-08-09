@@ -40,7 +40,7 @@ impl Feature for CountFeature {
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating count with id: {}", self.id);
-        let count = data.count(&self.inputs[0].feature_id()).unwrap_or(0.);
+        let count = data.count(self.inputs[0].feature_id()).unwrap_or(0.);
         let mut res = HashMap::new();
         res.insert(self.output.clone(), count);
         Ok(res)

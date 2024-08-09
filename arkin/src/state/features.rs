@@ -41,11 +41,9 @@ impl FeatureState {
                 .iter()
                 .map(|r| {
                     let data = match &r {
-                        FeatureDataRequest::Latest { feature_id } => {
-                            self.last_entry(instrument, &feature_id, timestamp)
-                        }
+                        FeatureDataRequest::Latest { feature_id } => self.last_entry(instrument, feature_id, timestamp),
                         FeatureDataRequest::Window { feature_id, window } => {
-                            self.list_entries_window(instrument, &feature_id, timestamp, window)
+                            self.list_entries_window(instrument, feature_id, timestamp, window)
                         }
                         FeatureDataRequest::Period {
                             feature_id,
@@ -154,9 +152,9 @@ impl From<PeriodInputConfig> for FeatureDataRequest {
 impl FeatureDataRequest {
     pub fn feature_id(&self) -> &FeatureId {
         match self {
-            FeatureDataRequest::Latest { feature_id } => &feature_id,
-            FeatureDataRequest::Window { feature_id, .. } => &feature_id,
-            FeatureDataRequest::Period { feature_id, .. } => &feature_id,
+            FeatureDataRequest::Latest { feature_id } => feature_id,
+            FeatureDataRequest::Window { feature_id, .. } => feature_id,
+            FeatureDataRequest::Period { feature_id, .. } => feature_id,
         }
     }
 }

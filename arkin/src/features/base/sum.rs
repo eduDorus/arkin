@@ -40,7 +40,7 @@ impl Feature for SumFeature {
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating sum with id: {}", self.id);
-        let sum = data.sum(&self.inputs[0].feature_id()).unwrap_or(0.);
+        let sum = data.sum(self.inputs[0].feature_id()).unwrap_or(0.);
         let mut res = HashMap::new();
         res.insert(self.output.clone(), sum);
         Ok(res)

@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{
     config::SimulationConfig,
-    models::{Fill, Order, Venue},
+    models::{Fill, Order, Tick, Venue},
     state::StateManager,
 };
 use rust_decimal::prelude::*;
@@ -40,9 +40,12 @@ impl ExecutionEndpoint for SimulationEndpoint {
         orders
             .into_iter()
             .filter_map(|o| {
-                if let Some(price) = self.state.latest_price(&o.instrument, &(o.event_time + self.latency)) {
+                if let Some(tick) = self
+                    .state
+                    .latest_event_by_instrument::<Tick>(&o.instrument, &(o.event_time + self.latency))
+                {
                     debug!("Placing order: {}", o);
-                    Some((o, price))
+                    Some((o, tick.mid_price()))
                 } else {
                     warn!("Order rejected: {}", o);
                     None
@@ -52,7 +55,7 @@ impl ExecutionEndpoint for SimulationEndpoint {
                 Fill::new(
                     o.event_time,
                     o.instrument,
-                    Some(o.order_id),
+                    o.order_id,
                     o.strategy_id,
                     p,
                     o.quantity,

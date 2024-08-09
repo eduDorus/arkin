@@ -88,7 +88,7 @@ impl Position {
             // Position is still open
             _ => {
                 self.avg_price = (self.notional() + fill.notional()) / (self.quantity + fill.quantity.abs());
-                self.quantity = self.quantity + fill.quantity;
+                self.quantity += fill.quantity;
                 None
             }
         }

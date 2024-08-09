@@ -40,8 +40,8 @@ impl Feature for SpreadFeature {
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating spread with id: {}", self.id);
-        let front = data.last(&self.inputs[0].feature_id()).unwrap_or(0.);
-        let back = data.last(&self.inputs[1].feature_id()).unwrap_or(0.);
+        let front = data.last(self.inputs[0].feature_id()).unwrap_or(0.);
+        let back = data.last(self.inputs[1].feature_id()).unwrap_or(0.);
 
         let mut spread = front - back;
 

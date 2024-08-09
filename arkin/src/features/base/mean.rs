@@ -40,7 +40,7 @@ impl Feature for MeanFeature {
 
     fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
         debug!("Calculating mean with id: {}", self.id);
-        let mean = data.mean(&self.inputs[0].feature_id()).unwrap_or(0.);
+        let mean = data.mean(self.inputs[0].feature_id()).unwrap_or(0.);
         let mut res = HashMap::new();
         res.insert(self.output.clone(), mean);
         Ok(res)
