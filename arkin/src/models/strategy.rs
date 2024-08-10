@@ -8,8 +8,8 @@ use super::{Event, EventType, EventTypeOf, Instrument, Weight};
 #[derive(Clone)]
 pub struct Signal {
     pub event_time: OffsetDateTime,
-    pub instrument: Instrument,
     pub strategy_id: StrategyId,
+    pub instrument: Instrument,
     pub signal: Weight,
 }
 
@@ -21,16 +21,6 @@ impl Signal {
             strategy_id,
             signal,
         }
-    }
-}
-
-impl fmt::Display for Signal {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {}",
-            self.event_time, self.strategy_id, self.instrument, self.signal
-        )
     }
 }
 
@@ -49,5 +39,15 @@ impl TryFrom<Event> for Signal {
         } else {
             Err(())
         }
+    }
+}
+
+impl fmt::Display for Signal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} {}",
+            self.event_time, self.strategy_id, self.instrument, self.signal
+        )
     }
 }

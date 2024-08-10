@@ -1,52 +1,27 @@
 use crate::constants;
 
-use super::{types::Maturity, Price, Venue};
+use super::{types::Maturity, Price};
 use anyhow::{anyhow, Result};
 use std::{fmt, str::FromStr};
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+use serde::{Deserialize, Serialize};
+use strum::{Display, EnumDiscriminants, EnumString};
+
+#[derive(Debug, Display, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+pub enum Venue {
+    Simulation,
+    Binance,
+}
+
+#[derive(Clone, EnumDiscriminants, PartialEq, Eq, Hash)]
+#[strum_discriminants(name(InstrumentType))]
+#[strum_discriminants(derive(EnumString, Display))]
 pub enum Instrument {
     Holding(Holding),
     Spot(SpotContract),
     Perpetual(PerpetualContract),
     Future(FutureContract),
     Option(OptionContract),
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum InstrumentType {
-    Holding,
-    Spot,
-    Perpetual,
-    Future,
-    Option,
-}
-
-impl FromStr for InstrumentType {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "holding" => Ok(InstrumentType::Holding),
-            "spot" => Ok(InstrumentType::Spot),
-            "perp" => Ok(InstrumentType::Perpetual),
-            "future" => Ok(InstrumentType::Future),
-            "option" => Ok(InstrumentType::Option),
-            _ => Err(anyhow!("Unknown instrument type: {}", s)),
-        }
-    }
-}
-
-impl fmt::Display for InstrumentType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            InstrumentType::Holding => write!(f, "holding"),
-            InstrumentType::Spot => write!(f, "spot"),
-            InstrumentType::Perpetual => write!(f, "perp"),
-            InstrumentType::Future => write!(f, "future"),
-            InstrumentType::Option => write!(f, "option"),
-        }
-    }
 }
 
 impl Instrument {

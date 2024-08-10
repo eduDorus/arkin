@@ -1,5 +1,5 @@
 use super::DBManager;
-use crate::models::Order;
+use crate::models::ExecutionOrder;
 use anyhow::Result;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
@@ -24,8 +24,8 @@ struct OrderRow {
     status: String,
 }
 
-impl From<Order> for OrderRow {
-    fn from(order: Order) -> Self {
+impl From<ExecutionOrder> for OrderRow {
+    fn from(order: ExecutionOrder) -> Self {
         Self {
             event_time: order.event_time,
             instrument_type: order.instrument.instrument_type().to_string(),
@@ -48,7 +48,7 @@ impl From<Order> for OrderRow {
 }
 
 impl DBManager {
-    pub async fn insert_order(&self, order: Order) -> Result<()> {
+    pub async fn insert_order(&self, order: ExecutionOrder) -> Result<()> {
         let order = OrderRow::from(order);
         sqlx::query!(
             r#"
@@ -96,7 +96,7 @@ mod tests {
         let config = config::load();
         let manager = DBManager::from_config(&config.db).await;
 
-        let order = Order {
+        let order = ExecutionOrder {
             event_time: OffsetDateTime::now_utc(),
             instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
             order_id: 1,

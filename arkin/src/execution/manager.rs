@@ -3,8 +3,7 @@ use tracing::{debug, warn};
 use super::{Execution, ExecutionEndpoint, ExecutionEndpointFactory};
 use crate::{
     config::ExecutionManagerConfig,
-    models::{Allocation, Event, Notional, Order, Position, Price, Tick, Venue},
-    portfolio::Portfolio,
+    models::{Allocation, Event, ExecutionOrder, Notional, Price, Tick, Venue},
     state::StateManager,
 };
 use core::fmt;
@@ -12,14 +11,12 @@ use std::{collections::HashMap, sync::Arc};
 
 pub struct ExecutionManager {
     state: Arc<StateManager>,
-    portfolio: Arc<Portfolio>,
     endpoints: HashMap<Venue, Box<dyn ExecutionEndpoint>>,
     default_endpoint: Venue,
-    rebalance_threshold: Notional,
 }
 
 impl ExecutionManager {
-    pub fn from_config(state: Arc<StateManager>, portfolio: Arc<Portfolio>, config: &ExecutionManagerConfig) -> Self {
+    pub fn from_config(state: Arc<StateManager>, config: &ExecutionManagerConfig) -> Self {
         let endpoints = ExecutionEndpointFactory::from_config(state.clone(), &config.endpoints)
             .into_iter()
             .map(|endpoint| (endpoint.venue().clone(), endpoint))
@@ -27,9 +24,7 @@ impl ExecutionManager {
         Self {
             state,
             endpoints,
-            portfolio,
             default_endpoint: config.default_endpoint.clone(),
-            rebalance_threshold: config.rebalance_threshold.into(),
         }
     }
 }
@@ -71,7 +66,7 @@ impl Execution for ExecutionManager {
             .into_iter()
             .map(|a| {
                 let quantity = a.difference() / a.current_price;
-                Order::new_market(
+                ExecutionOrder::new_market(
                     a.allocation.event_time,
                     a.allocation.instrument,
                     a.allocation.strategy_id,

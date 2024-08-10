@@ -1,23 +1,25 @@
+use std::sync::Arc;
+
 use super::AllocationModule;
 use crate::{
     config::EqualConfig,
     models::{Allocation, Signal, Weight},
+    state::StateManager,
     strategies::StrategyId,
 };
 use rust_decimal::prelude::*;
 
-#[derive(Debug)]
 pub struct EqualAllocation {
-    capital: Decimal,
+    state: Arc<StateManager>,
     max_allocation: Decimal,
     max_allocation_per_instrument: Decimal,
     strategies: Vec<StrategyId>,
 }
 
 impl EqualAllocation {
-    pub fn from_config(config: &EqualConfig) -> Self {
+    pub fn from_config(state: Arc<StateManager>, config: &EqualConfig) -> Self {
         EqualAllocation {
-            capital: config.capital,
+            state,
             max_allocation: config.max_allocation,
             max_allocation_per_instrument: config.max_allocation_per_instrument,
             strategies: config.strategies.clone(),
@@ -39,7 +41,6 @@ impl AllocationModule for EqualAllocation {
                 .max(Decimal::ONE));
 
         let allocation = allocation_per_instrument.min(self.max_allocation_per_instrument);
-        let allocation_notional = self.capital * allocation;
 
         signals
             .iter()

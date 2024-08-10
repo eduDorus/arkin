@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{
     config::SimulationConfig,
-    models::{Fill, Order, Tick, Venue},
+    models::{ExecutionOrder, Fill, Tick, Venue},
     state::StateManager,
 };
 use rust_decimal::prelude::*;
@@ -35,7 +35,7 @@ impl ExecutionEndpoint for SimulationEndpoint {
         &Venue::Simulation
     }
 
-    fn place_orders(&self, orders: Vec<Order>) -> Vec<Fill> {
+    fn place_orders(&self, orders: Vec<ExecutionOrder>) -> Vec<Fill> {
         // Simulate order placement
         orders
             .into_iter()

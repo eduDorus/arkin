@@ -38,7 +38,7 @@ impl fmt::Display for Maturity {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Price(Decimal);
 
 impl Price {
@@ -111,7 +111,7 @@ impl Div<Quantity> for Price {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Quantity(Decimal);
 
 impl Quantity {
@@ -219,7 +219,7 @@ impl Div<Quantity> for Quantity {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct Notional(Decimal);
 
 impl Notional {

@@ -27,7 +27,7 @@ pub use strategy::*;
 pub struct GlobalConfig {
     pub server: ServerConfig,
     pub clock: ClockConfig,
-    pub state: StateConfig,
+    pub state: StateManagerConfig,
     pub db: DatabaseConfig,
     pub ingestors: Vec<IngestorConfig>,
     pub feature_pipeline: PipelineConfig,

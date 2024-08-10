@@ -15,8 +15,9 @@ path = "src/bin/utils.rs"
 
 [dependencies]
 # Utiliy
-strum = { version = "0.26", features = ["derive"] }
 # rand = "0.8.5"
+# uuid = { version = "1.10.0", features = ["v4", "rng", "fast-rng", "serde", "borsh"] }
+strum = { version = "0.26", features = ["derive"] }
 url = {version = "2.5"}
 
 # Multi-threading

@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 mod equal;
 mod factory;
 mod manager;
@@ -11,7 +9,7 @@ use crate::{
     strategies::StrategyId,
 };
 
-pub trait AllocationModule: Debug + Send + Sync {
+pub trait AllocationModule: Send + Sync {
     fn strategies(&self) -> &[StrategyId];
     fn calculate(&self, signals: &[Signal]) -> Vec<Allocation>;
 }

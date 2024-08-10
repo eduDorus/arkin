@@ -1,19 +1,17 @@
-pub mod errors;
-
-mod account;
 mod allocation;
 mod events;
+mod execution;
 mod instrument;
 mod market;
+mod portfolio;
 mod strategy;
 mod types;
-mod venue;
 
-pub use account::*;
 pub use allocation::*;
 pub use events::*;
+pub use execution::*;
 pub use instrument::*;
 pub use market::*;
+pub use portfolio::*;
 pub use strategy::*;
 pub use types::*;
-pub use venue::*;

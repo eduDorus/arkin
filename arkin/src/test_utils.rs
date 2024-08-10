@@ -25,56 +25,56 @@ pub struct TestStateBuilder {
 }
 
 impl TestStateBuilder {
-    pub fn add_fills(self, instrument: &Instrument) -> Self {
-        // Create a couple of fills
-        self.state.add_event(Event::Fill(Fill {
-            event_time: datetime!(2024-01-01 00:00:00).assume_utc(),
-            instrument: instrument.clone(),
-            order_id: 0,
-            strategy_id: "test".into(),
-            price: Price::from(80.),
-            quantity: Quantity::from(10.),
-            commission: Notional::from(1.5),
-        }));
-        self.state.add_event(Event::Fill(Fill {
-            event_time: datetime!(2024-01-01 00:01:00).assume_utc(),
-            instrument: instrument.clone(),
-            order_id: 1,
-            strategy_id: "test".into(),
-            price: Price::from(120.),
-            quantity: Quantity::from(10.),
-            commission: Notional::from(1.0),
-        }));
-        self.state.add_event(Event::Fill(Fill {
-            event_time: datetime!(2024-01-01 00:02:00).assume_utc(),
-            instrument: instrument.clone(),
-            order_id: 2,
-            strategy_id: "test".into(),
-            price: Price::from(100.),
-            quantity: Quantity::from(-10.),
-            commission: Notional::from(1.5),
-        }));
-        self.state.add_event(Event::Fill(Fill {
-            event_time: datetime!(2024-01-01 00:03:00).assume_utc(),
-            instrument: instrument.clone(),
-            order_id: 3,
-            strategy_id: "test".into(),
-            price: Price::from(100.),
-            quantity: Quantity::from(-20.),
-            commission: Notional::from(2.),
-        }));
-        self.state.add_event(Event::Fill(Fill {
-            event_time: datetime!(2024-01-01 00:04:00).assume_utc(),
-            instrument: instrument.clone(),
-            order_id: 3,
-            strategy_id: "test".into(),
-            price: Price::from(50.),
-            quantity: Quantity::from(10.),
-            commission: Notional::from(2.),
-        }));
+    // pub fn add_fills(self, instrument: &Instrument) -> Self {
+    //     // Create a couple of fills
+    //     self.state.add_event(Event::Fill(Fill {
+    //         event_time: datetime!(2024-01-01 00:00:50).assume_utc(),
+    //         instrument: instrument.clone(),
+    //         order_id: 0,
+    //         strategy_id: "test".into(),
+    //         price: Price::from(80.),
+    //         quantity: Quantity::from(10.),
+    //         commission: Notional::from(1.5),
+    //     }));
+    //     self.state.add_event(Event::Fill(Fill {
+    //         event_time: datetime!(2024-01-01 00:01:50).assume_utc(),
+    //         instrument: instrument.clone(),
+    //         order_id: 1,
+    //         strategy_id: "test".into(),
+    //         price: Price::from(120.),
+    //         quantity: Quantity::from(10.),
+    //         commission: Notional::from(1.0),
+    //     }));
+    //     self.state.add_event(Event::Fill(Fill {
+    //         event_time: datetime!(2024-01-01 00:02:50).assume_utc(),
+    //         instrument: instrument.clone(),
+    //         order_id: 2,
+    //         strategy_id: "test".into(),
+    //         price: Price::from(100.),
+    //         quantity: Quantity::from(-10.),
+    //         commission: Notional::from(1.5),
+    //     }));
+    //     self.state.add_event(Event::Fill(Fill {
+    //         event_time: datetime!(2024-01-01 00:03:50).assume_utc(),
+    //         instrument: instrument.clone(),
+    //         order_id: 3,
+    //         strategy_id: "test".into(),
+    //         price: Price::from(100.),
+    //         quantity: Quantity::from(-20.),
+    //         commission: Notional::from(2.),
+    //     }));
+    //     self.state.add_event(Event::Fill(Fill {
+    //         event_time: datetime!(2024-01-01 00:04:50).assume_utc(),
+    //         instrument: instrument.clone(),
+    //         order_id: 3,
+    //         strategy_id: "test".into(),
+    //         price: Price::from(50.),
+    //         quantity: Quantity::from(10.),
+    //         commission: Notional::from(2.),
+    //     }));
 
-        self
-    }
+    // self
+    // }
 
     pub fn add_ticks(self, instrument: &Instrument) -> Self {
         // Create a couple of trades
@@ -126,11 +126,11 @@ impl TestStateBuilder {
     }
 }
 
-pub fn allocations(instrument: &Instrument) -> Vec<Allocation> {
-    vec![Allocation::new(
-        datetime!(2024-01-01 00:00:00).assume_utc(),
-        instrument.clone(),
-        "test".into(),
-        Notional::from(1000.),
-    )]
-}
+// pub fn allocations(instrument: &Instrument) -> Vec<Allocation> {
+//     vec![Allocation::new(
+//         datetime!(2024-01-01 00:00:00).assume_utc(),
+//         instrument.clone(),
+//         "test".into(),
+//         Notional::from(1000.),
+//     )]
+// }

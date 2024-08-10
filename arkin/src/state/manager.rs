@@ -6,25 +6,33 @@ use std::{
 use time::OffsetDateTime;
 
 use crate::{
+    config::StateManagerConfig,
     features::FeatureEvent,
     models::{Event, EventType, EventTypeOf, Instrument},
 };
 
-use super::{EventState, FeatureDataRequest, FeatureDataResponse, FeatureState};
+use super::{EventState, FeatureDataRequest, FeatureDataResponse, FeatureState, PortfolioState};
 
-#[derive(Default)]
 pub struct StateManager {
-    feature_state: FeatureState,
-    event_state: EventState,
+    features: FeatureState,
+    events: EventState,
+    portfolio: PortfolioState,
 }
 
 impl StateManager {
+    pub fn from_config(config: &StateManagerConfig) -> Self {
+        Self {
+            features: FeatureState::default(),
+            events: EventState::default(),
+            portfolio: PortfolioState::from_config(&config.portfolio),
+        }
+    }
     pub fn add_event(&self, event: Event) {
-        self.event_state.add_event(event);
+        self.events.add_event(event);
     }
 
     pub fn add_feature(&self, event: FeatureEvent) {
-        self.feature_state.add_feature(event);
+        self.features.add_feature(event);
     }
 
     pub fn read_features(
@@ -33,11 +41,11 @@ impl StateManager {
         timestamp: &OffsetDateTime,
         request: &[FeatureDataRequest],
     ) -> FeatureDataResponse {
-        self.feature_state.read_features(instrument, timestamp, request)
+        self.features.read_features(instrument, timestamp, request)
     }
 
     pub fn list_instruments(&self, event_type: &EventType) -> HashSet<Instrument> {
-        self.event_state.list_instruments(event_type)
+        self.events.list_instruments(event_type)
     }
 
     pub fn events<T>(&self, timestamp: &OffsetDateTime) -> HashMap<Instrument, Vec<T>>
@@ -49,7 +57,7 @@ impl StateManager {
         instruments
             .into_iter()
             .map(|i| {
-                let event = self.event_state.list_entries_since_start(&i, timestamp);
+                let event = self.events.list_entries_since_start(&i, timestamp);
                 (i, event)
             })
             .collect()
@@ -59,7 +67,7 @@ impl StateManager {
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
-        self.event_state.list_entries_since_start(instrument, timestamp)
+        self.events.list_entries_since_start(instrument, timestamp)
     }
 
     pub fn latest_events<T>(&self, timestamp: &OffsetDateTime) -> HashMap<Instrument, Option<T>>
@@ -71,7 +79,7 @@ impl StateManager {
         instruments
             .into_iter()
             .map(|i| {
-                let event = self.event_state.last_entry(&i, timestamp);
+                let event = self.events.last_entry(&i, timestamp);
                 (i, event)
             })
             .collect()
@@ -81,7 +89,7 @@ impl StateManager {
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
-        self.event_state.last_entry(instrument, timestamp)
+        self.events.last_entry(instrument, timestamp)
     }
 
     pub fn events_window<T>(&self, timestamp: &OffsetDateTime, window: &Duration) -> HashMap<Instrument, Vec<T>>
@@ -93,7 +101,7 @@ impl StateManager {
         instruments
             .into_iter()
             .map(|i| {
-                let event = self.event_state.list_entries_window(&i, timestamp, window);
+                let event = self.events.list_entries_window(&i, timestamp, window);
                 (i, event)
             })
             .collect()
@@ -108,6 +116,6 @@ impl StateManager {
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
-        self.event_state.list_entries_window(instrument, timestamp, window)
+        self.events.list_entries_window(instrument, timestamp, window)
     }
 }

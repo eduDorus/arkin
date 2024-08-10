@@ -1,6 +1,6 @@
 use crate::{
     config::BinanceExecutionConfig,
-    models::{Fill, Order, Venue},
+    models::{Fill, ExecutionOrder, Venue},
 };
 use rust_decimal::Decimal;
 
@@ -29,7 +29,7 @@ impl ExecutionEndpoint for BinanceEndpoint {
         &Venue::Binance
     }
 
-    fn place_orders(&self, _order: Vec<Order>) -> Vec<Fill> {
+    fn place_orders(&self, _order: Vec<ExecutionOrder>) -> Vec<Fill> {
         todo!()
     }
 }
