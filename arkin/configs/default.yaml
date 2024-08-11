@@ -4,9 +4,6 @@ server:
 clock:
   tick_frequency: 1 # In seconds
 
-state:
-  window: 600 # In seconds
-
 db:
   host: 127.0.0.1
   port: 5432
@@ -15,6 +12,10 @@ db:
   min_connections: 10
   max_connections: 200
   idle_timeout: 300
+
+state_manager:
+  portfolio:
+    initial_capital: 10000.
 
 ingestors:
   - binance:
@@ -110,29 +111,6 @@ feature_pipeline:
         output: spread_sma_vwap
         absolute: false
 
-analytics_pipeline:
-  name: analytics
-  frequency: 5 # In seconds
-  features:
-    - position:
-        id: position
-        input_position_price:
-          from: self
-          feature: position_price
-        input_position_quantity:
-          from: self
-          feature: position_quantity
-        input_fill_price:
-          from: base
-          feature: fill_price
-          window: 5
-        input_fill_quantity:
-          from: base
-          feature: fill_quantity
-          window: 5
-        output_price: position_price
-        output_quantity: position_quantity
-
 strategy_manager:
   strategies:
     - crossover:
@@ -160,15 +138,3 @@ execution_manager:
         max_orders_per_minute: 5
         max_order_size_notional: 10000.
         min_order_size_notional: 200.
-    # - binance:
-    #     max_orders_per_minute: 5
-    #     max_order_size_notional: 1000.
-    #     min_order_size_notional: 100.
-
-simulation:
-  latency: 200 # In ms
-  commission_maker: 0.00012
-  commission_taker: 0.0003
-  max_orders_per_minute: 5
-  max_order_size_notional: 1000.
-  min_order_size_notional: 100.

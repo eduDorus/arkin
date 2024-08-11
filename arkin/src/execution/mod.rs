@@ -7,10 +7,10 @@ pub use factory::ExecutionEndpointFactory;
 pub use manager::ExecutionManager;
 pub use simulation::SimulationEndpoint;
 
-use crate::models::{Allocation, Fill, ExecutionOrder, Venue};
+use crate::models::{ExecutionOrder, Fill, Venue};
 
 pub trait Execution: Send + Sync {
-    fn allocate(&self, allocation: &[Allocation]);
+    fn add_orders(&self, orders: Vec<ExecutionOrder>);
 }
 
 pub trait ExecutionEndpoint: Send + Sync {

@@ -1,10 +1,9 @@
-use crate::models::Venue;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExecutionManagerConfig {
-    pub default_endpoint: Venue,
+    pub default_endpoint: String,
     pub rebalance_threshold: Decimal,
     pub endpoints: Vec<ExecutionEndpointConfig>,
 }

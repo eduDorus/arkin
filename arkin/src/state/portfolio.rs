@@ -1,10 +1,11 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::Not, time::Duration};
 
 use dashmap::DashMap;
+use time::OffsetDateTime;
 
 use crate::{
     config::PortfolioStateConfig,
-    models::{ExecutionOrder, ExecutionStatus, Instrument, InternalTrade, Notional, TradeStatus},
+    models::{ExecutionOrder, ExecutionStatus, Instrument, Notional, Position, PositionStatus},
     strategies::StrategyId,
     utils::CompositeIndex,
 };
@@ -12,15 +13,15 @@ use crate::{
 // The hirarchy for positions is as followed:
 
 pub struct PortfolioState {
-    capital: Notional,
+    initial_capital: Notional,
     execution_orders: DashMap<(StrategyId, Instrument), BTreeMap<CompositeIndex, ExecutionOrder>>,
-    internal_trades: DashMap<(StrategyId, Instrument), BTreeMap<CompositeIndex, InternalTrade>>,
+    internal_trades: DashMap<(StrategyId, Instrument), BTreeMap<CompositeIndex, Position>>,
 }
 
 impl PortfolioState {
     pub fn from_config(config: &PortfolioStateConfig) -> Self {
         Self {
-            capital: config.initial_capital.into(),
+            initial_capital: config.initial_capital.into(),
             execution_orders: DashMap::new(),
             internal_trades: DashMap::new(),
         }
@@ -47,14 +48,14 @@ impl PortfolioState {
         let key = (order.strategy_id.clone(), order.instrument.clone());
 
         // Get or create a BTreeMap for the strategy and instrument
-        let mut trades_entry = self.internal_trades.entry(key.clone()).or_insert_with(BTreeMap::new);
+        let mut trades_entry = self.internal_trades.entry(key.clone()).or_default();
 
         // Obtain mutable access to the BTreeMap within DashMap
         let trades_entry = trades_entry.value_mut();
 
         // Get the last trade if it exists and is open, otherwise start a new trade
         let trade = if let Some((_, last_trade)) = trades_entry.iter_mut().last() {
-            if last_trade.status == TradeStatus::Open {
+            if last_trade.status == PositionStatus::Open {
                 // Update the existing trade
                 last_trade.avg_open_price = (last_trade.avg_open_price * last_trade.quantity
                     + order.avg_price * order.quantity)
@@ -64,11 +65,11 @@ impl PortfolioState {
                 last_trade.clone() // Clone it for further use
             } else {
                 // If the last trade isn't open, start a new one
-                InternalTrade::from(order.to_owned())
+                Position::from(order.to_owned())
             }
         } else {
             // If there are no trades, start a new one
-            InternalTrade::from(order.to_owned())
+            Position::from(order.to_owned())
         };
 
         // Generate a new composite key for the trade
@@ -83,85 +84,111 @@ impl PortfolioState {
         trades_entry.insert(composite_key, trade);
     }
 
-    // pub fn capital(&self) -> Decimal {
-    //     self.capital
-    // }
+    fn open_execution_orders(&self, timestamp: &OffsetDateTime) -> impl Iterator<Item = ExecutionOrder> + '_ {
+        let index = CompositeIndex::new_max(timestamp);
+        self.execution_orders.iter().flat_map(move |entry| {
+            entry
+                .value()
+                .range(..=index)
+                .filter_map(|(_, order)| {
+                    if order.is_active() {
+                        Some(order.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+    }
 
-    // pub fn total_value(&self, market_data: &MarketData, as_of: OffsetDateTime) -> Decimal {
-    //     self.capital + self.total_unrealized_pnl(market_data, as_of)
+    fn closed_execution_orders(&self, timestamp: &OffsetDateTime) -> impl Iterator<Item = ExecutionOrder> + '_ {
+        let index = CompositeIndex::new_max(timestamp);
+        self.execution_orders.iter().flat_map(move |entry| {
+            entry
+                .value()
+                .range(..=index)
+                .filter_map(|(_, order)| {
+                    if order.is_active().not() {
+                        Some(order.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+    }
+
+    // Since we know that the only option for a open position can be the last position in the BTreeMap we will just check that and clone if true
+    fn find_open_positions(&self, timestamp: &OffsetDateTime) -> impl Iterator<Item = Position> + '_ {
+        let index = CompositeIndex::new_max(timestamp);
+        self.internal_trades
+            .iter()
+            .flat_map(move |entry| {
+                entry.value().range(..=index).next_back().map(|(_, p)| {
+                    if p.status == PositionStatus::Open {
+                        Some(p.clone())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .flatten()
+    }
+
+    fn closed_positions(&self, timestamp: &OffsetDateTime) -> impl Iterator<Item = Position> + '_ {
+        let index = CompositeIndex::new_max(timestamp);
+        self.internal_trades.iter().flat_map(move |entry| {
+            entry
+                .value()
+                .range(..=index)
+                .filter_map(|(_, trade)| {
+                    if trade.status == PositionStatus::Closed {
+                        Some(trade.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+    }
+
+    pub fn capital(&self) -> Notional {
+        self.initial_capital
+    }
+
+    // pub fn total_value(&self, market_data: &MarketData, timestamp: &OffsetDateTime) -> Notional {
+    //     self.capital + self.total_unrealized_pnl(market_data, timestamp)
     // }
 
     // pub fn total_exposure(&self, as_of: OffsetDateTime) -> Decimal {
     //     self.calculate_positions(None, None, as_of).values().map(|p| p.exposure()).sum()
     // }
 
-    // pub fn total_realized_pnl(&self, as_of: OffsetDateTime) -> Decimal {
-    //     self.internal_trades
-    //         .iter()
-    //         .filter(|t| t.open_time <= as_of)
-    //         .map(|t| t.realized_pnl)
-    //         .sum()
+    pub fn total_realized_pnl(&self, timestamp: &OffsetDateTime) -> Notional {
+        self.closed_positions(timestamp).map(|t| t.realized_pnl).sum()
+    }
+
+    // pub fn totoal_unrealized_pnl(&self, timestamp: &OffsetDateTime) -> Notional {
+    //     self.find_open_positions(timestamp).map(|p| p.unrealized_pnl()).sum()
     // }
 
-    // pub fn total_unrealized_pnl(&self, market_data: &MarketData, as_of: OffsetDateTime) -> Decimal {
-    //     self.calculate_positions(None, None, as_of)
-    //         .iter()
-    //         .map(|(instrument, position)| {
-    //             let current_price = market_data.get_price(instrument);
-    //             position.quantity * (current_price - position.avg_price)
-    //         })
-    //         .sum()
-    // }
+    pub fn open_orders_count(&self, timestamp: &OffsetDateTime) -> usize {
+        self.open_execution_orders(timestamp).count()
+    }
 
-    // pub fn open_orders_count(&self, as_of: OffsetDateTime) -> usize {
-    //     self.execution_orders
-    //         .range(..=as_of)
-    //         .filter(|(_, order)| order.is_active())
-    //         .count()
-    // }
+    pub fn average_fill_time(&self, timestamp: &OffsetDateTime) -> Option<Duration> {
+        let fill_times: Vec<Duration> = self.closed_execution_orders(timestamp).filter_map(|o| o.fill_time()).collect();
 
-    // pub fn average_fill_time(&self, start: OffsetDateTime, end: OffsetDateTime) -> Option<Duration> {
-    //     let fill_times: Vec<Duration> = self
-    //         .execution_orders
-    //         .range(start..=end)
-    //         .filter_map(|(_, order)| order.fill_time())
-    //         .collect();
+        if fill_times.is_empty() {
+            None
+        } else {
+            Some(fill_times.iter().sum::<Duration>() / fill_times.len() as u32)
+        }
+    }
 
-    //     if fill_times.is_empty() {
-    //         None
-    //     } else {
-    //         Some(fill_times.iter().sum::<Duration>() / fill_times.len() as u32)
-    //     }
-    // }
-
-    // pub fn calculate_positions(
-    //     &self,
-    //     strategy_id: Option<&StrategyId>,
-    //     instrument: Option<&Instrument>,
-    //     as_of: OffsetDateTime,
-    // ) -> HashMap<Instrument, Position> {
-    //     let mut positions = HashMap::new();
-
-    //     for trade in &self.internal_trades {
-    //         if trade.open_time <= as_of
-    //             && strategy_id.map_or(true, |s| &trade.strategy_id == s)
-    //             && instrument.map_or(true, |i| &trade.instrument == i)
-    //         {
-    //             let position = positions.entry(trade.instrument.clone()).or_insert(Position::default());
-    //             let trade_quantity = if trade.initial_side == OrderSide::Buy {
-    //                 trade.quantity
-    //             } else {
-    //                 -trade.quantity
-    //             };
-    //             position.quantity += trade_quantity;
-    //             position.avg_price = (position.avg_price * position.quantity + trade.avg_open_price * trade_quantity)
-    //                 .abs()
-    //                 / position.quantity.abs();
-    //         }
-    //     }
-
-    //     positions
-    // }
+    pub fn positions(&self, timestamp: &OffsetDateTime) -> Vec<Position> {
+        self.find_open_positions(timestamp).collect()
+    }
 
     // pub fn strategy_performance(&self, strategy_id: &StrategyId, as_of: OffsetDateTime) -> StrategyPerformance {
     //     let positions = self.calculate_positions(Some(strategy_id), None, as_of);

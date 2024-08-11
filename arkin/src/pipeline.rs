@@ -14,7 +14,6 @@ use std::sync::Arc;
 use time::OffsetDateTime;
 use tracing::{debug, info};
 
-#[derive(Default)]
 pub struct Pipeline {
     state: Arc<StateManager>,
     graph: Arc<DiGraph<Box<dyn Feature>, ()>>,

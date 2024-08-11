@@ -49,8 +49,8 @@ impl From<Tick> for TickRow {
 impl From<TickRow> for Tick {
     fn from(db_tick: TickRow) -> Self {
         let instrument = Instrument::new(
-            &db_tick.instrument_type.parse().unwrap(),
-            db_tick.venue.parse().expect("Invalid venue"),
+            db_tick.instrument_type.parse().expect("Failed to parse instrument type"),
+            db_tick.venue.parse().expect("Falied to parse venue"),
             db_tick.base.as_str().into(),
             db_tick.quote.as_str().into(),
             db_tick.maturity.map(|m| m.into()),

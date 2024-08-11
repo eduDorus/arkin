@@ -47,7 +47,11 @@ impl From<Trade> for TradeRow {
 impl From<TradeRow> for Trade {
     fn from(db_trade: TradeRow) -> Self {
         let instrument = Instrument::new(
-            &db_trade.instrument_type.parse().unwrap(),
+            db_trade
+                .instrument_type
+                .as_str()
+                .parse()
+                .expect("Could not parse instrument type"),
             db_trade.venue.parse().expect("Invalid venue"),
             db_trade.base.as_str().into(),
             db_trade.quote.as_str().into(),

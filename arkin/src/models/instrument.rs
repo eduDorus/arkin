@@ -4,29 +4,32 @@ use super::{types::Maturity, Price};
 use anyhow::{anyhow, Result};
 use std::{fmt, str::FromStr};
 
-use serde::{Deserialize, Serialize};
 use strum::{Display, EnumDiscriminants, EnumString};
 
-#[derive(Debug, Display, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, Clone, PartialEq, Eq, Hash, EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum Venue {
     Simulation,
     Binance,
 }
 
-#[derive(Clone, EnumDiscriminants, PartialEq, Eq, Hash)]
+#[derive(Display, Clone, EnumDiscriminants, PartialEq, Eq, Hash)]
 #[strum_discriminants(name(InstrumentType))]
 #[strum_discriminants(derive(EnumString, Display))]
+#[strum_discriminants(strum(serialize_all = "snake_case"))]
 pub enum Instrument {
     Holding(Holding),
-    Spot(SpotContract),
-    Perpetual(PerpetualContract),
-    Future(FutureContract),
-    Option(OptionContract),
+    Spot(Spot),
+    #[strum_discriminants(strum(serialize = "perp"))]
+    Perpetual(Perpetual),
+    Future(Future),
+    #[strum_discriminants(strum(serialize = "option"))]
+    Option(EuropeanOption),
 }
 
 impl Instrument {
     pub fn new(
-        instrument_type: &InstrumentType,
+        instrument_type: InstrumentType,
         venue: Venue,
         base: Asset,
         quote: Asset,
@@ -57,15 +60,15 @@ impl Instrument {
     }
 
     pub fn spot(venue: Venue, base: Asset, quote: Asset) -> Self {
-        Instrument::Spot(SpotContract::new(venue, base, quote))
+        Instrument::Spot(Spot::new(venue, base, quote))
     }
 
     pub fn perpetual(venue: Venue, base: Asset, quote: Asset) -> Self {
-        Instrument::Perpetual(PerpetualContract::new(venue, base, quote))
+        Instrument::Perpetual(Perpetual::new(venue, base, quote))
     }
 
     pub fn future(venue: Venue, base: Asset, quote: Asset, maturity: Maturity) -> Self {
-        Instrument::Future(FutureContract::new(venue, base, quote, maturity))
+        Instrument::Future(Future::new(venue, base, quote, maturity))
     }
 
     pub fn option(
@@ -76,7 +79,7 @@ impl Instrument {
         maturity: Maturity,
         option_type: OptionType,
     ) -> Self {
-        Instrument::Option(OptionContract::new(venue, base, quote, strike, maturity, option_type))
+        Instrument::Option(EuropeanOption::new(venue, base, quote, strike, maturity, option_type))
     }
 
     pub fn instrument_type(&self) -> &InstrumentType {
@@ -142,17 +145,17 @@ impl Instrument {
     }
 }
 
-impl fmt::Display for Instrument {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Instrument::Holding(holding) => write!(f, "holding_{}", holding),
-            Instrument::Spot(spot) => write!(f, "spot_{}", spot),
-            Instrument::Perpetual(perpetual) => write!(f, "perp_{}", perpetual),
-            Instrument::Future(future) => write!(f, "future_{}", future),
-            Instrument::Option(option) => write!(f, "option_{}", option),
-        }
-    }
-}
+// impl fmt::Display for Instrument {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match self {
+//             Instrument::Holding(holding) => write!(f, "holding_{}", holding),
+//             Instrument::Spot(spot) => write!(f, "spot_{}", spot),
+//             Instrument::Perp(perpetual) => write!(f, "perp_{}", perpetual),
+//             Instrument::Future(future) => write!(f, "future_{}", future),
+//             Instrument::Option(option) => write!(f, "option_{}", option),
+//         }
+//     }
+// }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Asset {
@@ -187,59 +190,59 @@ impl Holding {
 
 impl fmt::Display for Holding {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}@{}", self.asset, self.venue)
+        write!(f, "holding_{}@{}", self.asset, self.venue)
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct SpotContract {
+pub struct Spot {
     pub venue: Venue,
     pub base: Asset,
     pub quote: Asset,
 }
 
-impl SpotContract {
+impl Spot {
     pub fn new(venue: Venue, base: Asset, quote: Asset) -> Self {
-        SpotContract { venue, base, quote }
+        Spot { venue, base, quote }
     }
 }
 
-impl fmt::Display for SpotContract {
+impl fmt::Display for Spot {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}_{}@{}", self.base, self.quote, self.venue)
+        write!(f, "spot_{}_{}@{}", self.base, self.quote, self.venue)
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct PerpetualContract {
+pub struct Perpetual {
     pub venue: Venue,
     pub base: Asset,
     pub quote: Asset,
 }
 
-impl PerpetualContract {
+impl Perpetual {
     pub fn new(venue: Venue, base: Asset, quote: Asset) -> Self {
-        PerpetualContract { venue, base, quote }
+        Perpetual { venue, base, quote }
     }
 }
 
-impl fmt::Display for PerpetualContract {
+impl fmt::Display for Perpetual {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}_{}@{}", self.base, self.quote, self.venue)
+        write!(f, "perp_{}_{}@{}", self.base, self.quote, self.venue)
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct FutureContract {
+pub struct Future {
     pub venue: Venue,
     pub base: Asset,
     pub quote: Asset,
     pub maturity: Maturity,
 }
 
-impl FutureContract {
+impl Future {
     pub fn new(venue: Venue, base: Asset, quote: Asset, maturity: Maturity) -> Self {
-        FutureContract {
+        Future {
             venue,
             base,
             quote,
@@ -248,19 +251,19 @@ impl FutureContract {
     }
 }
 
-impl fmt::Display for FutureContract {
+impl fmt::Display for Future {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let formatted = self
             .maturity
             .value()
             .format(constants::INSTRUMENT_TIMESTAMP_FORMAT)
             .expect("Unable to format expiry");
-        write!(f, "{}_{}_{}@{}", self.base, self.quote, formatted, self.venue)
+        write!(f, "future_{}_{}_{}@{}", self.base, self.quote, formatted, self.venue)
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct OptionContract {
+pub struct EuropeanOption {
     pub venue: Venue,
     pub base: Asset,
     pub quote: Asset,
@@ -269,7 +272,7 @@ pub struct OptionContract {
     pub option_type: OptionType,
 }
 
-impl OptionContract {
+impl EuropeanOption {
     pub fn new(
         venue: Venue,
         base: Asset,
@@ -278,7 +281,7 @@ impl OptionContract {
         maturity: Maturity,
         option_type: OptionType,
     ) -> Self {
-        OptionContract {
+        EuropeanOption {
             venue,
             base,
             quote,
@@ -289,7 +292,7 @@ impl OptionContract {
     }
 }
 
-impl fmt::Display for OptionContract {
+impl fmt::Display for EuropeanOption {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let formatted = self
             .maturity
@@ -299,7 +302,7 @@ impl fmt::Display for OptionContract {
 
         write!(
             f,
-            "{}_{}_{:?}_{}_{}@{}",
+            "option_{}_{}_{:?}_{}_{}@{}",
             self.base, self.quote, formatted, self.strike, self.option_type, self.venue
         )
     }
@@ -328,8 +331,29 @@ impl FromStr for OptionType {
 impl fmt::Display for OptionType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            OptionType::Call => write!(f, "C"),
-            OptionType::Put => write!(f, "P"),
+            OptionType::Call => write!(f, "c"),
+            OptionType::Put => write!(f, "p"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_instrument_type() {
+        assert_eq!("holding".parse::<InstrumentType>().unwrap(), InstrumentType::Holding);
+        assert_eq!("spot".parse::<InstrumentType>().unwrap(), InstrumentType::Spot);
+        assert_eq!("perp".parse::<InstrumentType>().unwrap(), InstrumentType::Perpetual);
+        assert_eq!("future".parse::<InstrumentType>().unwrap(), InstrumentType::Future);
+        assert_eq!("option".parse::<InstrumentType>().unwrap(), InstrumentType::Option);
+
+        // Check the other way around
+        assert_eq!(InstrumentType::Holding.to_string(), "holding");
+        assert_eq!(InstrumentType::Spot.to_string(), "spot");
+        assert_eq!(InstrumentType::Perpetual.to_string(), "perp");
+        assert_eq!(InstrumentType::Future.to_string(), "future");
+        assert_eq!(InstrumentType::Option.to_string(), "option");
     }
 }

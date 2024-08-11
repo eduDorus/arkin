@@ -1,6 +1,6 @@
 use crate::{
     config::BinanceExecutionConfig,
-    models::{Fill, ExecutionOrder, Venue},
+    models::{ExecutionOrder, Fill, Venue},
 };
 use rust_decimal::Decimal;
 

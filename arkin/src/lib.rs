@@ -10,7 +10,7 @@ pub mod ingestors;
 pub mod logging;
 pub mod models;
 pub mod pipeline;
-pub mod server;
+// pub mod server;
 pub mod state;
 pub mod strategies;
 // pub mod test_utils;

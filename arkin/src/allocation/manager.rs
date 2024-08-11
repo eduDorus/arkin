@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use super::{factory::AllocationFactory, AllocationModule};
 use crate::{
     config::AllocationManagerConfig,
-    models::{Allocation, Signal},
+    models::{ExecutionOrder, Signal},
+    state::StateManager,
 };
 use rayon::prelude::*;
 
@@ -10,13 +13,13 @@ pub struct AllocationManager {
 }
 
 impl AllocationManager {
-    pub fn from_config(config: &AllocationManagerConfig) -> Self {
+    pub fn from_config(state: Arc<StateManager>, config: &AllocationManagerConfig) -> Self {
         Self {
-            allocations: AllocationFactory::from_config(&config.allocations),
+            allocations: AllocationFactory::from_config(state, &config.allocations),
         }
     }
 
-    pub fn calculate(&self, signals: &[Signal]) -> Vec<Allocation> {
+    pub fn calculate(&self, signals: &[Signal]) -> Vec<ExecutionOrder> {
         self.allocations
             .par_iter()
             .map(|a| a.calculate(signals))

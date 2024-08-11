@@ -54,10 +54,6 @@ impl DBManager {
         match event {
             Event::Tick(t) => self.insert_tick(t).await?,
             Event::Trade(t) => self.insert_trade(t).await?,
-            Event::Order(o) => self.insert_order(o).await?,
-            Event::Fill(f) => self.insert_fill(f).await?,
-            Event::Signal(s) => self.insert_signal(s).await?,
-            Event::Allocation(a) => self.insert_allocation(a).await?,
             _ => {
                 error!("Event type not supported: {}", event.event_type());
             }

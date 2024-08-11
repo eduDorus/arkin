@@ -3,7 +3,7 @@ use crate::strategies::StrategyId;
 use time::OffsetDateTime;
 
 #[derive(Clone)]
-pub struct InternalTrade {
+pub struct Position {
     pub strategy_id: StrategyId,
     pub instrument: Instrument,
     pub side: OrderSide,
@@ -14,12 +14,12 @@ pub struct InternalTrade {
     pub quantity: Quantity,
     pub realized_pnl: Notional,
     pub commission: Notional,
-    pub status: TradeStatus,
+    pub status: PositionStatus,
     pub created_at: OffsetDateTime,
     pub last_updated_at: OffsetDateTime,
 }
 
-impl From<ExecutionOrder> for InternalTrade {
+impl From<ExecutionOrder> for Position {
     fn from(order: ExecutionOrder) -> Self {
         Self {
             strategy_id: order.strategy_id,
@@ -32,7 +32,7 @@ impl From<ExecutionOrder> for InternalTrade {
             quantity: order.quantity,
             realized_pnl: Notional::default(),
             commission: Notional::default(),
-            status: TradeStatus::Open,
+            status: PositionStatus::Open,
             created_at: order.last_updated_at,
             last_updated_at: order.last_updated_at,
         }
@@ -40,21 +40,9 @@ impl From<ExecutionOrder> for InternalTrade {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum TradeStatus {
+pub enum PositionStatus {
     Open,
     Closed,
-}
-
-#[derive(Default)]
-pub struct Position {
-    avg_price: Price,
-    quantity: Quantity,
-}
-
-impl Position {
-    pub fn exposure(&self) -> Notional {
-        self.quantity.abs() * self.avg_price
-    }
 }
 
 // impl CompletedTrade {

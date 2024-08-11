@@ -12,12 +12,14 @@ pub struct PipelineConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LatestInputConfig {
     pub from: NodeId,
+    #[serde(rename = "feature")]
     pub feature_id: FeatureId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WindowInputConfig {
     pub from: NodeId,
+    #[serde(rename = "feature")]
     pub feature_id: FeatureId,
     pub window: u64,
 }
@@ -25,6 +27,7 @@ pub struct WindowInputConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PeriodInputConfig {
     pub from: NodeId,
+    #[serde(rename = "feature")]
     pub feature_id: FeatureId,
     pub periods: usize,
 }
