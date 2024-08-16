@@ -7,32 +7,38 @@ use time::OffsetDateTime;
 
 use crate::{
     config::StateManagerConfig,
-    features::FeatureEvent,
-    models::{Event, EventType, EventTypeOf, Instrument},
+    models::{Event, EventType, EventTypeOf, FeatureEvent, Instrument, MarketSnapshot, PositionSnapshot},
 };
 
-use super::{EventState, FeatureDataRequest, FeatureDataResponse, FeatureState, PortfolioState};
+use super::{EventState, FeatureDataRequest, FeatureDataResponse, FeatureState};
 
 pub struct StateManager {
     features: FeatureState,
     events: EventState,
-    portfolio: PortfolioState,
 }
 
 impl StateManager {
-    pub fn from_config(config: &StateManagerConfig) -> Self {
+    pub fn from_config(_config: &StateManagerConfig) -> Self {
         Self {
             features: FeatureState::default(),
             events: EventState::default(),
-            portfolio: PortfolioState::from_config(&config.portfolio),
         }
     }
+
     pub fn add_event(&self, event: Event) {
         self.events.add_event(event);
     }
 
     pub fn add_feature(&self, event: FeatureEvent) {
         self.features.add_feature(event);
+    }
+
+    pub fn position_snapshot(&self, _timestamp: &OffsetDateTime) -> PositionSnapshot {
+        todo!()
+    }
+
+    pub fn market_snapshot(&self, _timestamp: &OffsetDateTime) -> MarketSnapshot {
+        todo!()
     }
 
     pub fn read_features(
@@ -70,7 +76,7 @@ impl StateManager {
         self.events.list_entries_since_start(instrument, timestamp)
     }
 
-    pub fn latest_events<T>(&self, timestamp: &OffsetDateTime) -> HashMap<Instrument, Option<T>>
+    pub fn last_events<T>(&self, timestamp: &OffsetDateTime) -> HashMap<Instrument, Option<T>>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
@@ -85,7 +91,7 @@ impl StateManager {
             .collect()
     }
 
-    pub fn latest_event_by_instrument<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Option<T>
+    pub fn last_event_by_instrument<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Option<T>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {

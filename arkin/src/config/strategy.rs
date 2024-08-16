@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use crate::{features::FeatureId, strategies::StrategyId};
+use crate::models::{FeatureId, StrategyId};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StrategyManagerConfig {

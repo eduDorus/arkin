@@ -1,10 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-use crate::features::{FeatureId, NodeId};
+use crate::models::{FeatureId, NodeId};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FeatureManagerConfig {
+    pub pipeline: PipelineConfig,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PipelineConfig {
-    pub name: String,
     pub frequency: u64,
     pub features: Vec<FeatureConfig>,
 }

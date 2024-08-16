@@ -6,6 +6,10 @@ use time::OffsetDateTime;
 
 use crate::constants;
 
+pub type StrategyId = String;
+pub type FeatureId = String;
+pub type NodeId = String;
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Maturity(OffsetDateTime);
 

@@ -30,7 +30,7 @@ pub struct GlobalConfig {
     pub db: DatabaseConfig,
     pub state_manager: StateManagerConfig,
     pub ingestors: Vec<IngestorConfig>,
-    pub feature_pipeline: PipelineConfig,
+    pub feature_manager: FeatureManagerConfig,
     pub strategy_manager: StrategyManagerConfig,
     pub allocation_manager: AllocationManagerConfig,
     pub execution_manager: ExecutionManagerConfig,

@@ -1,7 +1,7 @@
-use super::{Execution, ExecutionEndpoint, ExecutionEndpointFactory};
+use super::{ExecutionEndpoint, ExecutionEndpointFactory};
 use crate::{
     config::ExecutionManagerConfig,
-    models::{ExecutionOrder, Venue},
+    models::{AllocationSnapshot, Venue},
     state::StateManager,
 };
 use std::{collections::HashMap, sync::Arc};
@@ -24,10 +24,8 @@ impl ExecutionManager {
             _default_endpoint: config.default_endpoint.parse().expect("Invalid venue"),
         }
     }
-}
 
-impl Execution for ExecutionManager {
-    fn add_orders(&self, _orders: Vec<ExecutionOrder>) {
+    pub fn execute(&self, _allocations: AllocationSnapshot) {
         todo!()
     }
 }

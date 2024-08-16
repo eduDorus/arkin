@@ -1,9 +1,7 @@
 use std::fmt;
 use time::OffsetDateTime;
 
-use crate::strategies::StrategyId;
-
-use super::{Event, EventType, EventTypeOf, Instrument, Weight};
+use super::{Event, EventType, EventTypeOf, Instrument, StrategyId, Weight};
 
 #[derive(Clone)]
 pub struct Signal {
@@ -39,6 +37,12 @@ impl TryFrom<Event> for Signal {
         } else {
             Err(())
         }
+    }
+}
+
+impl From<Signal> for Event {
+    fn from(signal: Signal) -> Self {
+        Event::Signal(signal)
     }
 }
 

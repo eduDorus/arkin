@@ -66,6 +66,12 @@ impl TryFrom<Event> for Tick {
     }
 }
 
+impl From<Tick> for Event {
+    fn from(value: Tick) -> Self {
+        Event::Tick(value)
+    }
+}
+
 impl fmt::Display for Tick {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

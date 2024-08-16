@@ -181,7 +181,7 @@ impl DBManager {
         Ok(())
     }
 
-    pub async fn read_ticks(&self, from: OffsetDateTime, till: OffsetDateTime) -> Vec<Tick> {
+    pub async fn read_ticks(&self, from: &OffsetDateTime, till: &OffsetDateTime) -> Vec<Tick> {
         let stream = sqlx::query_as::<_, TickRow>(
             r#"
             SELECT 
@@ -275,7 +275,7 @@ mod tests {
         let till = OffsetDateTime::now_utc();
         let from = till - time::Duration::days(1);
 
-        let ticks = manager.read_ticks(from, till).await;
+        let ticks = manager.read_ticks(&from, &till).await;
         assert_eq!(ticks.len(), 2);
         for tick in ticks {
             info!("{}", tick);

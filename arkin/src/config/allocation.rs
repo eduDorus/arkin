@@ -1,7 +1,7 @@
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::strategies::StrategyId;
+use crate::models::StrategyId;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AllocationManagerConfig {

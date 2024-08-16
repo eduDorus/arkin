@@ -1,6 +1,6 @@
 use crate::config::PipelineConfig;
-use crate::features::{Feature, FeatureEvent, FeatureFactory};
-use crate::models::Instrument;
+use crate::features::{Feature, FeatureFactory};
+use crate::models::{FeatureEvent, Instrument};
 use crate::state::StateManager;
 use parking_lot::Mutex;
 use petgraph::graph::NodeIndex;
@@ -15,13 +15,12 @@ use time::OffsetDateTime;
 use tracing::{debug, info};
 
 pub struct Pipeline {
-    state: Arc<StateManager>,
     graph: Arc<DiGraph<Box<dyn Feature>, ()>>,
     order: Vec<NodeIndex>,
 }
 
 impl Pipeline {
-    pub fn from_config(state: Arc<StateManager>, config: &PipelineConfig) -> Self {
+    pub fn from_config(config: &PipelineConfig) -> Self {
         let mut graph = DiGraph::new();
 
         // Create features
@@ -55,14 +54,18 @@ impl Pipeline {
 
         info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
         Pipeline {
-            state,
             graph: Arc::new(graph),
             order,
         }
     }
 
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
-    pub fn calculate(&self, instrument: Instrument, event_time: OffsetDateTime) -> Vec<FeatureEvent> {
+    pub fn calculate(
+        &self,
+        state: Arc<StateManager>,
+        timestamp: &OffsetDateTime,
+        instrument: &Instrument,
+    ) -> Vec<FeatureEvent> {
         // Step 1: Calculate in-degrees
         let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
         for edge in self.graph.edge_indices() {
@@ -85,7 +88,7 @@ impl Pipeline {
         let pool = ThreadPoolBuilder::new().build().expect("Failed to create thread pool");
         pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
-                let state = self.state.clone();
+                let state = state.clone();
                 let instrument = instrument.clone();
                 let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);
@@ -97,7 +100,7 @@ impl Pipeline {
                     let feature = &graph[node];
 
                     // Query the data
-                    let data = state.read_features(&instrument, &event_time, feature.data());
+                    let data = state.read_features(&instrument, timestamp, feature.data());
 
                     // Calculate the feature
                     let res = feature.calculate(data);
@@ -108,7 +111,7 @@ impl Pipeline {
                             // Save data to state and result set
                             data.into_iter().for_each(|(id, value)| {
                                 debug!("Saving: {} => {}", id, value);
-                                let event = FeatureEvent::new(id, instrument.to_owned(), event_time, value);
+                                let event = FeatureEvent::new(id, instrument.to_owned(), timestamp.to_owned(), value);
                                 state.add_feature(event.clone());
                                 pipeline_result.lock().push(event);
                             });

@@ -1,11 +1,10 @@
 use super::{Strategy, StrategyId};
 use crate::{
     config::CrossoverConfig,
-    features::{FeatureEvent, FeatureId},
-    models::{Signal, Weight},
+    models::{FeatureEvent, FeatureId, Signal, Weight},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[allow(unused)]
 pub struct CrossoverStrategy {
     id: StrategyId,

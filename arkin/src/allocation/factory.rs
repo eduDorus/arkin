@@ -1,17 +1,15 @@
-use std::sync::Arc;
-
 use super::{equal::EqualAllocation, AllocationModule};
-use crate::{config::AllocationConfig, state::StateManager};
+use crate::config::AllocationConfig;
 
 pub struct AllocationFactory {}
 
 impl AllocationFactory {
-    pub fn from_config(state: Arc<StateManager>, configs: &[AllocationConfig]) -> Vec<Box<dyn AllocationModule>> {
+    pub fn from_config(configs: &[AllocationConfig]) -> Vec<Box<dyn AllocationModule>> {
         let mut allocations = Vec::new();
 
         configs.iter().for_each(|c| {
             let allocation: Box<dyn AllocationModule> = match &c {
-                AllocationConfig::Equal(c) => Box::new(EqualAllocation::from_config(state.clone(), c)),
+                AllocationConfig::Equal(c) => Box::new(EqualAllocation::from_config(c)),
             };
             allocations.push(allocation);
         });

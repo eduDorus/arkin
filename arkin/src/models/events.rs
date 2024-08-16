@@ -1,7 +1,7 @@
 use strum::{Display, EnumDiscriminants, EnumString};
 use time::OffsetDateTime;
 
-use super::{Allocation, Book, ExecutionOrder, Fill, Instrument, Signal, Tick, Trade};
+use super::{Allocation, Book, ExecutionOrder, Fill, Instrument, Position, Signal, Tick, Trade};
 
 pub trait EventTypeOf {
     fn event_type() -> EventType;
@@ -18,7 +18,7 @@ pub enum Event {
     Allocation(Allocation),
     ExecutionOrder(ExecutionOrder),
     Fill(Fill),
-    CompletedTrade(Trade),
+    Position(Position),
 }
 
 impl Event {
@@ -31,7 +31,7 @@ impl Event {
             Event::Allocation(e) => &e.event_time,
             Event::ExecutionOrder(e) => &e.event_time,
             Event::Fill(e) => &e.event_time,
-            Event::CompletedTrade(e) => &e.event_time,
+            Event::Position(e) => &e.last_updated_at,
         }
     }
 
@@ -44,7 +44,7 @@ impl Event {
             Event::Allocation(e) => &e.instrument,
             Event::ExecutionOrder(e) => &e.instrument,
             Event::Fill(e) => &e.instrument,
-            Event::CompletedTrade(e) => &e.instrument,
+            Event::Position(e) => &e.instrument,
         }
     }
 

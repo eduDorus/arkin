@@ -1,5 +1,4 @@
-use super::{ExecutionOrder, Instrument, Notional, OrderSide, Price, Quantity};
-use crate::strategies::StrategyId;
+use super::{ExecutionOrder, Instrument, Notional, OrderSide, Price, Quantity, StrategyId};
 use time::OffsetDateTime;
 
 #[derive(Clone)]

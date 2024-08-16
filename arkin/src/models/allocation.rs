@@ -1,5 +1,4 @@
-use super::{Event, EventType, EventTypeOf, Instrument, Notional, Price, Quantity, Weight};
-use crate::strategies::StrategyId;
+use super::{Event, EventType, EventTypeOf, Instrument, Notional, Price, Quantity, StrategyId, Weight};
 use rust_decimal::Decimal;
 use std::{fmt, time::Duration};
 use strum::Display;
@@ -36,6 +35,12 @@ impl TryFrom<Event> for Allocation {
         } else {
             Err(())
         }
+    }
+}
+
+impl From<Allocation> for Event {
+    fn from(allocation: Allocation) -> Self {
+        Event::Allocation(allocation)
     }
 }
 
@@ -81,9 +86,11 @@ impl ExecutionOrder {
 
     pub fn fill_time(&self) -> Option<Duration> {
         match self.status {
-            ExecutionStatus::Filled | ExecutionStatus::PartiallyFilled => Some(Duration::from_millis(
-                (self.last_updated_at - self.event_time).whole_milliseconds() as u64,
-            )),
+            ExecutionStatus::Filled | ExecutionStatus::PartiallyFilled | ExecutionStatus::PartiallyFilledCancelled => {
+                Some(Duration::from_millis(
+                    (self.last_updated_at - self.event_time).whole_milliseconds() as u64,
+                ))
+            }
             _ => None,
         }
     }
@@ -127,6 +134,7 @@ pub enum ExecutionStatus {
     Pending,
     Open,
     PartiallyFilled,
+    PartiallyFilledCancelled,
     Filled,
     Cancelled,
     Rejected,

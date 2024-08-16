@@ -8,8 +8,7 @@ use time::OffsetDateTime;
 
 use crate::{
     config::{LatestInputConfig, PeriodInputConfig, WindowInputConfig},
-    features::{FeatureEvent, FeatureId},
-    models::Instrument,
+    models::{FeatureEvent, FeatureId, Instrument},
     utils::CompositeIndex,
 };
 

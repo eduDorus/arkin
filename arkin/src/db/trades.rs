@@ -124,7 +124,7 @@ impl DBManager {
         Ok(())
     }
 
-    pub async fn read_trades(&self, from: OffsetDateTime, to: OffsetDateTime) -> Vec<Trade> {
+    pub async fn read_trades(&self, from: &OffsetDateTime, to: &OffsetDateTime) -> Vec<Trade> {
         let stream = sqlx::query_as!(
             TradeRow,
             r#"
@@ -217,7 +217,7 @@ mod tests {
         let till = OffsetDateTime::now_utc();
         let from = till - time::Duration::days(1);
 
-        let trades = manager.read_trades(from, till).await;
+        let trades = manager.read_trades(&from, &till).await;
         assert_eq!(trades.len(), 2);
         for trade in trades {
             info!("{}", trade);

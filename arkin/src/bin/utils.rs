@@ -4,9 +4,8 @@ use arkin::config;
 use arkin::constants::TRADE_PRICE_ID;
 use arkin::constants::TRADE_QUANTITY_ID;
 use arkin::db::DBManager;
-use arkin::execution::Execution;
 use arkin::execution::ExecutionManager;
-use arkin::features::FeatureEvent;
+use arkin::features::FeatureManager;
 use arkin::ingestors::BinanceParser;
 use arkin::ingestors::TardisChannel;
 use arkin::ingestors::TardisExchange;
@@ -14,9 +13,9 @@ use arkin::ingestors::TardisRequest;
 use arkin::ingestors::TardisService;
 use arkin::logging;
 use arkin::models::Event;
+use arkin::models::FeatureEvent;
 use arkin::models::Instrument;
 use arkin::models::Venue;
-use arkin::pipeline::Pipeline;
 use arkin::state::StateManager;
 use arkin::strategies::StrategyManager;
 use clap::Parser;
@@ -28,6 +27,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use time::macros::format_description;
+use time::OffsetDateTime;
 use time::PrimitiveDateTime;
 use tokio::pin;
 use tracing::debug;
@@ -165,75 +165,41 @@ async fn main() -> Result<()> {
                 start.format(&format).expect("Failed to format date"),
                 end.format(&format).expect("Failed to format date")
             );
-            let db = DBManager::from_config(&config.db).await;
+
+            // Load data
+            let db = Arc::new(DBManager::from_config(&config.db).await);
             let state = Arc::new(StateManager::from_config(&config.state_manager));
-
-            // Load trades
-            let trades = db.read_trades(start, end).await;
-            // split trades to feature events
-            trades.into_iter().for_each(|t| {
-                state.add_event(Event::Trade(t.clone()));
-                state.add_feature(FeatureEvent::new(
-                    TRADE_PRICE_ID.to_owned(),
-                    t.instrument.clone(),
-                    t.event_time,
-                    t.price.value().to_f64().unwrap(),
-                ));
-                state.add_feature(FeatureEvent::new(
-                    TRADE_QUANTITY_ID.to_owned(),
-                    t.instrument,
-                    t.event_time,
-                    t.quantity.value().to_f64().unwrap(),
-                ));
-            });
-
-            // Load ticks
-            let ticks = db.read_ticks(start, end).await;
-            ticks.into_iter().for_each(|t| {
-                state.add_event(Event::Tick(t));
-            });
+            init_state(state.clone(), db.clone(), &start, &end).await;
 
             // INITIALIZE
-            let feature_pipeline = Pipeline::from_config(state.clone(), &config.feature_pipeline);
-            // let analytics_pipeline = Pipeline::from_config(state.clone(), &config.analytics_pipeline);
-            let strategy_manager = StrategyManager::from_config(&config.strategy_manager);
+            let feature_manager = FeatureManager::from_config(state.clone(), &config.feature_manager);
+            let strategy_manager = StrategyManager::from_config(state.clone(), &config.strategy_manager);
             let allocation_manager = AllocationManager::from_config(state.clone(), &config.allocation_manager);
             let execution_manager = ExecutionManager::from_config(state.clone(), &config.execution_manager);
 
             // RUN
             let timer = Instant::now();
-            let instrument = Instrument::perpetual(Venue::Binance, "btc".into(), "usdt".into());
+            let instruments = vec![Instrument::perpetual(Venue::Binance, "btc".into(), "usdt".into())];
             let mut timestamp = start + Duration::from_secs(frequency);
             let intervals = ((end - start).whole_seconds() / frequency as i64) - 1;
 
             for _ in 0..intervals {
                 debug!("----------------- {:?} -----------------", timestamp);
                 // Run pipeline
-                let features = feature_pipeline.calculate(instrument.clone(), timestamp);
-                for feature in &features {
-                    debug!("Feature: {}", feature);
-                }
+                let features = feature_manager.calculate(&timestamp, &instruments);
 
                 // Run strategies
-                let signals = strategy_manager.calculate(&features);
-                for signal in &signals {
-                    debug!("Signal: {}", signal);
-                }
+                let signals = strategy_manager.calculate(&timestamp, &features);
 
-                // Run analytics
-                // let analytics = analytics_pipeline.calculate(instrument.clone(), timestamp);
-                // for analytic in &analytics {
-                //     debug!("Analytic: {}", analytic);
-                // }
+                // Run portfolio
+                let positions = state.position_snapshot(&timestamp);
+                let market = state.market_snapshot(&timestamp);
 
                 // Run allocation
-                let orders = allocation_manager.calculate(&signals);
-                for allocation in &orders {
-                    debug!("E: {}", allocation);
-                }
+                let allocations = allocation_manager.calculate(&timestamp, &signals, &market, &positions);
 
                 // Run simulation
-                execution_manager.add_orders(orders);
+                execution_manager.execute(allocations);
                 // Run analytics
 
                 timestamp += Duration::from_secs(frequency);
@@ -253,4 +219,31 @@ async fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub async fn init_state(state: Arc<StateManager>, db: Arc<DBManager>, start: &OffsetDateTime, end: &OffsetDateTime) {
+    // Load trades
+    let trades = db.read_trades(start, end).await;
+    // split trades to feature events
+    trades.into_iter().for_each(|t| {
+        state.add_event(Event::Trade(t.clone()));
+        state.add_feature(FeatureEvent::new(
+            TRADE_PRICE_ID.to_owned(),
+            t.instrument.clone(),
+            t.event_time,
+            t.price.value().to_f64().unwrap(),
+        ));
+        state.add_feature(FeatureEvent::new(
+            TRADE_QUANTITY_ID.to_owned(),
+            t.instrument,
+            t.event_time,
+            t.quantity.value().to_f64().unwrap(),
+        ));
+    });
+
+    // Load ticks
+    let ticks = db.read_ticks(start, end).await;
+    ticks.into_iter().for_each(|t| {
+        state.add_event(t.into());
+    });
 }
