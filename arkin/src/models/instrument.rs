@@ -13,7 +13,7 @@ pub enum Venue {
     Binance,
 }
 
-#[derive(Display, Clone, EnumDiscriminants, PartialEq, Eq, Hash)]
+#[derive(Clone, EnumDiscriminants, PartialEq, Eq, Hash)]
 #[strum_discriminants(name(InstrumentType))]
 #[strum_discriminants(derive(EnumString, Display))]
 #[strum_discriminants(strum(serialize_all = "snake_case"))]
@@ -145,17 +145,17 @@ impl Instrument {
     }
 }
 
-// impl fmt::Display for Instrument {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         match self {
-//             Instrument::Holding(holding) => write!(f, "holding_{}", holding),
-//             Instrument::Spot(spot) => write!(f, "spot_{}", spot),
-//             Instrument::Perp(perpetual) => write!(f, "perp_{}", perpetual),
-//             Instrument::Future(future) => write!(f, "future_{}", future),
-//             Instrument::Option(option) => write!(f, "option_{}", option),
-//         }
-//     }
-// }
+impl fmt::Display for Instrument {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Instrument::Holding(holding) => write!(f, "{}", holding),
+            Instrument::Spot(spot) => write!(f, "{}", spot),
+            Instrument::Perpetual(perpetual) => write!(f, "{}", perpetual),
+            Instrument::Future(future) => write!(f, "{}", future),
+            Instrument::Option(option) => write!(f, "{}", option),
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Asset {

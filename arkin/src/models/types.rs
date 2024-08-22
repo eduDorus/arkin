@@ -1,7 +1,7 @@
 use rust_decimal::prelude::*;
 use std::fmt;
 use std::iter::Sum;
-use std::ops::{Add, AddAssign, Div, Mul, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use time::OffsetDateTime;
 
 use crate::constants;
@@ -115,10 +115,14 @@ impl Div<Quantity> for Price {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct Quantity(Decimal);
 
 impl Quantity {
+    pub fn zero() -> Self {
+        Quantity(Decimal::ZERO)
+    }
+
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
@@ -157,6 +161,12 @@ impl From<Decimal> for Quantity {
     }
 }
 
+impl From<i32> for Quantity {
+    fn from(value: i32) -> Self {
+        Quantity(Decimal::from(value))
+    }
+}
+
 impl From<Quantity> for f64 {
     fn from(quantity: Quantity) -> f64 {
         quantity.0.to_f64().expect("Failed to convert Decimal to f64")
@@ -188,6 +198,20 @@ impl Sub<Quantity> for Quantity {
 impl AddAssign<Quantity> for Quantity {
     fn add_assign(&mut self, rhs: Quantity) {
         self.0 = Self::round(self.0 + rhs.0);
+    }
+}
+
+impl SubAssign<Quantity> for Quantity {
+    fn sub_assign(&mut self, rhs: Quantity) {
+        self.0 = Self::round(self.0 - rhs.0);
+    }
+}
+
+impl Mul<Decimal> for Quantity {
+    type Output = Quantity;
+
+    fn mul(self, rhs: Decimal) -> Quantity {
+        Quantity::from(self.0 * rhs)
     }
 }
 

@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{
     config::SimulationConfig,
-    models::{ExecutionOrder, Fill, Venue},
+    models::{ExecutionOrder, Venue},
     state::StateManager,
 };
 use rust_decimal::prelude::*;

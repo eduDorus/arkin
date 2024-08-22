@@ -4,7 +4,6 @@ use arkin::config;
 use arkin::constants::TRADE_PRICE_ID;
 use arkin::constants::TRADE_QUANTITY_ID;
 use arkin::db::DBManager;
-use arkin::execution::ExecutionManager;
 use arkin::features::FeatureManager;
 use arkin::ingestors::BinanceParser;
 use arkin::ingestors::TardisChannel;
@@ -16,6 +15,7 @@ use arkin::models::Event;
 use arkin::models::FeatureEvent;
 use arkin::models::Instrument;
 use arkin::models::Venue;
+use arkin::portfolio::PortfolioManager;
 use arkin::state::StateManager;
 use arkin::strategies::StrategyManager;
 use clap::Parser;
@@ -172,10 +172,11 @@ async fn main() -> Result<()> {
             init_state(state.clone(), db.clone(), &start, &end).await;
 
             // INITIALIZE
+            let portfolio_manager = PortfolioManager::from_config(state.clone(), &config.portfolio_manager);
             let feature_manager = FeatureManager::from_config(state.clone(), &config.feature_manager);
             let strategy_manager = StrategyManager::from_config(state.clone(), &config.strategy_manager);
             let allocation_manager = AllocationManager::from_config(state.clone(), &config.allocation_manager);
-            let execution_manager = ExecutionManager::from_config(state.clone(), &config.execution_manager);
+            // let execution_manager = ExecutionManager::from_config(state.clone(), &config.execution_manager);
 
             // RUN
             let timer = Instant::now();
@@ -190,16 +191,18 @@ async fn main() -> Result<()> {
 
                 // Run strategies
                 let signals = strategy_manager.calculate(&timestamp, &features);
+                info!("Signals: {}", signals);
 
                 // Run portfolio
-                let positions = state.position_snapshot(&timestamp);
+                let positions = portfolio_manager.position_snapshot(&timestamp);
+                info!("Positions: {}", positions);
                 let market = state.market_snapshot(&timestamp);
 
                 // Run allocation
                 let allocations = allocation_manager.calculate(&timestamp, &signals, &market, &positions);
 
                 // Run simulation
-                execution_manager.execute(allocations);
+                // execution_manager.execute(allocations);
                 // Run analytics
 
                 timestamp += Duration::from_secs(frequency);

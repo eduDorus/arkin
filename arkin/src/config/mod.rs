@@ -1,4 +1,5 @@
 use config::{Config, Environment, File};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::env;
 use tracing::error;
@@ -30,10 +31,19 @@ pub struct GlobalConfig {
     pub db: DatabaseConfig,
     pub state_manager: StateManagerConfig,
     pub ingestors: Vec<IngestorConfig>,
+    pub portfolio_manager: PortfolioManagerConfig,
     pub feature_manager: FeatureManagerConfig,
     pub strategy_manager: StrategyManagerConfig,
     pub allocation_manager: AllocationManagerConfig,
     pub execution_manager: ExecutionManagerConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PortfolioManagerConfig {
+    pub initial_capital: Decimal,
+    pub leverage: Decimal,
+    pub initial_margin: Decimal,
+    pub maintenance_margin: Decimal,
 }
 
 pub fn load() -> GlobalConfig {

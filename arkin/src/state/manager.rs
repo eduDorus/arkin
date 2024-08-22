@@ -7,7 +7,7 @@ use time::OffsetDateTime;
 
 use crate::{
     config::StateManagerConfig,
-    models::{Event, EventType, EventTypeOf, FeatureEvent, Instrument, MarketSnapshot, PositionSnapshot},
+    models::{Event, EventTypeOf, FeatureEvent, Instrument, MarketSnapshot, Tick},
 };
 
 use super::{EventState, FeatureDataRequest, FeatureDataResponse, FeatureState};
@@ -33,12 +33,14 @@ impl StateManager {
         self.features.add_feature(event);
     }
 
-    pub fn position_snapshot(&self, _timestamp: &OffsetDateTime) -> PositionSnapshot {
-        todo!()
-    }
-
-    pub fn market_snapshot(&self, _timestamp: &OffsetDateTime) -> MarketSnapshot {
-        todo!()
+    // Get the latest ticks for every instrument
+    pub fn market_snapshot(&self, timestamp: &OffsetDateTime) -> MarketSnapshot {
+        let instruments = self.events.list_instruments::<Tick>();
+        let ticks = instruments
+            .iter()
+            .filter_map(|i| self.events.last_entry(i, timestamp))
+            .collect::<Vec<_>>();
+        MarketSnapshot::new(timestamp.to_owned(), ticks)
     }
 
     pub fn read_features(
@@ -50,16 +52,18 @@ impl StateManager {
         self.features.read_features(instrument, timestamp, request)
     }
 
-    pub fn list_instruments(&self, event_type: &EventType) -> HashSet<Instrument> {
-        self.events.list_instruments(event_type)
+    pub fn list_instruments<T>(&self) -> HashSet<Instrument>
+    where
+        T: TryFrom<Event, Error = ()> + EventTypeOf,
+    {
+        self.events.list_instruments::<T>()
     }
 
     pub fn events<T>(&self, timestamp: &OffsetDateTime) -> HashMap<Instrument, Vec<T>>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
-        let event_type = T::event_type();
-        let instruments = self.list_instruments(&event_type);
+        let instruments = self.events.list_instruments::<T>();
         instruments
             .into_iter()
             .map(|i| {
@@ -80,8 +84,7 @@ impl StateManager {
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
-        let event_type = T::event_type();
-        let instruments = self.list_instruments(&event_type);
+        let instruments = self.events.list_instruments::<T>();
         instruments
             .into_iter()
             .map(|i| {
@@ -102,8 +105,7 @@ impl StateManager {
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
-        let event_type = T::event_type();
-        let instruments = self.list_instruments(&event_type);
+        let instruments = self.events.list_instruments::<T>();
         instruments
             .into_iter()
             .map(|i| {

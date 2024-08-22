@@ -1,136 +1,71 @@
+use rstest::*;
+use rust_decimal::prelude::*;
+use rust_decimal_macros::dec;
 use std::sync::Arc;
-
-use time::macros::datetime;
+use time::OffsetDateTime;
 
 use crate::{
-    models::{Allocation, Event, Fill, Instrument, Notional, Price, Quantity, Tick, Venue},
+    config::{PortfolioManagerConfig, StateManagerConfig},
+    models::{ExecutionOrder, Instrument, OrderSide, Position, PositionSide, StrategyId, Venue},
+    portfolio::PortfolioManager,
     state::StateManager,
 };
-pub fn test_perp_instrument() -> Instrument {
-    // Create an instrument
+
+#[fixture]
+pub fn instrument() -> Instrument {
     Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into())
 }
 
-pub fn test_multi_perp_instrument() -> Vec<Instrument> {
-    // Create an instrument
-    vec![
-        Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
-        Instrument::perpetual(Venue::Binance, "ETH".into(), "USDT".into()),
-    ]
+#[fixture]
+pub fn strategy() -> StrategyId {
+    "test_strategy".into()
 }
 
-#[derive(Default)]
-pub struct TestStateBuilder {
-    state: Arc<StateManager>,
+#[fixture]
+pub fn state_manager() -> StateManager {
+    StateManager::from_config(&StateManagerConfig::default())
 }
 
-impl TestStateBuilder {
-    // pub fn add_fills(self, instrument: &Instrument) -> Self {
-    //     // Create a couple of fills
-    //     self.state.add_event(Event::Fill(Fill {
-    //         event_time: datetime!(2024-01-01 00:00:50).assume_utc(),
-    //         instrument: instrument.clone(),
-    //         order_id: 0,
-    //         strategy_id: "test".into(),
-    //         price: Price::from(80.),
-    //         quantity: Quantity::from(10.),
-    //         commission: Notional::from(1.5),
-    //     }));
-    //     self.state.add_event(Event::Fill(Fill {
-    //         event_time: datetime!(2024-01-01 00:01:50).assume_utc(),
-    //         instrument: instrument.clone(),
-    //         order_id: 1,
-    //         strategy_id: "test".into(),
-    //         price: Price::from(120.),
-    //         quantity: Quantity::from(10.),
-    //         commission: Notional::from(1.0),
-    //     }));
-    //     self.state.add_event(Event::Fill(Fill {
-    //         event_time: datetime!(2024-01-01 00:02:50).assume_utc(),
-    //         instrument: instrument.clone(),
-    //         order_id: 2,
-    //         strategy_id: "test".into(),
-    //         price: Price::from(100.),
-    //         quantity: Quantity::from(-10.),
-    //         commission: Notional::from(1.5),
-    //     }));
-    //     self.state.add_event(Event::Fill(Fill {
-    //         event_time: datetime!(2024-01-01 00:03:50).assume_utc(),
-    //         instrument: instrument.clone(),
-    //         order_id: 3,
-    //         strategy_id: "test".into(),
-    //         price: Price::from(100.),
-    //         quantity: Quantity::from(-20.),
-    //         commission: Notional::from(2.),
-    //     }));
-    //     self.state.add_event(Event::Fill(Fill {
-    //         event_time: datetime!(2024-01-01 00:04:50).assume_utc(),
-    //         instrument: instrument.clone(),
-    //         order_id: 3,
-    //         strategy_id: "test".into(),
-    //         price: Price::from(50.),
-    //         quantity: Quantity::from(10.),
-    //         commission: Notional::from(2.),
-    //     }));
-
-    // self
-    // }
-
-    pub fn add_ticks(self, instrument: &Instrument) -> Self {
-        // Create a couple of trades
-        self.state.add_event(Event::Tick(Tick::new(
-            datetime!(2024-01-01 00:00:00).assume_utc(),
-            instrument.clone(),
-            0,
-            Price::from(101.),
-            Quantity::from(10.),
-            Price::from(100.),
-            Quantity::from(10.),
-        )));
-
-        self.state.add_event(Event::Tick(Tick::new(
-            datetime!(2024-01-01 00:01:00).assume_utc(),
-            instrument.clone(),
-            1,
-            Price::from(102.),
-            Quantity::from(10.),
-            Price::from(101.),
-            Quantity::from(10.),
-        )));
-
-        self.state.add_event(Event::Tick(Tick::new(
-            datetime!(2024-01-01 00:02:00).assume_utc(),
-            instrument.clone(),
-            2,
-            Price::from(103.),
-            Quantity::from(10.),
-            Price::from(102.),
-            Quantity::from(10.),
-        )));
-
-        self.state.add_event(Event::Tick(Tick::new(
-            datetime!(2024-01-01 00:03:00).assume_utc(),
-            instrument.clone(),
-            3,
-            Price::from(104.),
-            Quantity::from(10.),
-            Price::from(101.),
-            Quantity::from(10.),
-        )));
-
-        self
-    }
-
-    pub fn build(self) -> Arc<StateManager> {
-        self.state
-    }
+#[fixture]
+pub fn portfolio_manager(#[default(state_manager())] state: StateManager) -> PortfolioManager {
+    let config = PortfolioManagerConfig {
+        initial_capital: dec!(100000),
+        leverage: dec!(1),
+        initial_margin: dec!(0.2),
+        maintenance_margin: dec!(0.15),
+    };
+    PortfolioManager::from_config(Arc::new(state), &config)
 }
 
-// pub fn allocations(instrument: &Instrument) -> Vec<Allocation> {
-//     vec![Allocation::new(
-//         datetime!(2024-01-01 00:00:00).assume_utc(),
-//         instrument.clone(),
-//         "test".into(),
-//         Notional::from(1000.),
-//     )]
-// }
+#[fixture]
+pub fn market_execution_order(
+    #[default(1)] id: u64,
+    #[default(OffsetDateTime::now_utc())] event_time: OffsetDateTime,
+    #[default(strategy())] strategy_id: StrategyId,
+    #[default(instrument())] instrument: Instrument,
+    #[default(OrderSide::Buy)] side: OrderSide,
+    #[default(dec!(1))] quantity: Decimal,
+) -> ExecutionOrder {
+    ExecutionOrder::new_market_order(id, event_time, strategy_id, instrument, side, quantity.into())
+}
+
+#[fixture]
+pub fn position_fixture(
+    #[default(OffsetDateTime::now_utc())] event_time: OffsetDateTime,
+    #[default(strategy())] strategy_id: StrategyId,
+    #[default(instrument())] instrument: Instrument,
+    #[default(PositionSide::Long)] side: PositionSide,
+    #[default(dec!(0))] price: Decimal,
+    #[default(dec!(0))] quantity: Decimal,
+    #[default(dec!(0))] commission: Decimal,
+) -> Position {
+    Position::new(
+        event_time,
+        strategy_id,
+        instrument,
+        side,
+        price.into(),
+        quantity.into(),
+        commission.into(),
+    )
+}

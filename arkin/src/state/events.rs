@@ -28,11 +28,15 @@ impl EventState {
         entry.insert(composit_key, event);
     }
 
-    pub fn list_instruments(&self, event_type: &EventType) -> HashSet<Instrument> {
+    pub fn list_instruments<T>(&self) -> HashSet<Instrument>
+    where
+        T: TryFrom<Event, Error = ()> + EventTypeOf,
+    {
+        let event_type = T::event_type();
         self.events
             .iter()
             .filter_map(|k| {
-                if k.key().1 == *event_type {
+                if k.key().1 == event_type {
                     Some(k.key().0.clone())
                 } else {
                     None

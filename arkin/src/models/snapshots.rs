@@ -1,3 +1,5 @@
+use std::fmt;
+
 use time::OffsetDateTime;
 
 use super::{Allocation, ExecutionOrder, FeatureEvent, Position, Signal, Tick};
@@ -13,6 +15,16 @@ impl PositionSnapshot {
             timestamp,
             positions,
         }
+    }
+}
+
+impl fmt::Display for PositionSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PositionSnapshot: {}", self.timestamp)?;
+        for position in &self.positions {
+            write!(f, "\n{}", position)?;
+        }
+        Ok(())
     }
 }
 
@@ -44,6 +56,16 @@ impl SignalSnapshot {
     }
 }
 
+impl fmt::Display for SignalSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SignalSnapshot: {}", self.event_time)?;
+        for signal in &self.signals {
+            write!(f, "\n{}", signal)?;
+        }
+        Ok(())
+    }
+}
+
 pub struct AllocationSnapshot {
     pub event_time: OffsetDateTime,
     pub allocations: Vec<Allocation>,
@@ -68,5 +90,15 @@ pub struct MarketSnapshot {
 impl MarketSnapshot {
     pub fn new(event_time: OffsetDateTime, ticks: Vec<Tick>) -> Self {
         Self { event_time, ticks }
+    }
+}
+
+impl fmt::Display for MarketSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MarketSnapshot: {}", self.event_time)?;
+        for tick in &self.ticks {
+            write!(f, "\n{}", tick)?;
+        }
+        Ok(())
     }
 }

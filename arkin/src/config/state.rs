@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StateManagerConfig {}
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub struct StateManagerConfig {
+    lookback: usize,
+}
