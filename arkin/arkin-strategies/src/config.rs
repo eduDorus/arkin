@@ -3,12 +3,17 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StrategyManagerConfig {
-    pub strategies: Vec<StrategyConfig>,
+pub struct StrategyConfig {
+    pub strategy_manager: StrategyManagerConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum StrategyConfig {
+pub struct StrategyManagerConfig {
+    pub strategies: Vec<StrategyModuleConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum StrategyModuleConfig {
     #[serde(rename = "crossover")]
     Crossover(CrossoverConfig),
     // #[serde(rename = "spreader")]

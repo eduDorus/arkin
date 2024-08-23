@@ -5,13 +5,14 @@ use std::{
 
 use arkin_common::prelude::*;
 use dashmap::DashMap;
+use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
 use crate::config::{LatestInputConfig, PeriodInputConfig, WindowInputConfig};
 
 #[derive(Default)]
 pub struct FeatureState {
-    features: DashMap<(Instrument, FeatureId), BTreeMap<CompositeIndex, f64>>,
+    features: DashMap<(Instrument, FeatureId), BTreeMap<CompositeIndex, Decimal>>,
 }
 
 impl FeatureState {
@@ -52,7 +53,7 @@ impl FeatureState {
         )
     }
 
-    fn last_entry(&self, instrument: &Instrument, feature_id: &FeatureId, timestamp: &OffsetDateTime) -> Vec<f64> {
+    fn last_entry(&self, instrument: &Instrument, feature_id: &FeatureId, timestamp: &OffsetDateTime) -> Vec<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
 
         if let Some(tree) = self.features.get(&(instrument.to_owned(), feature_id.to_owned())) {
@@ -68,7 +69,7 @@ impl FeatureState {
         feature_id: &FeatureId,
         timestamp: &OffsetDateTime,
         window: &Duration,
-    ) -> Vec<f64> {
+    ) -> Vec<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
         let end_index = CompositeIndex::new(&(*timestamp - *window));
 
@@ -85,7 +86,7 @@ impl FeatureState {
         feature_id: &FeatureId,
         timestamp: &OffsetDateTime,
         periods: &usize,
-    ) -> Vec<f64> {
+    ) -> Vec<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
 
         if let Some(tree) = self.features.get(&(instrument.to_owned(), feature_id.to_owned())) {
@@ -157,48 +158,36 @@ impl FeatureDataRequest {
 
 #[derive(Debug, Clone)]
 pub struct FeatureDataResponse {
-    data: HashMap<FeatureId, Vec<f64>>,
+    data: HashMap<FeatureId, Vec<Decimal>>,
 }
 
 impl FeatureDataResponse {
-    pub fn new(data: HashMap<FeatureId, Vec<f64>>) -> Self {
+    pub fn new(data: HashMap<FeatureId, Vec<Decimal>>) -> Self {
         FeatureDataResponse { data }
     }
 
     // Convenience method to get the last value for a feature ID
-    pub fn last(&self, feature_id: &FeatureId) -> Option<f64> {
+    pub fn last(&self, feature_id: &FeatureId) -> Option<Decimal> {
         self.data.get(feature_id).and_then(|values| values.last().cloned())
     }
 
-    pub fn count(&self, feature_id: &FeatureId) -> Option<f64> {
-        self.data.get(feature_id).map(|values| values.len() as f64)
+    pub fn count(&self, feature_id: &FeatureId) -> Option<Decimal> {
+        self.data.get(feature_id).map(|values| values.len().into())
     }
 
     // Convenience method to get the sum of values for a feature ID
-    pub fn sum(&self, feature_id: &FeatureId) -> Option<f64> {
+    pub fn sum(&self, feature_id: &FeatureId) -> Option<Decimal> {
         self.data.get(feature_id).map(|values| values.iter().sum())
     }
 
-    pub fn mean(&self, feature_id: &FeatureId) -> Option<f64> {
+    pub fn mean(&self, feature_id: &FeatureId) -> Option<Decimal> {
         self.data.get(feature_id).map(|values| {
-            let sum: f64 = values.iter().sum();
-            sum / values.len() as f64
+            let sum = values.iter().sum::<Decimal>();
+            sum / Decimal::from(values.len())
         })
     }
 
-    pub fn _max(&self, feature_id: &FeatureId) -> Option<f64> {
-        self.data
-            .get(feature_id)
-            .map(|values| values.iter().fold(f64::MIN, |acc, &v| acc.max(v)))
-    }
-
-    pub fn _min(&self, feature_id: &FeatureId) -> Option<f64> {
-        self.data
-            .get(feature_id)
-            .map(|values| values.iter().fold(f64::MAX, |acc, &v| acc.min(v)))
-    }
-
-    pub fn get(&self, feature_id: &FeatureId) -> Vec<f64> {
+    pub fn get(&self, feature_id: &FeatureId) -> Vec<Decimal> {
         self.data.get(feature_id).unwrap_or(&vec![]).to_vec()
     }
 }

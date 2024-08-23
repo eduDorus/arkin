@@ -17,3 +17,4 @@ serde = { workspace = true }
 parking_lot = { workspace = true }
 rayon = { workspace = true }
 flume = { workspace = true }
+rust_decimal = { workspace = true }

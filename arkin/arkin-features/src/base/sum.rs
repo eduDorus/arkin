@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use arkin_common::prelude::*;
+use rust_decimal::Decimal;
 use tracing::debug;
 
 use crate::{
@@ -42,9 +43,9 @@ impl FeatureModule for SumFeature {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
+    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating sum with id: {}", self.id);
-        let sum = data.sum(self.inputs[0].feature_id()).unwrap_or(0.);
+        let sum = data.sum(self.inputs[0].feature_id()).unwrap_or_default();
         let mut res = HashMap::new();
         res.insert(self.output.clone(), sum);
         Ok(res)

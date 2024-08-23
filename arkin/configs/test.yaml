@@ -1,0 +1,6 @@
+strategy_manager:
+  strategies:
+    - crossover:
+        id: crossover
+        price_spread_id: spread_sma_vwap
+        volume_spread_id: spread_sma_volume

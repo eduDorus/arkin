@@ -4,6 +4,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::Result;
 use arkin_common::prelude::*;
 use rayon::prelude::*;
+use rust_decimal::Decimal;
 use time::OffsetDateTime;
 
 use crate::Pipeline;
@@ -16,7 +17,7 @@ pub trait FeatureModule: Debug + Send + Sync {
     fn id(&self) -> &NodeId;
     fn sources(&self) -> &[NodeId];
     fn data(&self) -> &[FeatureDataRequest];
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>>;
+    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>>;
 }
 
 pub struct FeatureManager {

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use rust_decimal::Decimal;
 use time::OffsetDateTime;
 
 use crate::{constants::TIMESTAMP_FORMAT, FeatureId};
@@ -11,11 +12,11 @@ pub struct Feature {
     pub id: FeatureId,
     pub instrument: Instrument,
     pub event_time: OffsetDateTime,
-    pub value: f64,
+    pub value: Decimal,
 }
 
 impl Feature {
-    pub fn new(id: FeatureId, instrument: Instrument, event_time: OffsetDateTime, value: f64) -> Self {
+    pub fn new(id: FeatureId, instrument: Instrument, event_time: OffsetDateTime, value: Decimal) -> Self {
         Feature {
             id,
             instrument,

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use arkin_common::prelude::*;
+use rust_decimal::Decimal;
 use tracing::debug;
 
 use crate::{
@@ -42,23 +43,23 @@ impl FeatureModule for VWAPFeature {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
+    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating VWAP with id: {}", self.id);
         // Check if both trade_price and trade_quantity are present
         let price = data.get(self.inputs[0].feature_id());
         let quantity = data.get(self.inputs[1].feature_id());
         assert_eq!(price.len(), quantity.len());
 
-        let mut total_quantity = 0.;
-        let mut total_notional = 0.;
+        let mut total_quantity = Decimal::ZERO;
+        let mut total_notional = Decimal::ZERO;
 
         price.iter().zip(quantity).for_each(|(p, q)| {
             total_quantity += q;
             total_notional += p * q.abs();
         });
 
-        let vwap = if total_quantity == 0. {
-            f64::NAN
+        let vwap = if total_quantity.is_zero() {
+            Decimal::ZERO
         } else {
             total_notional / total_quantity
         };

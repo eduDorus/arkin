@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use arkin_common::prelude::*;
+use rust_decimal::Decimal;
 use tracing::debug;
 
 use crate::{
@@ -45,12 +46,16 @@ impl FeatureModule for SMAFeature {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
+    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating mean with id: {}", self.id);
-        let sum = data.mean(self.inputs[0].feature_id()).unwrap_or(0.);
-        let count = data.count(self.inputs[0].feature_id()).unwrap_or(0.);
+        let sum = data.mean(self.inputs[0].feature_id()).unwrap_or_default();
+        let count = data.count(self.inputs[0].feature_id()).unwrap_or_default();
 
-        let mean = if count == 0. { f64::NAN } else { sum / count };
+        let mean = if count.is_zero() {
+            Decimal::ZERO
+        } else {
+            sum / count
+        };
         let mut res = HashMap::new();
         res.insert(self.output.clone(), mean);
         Ok(res)

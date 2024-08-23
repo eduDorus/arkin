@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use arkin_common::prelude::*;
+use rust_decimal::Decimal;
 use tracing::debug;
 
 use crate::{
@@ -44,10 +45,10 @@ impl FeatureModule for SpreadFeature {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
+    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating spread with id: {}", self.id);
-        let front = data.last(self.inputs[0].feature_id()).unwrap_or(0.);
-        let back = data.last(self.inputs[1].feature_id()).unwrap_or(0.);
+        let front = data.last(self.inputs[0].feature_id()).unwrap_or_default();
+        let back = data.last(self.inputs[1].feature_id()).unwrap_or_default();
 
         let mut spread = front - back;
 

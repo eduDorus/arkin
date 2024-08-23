@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use arkin_common::prelude::*;
+use rust_decimal::Decimal;
 use tracing::debug;
 
 use crate::{
@@ -42,9 +43,9 @@ impl FeatureModule for CountFeature {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, f64>> {
+    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating count with id: {}", self.id);
-        let count = data.count(self.inputs[0].feature_id()).unwrap_or(0.);
+        let count = data.count(self.inputs[0].feature_id()).unwrap_or_default();
         let mut res = HashMap::new();
         res.insert(self.output.clone(), count);
         Ok(res)

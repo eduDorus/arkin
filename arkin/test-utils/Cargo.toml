@@ -1,0 +1,13 @@
+[package]
+name = "test-utils"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-common = { path = "../arkin-common" }
+
+rstest = { workspace = true }
+time = { workspace = true }
+rust_decimal = { workspace = true }

@@ -10,8 +10,8 @@ members = [
    "arkin-persistance",
    "arkin-strategies", 
    #"arkin-state", 
-   "tests-integration", 
-   "tests-fixtures", 
+   #"test-integration", 
+   "test-utils", 
 ]
 
 default-members = ["arkin"]
@@ -101,9 +101,11 @@ clap = {version = "4.5", features = ["std", "derive", "color", "suggestions"]}
 # Graph Library
 petgraph = {version = "0.6", features = ["graphmap"], default-features = false}
 
+# Testing
+rstest = "0.22.0"
+
 #[workspace.dev-dependencies]
 # Testing
-#rstest = "0.22.0"
 #fake = { version = "2.9.2", features = ["derive", "rust_decimal", "time"] }
 #proptest = { version = "1.5.0", features = ["proptest-macro"] }
 #mockall = { version = "0.13.0", features = ["nightly"] }

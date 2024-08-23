@@ -1,4 +1,5 @@
 use arkin_common::prelude::*;
+use rust_decimal::prelude::*;
 
 use crate::{config::CrossoverConfig, manager::StrategyModule};
 
@@ -31,27 +32,21 @@ impl StrategyModule for CrossoverStrategy {
         let price_spread = data.iter().find(|d| d.id == self.source[0]).expect("Missing price spread");
         let volume_spread = data.iter().find(|d| d.id == self.source[1]).expect("Missing volume spread");
 
-        // If price is high and volume is high we want to sell
-        // If price is low and volume is high we want to buy
-        match (price_spread.value, volume_spread.value) {
-            (p, v) if p > 0. && v > 0. => vec![Signal::new(
-                price_spread.event_time,
-                price_spread.instrument.clone(),
-                self.id.clone(),
-                Weight::from(-1),
-            )],
-            (p, v) if p < 0. && v > 0. => vec![Signal::new(
-                price_spread.event_time,
-                price_spread.instrument.clone(),
-                self.id.clone(),
-                Weight::from(1),
-            )],
-            _ => vec![Signal::new(
-                price_spread.event_time,
-                price_spread.instrument.clone(),
-                self.id.clone(),
-                Weight::from(0),
-            )],
-        }
+        let weight = if volume_spread.value > Decimal::ZERO {
+            match price_spread.value.cmp(&Decimal::ZERO) {
+                std::cmp::Ordering::Greater => Weight::from(-1),
+                std::cmp::Ordering::Less => Weight::from(1),
+                std::cmp::Ordering::Equal => Weight::from(0),
+            }
+        } else {
+            Weight::from(0)
+        };
+
+        vec![Signal::new(
+            price_spread.event_time,
+            price_spread.instrument.clone(),
+            self.id.clone(),
+            weight,
+        )]
     }
 }
