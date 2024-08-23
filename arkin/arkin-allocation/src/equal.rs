@@ -1,0 +1,24 @@
+use arkin_common::prelude::*;
+use rust_decimal::prelude::*;
+
+use crate::{config::EqualConfig, manager::AllocationModule};
+
+pub struct EqualAllocation {
+    _max_allocation: Decimal,
+    _max_allocation_per_instrument: Decimal,
+}
+
+impl EqualAllocation {
+    pub fn from_config(config: &EqualConfig) -> Self {
+        EqualAllocation {
+            _max_allocation: config.max_allocation,
+            _max_allocation_per_instrument: config.max_allocation_per_instrument,
+        }
+    }
+}
+
+impl AllocationModule for EqualAllocation {
+    fn calculate(&self, _signals: &SignalSnapshot, _positions: &PositionSnapshot) -> Vec<Allocation> {
+        todo!()
+    }
+}

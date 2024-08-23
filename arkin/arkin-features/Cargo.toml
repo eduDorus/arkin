@@ -1,0 +1,19 @@
+[package]
+name = "arkin-features"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-common = { path = "../arkin-common" }
+
+dashmap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+time = { workspace = true }
+petgraph = { workspace = true }
+serde = { workspace = true }
+parking_lot = { workspace = true }
+rayon = { workspace = true }
+flume = { workspace = true }
