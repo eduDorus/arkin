@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS ticks (
     bid_quantity NUMERIC(21, 9) NOT NULL,
     ask_price NUMERIC(21, 9) NOT NULL,
     ask_quantity NUMERIC(21, 9) NOT NULL,
-    source TEXT NOT NULL,
     PRIMARY KEY (source, instrument_id, tick_id, event_time)
 );
 -- Convert the table to a hypertable
@@ -41,7 +40,6 @@ CREATE TABLE IF NOT EXISTS trades (
     trade_id BIGINT NOT NULL,
     price NUMERIC(21, 9) NOT NULL,
     quantity NUMERIC(21, 9) NOT NULL,
-    source TEXT NOT NULL,
     PRIMARY KEY (source, instrument_id, trade_id, event_time)
 );
 

@@ -4,3 +4,12 @@ strategy_manager:
         id: crossover
         price_spread_id: spread_sma_vwap
         volume_spread_id: spread_sma_volume
+
+database:
+  host: 127.0.0.1
+  port: 5432
+  user: arkin_admin
+  database: arkin
+  min_connections: 10
+  max_connections: 200
+  idle_timeout: 300

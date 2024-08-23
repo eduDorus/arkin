@@ -102,7 +102,8 @@ clap = {version = "4.5", features = ["std", "derive", "color", "suggestions"]}
 petgraph = {version = "0.6", features = ["graphmap"], default-features = false}
 
 # Testing
-rstest = "0.22.0"
+rstest = { version = "0.22.0" }
+async-std = { version = "1.5", features = ["attributes"] }
 
 #[workspace.dev-dependencies]
 # Testing

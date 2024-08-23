@@ -9,6 +9,10 @@ license.workspace = true
 name = "server"
 path = "src/bin/server.rs"
 
+[[bin]]
+name = "features"
+path = "src/bin/features.rs"
+
 #[[bin]]
 #name = "utils"
 #path = "src/bin/utils.rs"
@@ -21,3 +25,4 @@ mimalloc = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true }
 tokio-rustls = { workspace = true }
+rstest.workspace = true
