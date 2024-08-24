@@ -10,5 +10,6 @@ pub use manager::StrategyModule;
 
 pub mod prelude {
     pub use crate::config::*;
+    pub use crate::crossover::CrossoverStrategy;
     pub use crate::manager::*;
 }

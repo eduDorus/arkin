@@ -1,22 +1,24 @@
-use arkin_common::prelude::*;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AllocationManagerConfig {
-    pub allocations: Vec<AllocationConfig>,
+pub struct AllocationConfig {
+    pub allocation_manager: AllocationManagerConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum AllocationConfig {
+pub struct AllocationManagerConfig {
+    pub allocations: Vec<AllocationModuleConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum AllocationModuleConfig {
     #[serde(rename = "equal")]
     Equal(EqualConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EqualConfig {
-    pub capital: Decimal,
     pub max_allocation: Decimal,
-    pub max_allocation_per_instrument: Decimal,
-    pub strategies: Vec<StrategyId>,
+    pub max_allocation_per_underlier: Decimal,
 }

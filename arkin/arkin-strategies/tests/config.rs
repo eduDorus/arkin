@@ -1,5 +1,5 @@
 use arkin_common::prelude::*;
-use arkin_strategies::{StrategyConfig, StrategyModuleConfig};
+use arkin_strategies::prelude::*;
 
 #[test]
 fn load_config() {

@@ -1,3 +1,4 @@
+use arkin_allocation::prelude::*;
 use arkin_common::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_persistance::prelude::*;
@@ -38,4 +39,10 @@ pub fn insights_manager() -> InsightsManager {
 pub fn strategy_manager() -> StrategyManager {
     let config = load::<StrategyConfig>();
     StrategyManager::from_config(&config.strategy_manager)
+}
+
+#[fixture]
+pub fn allocation_manager() -> AllocationManager {
+    let config = load::<AllocationConfig>();
+    AllocationManager::from_config(&config.allocation_manager)
 }

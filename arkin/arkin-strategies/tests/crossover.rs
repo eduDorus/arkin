@@ -1,5 +1,5 @@
 use arkin_common::prelude::*;
-use arkin_strategies::{CrossoverConfig, CrossoverStrategy, StrategyModule};
+use arkin_strategies::prelude::*;
 use rstest::*;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;

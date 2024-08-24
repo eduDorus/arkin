@@ -129,18 +129,12 @@ version = "0.1.0"
 dependencies = [
  "arkin-common",
  "rayon",
+ "rstest",
  "rust_decimal",
+ "rust_decimal_macros",
  "serde",
+ "test-utils",
  "time",
-]
-
-[[package]]
-name = "arkin-backoffice"
-version = "0.1.0"
-dependencies = [
- "arkin-common",
- "rust_decimal",
- "serde",
 ]
 
 [[package]]
@@ -191,6 +185,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-market"
+version = "0.1.0"
+dependencies = [
+ "arkin-common",
+ "dashmap",
+ "rstest",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "test-utils",
+ "time",
+ "tracing",
+]
+
+[[package]]
 name = "arkin-persistance"
 version = "0.1.0"
 dependencies = [
@@ -204,6 +213,21 @@ dependencies = [
  "test-utils",
  "time",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "arkin-portfolio"
+version = "0.1.0"
+dependencies = [
+ "arkin-common",
+ "dashmap",
+ "rstest",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "test-utils",
+ "time",
  "tracing",
 ]
 
@@ -2543,6 +2567,7 @@ dependencies = [
 name = "test-integration"
 version = "0.1.0"
 dependencies = [
+ "arkin-allocation",
  "arkin-common",
  "arkin-insights",
  "arkin-persistance",
@@ -2559,6 +2584,7 @@ dependencies = [
 name = "test-utils"
 version = "0.1.0"
 dependencies = [
+ "arkin-allocation",
  "arkin-common",
  "arkin-insights",
  "arkin-persistance",

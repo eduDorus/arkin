@@ -1,5 +1,5 @@
 [package]
-name = "arkin-allocation"
+name = "arkin-portfolio"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true
@@ -8,11 +8,12 @@ license.workspace = true
 [dependencies]
 arkin-common = { path = "../arkin-common" }
 
-rayon = { workspace = true }
-time = { workspace = true }
+serde = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
-serde = { workspace = true }
+dashmap = { workspace = true }
+time = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 test-utils = { path = "../test-utils" }

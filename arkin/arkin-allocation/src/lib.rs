@@ -3,5 +3,10 @@ mod equal;
 mod factory;
 mod manager;
 
-pub use manager::AllocationManager;
-pub use manager::AllocationModule;
+pub use config::*;
+pub use manager::{AllocationManager, AllocationModule};
+
+pub mod prelude {
+    pub use crate::config::*;
+    pub use crate::manager::*;
+}

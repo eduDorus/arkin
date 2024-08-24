@@ -2,14 +2,13 @@
 members = [
    "arkin",
    "arkin-allocation", 
-   "arkin-backoffice",
    "arkin-common",
    "arkin-execution",
-   "arkin-insights",
-   #"arkin-ingestors",
-   "arkin-persistance",
+   "arkin-insights", 
+   "arkin-market",
+   "arkin-persistance", 
+   "arkin-portfolio",
    "arkin-strategies", 
-   #"arkin-state", 
    "test-integration", 
    "test-utils", 
 ]

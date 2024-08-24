@@ -4,6 +4,7 @@ use rstest::*;
 use time::macros::datetime;
 use tracing::info;
 
+use arkin_allocation::prelude::*;
 use arkin_common::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_persistance::prelude::*;
@@ -12,7 +13,12 @@ use test_utils::prelude::*;
 
 #[rstest]
 #[tokio::test]
-async fn test_end_to_end(database: DBManager, insights_manager: InsightsManager, strategy_manager: StrategyManager) {
+async fn test_end_to_end(
+    database: DBManager,
+    insights_manager: InsightsManager,
+    strategy_manager: StrategyManager,
+    allocation_manager: AllocationManager,
+) {
     info!("Starting end-to-end test");
 
     let start = datetime!(2024-07-01 00:00).assume_utc();
@@ -37,6 +43,7 @@ async fn test_end_to_end(database: DBManager, insights_manager: InsightsManager,
     let (mut timestamp, intervals) = calculate_intervals(&start, &end, frequency_secs);
     for _ in 0..intervals {
         info!("----------------- {:?} -----------------", timestamp);
+        // Take a snapshot of the market and positions
         let insights = insights_manager.calculate(&timestamp);
         for metric in &insights.metrics {
             info!("Insight: {}", metric);
@@ -46,6 +53,8 @@ async fn test_end_to_end(database: DBManager, insights_manager: InsightsManager,
         for signal in &signals.signals {
             info!("Signal: {}", signal);
         }
+
+        // let orders = allocation_manager.calculate(&timestamp, &signals, market, positions);
 
         timestamp += Duration::from_secs(frequency_secs);
     }

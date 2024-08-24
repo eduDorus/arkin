@@ -78,6 +78,21 @@ strategy_manager:
         price_spread_id: spread_sma_vwap
         volume_spread_id: spread_sma_volume
 
+allocation_manager:
+  allocations:
+    - equal:
+        max_allocation: 0.9
+        max_allocation_per_underlier: 0.25
+
+portfolio_manager:
+  initial_capital: 100000
+  leverage: 1
+  initial_margin: 0.2
+  maintenance_margin: 0.15
+
+market_manager:
+  lookback_min: 1440
+
 database:
   host: 127.0.0.1
   port: 5432
