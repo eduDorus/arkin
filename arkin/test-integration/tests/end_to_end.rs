@@ -17,7 +17,7 @@ async fn test_end_to_end(database: DBManager, insights_manager: InsightsManager,
 
     let start = datetime!(2024-07-01 00:00).assume_utc();
     let end = datetime!(2024-07-01 01:00).assume_utc();
-    let frequency_secs = 1;
+    let frequency_secs = 5;
     info!("Start: {}, End: {}", start, end);
 
     // Load trades

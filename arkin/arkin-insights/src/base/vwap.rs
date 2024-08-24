@@ -45,23 +45,24 @@ impl FeatureModule for VWAPFeature {
 
     fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating VWAP with id: {}", self.id);
-        // Check if both trade_price and trade_quantity are present
-        let price = data.get(self.inputs[0].feature_id());
-        let quantity = data.get(self.inputs[1].feature_id());
-        assert_eq!(price.len(), quantity.len());
 
-        let mut total_quantity = Decimal::ZERO;
-        let mut total_notional = Decimal::ZERO;
+        // Retrieve prices and volumes separately
+        let prices = data.get(self.inputs[0].feature_id());
+        let volumes = data.get(self.inputs[1].feature_id());
 
-        price.iter().zip(quantity).for_each(|(p, q)| {
-            total_quantity += q;
-            total_notional += p * q.abs();
-        });
+        // Calculate the sum of price * volume and the sum of volume
+        let (total_price_volume, total_volume) = prices.iter().zip(volumes.iter()).fold(
+            (Decimal::ZERO, Decimal::ZERO),
+            |(acc_price_volume, acc_volume), (price, volume)| {
+                (acc_price_volume + (price * volume), acc_volume + volume)
+            },
+        );
 
-        let vwap = if total_quantity.is_zero() {
+        // Calculate the VWAP
+        let vwap = if total_volume.is_zero() {
             Decimal::ZERO
         } else {
-            total_notional / total_quantity
+            total_price_volume / total_volume
         };
 
         let mut res = HashMap::new();

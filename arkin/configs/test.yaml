@@ -8,7 +8,7 @@ insights_manager:
           input:
             from: base
             feature: trade_quantity
-            window: 1
+            window: 5
           output: volume
       - sma:
           id: sma_5_volume
@@ -40,11 +40,11 @@ insights_manager:
           input_price:
             from: base
             feature: trade_price
-            window: 1
+            window: 5
           input_quantity:
             from: base
             feature: trade_quantity
-            window: 1
+            window: 5
           output: vwap
       - sma:
           id: sma_5_vwap

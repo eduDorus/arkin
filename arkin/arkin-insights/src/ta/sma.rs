@@ -47,15 +47,22 @@ impl FeatureModule for SMAFeature {
     }
 
     fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
-        debug!("Calculating mean with id: {}", self.id);
-        let sum = data.mean(self.inputs[0].feature_id()).unwrap_or_default();
-        let count = data.count(self.inputs[0].feature_id()).unwrap_or_default();
+        debug!("Calculating SMA with id: {}", self.id);
 
+        // Retrieve the values for the feature over the window period
+        let values = data.get(self.inputs[0].feature_id());
+
+        // Sum the values in the window
+        let sum: Decimal = values.iter().sum();
+        let count = Decimal::from(values.len());
+
+        // Calculate the mean (SMA)
         let mean = if count.is_zero() {
             Decimal::ZERO
         } else {
             sum / count
         };
+
         let mut res = HashMap::new();
         res.insert(self.output.clone(), mean);
         Ok(res)
