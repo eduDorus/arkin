@@ -30,14 +30,14 @@ impl fmt::Display for PositionSnapshot {
 
 pub struct FeatureSnapshot {
     pub event_time: OffsetDateTime,
-    pub features: Vec<Feature>,
+    pub metrics: Vec<Feature>,
 }
 
 impl FeatureSnapshot {
     pub fn new(event_time: OffsetDateTime, features: Vec<Feature>) -> Self {
         Self {
             event_time,
-            features,
+            metrics: features,
         }
     }
 }

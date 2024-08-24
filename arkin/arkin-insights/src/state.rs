@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     time::Duration,
 };
 
@@ -11,12 +11,12 @@ use time::OffsetDateTime;
 use crate::config::{LatestInputConfig, PeriodInputConfig, WindowInputConfig};
 
 #[derive(Default)]
-pub struct FeatureState {
+pub struct InsightsState {
     features: DashMap<(Instrument, FeatureId), BTreeMap<CompositeIndex, Decimal>>,
 }
 
-impl FeatureState {
-    pub fn add_feature(&self, event: Feature) {
+impl InsightsState {
+    pub fn insert(&self, event: Feature) {
         let key = (event.instrument, event.id);
         let mut composit_key = CompositeIndex::new(&event.event_time);
 
@@ -31,18 +31,18 @@ impl FeatureState {
         &self,
         instrument: &Instrument,
         timestamp: &OffsetDateTime,
-        request: &[FeatureDataRequest],
-    ) -> FeatureDataResponse {
-        FeatureDataResponse::new(
+        request: &[DataRequest],
+    ) -> DataResponse {
+        DataResponse::new(
             request
                 .iter()
                 .map(|r| {
                     let data = match &r {
-                        FeatureDataRequest::Latest { feature_id } => self.last_entry(instrument, feature_id, timestamp),
-                        FeatureDataRequest::Window { feature_id, window } => {
+                        DataRequest::Latest { feature_id } => self.last_entry(instrument, feature_id, timestamp),
+                        DataRequest::Window { feature_id, window } => {
                             self.list_entries_window(instrument, feature_id, timestamp, window)
                         }
-                        FeatureDataRequest::Period {
+                        DataRequest::Period {
                             feature_id,
                             periods,
                         } => self.list_entries_periods(instrument, feature_id, timestamp, periods),
@@ -51,6 +51,10 @@ impl FeatureState {
                 })
                 .collect(),
         )
+    }
+
+    pub fn instruments(&self) -> HashSet<Instrument> {
+        self.features.iter().map(|v| v.key().0.clone()).collect::<HashSet<_>>()
     }
 
     fn last_entry(&self, instrument: &Instrument, feature_id: &FeatureId, timestamp: &OffsetDateTime) -> Vec<Decimal> {
@@ -106,7 +110,7 @@ impl FeatureState {
 }
 
 #[derive(Debug)]
-pub enum FeatureDataRequest {
+pub enum DataRequest {
     Latest {
         feature_id: FeatureId,
     },
@@ -120,50 +124,50 @@ pub enum FeatureDataRequest {
     },
 }
 
-impl From<LatestInputConfig> for FeatureDataRequest {
+impl From<LatestInputConfig> for DataRequest {
     fn from(v: LatestInputConfig) -> Self {
-        FeatureDataRequest::Latest {
+        DataRequest::Latest {
             feature_id: v.feature_id,
         }
     }
 }
 
-impl From<WindowInputConfig> for FeatureDataRequest {
+impl From<WindowInputConfig> for DataRequest {
     fn from(v: WindowInputConfig) -> Self {
-        FeatureDataRequest::Window {
+        DataRequest::Window {
             feature_id: v.feature_id,
             window: Duration::from_secs(v.window),
         }
     }
 }
 
-impl From<PeriodInputConfig> for FeatureDataRequest {
+impl From<PeriodInputConfig> for DataRequest {
     fn from(v: PeriodInputConfig) -> Self {
-        FeatureDataRequest::Period {
+        DataRequest::Period {
             feature_id: v.feature_id,
             periods: v.periods,
         }
     }
 }
 
-impl FeatureDataRequest {
+impl DataRequest {
     pub fn feature_id(&self) -> &FeatureId {
         match self {
-            FeatureDataRequest::Latest { feature_id } => feature_id,
-            FeatureDataRequest::Window { feature_id, .. } => feature_id,
-            FeatureDataRequest::Period { feature_id, .. } => feature_id,
+            DataRequest::Latest { feature_id } => feature_id,
+            DataRequest::Window { feature_id, .. } => feature_id,
+            DataRequest::Period { feature_id, .. } => feature_id,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct FeatureDataResponse {
+pub struct DataResponse {
     data: HashMap<FeatureId, Vec<Decimal>>,
 }
 
-impl FeatureDataResponse {
+impl DataResponse {
     pub fn new(data: HashMap<FeatureId, Vec<Decimal>>) -> Self {
-        FeatureDataResponse { data }
+        DataResponse { data }
     }
 
     // Convenience method to get the last value for a feature ID

@@ -15,14 +15,14 @@ use tracing::{debug, info};
 use crate::config::PipelineConfig;
 use crate::factory::FeatureFactory;
 use crate::manager::FeatureModule;
-use crate::state::FeatureState;
+use crate::state::InsightsState;
 
-pub struct Pipeline {
+pub struct ComputationGraph {
     graph: Arc<DiGraph<Box<dyn FeatureModule>, ()>>,
     order: Vec<NodeIndex>,
 }
 
-impl Pipeline {
+impl ComputationGraph {
     pub fn from_config(config: &PipelineConfig) -> Self {
         let mut graph = DiGraph::new();
 
@@ -56,7 +56,7 @@ impl Pipeline {
         let order = toposort(&graph, None).expect("Cycle detected in graph");
 
         info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
-        Pipeline {
+        ComputationGraph {
             graph: Arc::new(graph),
             order,
         }
@@ -65,7 +65,7 @@ impl Pipeline {
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
     pub fn calculate(
         &self,
-        state: Arc<FeatureState>,
+        state: Arc<InsightsState>,
         timestamp: &OffsetDateTime,
         instrument: &Instrument,
     ) -> Vec<Feature> {
@@ -115,7 +115,7 @@ impl Pipeline {
                             data.into_iter().for_each(|(id, value)| {
                                 debug!("Saving: {} => {}", id, value);
                                 let event = Feature::new(id, instrument.to_owned(), timestamp.to_owned(), value);
-                                state.add_feature(event.clone());
+                                state.insert(event.clone());
                                 pipeline_result.lock().push(event);
                             });
                         }

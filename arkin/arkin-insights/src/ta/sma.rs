@@ -8,14 +8,14 @@ use tracing::debug;
 use crate::{
     config::SMAFeatureConfig,
     manager::FeatureModule,
-    state::{FeatureDataRequest, FeatureDataResponse},
+    state::{DataRequest, DataResponse},
 };
 
 #[derive(Debug)]
 pub struct SMAFeature {
     id: NodeId,
     sources: Vec<NodeId>,
-    inputs: Vec<FeatureDataRequest>,
+    inputs: Vec<DataRequest>,
     output: FeatureId,
 }
 
@@ -42,11 +42,11 @@ impl FeatureModule for SMAFeature {
         &self.sources
     }
 
-    fn data(&self) -> &[FeatureDataRequest] {
+    fn data(&self) -> &[DataRequest] {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
+    fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating mean with id: {}", self.id);
         let sum = data.mean(self.inputs[0].feature_id()).unwrap_or_default();
         let count = data.count(self.inputs[0].feature_id()).unwrap_or_default();

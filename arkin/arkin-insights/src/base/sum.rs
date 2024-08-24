@@ -8,14 +8,14 @@ use tracing::debug;
 use crate::{
     config::SumFeatureConfig,
     manager::FeatureModule,
-    state::{FeatureDataRequest, FeatureDataResponse},
+    state::{DataRequest, DataResponse},
 };
 
 #[derive(Debug)]
 pub struct SumFeature {
     id: NodeId,
     sources: Vec<NodeId>,
-    inputs: Vec<FeatureDataRequest>,
+    inputs: Vec<DataRequest>,
     output: FeatureId,
 }
 
@@ -39,11 +39,11 @@ impl FeatureModule for SumFeature {
         &self.sources
     }
 
-    fn data(&self) -> &[FeatureDataRequest] {
+    fn data(&self) -> &[DataRequest] {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
+    fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating sum with id: {}", self.id);
         let sum = data.sum(self.inputs[0].feature_id()).unwrap_or_default();
         let mut res = HashMap::new();

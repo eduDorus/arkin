@@ -8,14 +8,14 @@ use tracing::debug;
 use crate::{
     config::SpreadFeatureConfig,
     manager::FeatureModule,
-    state::{FeatureDataRequest, FeatureDataResponse},
+    state::{DataRequest, DataResponse},
 };
 
 #[derive(Debug)]
 pub struct SpreadFeature {
     id: NodeId,
     sources: Vec<NodeId>,
-    inputs: Vec<FeatureDataRequest>,
+    inputs: Vec<DataRequest>,
     output: FeatureId,
     absolute: bool,
 }
@@ -41,11 +41,11 @@ impl FeatureModule for SpreadFeature {
         &self.sources
     }
 
-    fn data(&self) -> &[FeatureDataRequest] {
+    fn data(&self) -> &[DataRequest] {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
+    fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating spread with id: {}", self.id);
         let front = data.last(self.inputs[0].feature_id()).unwrap_or_default();
         let back = data.last(self.inputs[1].feature_id()).unwrap_or_default();

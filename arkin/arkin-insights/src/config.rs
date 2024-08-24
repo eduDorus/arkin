@@ -2,7 +2,12 @@ use arkin_common::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FeatureManagerConfig {
+pub struct InsightsConfig {
+    pub insights_manager: InsightsManagerConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct InsightsManagerConfig {
     pub pipeline: PipelineConfig,
 }
 

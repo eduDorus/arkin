@@ -7,7 +7,11 @@ license.workspace = true
 
 [dependencies]
 arkin-common = { path = "../arkin-common" }
+arkin-persistance = { path = "../arkin-persistance" }
+arkin-insights = { path = "../arkin-insights" }
+arkin-strategies = { path = "../arkin-strategies" }
 
 rstest = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }
+ctor = { workspace = true }

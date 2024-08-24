@@ -7,33 +7,42 @@ use rayon::prelude::*;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 
-use crate::Pipeline;
+use crate::ComputationGraph;
 use crate::{
-    config::FeatureManagerConfig,
-    state::{FeatureDataRequest, FeatureDataResponse, FeatureState},
+    config::InsightsManagerConfig,
+    state::{DataRequest, DataResponse, InsightsState},
 };
 
 pub trait FeatureModule: Debug + Send + Sync {
     fn id(&self) -> &NodeId;
     fn sources(&self) -> &[NodeId];
-    fn data(&self) -> &[FeatureDataRequest];
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>>;
+    fn data(&self) -> &[DataRequest];
+    fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>>;
 }
 
-pub struct FeatureManager {
-    state: Arc<FeatureState>,
-    pipeline: Pipeline,
+pub struct InsightsManager {
+    state: Arc<InsightsState>,
+    pipeline: ComputationGraph,
 }
 
-impl FeatureManager {
-    pub fn from_config(config: &FeatureManagerConfig) -> Self {
+impl InsightsManager {
+    pub fn from_config(config: &InsightsManagerConfig) -> Self {
         Self {
-            state: Arc::new(FeatureState::default()),
-            pipeline: Pipeline::from_config(&config.pipeline),
+            state: Arc::new(InsightsState::default()),
+            pipeline: ComputationGraph::from_config(&config.pipeline),
         }
     }
 
-    pub fn calculate(&self, timestamp: &OffsetDateTime, instruments: &[Instrument]) -> FeatureSnapshot {
+    pub fn insert(&self, event: Feature) {
+        self.state.insert(event);
+    }
+
+    pub fn insert_batch(&self, events: Vec<Feature>) {
+        events.into_iter().for_each(|event| self.insert(event));
+    }
+
+    pub fn calculate(&self, timestamp: &OffsetDateTime) -> FeatureSnapshot {
+        let instruments = self.state.instruments();
         let features = instruments
             .par_iter()
             .map(|instrument| self.pipeline.calculate(self.state.clone(), timestamp, instrument))
@@ -42,7 +51,7 @@ impl FeatureManager {
 
         FeatureSnapshot {
             event_time: timestamp.to_owned(),
-            features,
+            metrics: features,
         }
     }
 }

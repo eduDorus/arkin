@@ -1,17 +1,7 @@
-use arkin_common::prelude::*;
 use arkin_persistance::prelude::*;
 use rstest::*;
+use test_utils::prelude::*;
 use time::macros::datetime;
-
-#[fixture]
-pub fn database() -> DBManager {
-    init_test_tracing();
-    // Set env var to test
-    std::env::set_var("RUN_MODE", "test");
-
-    let config = load::<PersistanceConfig>();
-    DBManager::from_config(&config.database)
-}
 
 #[rstest]
 #[tokio::test]

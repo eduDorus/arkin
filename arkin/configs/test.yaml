@@ -1,3 +1,76 @@
+insights_manager:
+  pipeline:
+    frequency: 1 # In seconds
+    features:
+      # Volume
+      - sum:
+          id: volume
+          input:
+            from: base
+            feature: trade_quantity
+            window: 1
+          output: volume
+      - sma:
+          id: sma_5_volume
+          input:
+            from: volume
+            feature: volume
+            periods: 5
+          output: sma_5_volume
+      - sma:
+          id: sma_60_volume
+          input:
+            from: volume
+            feature: volume
+            periods: 60
+          output: sma_60_volume
+      - spread:
+          id: spread_sma_volume
+          input_front:
+            from: sma_5_volume
+            feature: sma_5_volume
+          input_back:
+            from: sma_60_volume
+            feature: sma_60_volume
+          output: spread_sma_volume
+          absolute: false
+      # VWAP
+      - vwap:
+          id: vwap
+          input_price:
+            from: base
+            feature: trade_price
+            window: 1
+          input_quantity:
+            from: base
+            feature: trade_quantity
+            window: 1
+          output: vwap
+      - sma:
+          id: sma_5_vwap
+          input:
+            from: vwap
+            feature: vwap
+            periods: 5
+          output: sma_5_vwap
+      - sma:
+          id: sma_60_vwap
+          input:
+            from: vwap
+            feature: vwap
+            periods: 60
+          output: sma_60_vwap
+      - spread:
+          id: spread_sma_vwap
+          input_front:
+            from: sma_5_vwap
+            feature: sma_5_vwap
+          input_back:
+            from: sma_60_vwap
+            feature: sma_60_vwap
+          output: spread_sma_vwap
+          absolute: false
+
 strategy_manager:
   strategies:
     - crossover:

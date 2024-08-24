@@ -26,7 +26,7 @@ impl StrategyManager {
         let signals = self
             .strategies
             .par_iter()
-            .map(|s| s.calculate(&features.features))
+            .map(|s| s.calculate(&features.metrics))
             .flat_map(|s| s)
             .collect::<Vec<_>>();
 

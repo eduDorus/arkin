@@ -6,5 +6,5 @@ pub use db::DBManager;
 
 pub mod prelude {
     pub use crate::config::*;
-    pub use crate::db::DBManager;
+    pub use crate::db::*;
 }

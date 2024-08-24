@@ -9,7 +9,7 @@ use crate::{
     Event, Price, Quantity,
 };
 
-use super::Instrument;
+use super::{Feature, Instrument};
 
 #[derive(Clone)]
 pub struct Tick {
@@ -73,6 +73,15 @@ impl TryFrom<Event> for Tick {
 impl From<Tick> for Event {
     fn from(value: Tick) -> Self {
         Event::Tick(value)
+    }
+}
+
+impl From<Tick> for Vec<Feature> {
+    fn from(value: Tick) -> Self {
+        vec![
+            Feature::new("bid_price".into(), value.instrument.clone(), value.event_time, value.bid_price),
+            Feature::new("ask_price".into(), value.instrument.clone(), value.event_time, value.ask_price),
+        ]
     }
 }
 

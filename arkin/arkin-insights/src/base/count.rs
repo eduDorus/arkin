@@ -8,14 +8,14 @@ use tracing::debug;
 use crate::{
     config::CountFeatureConfig,
     manager::FeatureModule,
-    state::{FeatureDataRequest, FeatureDataResponse},
+    state::{DataRequest, DataResponse},
 };
 
 #[derive(Debug)]
 pub struct CountFeature {
     id: NodeId,
     sources: Vec<NodeId>,
-    inputs: Vec<FeatureDataRequest>,
+    inputs: Vec<DataRequest>,
     output: FeatureId,
 }
 
@@ -39,11 +39,11 @@ impl FeatureModule for CountFeature {
         &self.sources
     }
 
-    fn data(&self) -> &[FeatureDataRequest] {
+    fn data(&self) -> &[DataRequest] {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
+    fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating count with id: {}", self.id);
         let count = data.count(self.inputs[0].feature_id()).unwrap_or_default();
         let mut res = HashMap::new();

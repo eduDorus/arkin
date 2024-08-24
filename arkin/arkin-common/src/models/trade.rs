@@ -4,6 +4,7 @@ use time::OffsetDateTime;
 
 use crate::{
     events::{EventType, EventTypeOf},
+    models::Feature,
     Event, Price, Quantity,
 };
 
@@ -54,6 +55,26 @@ impl TryFrom<Event> for Trade {
         } else {
             Err(())
         }
+    }
+}
+
+impl From<Trade> for Event {
+    fn from(v: Trade) -> Self {
+        Event::Trade(v)
+    }
+}
+
+impl From<Trade> for Vec<Feature> {
+    fn from(v: Trade) -> Self {
+        vec![
+            Feature::new("trade_price".into(), v.instrument.clone(), v.event_time.clone(), v.price),
+            Feature::new(
+                "trade_quantity".into(),
+                v.instrument.clone(),
+                v.event_time.clone(),
+                v.quantity.into(),
+            ),
+        ]
     }
 }
 

@@ -8,14 +8,14 @@ use tracing::debug;
 use crate::{
     config::VWAPFeatureConfig,
     manager::FeatureModule,
-    state::{FeatureDataRequest, FeatureDataResponse},
+    state::{DataRequest, DataResponse},
 };
 
 #[derive(Debug)]
 pub struct VWAPFeature {
     id: NodeId,
     sources: Vec<NodeId>,
-    inputs: Vec<FeatureDataRequest>,
+    inputs: Vec<DataRequest>,
     output: FeatureId,
 }
 
@@ -39,11 +39,11 @@ impl FeatureModule for VWAPFeature {
         &self.sources
     }
 
-    fn data(&self) -> &[FeatureDataRequest] {
+    fn data(&self) -> &[DataRequest] {
         &self.inputs
     }
 
-    fn calculate(&self, data: FeatureDataResponse) -> Result<HashMap<FeatureId, Decimal>> {
+    fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
         debug!("Calculating VWAP with id: {}", self.id);
         // Check if both trade_price and trade_quantity are present
         let price = data.get(self.inputs[0].feature_id());
