@@ -81,9 +81,8 @@ impl PortfolioManager {
     }
 
     /// Get the latest position snapshot at a given timestamp (take the last position before the timestamp)
-    pub fn position_snapshot(&self, timestamp: &OffsetDateTime) -> PositionSnapshot {
-        let positions = self
-            .positions
+    pub fn snapshot(&self, timestamp: &OffsetDateTime) -> Vec<Position> {
+        self.positions
             .iter()
             .map(|v| v.value().clone())
             .filter_map(|v| {
@@ -96,8 +95,7 @@ impl PortfolioManager {
                 }
                 None
             })
-            .collect();
-        PositionSnapshot::new(timestamp.clone(), positions)
+            .collect()
     }
 
     pub fn total_capital(&self) -> Notional {

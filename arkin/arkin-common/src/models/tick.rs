@@ -9,7 +9,7 @@ use crate::{
     Event, Price, Quantity,
 };
 
-use super::{Feature, Instrument};
+use super::{Insight, Instrument};
 
 #[derive(Clone)]
 pub struct Tick {
@@ -76,11 +76,11 @@ impl From<Tick> for Event {
     }
 }
 
-impl From<Tick> for Vec<Feature> {
+impl From<Tick> for Vec<Insight> {
     fn from(value: Tick) -> Self {
         vec![
-            Feature::new("bid_price".into(), value.instrument.clone(), value.event_time, value.bid_price),
-            Feature::new("ask_price".into(), value.instrument.clone(), value.event_time, value.ask_price),
+            Insight::new("bid_price".into(), value.instrument.clone(), value.event_time, value.bid_price),
+            Insight::new("ask_price".into(), value.instrument.clone(), value.event_time, value.ask_price),
         ]
     }
 }

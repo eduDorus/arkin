@@ -37,8 +37,8 @@ pub fn crossover(
     #[case] expected: Decimal,
 ) {
     let features = vec![
-        Feature::new("spread_sma_vwap".into(), instrument.clone(), event_time, spread_price),
-        Feature::new("spread_sma_volume".into(), instrument, event_time, spread_volume),
+        Insight::new("spread_sma_vwap".into(), instrument.clone(), event_time, spread_price),
+        Insight::new("spread_sma_volume".into(), instrument, event_time, spread_volume),
     ];
     let res = crossover_strategy.calculate(&features);
     assert_eq!(res.len(), 1);

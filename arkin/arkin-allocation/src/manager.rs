@@ -1,11 +1,10 @@
 use arkin_common::prelude::*;
 use rayon::prelude::*;
-use time::OffsetDateTime;
 
 use crate::{config::AllocationManagerConfig, factory::AllocationFactory};
 
 pub trait AllocationModule: Send + Sync {
-    fn calculate(&self, signals: &SignalSnapshot, positions: &PositionSnapshot) -> Vec<Allocation>;
+    fn calculate(&self, signals: &[Signal], positions: &[Position]) -> Vec<Allocation>;
 }
 
 pub struct AllocationManager {
@@ -19,21 +18,11 @@ impl AllocationManager {
         }
     }
 
-    pub fn calculate(
-        &self,
-        timestamp: &OffsetDateTime,
-        signals: &SignalSnapshot,
-        _market: &MarketSnapshot,
-        positions: &PositionSnapshot,
-    ) -> AllocationSnapshot {
-        // Calculate allocations for each module
-        let allocations = self
-            .allocations
+    pub fn calculate_allocations(&self, snapshot: &Snapshot) -> Vec<Allocation> {
+        self.allocations
             .par_iter()
-            .map(|a| a.calculate(signals, positions))
+            .map(|a| a.calculate(&snapshot.signals, &snapshot.positions))
             .flat_map(|a| a)
-            .collect::<Vec<_>>();
-
-        AllocationSnapshot::new(timestamp.to_owned(), allocations, Vec::new())
+            .collect::<Vec<_>>()
     }
 }

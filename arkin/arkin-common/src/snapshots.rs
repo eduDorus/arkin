@@ -1,8 +1,50 @@
 use std::fmt;
 
+use derive_builder::Builder;
 use time::OffsetDateTime;
 
-use crate::models::{Allocation, ExecutionOrder, Feature, Position, Signal, Tick};
+use crate::models::{Allocation, ExecutionOrder, Insight, Position, Signal, Tick};
+
+#[derive(Clone, Builder)]
+pub struct Snapshot {
+    pub event_time: OffsetDateTime,
+    pub positions: Vec<Position>,
+    pub ticks: Vec<Tick>,
+    #[builder(default)]
+    pub insights: Vec<Insight>,
+    #[builder(default)]
+    pub signals: Vec<Signal>,
+    #[builder(default)]
+    pub allocations: Vec<Allocation>,
+    #[builder(default)]
+    pub orders: Vec<ExecutionOrder>,
+}
+
+impl Snapshot {
+    pub fn add_ticks(&mut self, ticks: Vec<Tick>) {
+        self.ticks = ticks;
+    }
+
+    pub fn add_positions(&mut self, positions: Vec<Position>) {
+        self.positions = positions;
+    }
+
+    pub fn add_insights(&mut self, features: Vec<Insight>) {
+        self.insights = features;
+    }
+
+    pub fn add_signals(&mut self, signals: Vec<Signal>) {
+        self.signals = signals;
+    }
+
+    pub fn add_allocations(&mut self, allocations: Vec<Allocation>) {
+        self.allocations = allocations;
+    }
+
+    pub fn add_orders(&mut self, orders: Vec<ExecutionOrder>) {
+        self.orders = orders;
+    }
+}
 
 pub struct PositionSnapshot {
     pub timestamp: OffsetDateTime,
@@ -30,14 +72,14 @@ impl fmt::Display for PositionSnapshot {
 
 pub struct FeatureSnapshot {
     pub event_time: OffsetDateTime,
-    pub metrics: Vec<Feature>,
+    pub insights: Vec<Insight>,
 }
 
 impl FeatureSnapshot {
-    pub fn new(event_time: OffsetDateTime, features: Vec<Feature>) -> Self {
+    pub fn new(event_time: OffsetDateTime, features: Vec<Insight>) -> Self {
         Self {
             event_time,
-            metrics: features,
+            insights: features,
         }
     }
 }

@@ -1,13 +1,12 @@
 use arkin_common::prelude::*;
 use rayon::prelude::*;
-use time::OffsetDateTime;
 
 use crate::{config::StrategyManagerConfig, factory::StrategyFactory};
 
 pub trait StrategyModule: Send + Sync {
     fn id(&self) -> &StrategyId;
     fn sources(&self) -> &[FeatureId];
-    fn calculate(&self, data: &[Feature]) -> Vec<Signal>;
+    fn calculate(&self, data: &[Insight]) -> Vec<Signal>;
 }
 
 pub struct StrategyManager {
@@ -21,16 +20,16 @@ impl StrategyManager {
         }
     }
 
-    pub fn calculate(&self, timestamp: &OffsetDateTime, features: &FeatureSnapshot) -> SignalSnapshot {
-        // Calculate signals for each strategy
-        let signals = self
-            .strategies
-            .par_iter()
-            .map(|s| s.calculate(&features.metrics))
-            .flat_map(|s| s)
-            .collect::<Vec<_>>();
+    pub fn calculate(&self, snapshot: &Snapshot) -> Vec<Signal> {
+        if snapshot.insights.is_empty() {
+            return vec![];
+        }
 
-        // Return signals
-        SignalSnapshot::new(timestamp.to_owned(), signals)
+        // Calculate signals for each strategy
+        self.strategies
+            .par_iter()
+            .map(|s| s.calculate(&snapshot.insights))
+            .flat_map(|s| s)
+            .collect::<Vec<_>>()
     }
 }

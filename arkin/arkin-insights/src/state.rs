@@ -16,7 +16,7 @@ pub struct InsightsState {
 }
 
 impl InsightsState {
-    pub fn insert(&self, event: Feature) {
+    pub fn insert(&self, event: Insight) {
         let key = (event.instrument, event.id);
         let mut composit_key = CompositeIndex::new(&event.event_time);
 

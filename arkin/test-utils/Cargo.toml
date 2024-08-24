@@ -11,6 +11,8 @@ arkin-persistance = { path = "../arkin-persistance" }
 arkin-insights = { path = "../arkin-insights" }
 arkin-strategies = { path = "../arkin-strategies" }
 arkin-allocation = { path = "../arkin-allocation" }
+arkin-portfolio = { path = "../arkin-portfolio" }
+arkin-market = { path = "../arkin-market" }
 
 rstest = { workspace = true }
 time = { workspace = true }

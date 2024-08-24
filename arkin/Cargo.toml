@@ -37,7 +37,7 @@ license = "Proprietary"
 [workspace.dependencies]
 # Utiliy
 # uuid = { version = "1.10.0", features = ["v4", "rng", "fast-rng", "serde", "borsh"] }
-# derive_builder = "0.20.0"
+derive_builder = "0.20.0"
 rand = "0.8.5"
 strum = { version = "0.26", features = ["derive"] }
 url = {version = "2.5"}

@@ -68,7 +68,7 @@ impl ComputationGraph {
         state: Arc<InsightsState>,
         timestamp: &OffsetDateTime,
         instrument: &Instrument,
-    ) -> Vec<Feature> {
+    ) -> Vec<Insight> {
         // Step 1: Calculate in-degrees
         let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
         for edge in self.graph.edge_indices() {
@@ -114,7 +114,7 @@ impl ComputationGraph {
                             // Save data to state and result set
                             data.into_iter().for_each(|(id, value)| {
                                 debug!("Saving: {} => {}", id, value);
-                                let event = Feature::new(id, instrument.to_owned(), timestamp.to_owned(), value);
+                                let event = Insight::new(id, instrument.to_owned(), timestamp.to_owned(), value);
                                 state.insert(event.clone());
                                 pipeline_result.lock().push(event);
                             });

@@ -1,8 +1,11 @@
 use arkin_allocation::prelude::*;
 use arkin_common::prelude::*;
 use arkin_insights::prelude::*;
+use arkin_market::prelude::*;
 use arkin_persistance::prelude::*;
+use arkin_portfolio::prelude::*;
 use arkin_strategies::prelude::*;
+
 use ctor::ctor;
 use rstest::*;
 use time::OffsetDateTime;
@@ -45,4 +48,16 @@ pub fn strategy_manager() -> StrategyManager {
 pub fn allocation_manager() -> AllocationManager {
     let config = load::<AllocationConfig>();
     AllocationManager::from_config(&config.allocation_manager)
+}
+
+#[fixture]
+pub fn portfolio_manager() -> PortfolioManager {
+    let config = load::<PortfolioConfig>();
+    PortfolioManager::from_config(&config.portfolio_manager)
+}
+
+#[fixture]
+pub fn market_manager() -> MarketManager {
+    let config = load::<MarketConfig>();
+    MarketManager::from_config(&config.market_manager)
 }

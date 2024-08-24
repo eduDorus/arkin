@@ -7,7 +7,9 @@ use tracing::info;
 use arkin_allocation::prelude::*;
 use arkin_common::prelude::*;
 use arkin_insights::prelude::*;
+use arkin_market::prelude::*;
 use arkin_persistance::prelude::*;
+use arkin_portfolio::prelude::*;
 use arkin_strategies::prelude::*;
 use test_utils::prelude::*;
 
@@ -18,6 +20,8 @@ async fn test_end_to_end(
     insights_manager: InsightsManager,
     strategy_manager: StrategyManager,
     allocation_manager: AllocationManager,
+    portfolio_manager: PortfolioManager,
+    market_manager: MarketManager,
 ) {
     info!("Starting end-to-end test");
 
@@ -35,8 +39,8 @@ async fn test_end_to_end(
     info!("Loaded {} trades and {} ticks", trades.len(), ticks.len());
 
     // insights
-    let trade_features = trades.into_iter().flat_map::<Vec<Feature>, _>(|t| t.into()).collect();
-    let tick_features = ticks.into_iter().flat_map::<Vec<Feature>, _>(|t| t.into()).collect();
+    let trade_features = trades.into_iter().flat_map::<Vec<Insight>, _>(|t| t.into()).collect();
+    let tick_features = ticks.into_iter().flat_map::<Vec<Insight>, _>(|t| t.into()).collect();
     insights_manager.insert_batch(trade_features);
     insights_manager.insert_batch(tick_features);
 
@@ -44,18 +48,32 @@ async fn test_end_to_end(
     for _ in 0..intervals {
         info!("----------------- {:?} -----------------", timestamp);
         // Take a snapshot of the market and positions
-        let insights = insights_manager.calculate(&timestamp);
-        for metric in &insights.metrics {
+        let mut snapshot = SnapshotBuilder::default()
+            .event_time(timestamp)
+            .ticks(market_manager.snapshot(&timestamp))
+            .positions(portfolio_manager.snapshot(&timestamp))
+            .build()
+            .unwrap();
+
+        // Calculate insights
+        snapshot.add_insights(insights_manager.calculate(&snapshot));
+        for metric in &snapshot.insights {
             info!("Insight: {}", metric);
         }
 
-        let signals = strategy_manager.calculate(&timestamp, &insights);
-        for signal in &signals.signals {
+        // Calculate signals
+        snapshot.add_signals(strategy_manager.calculate(&snapshot));
+        for signal in &snapshot.signals {
             info!("Signal: {}", signal);
         }
 
-        // let orders = allocation_manager.calculate(&timestamp, &signals, market, positions);
+        // Calculate allocations
+        snapshot.add_allocations(allocation_manager.calculate_allocations(&snapshot));
+        for allocation in &snapshot.allocations {
+            info!("Allocation: {}", allocation);
+        }
 
+        // Increase timestamp
         timestamp += Duration::from_secs(frequency_secs);
     }
 }
