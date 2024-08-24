@@ -5,7 +5,7 @@ members = [
    "arkin-backoffice",
    "arkin-common",
    "arkin-execution",
-   "arkin-features",
+   "arkin-insights",
    #"arkin-ingestors",
    "arkin-persistance",
    "arkin-strategies", 
@@ -103,7 +103,7 @@ petgraph = {version = "0.6", features = ["graphmap"], default-features = false}
 
 # Testing
 rstest = { version = "0.22.0" }
-async-std = { version = "1.5", features = ["attributes"] }
+async-std = { version = "1.12", features = ["attributes"] }
 
 #[workspace.dev-dependencies]
 # Testing

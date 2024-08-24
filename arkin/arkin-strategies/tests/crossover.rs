@@ -28,7 +28,7 @@ pub fn crossover_strategy() -> CrossoverStrategy {
 #[case(dec!(0), dec!(-1), dec!(0))]
 #[case(dec!(0), dec!(-1), dec!(0))]
 
-pub fn crossover_buy_signal(
+pub fn crossover(
     crossover_strategy: CrossoverStrategy,
     instrument: Instrument,
     event_time: OffsetDateTime,
