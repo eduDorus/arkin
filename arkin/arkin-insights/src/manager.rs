@@ -37,7 +37,7 @@ impl InsightsManager {
     }
 
     pub fn insert_batch(&self, events: Vec<Insight>) {
-        events.into_iter().for_each(|event| self.insert(event));
+        events.into_iter().for_each(|event| self.insert(event.into()));
     }
 
     pub fn calculate(&self, snapshot: &Snapshot) -> Vec<Insight> {

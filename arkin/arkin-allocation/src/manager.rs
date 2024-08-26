@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use crate::{config::AllocationManagerConfig, factory::AllocationFactory};
 
 pub trait AllocationModule: Send + Sync {
-    fn calculate(&self, signals: &[Signal], positions: &[Position]) -> Vec<Allocation>;
+    fn calculate(&self, snapshot: &Snapshot) -> Vec<Allocation>;
 }
 
 pub struct AllocationManager {
@@ -21,7 +21,7 @@ impl AllocationManager {
     pub fn calculate_allocations(&self, snapshot: &Snapshot) -> Vec<Allocation> {
         self.allocations
             .par_iter()
-            .map(|a| a.calculate(&snapshot.signals, &snapshot.positions))
+            .map(|a| a.calculate(&snapshot))
             .flat_map(|a| a)
             .collect::<Vec<_>>()
     }

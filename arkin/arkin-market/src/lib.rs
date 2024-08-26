@@ -1,4 +1,5 @@
 mod config;
+mod events;
 mod manager;
 
 pub use config::*;

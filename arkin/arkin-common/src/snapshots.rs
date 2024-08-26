@@ -1,15 +1,20 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use derive_builder::Builder;
 use time::OffsetDateTime;
 
-use crate::models::{Allocation, ExecutionOrder, Insight, Position, Signal, Tick};
+use crate::{
+    models::{Allocation, ExecutionOrder, Insight, Position, Signal, Tick, Trade},
+    Instrument,
+};
 
 #[derive(Clone, Builder)]
 pub struct Snapshot {
     pub event_time: OffsetDateTime,
-    pub positions: Vec<Position>,
-    pub ticks: Vec<Tick>,
+    pub portfolio: PortfolioSnapshot,
+    pub market: MarketSnapshot,
+    #[builder(default)]
+    pub trades: Vec<Trade>,
     #[builder(default)]
     pub insights: Vec<Insight>,
     #[builder(default)]
@@ -21,14 +26,6 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    pub fn add_ticks(&mut self, ticks: Vec<Tick>) {
-        self.ticks = ticks;
-    }
-
-    pub fn add_positions(&mut self, positions: Vec<Position>) {
-        self.positions = positions;
-    }
-
     pub fn add_insights(&mut self, features: Vec<Insight>) {
         self.insights = features;
     }
@@ -46,12 +43,13 @@ impl Snapshot {
     }
 }
 
-pub struct PositionSnapshot {
+#[derive(Clone)]
+pub struct PortfolioSnapshot {
     pub timestamp: OffsetDateTime,
     pub positions: Vec<Position>,
 }
 
-impl PositionSnapshot {
+impl PortfolioSnapshot {
     pub fn new(timestamp: OffsetDateTime, positions: Vec<Position>) -> Self {
         Self {
             timestamp,
@@ -60,7 +58,7 @@ impl PositionSnapshot {
     }
 }
 
-impl fmt::Display for PositionSnapshot {
+impl fmt::Display for PortfolioSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "PositionSnapshot: {}", self.timestamp)?;
         for position in &self.positions {
@@ -124,23 +122,30 @@ impl AllocationSnapshot {
     }
 }
 
+#[derive(Clone)]
 pub struct MarketSnapshot {
     pub event_time: OffsetDateTime,
-    pub ticks: Vec<Tick>,
+    pub ticks: HashMap<Instrument, Vec<Tick>>,
+    pub trades: HashMap<Instrument, Vec<Trade>>,
 }
 
 impl MarketSnapshot {
-    pub fn new(event_time: OffsetDateTime, ticks: Vec<Tick>) -> Self {
-        Self { event_time, ticks }
+    pub fn new(
+        event_time: OffsetDateTime,
+        ticks: HashMap<Instrument, Vec<Tick>>,
+        trades: HashMap<Instrument, Vec<Trade>>,
+    ) -> Self {
+        Self {
+            event_time,
+            ticks,
+            trades,
+        }
     }
 }
 
 impl fmt::Display for MarketSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "MarketSnapshot: {}", self.event_time)?;
-        for tick in &self.ticks {
-            write!(f, "\n{}", tick)?;
-        }
         Ok(())
     }
 }

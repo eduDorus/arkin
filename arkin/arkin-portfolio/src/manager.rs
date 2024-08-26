@@ -12,8 +12,6 @@ pub struct PortfolioManager {
     positions: DashMap<(StrategyId, Instrument), BTreeMap<CompositeIndex, Position>>,
     initial_capital: Notional,
     leverage: Decimal,
-    _initial_margin: Decimal,
-    _maintenance_margin: Decimal,
 }
 
 impl PortfolioManager {
@@ -22,8 +20,6 @@ impl PortfolioManager {
             positions: DashMap::new(),
             initial_capital: config.initial_capital.into(),
             leverage: config.leverage,
-            _initial_margin: config.initial_margin,
-            _maintenance_margin: config.maintenance_margin,
         }
     }
 
@@ -81,8 +77,9 @@ impl PortfolioManager {
     }
 
     /// Get the latest position snapshot at a given timestamp (take the last position before the timestamp)
-    pub fn snapshot(&self, timestamp: &OffsetDateTime) -> Vec<Position> {
-        self.positions
+    pub fn snapshot(&self, timestamp: &OffsetDateTime) -> PortfolioSnapshot {
+        let positions = self
+            .positions
             .iter()
             .map(|v| v.value().clone())
             .filter_map(|v| {
@@ -95,66 +92,16 @@ impl PortfolioManager {
                 }
                 None
             })
-            .collect()
+            .collect();
+
+        PortfolioSnapshot::new(timestamp.to_owned(), positions)
     }
 
-    pub fn total_capital(&self) -> Notional {
+    pub fn initial_capital(&self) -> Notional {
         self.initial_capital
     }
 
     pub fn leverage(&self) -> Decimal {
         self.leverage
     }
-
-    pub fn buying_power(&self) -> Notional {
-        self.total_capital() * self.leverage()
-    }
-
-    // pub fn total_value(&self, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_value_strategy(&self, strategy: &StrategyId, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_value_instrument(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_exposure(&self, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_exposure_strategy(&self, strategy: &StrategyId, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_exposure_instrument(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_realized_pnl(&self, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_realized_pnl_strategy(&self, strategy: &StrategyId, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_realized_pnl_instrument(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_unrealized_pnl(&self, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_unrealized_pnl_strategy(&self, strategy: &StrategyId, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
-
-    // pub fn total_unrealized_pnl_instrument(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Notional {
-    //     todo!()
-    // }
 }

@@ -18,7 +18,7 @@ impl EqualAllocation {
 }
 
 impl AllocationModule for EqualAllocation {
-    fn calculate(&self, _signals: &[Signal], _positions: &[Position]) -> Vec<Allocation> {
-        todo!()
+    fn calculate(&self, _snapshot: &Snapshot) -> Vec<Allocation> {
+        vec![]
     }
 }
