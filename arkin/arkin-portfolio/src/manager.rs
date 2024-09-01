@@ -54,9 +54,16 @@ impl PortfolioManager {
             let remaining_quantity = updating_position.update(timestamp, side, price, quantity, commission);
             debug!("Updated position: {}", position);
 
-            if let Some(quantity) = remaining_quantity {
-                updating_position =
-                    Position::new(timestamp, strategy_id, instrument, side, price, quantity, commission);
+            if let Some(remaining) = remaining_quantity {
+                updating_position = Position::new(
+                    timestamp,
+                    strategy_id,
+                    instrument,
+                    side,
+                    price,
+                    remaining,
+                    commission * (remaining / quantity),
+                );
             }
 
             self.positions.update(updating_position);

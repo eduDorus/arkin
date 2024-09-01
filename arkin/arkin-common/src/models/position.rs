@@ -83,7 +83,13 @@ impl Position {
                 self.reduce_or_close_position(price, quantity)
             }
         };
-        self.commission += commission;
+        // If there is a remaining quantity we only want to add the fraction of the commission
+        // that is proportional to the filled quantity
+        if remaining.is_some() {
+            self.commission += commission * ((quantity - remaining.unwrap()) / quantity);
+        } else {
+            self.commission += commission;
+        };
         self.total_quantity += quantity;
         self.last_updated_at = event_time;
         remaining
