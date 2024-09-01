@@ -1,104 +1,78 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use arkin_common::prelude::*;
-use dashmap::DashMap;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::config::PortfolioManagerConfig;
 
 pub struct PortfolioManager {
-    positions: DashMap<(StrategyId, Instrument), BTreeMap<CompositeIndex, Position>>,
-    initial_capital: Notional,
+    capital: Notional,
     leverage: Decimal,
+    positions: PositionState,
+}
+
+#[derive(Default, Clone)]
+pub struct PositionState {
+    positions: HashMap<(StrategyId, Instrument), Position>,
+}
+
+impl PositionState {
+    pub fn position(&self, strategy_id: &StrategyId, instrument: &Instrument) -> Option<&Position> {
+        self.positions.get(&(strategy_id.clone(), instrument.clone()))
+    }
+
+    pub fn update(&mut self, position: Position) {
+        self.positions
+            .insert((position.strategy_id.clone(), position.instrument.clone()), position);
+    }
 }
 
 impl PortfolioManager {
     pub fn from_config(config: &PortfolioManagerConfig) -> Self {
         Self {
-            positions: DashMap::new(),
-            initial_capital: config.initial_capital.into(),
+            capital: config.initial_capital.into(),
             leverage: config.leverage,
+            positions: PositionState::default(),
         }
     }
 
-    pub fn update_position(&self, order: ExecutionOrder) {
-        if !self.is_valid_position_update(&order) {
-            warn!("Invalid position update: {}", order);
-            return;
+    pub fn update_position(
+        &mut self,
+        timestamp: OffsetDateTime,
+        strategy_id: StrategyId,
+        instrument: Instrument,
+        side: Side,
+        price: Price,
+        quantity: Quantity,
+        commission: Notional,
+    ) {
+        if let Some(position) = self.positions.position(&strategy_id, &instrument) {
+            let mut updating_position = position.clone();
+            // We create a new updated value for point T so we can do historical look ups
+            let remaining_quantity = updating_position.update(timestamp, side, price, quantity, commission);
+            debug!("Updated position: {}", position);
+
+            if let Some(quantity) = remaining_quantity {
+                updating_position =
+                    Position::new(timestamp, strategy_id, instrument, side, price, quantity, commission);
+            }
+
+            self.positions.update(updating_position);
+        } else {
+            debug!("No position found, inserting new position");
+            let new_position = Position::new(timestamp, strategy_id, instrument, side, price, quantity, commission);
+            self.positions.update(new_position);
         }
-
-        let key = (order.strategy_id.clone(), order.instrument.clone());
-        self.positions
-            .entry(key)
-            .and_modify(|position_tree| {
-                if let Some(entry) = position_tree.last_entry() {
-                    if entry.get().status == PositionStatus::Open {
-                        debug!("Updating position: {}", entry.get());
-
-                        // We create a new updated value for point T so we can do historical look ups
-                        let mut position = entry.get().clone();
-                        let remaining_quantity = position.update_with_order(&order);
-                        debug!("Updated position: {}", position);
-                        let new_index = CompositeIndex::new(&position.last_updated_at);
-                        position_tree.insert(new_index, position);
-
-                        if let Some(quantity) = remaining_quantity {
-                            let mut remaining_order = order.to_owned();
-                            remaining_order.last_fill_quantity = quantity;
-                            self.insert_new_position(position_tree, &remaining_order);
-                        }
-                    } else {
-                        debug!("No open position, inserting new position: {}", order);
-                        self.insert_new_position(position_tree, &order);
-                    }
-                } else {
-                    debug!("No last entry, inserting new position: {}", order);
-                    self.insert_new_position(position_tree, &order);
-                }
-            })
-            .or_insert_with(|| {
-                debug!("No position found, inserting new position: {}", order);
-                let mut new_tree = BTreeMap::new();
-                self.insert_new_position(&mut new_tree, &order);
-                new_tree
-            });
     }
 
-    fn is_valid_position_update(&self, order: &ExecutionOrder) -> bool {
-        matches!(order.status, ExecutionStatus::PartiallyFilled | ExecutionStatus::Filled)
-    }
-
-    fn insert_new_position(&self, tree: &mut BTreeMap<CompositeIndex, Position>, order: &ExecutionOrder) {
-        let new_position = Position::from(order.clone());
-        let new_index = CompositeIndex::new(&new_position.last_updated_at);
-        tree.insert(new_index, new_position);
-    }
-
-    /// Get the latest position snapshot at a given timestamp (take the last position before the timestamp)
-    pub fn snapshot(&self, timestamp: &OffsetDateTime) -> PortfolioSnapshot {
-        let positions = self
-            .positions
-            .iter()
-            .map(|v| v.value().clone())
-            .filter_map(|v| {
-                let position = v.values().rev().find(|p| p.last_updated_at <= *timestamp);
-                if let Some(p) = position {
-                    // Check if position is open and return it
-                    if p.status == PositionStatus::Open {
-                        return Some(p.clone());
-                    }
-                }
-                None
-            })
-            .collect();
-
-        PortfolioSnapshot::new(timestamp.to_owned(), positions)
+    pub fn position(&self, strategy_id: &StrategyId, instrument: &Instrument) -> Option<&Position> {
+        self.positions.position(strategy_id, instrument)
     }
 
     pub fn initial_capital(&self) -> Notional {
-        self.initial_capital
+        self.capital
     }
 
     pub fn leverage(&self) -> Decimal {

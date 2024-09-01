@@ -21,15 +21,16 @@ impl StrategyManager {
     }
 
     pub fn calculate(&self, snapshot: &Snapshot) -> Vec<Signal> {
-        if snapshot.insights.is_empty() {
-            return vec![];
-        }
+        // if snapshot.insights.is_empty() {
+        //     return vec![];
+        // }
 
-        // Calculate signals for each strategy
-        self.strategies
-            .par_iter()
-            .map(|s| s.calculate(&snapshot.insights))
-            .flat_map(|s| s)
-            .collect::<Vec<_>>()
+        // // Calculate signals for each strategy
+        // self.strategies
+        //     .par_iter()
+        //     .map(|s| s.calculate(&snapshot.insights))
+        //     .flat_map(|s| s)
+        //     .collect::<Vec<_>>()
+        todo!()
     }
 }

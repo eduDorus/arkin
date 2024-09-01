@@ -50,6 +50,14 @@ impl Tick {
     pub fn mid_price(&self) -> Price {
         (self.bid_price + self.ask_price) / dec!(2)
     }
+
+    pub fn bid_price(&self) -> Price {
+        self.bid_price
+    }
+
+    pub fn ask_price(&self) -> Price {
+        self.ask_price
+    }
 }
 
 impl EventTypeOf for Tick {

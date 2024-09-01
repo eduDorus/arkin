@@ -20,7 +20,7 @@ pub struct ExecutionOrder {
     pub id: u64,
     pub strategy_id: StrategyId,
     pub instrument: Instrument,
-    pub side: OrderSide,
+    pub side: Side,
     pub execution_type: ExecutionType,
     pub time_in_force: TimeInForce,
     pub last_fill_price: Price,
@@ -41,7 +41,7 @@ impl ExecutionOrder {
         id: u64,
         strategy_id: StrategyId,
         instrument: Instrument,
-        side: OrderSide,
+        side: Side,
         execution_type: ExecutionType,
         time_in_force: TimeInForce,
         quantity: Quantity,
@@ -71,7 +71,7 @@ impl ExecutionOrder {
         event_time: OffsetDateTime,
         strategy_id: StrategyId,
         instrument: Instrument,
-        side: OrderSide,
+        side: Side,
         quantity: Quantity,
     ) -> Self {
         Self::new(
@@ -175,7 +175,7 @@ pub enum ExecutionType {
 }
 
 #[derive(Display, Clone, Copy, PartialEq, Eq)]
-pub enum OrderSide {
+pub enum Side {
     Buy,
     Sell,
 }

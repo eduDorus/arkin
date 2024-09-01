@@ -30,15 +30,15 @@ pub fn crossover_strategy() -> CrossoverStrategy {
 
 pub fn crossover(
     crossover_strategy: CrossoverStrategy,
-    instrument: Instrument,
+    perpetual_btc: Instrument,
     event_time: OffsetDateTime,
     #[case] spread_price: Decimal,
     #[case] spread_volume: Decimal,
     #[case] expected: Decimal,
 ) {
     let features = vec![
-        Insight::new("spread_sma_vwap".into(), instrument.clone(), event_time, spread_price),
-        Insight::new("spread_sma_volume".into(), instrument, event_time, spread_volume),
+        Insight::new("spread_sma_vwap".into(), perpetual_btc.clone(), event_time, spread_price),
+        Insight::new("spread_sma_volume".into(), perpetual_btc, event_time, spread_volume),
     ];
     let res = crossover_strategy.calculate(&features);
     assert_eq!(res.len(), 1);

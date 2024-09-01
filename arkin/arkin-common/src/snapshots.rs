@@ -1,56 +1,111 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
 
-use derive_builder::Builder;
 use time::OffsetDateTime;
+use tracing::warn;
 
 use crate::{
     models::{Allocation, ExecutionOrder, Insight, Position, Signal, Tick, Trade},
-    Instrument,
+    utils::CompositeIndex,
+    Instrument, Price, StrategyId,
 };
 
-#[derive(Clone, Builder)]
 pub struct Snapshot {
     pub event_time: OffsetDateTime,
-    pub portfolio: PortfolioSnapshot,
     pub market: MarketSnapshot,
-    #[builder(default)]
-    pub trades: Vec<Trade>,
-    #[builder(default)]
-    pub insights: Vec<Insight>,
-    #[builder(default)]
-    pub signals: Vec<Signal>,
-    #[builder(default)]
-    pub allocations: Vec<Allocation>,
-    #[builder(default)]
-    pub orders: Vec<ExecutionOrder>,
+    pub portfolio: PortfolioSnapshot,
+    pub insights: InsightsSnapshot,
+    pub signals: SignalSnapshot,
+    pub allocations: AllocationSnapshot,
 }
 
 impl Snapshot {
-    pub fn add_insights(&mut self, features: Vec<Insight>) {
-        self.insights = features;
+    pub fn add_insights(&mut self, insights: InsightsSnapshot) {
+        if self.event_time != insights.event_time {
+            warn!(
+                "Event time mismatch: Snapshot event time: {}, Insights event time: {}",
+                self.event_time, insights.event_time
+            );
+        }
+        self.insights = insights;
     }
 
-    pub fn add_signals(&mut self, signals: Vec<Signal>) {
+    pub fn add_signals(&mut self, signals: SignalSnapshot) {
         self.signals = signals;
     }
 
-    pub fn add_allocations(&mut self, allocations: Vec<Allocation>) {
+    pub fn add_allocations(&mut self, allocations: AllocationSnapshot) {
         self.allocations = allocations;
-    }
-
-    pub fn add_orders(&mut self, orders: Vec<ExecutionOrder>) {
-        self.orders = orders;
     }
 }
 
-#[derive(Clone)]
+pub struct MarketSnapshot {
+    event_time: OffsetDateTime,
+    ticks: HashMap<Instrument, BTreeMap<CompositeIndex, Tick>>,
+    trades: HashMap<Instrument, BTreeMap<CompositeIndex, Trade>>,
+}
+
+impl MarketSnapshot {
+    pub fn new(
+        event_time: OffsetDateTime,
+        ticks: HashMap<Instrument, BTreeMap<CompositeIndex, Tick>>,
+        trades: HashMap<Instrument, BTreeMap<CompositeIndex, Trade>>,
+    ) -> Self {
+        Self {
+            event_time,
+            ticks,
+            trades,
+        }
+    }
+
+    pub fn last_mid_price(&self, instrument: &Instrument) -> Option<Price> {
+        self.ticks
+            .get(instrument)
+            .and_then(|ticks| ticks.values().last())
+            .map(|tick| tick.mid_price())
+    }
+
+    pub fn last_bid_price(&self, instrument: &Instrument) -> Option<Price> {
+        self.ticks
+            .get(instrument)
+            .and_then(|ticks| ticks.values().last())
+            .map(|tick| tick.bid_price())
+    }
+
+    pub fn last_ask_price(&self, instrument: &Instrument) -> Option<Price> {
+        self.ticks
+            .get(instrument)
+            .and_then(|ticks| ticks.values().last())
+            .map(|tick| tick.ask_price())
+    }
+
+    pub fn last_trade_price(&self, instrument: &Instrument) -> Option<Price> {
+        self.trades
+            .get(instrument)
+            .and_then(|trades| trades.values().last())
+            .map(|trade| trade.price)
+    }
+}
+
+impl fmt::Display for MarketSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MarketSnapshot: {}", self.event_time)?;
+        for (i, _) in &self.ticks {
+            write!(f, "\n{}: {:?}", i, &self.last_mid_price(i))?;
+        }
+        Ok(())
+    }
+}
+
 pub struct PortfolioSnapshot {
     pub timestamp: OffsetDateTime,
-    pub positions: Vec<Position>,
+    pub positions: HashMap<(StrategyId, Instrument), Position>,
 }
 
 impl PortfolioSnapshot {
-    pub fn new(timestamp: OffsetDateTime, positions: Vec<Position>) -> Self {
+    pub fn new(timestamp: OffsetDateTime, positions: HashMap<(StrategyId, Instrument), Position>) -> Self {
         Self {
             timestamp,
             positions,
@@ -61,19 +116,16 @@ impl PortfolioSnapshot {
 impl fmt::Display for PortfolioSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "PositionSnapshot: {}", self.timestamp)?;
-        for position in &self.positions {
-            write!(f, "\n{}", position)?;
-        }
         Ok(())
     }
 }
 
-pub struct FeatureSnapshot {
+pub struct InsightsSnapshot {
     pub event_time: OffsetDateTime,
     pub insights: Vec<Insight>,
 }
 
-impl FeatureSnapshot {
+impl InsightsSnapshot {
     pub fn new(event_time: OffsetDateTime, features: Vec<Insight>) -> Self {
         Self {
             event_time,
@@ -84,11 +136,11 @@ impl FeatureSnapshot {
 
 pub struct SignalSnapshot {
     pub event_time: OffsetDateTime,
-    pub signals: Vec<Signal>,
+    pub signals: HashMap<(StrategyId, Instrument), Signal>,
 }
 
 impl SignalSnapshot {
-    pub fn new(event_time: OffsetDateTime, signals: Vec<Signal>) -> Self {
+    pub fn new(event_time: OffsetDateTime, signals: HashMap<(StrategyId, Instrument), Signal>) -> Self {
         Self {
             event_time,
             signals,
@@ -99,21 +151,22 @@ impl SignalSnapshot {
 impl fmt::Display for SignalSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "SignalSnapshot: {}", self.event_time)?;
-        for signal in &self.signals {
-            write!(f, "\n{}", signal)?;
-        }
         Ok(())
     }
 }
 
 pub struct AllocationSnapshot {
     pub event_time: OffsetDateTime,
-    pub allocations: Vec<Allocation>,
-    pub orders: Vec<ExecutionOrder>,
+    pub allocations: HashMap<(StrategyId, Instrument), Allocation>,
+    pub orders: HashMap<(StrategyId, Instrument), ExecutionOrder>,
 }
 
 impl AllocationSnapshot {
-    pub fn new(event_time: OffsetDateTime, allocations: Vec<Allocation>, orders: Vec<ExecutionOrder>) -> Self {
+    pub fn new(
+        event_time: OffsetDateTime,
+        allocations: HashMap<(StrategyId, Instrument), Allocation>,
+        orders: HashMap<(StrategyId, Instrument), ExecutionOrder>,
+    ) -> Self {
         Self {
             event_time,
             allocations,
@@ -122,30 +175,9 @@ impl AllocationSnapshot {
     }
 }
 
-#[derive(Clone)]
-pub struct MarketSnapshot {
-    pub event_time: OffsetDateTime,
-    pub ticks: HashMap<Instrument, Vec<Tick>>,
-    pub trades: HashMap<Instrument, Vec<Trade>>,
-}
-
-impl MarketSnapshot {
-    pub fn new(
-        event_time: OffsetDateTime,
-        ticks: HashMap<Instrument, Vec<Tick>>,
-        trades: HashMap<Instrument, Vec<Trade>>,
-    ) -> Self {
-        Self {
-            event_time,
-            ticks,
-            trades,
-        }
-    }
-}
-
-impl fmt::Display for MarketSnapshot {
+impl fmt::Display for AllocationSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "MarketSnapshot: {}", self.event_time)?;
+        write!(f, "AllocationSnapshot: {}", self.event_time)?;
         Ok(())
     }
 }

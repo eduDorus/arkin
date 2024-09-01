@@ -8,7 +8,7 @@ use crate::{
     types::{Notional, Price, Quantity, StrategyId},
 };
 
-use super::Instrument;
+use super::{Instrument, Side};
 
 #[derive(Clone)]
 pub struct Fill {
@@ -17,6 +17,7 @@ pub struct Fill {
     pub instrument: Instrument,
     pub order_id: u64,
     pub venue_order_id: u64,
+    pub side: Side,
     pub price: Price,
     pub quantity: Quantity,
     pub commission: Notional,
@@ -29,6 +30,7 @@ impl Fill {
         instrument: Instrument,
         order_id: u64,
         venue_order_id: u64,
+        side: Side,
         price: Price,
         quantity: Quantity,
         commission: Notional,
@@ -39,14 +41,11 @@ impl Fill {
             instrument,
             order_id,
             venue_order_id,
+            side,
             price,
             quantity,
             commission,
         }
-    }
-
-    pub fn notional(&self) -> Notional {
-        self.price * self.quantity.abs()
     }
 }
 
@@ -72,9 +71,10 @@ impl fmt::Display for Fill {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "FILL {} {} avg price: {} quantity: {} commission: {}",
+            "FILL {} {} side: {} avg price: {} quantity: {} commission: {}",
             self.event_time.format(TIMESTAMP_FORMAT).unwrap(),
             self.instrument,
+            self.side,
             self.price,
             self.quantity,
             self.commission

@@ -17,8 +17,23 @@ fn setup_env() {
 }
 
 #[fixture]
-pub fn instrument() -> Instrument {
-    Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into())
+pub fn perpetual_btc() -> Instrument {
+    Instrument::perpetual(Venue::Binance, "BTC".into(), "ETH".into())
+}
+
+#[fixture]
+pub fn perpetual_eth() -> Instrument {
+    Instrument::perpetual(Venue::Binance, "ETH".into(), "ETH".into())
+}
+
+#[fixture]
+pub fn strategy_crossover() -> StrategyId {
+    StrategyId::from("crossover")
+}
+
+#[fixture]
+pub fn strategy_predator() -> StrategyId {
+    StrategyId::from("predator")
 }
 
 #[fixture]
@@ -26,10 +41,47 @@ pub fn event_time() -> OffsetDateTime {
     OffsetDateTime::now_utc()
 }
 
+// #[fixture]
+// fn base_fill(
+//     #[default(event_time())] event_time: OffsetDateTime,
+//     #[default(strategy_id())] strategy_id: StrategyId,
+//     #[default(instrument())] instrument: Instrument,
+//     #[default(1)] order_id: u64,
+//     #[default(1)] venue_order_id: u64,
+//     #[default(Side::Buy)] side: Side,
+//     #[default(dec!(100.0))] price: Price,
+//     #[default(dec!(1.0))] quantity: Quantity,
+//     #[default(dec!(0.1))] commission: Notional,
+// ) -> Fill {
+//     Fill::new(
+//         event_time,
+//         strategy_id,
+//         instrument,
+//         order_id,
+//         venue_order_id,
+//         side,
+//         price,
+//         quantity,
+//         commission,
+//     )
+// }
+
 #[fixture]
 pub fn database() -> DBManager {
     let config = load::<PersistanceConfig>();
     DBManager::from_config(&config.database)
+}
+
+#[fixture]
+pub fn market_manager() -> MarketManager {
+    let config = load::<MarketConfig>();
+    MarketManager::from_config(&config.market_manager)
+}
+
+#[fixture]
+pub fn portfolio_manager() -> PortfolioManager {
+    let config = load::<PortfolioConfig>();
+    PortfolioManager::from_config(&config.portfolio_manager)
 }
 
 #[fixture]
@@ -48,16 +100,4 @@ pub fn strategy_manager() -> StrategyManager {
 pub fn allocation_manager() -> AllocationManager {
     let config = load::<AllocationConfig>();
     AllocationManager::from_config(&config.allocation_manager)
-}
-
-#[fixture]
-pub fn portfolio_manager() -> PortfolioManager {
-    let config = load::<PortfolioConfig>();
-    PortfolioManager::from_config(&config.portfolio_manager)
-}
-
-#[fixture]
-pub fn market_manager() -> MarketManager {
-    let config = load::<MarketConfig>();
-    MarketManager::from_config(&config.market_manager)
 }

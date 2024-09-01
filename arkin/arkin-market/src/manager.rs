@@ -27,19 +27,20 @@ impl MarketManager {
     }
 
     pub fn snapshot(&self, timestamp: &OffsetDateTime, window: Duration) -> MarketSnapshot {
-        let ticks = self
-            .state
-            .list_instruments::<Tick>()
-            .into_iter()
-            .map(|i| (i.clone(), self.state.list_entries_window::<Tick>(&i, timestamp, &window)))
-            .collect::<HashMap<_, Vec<_>>>();
-        let trades = self
-            .state
-            .list_instruments::<Trade>()
-            .into_iter()
-            .map(|i| (i.clone(), self.state.list_entries_window::<Trade>(&i, timestamp, &window)))
-            .collect::<HashMap<_, Vec<_>>>();
+        // let ticks = self
+        //     .state
+        //     .list_instruments::<Tick>()
+        //     .into_iter()
+        //     .map(|i| (i.clone(), self.state.list_entries_window::<Tick>(&i, timestamp, &window)))
+        //     .collect::<HashMap<_, Vec<_>>>();
+        // let trades = self
+        //     .state
+        //     .list_instruments::<Trade>()
+        //     .into_iter()
+        //     .map(|i| (i.clone(), self.state.list_entries_window::<Trade>(&i, timestamp, &window)))
+        //     .collect::<HashMap<_, Vec<_>>>();
 
-        MarketSnapshot::new(timestamp.to_owned(), ticks, trades)
+        // MarketSnapshot::new(timestamp.to_owned(), ticks, trades)
+        todo!()
     }
 }

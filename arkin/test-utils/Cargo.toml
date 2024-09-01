@@ -17,4 +17,5 @@ arkin-market = { path = "../arkin-market" }
 rstest = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
 ctor = { workspace = true }
