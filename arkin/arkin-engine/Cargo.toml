@@ -1,5 +1,5 @@
 [package]
-name = "test-utils"
+name = "arkin-engine"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true
@@ -7,7 +7,6 @@ license.workspace = true
 
 [dependencies]
 arkin-common = { path = "../arkin-common" }
-arkin-engine = { path = "../arkin-engine" }
 arkin-execution = { path = "../arkin-execution" }
 arkin-persistance = { path = "../arkin-persistance" }
 arkin-insights = { path = "../arkin-insights" }
@@ -16,8 +15,7 @@ arkin-allocation = { path = "../arkin-allocation" }
 arkin-portfolio = { path = "../arkin-portfolio" }
 arkin-market = { path = "../arkin-market" }
 
-rstest = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 time = { workspace = true }
-rust_decimal = { workspace = true }
-rust_decimal_macros = { workspace = true }
-ctor = { workspace = true }
+derive_builder = { workspace = true }

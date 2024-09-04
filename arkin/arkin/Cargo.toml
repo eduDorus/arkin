@@ -25,5 +25,4 @@ mimalloc = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true }
 tokio-rustls = { workspace = true }
-rstest.workspace = true
 

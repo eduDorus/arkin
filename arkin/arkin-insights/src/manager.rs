@@ -5,6 +5,7 @@ use anyhow::Result;
 use arkin_common::prelude::*;
 use rayon::prelude::*;
 use rust_decimal::Decimal;
+use time::OffsetDateTime;
 
 use crate::ComputationGraph;
 use crate::{
@@ -40,12 +41,15 @@ impl InsightsManager {
         events.into_iter().for_each(|event| self.insert(event.into()));
     }
 
-    pub fn calculate(&self, snapshot: &Snapshot) -> Vec<Insight> {
+    pub fn calculate(&self, timestamp: OffsetDateTime) -> InsightsSnapshot {
         let instruments = self.state.instruments();
-        instruments
+        let insights = instruments
             .par_iter()
-            .map(|instrument| self.pipeline.calculate(self.state.clone(), &snapshot.event_time, instrument))
+            .map(|instrument| self.pipeline.calculate(self.state.clone(), &timestamp, instrument))
             .flat_map(|f| f)
-            .collect::<Vec<_>>()
+            .map(|f| (f.instrument.clone(), f))
+            .collect::<HashMap<_, _>>();
+
+        InsightsSnapshot::new(timestamp, insights)
     }
 }

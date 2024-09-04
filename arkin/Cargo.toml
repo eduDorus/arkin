@@ -2,7 +2,7 @@
 members = [
    "arkin",
    "arkin-allocation", 
-   "arkin-common",
+   "arkin-common", "arkin-engine",
    "arkin-execution",
    "arkin-insights", 
    "arkin-market",

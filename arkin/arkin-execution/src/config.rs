@@ -2,6 +2,11 @@ use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ExecutionConfig {
+    pub execution_manager: ExecutionManagerConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExecutionManagerConfig {
     pub default_endpoint: String,
     pub rebalance_threshold: Decimal,

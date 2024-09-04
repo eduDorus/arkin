@@ -117,7 +117,6 @@ dependencies = [
  "arkin-common",
  "clap",
  "mimalloc",
- "rstest",
  "tokio",
  "tokio-rustls",
  "tracing",
@@ -153,6 +152,24 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "arkin-engine"
+version = "0.1.0"
+dependencies = [
+ "arkin-allocation",
+ "arkin-common",
+ "arkin-execution",
+ "arkin-insights",
+ "arkin-market",
+ "arkin-persistance",
+ "arkin-portfolio",
+ "arkin-strategies",
+ "derive_builder",
+ "time",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2619,6 +2636,8 @@ version = "0.1.0"
 dependencies = [
  "arkin-allocation",
  "arkin-common",
+ "arkin-engine",
+ "arkin-execution",
  "arkin-insights",
  "arkin-market",
  "arkin-persistance",
@@ -2638,6 +2657,8 @@ version = "0.1.0"
 dependencies = [
  "arkin-allocation",
  "arkin-common",
+ "arkin-engine",
+ "arkin-execution",
  "arkin-insights",
  "arkin-market",
  "arkin-persistance",

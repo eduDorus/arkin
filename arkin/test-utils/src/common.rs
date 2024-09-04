@@ -1,5 +1,7 @@
 use arkin_allocation::prelude::*;
 use arkin_common::prelude::*;
+use arkin_engine::Engine;
+use arkin_execution::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_market::prelude::*;
 use arkin_persistance::prelude::*;
@@ -100,4 +102,29 @@ pub fn strategy_manager() -> StrategyManager {
 pub fn allocation_manager() -> AllocationManager {
     let config = load::<AllocationConfig>();
     AllocationManager::from_config(&config.allocation_manager)
+}
+
+#[fixture]
+pub fn execution_manager() -> ExecutionManager {
+    let config = load::<ExecutionConfig>();
+    ExecutionManager::from_config(&config.execution_manager)
+}
+
+#[fixture]
+pub fn engine(
+    market_manager: MarketManager,
+    portfolio_manager: PortfolioManager,
+    insights_manager: InsightsManager,
+    strategy_manager: StrategyManager,
+    allocation_manager: AllocationManager,
+    execution_manager: ExecutionManager,
+) -> Engine {
+    Engine::new(
+        market_manager,
+        portfolio_manager,
+        insights_manager,
+        strategy_manager,
+        allocation_manager,
+        execution_manager,
+    )
 }
