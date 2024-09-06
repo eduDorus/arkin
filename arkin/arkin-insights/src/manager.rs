@@ -5,7 +5,6 @@ use anyhow::Result;
 use arkin_common::prelude::*;
 use rayon::prelude::*;
 use rust_decimal::Decimal;
-use time::OffsetDateTime;
 
 use crate::ComputationGraph;
 use crate::{
@@ -41,8 +40,16 @@ impl InsightsManager {
         events.into_iter().for_each(|event| self.insert(event.into()));
     }
 
-    pub fn process(&self, timestamp: OffsetDateTime) -> InsightsSnapshot {
+    pub fn process(&self, snapshot: &MarketSnapshot) -> InsightsSnapshot {
+        let timestamp = snapshot.timestamp();
+
+        // Update state
+        self.insert_batch(snapshot.insights());
+
+        // Get instruments
         let instruments = self.state.instruments();
+
+        // Generate insights
         let insights = instruments
             .par_iter()
             .map(|instrument| self.pipeline.calculate(self.state.clone(), &timestamp, instrument))

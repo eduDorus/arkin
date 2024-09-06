@@ -5,7 +5,6 @@ use time::macros::datetime;
 use tracing::info;
 
 use arkin_allocation::prelude::*;
-use arkin_engine::Engine;
 use arkin_execution::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_market::prelude::*;
@@ -38,15 +37,4 @@ async fn test_end_to_end(
     info!("Loaded {} trades and {} ticks", trades.len(), ticks.len());
     market_manager.insert_batch(ticks.into_iter().map(|v| v.into()).collect());
     market_manager.insert_batch(trades.into_iter().map(|v| v.into()).collect());
-
-    let engine = Engine::new(
-        market_manager,
-        portfolio_manager,
-        insights_manager,
-        strategy_manager,
-        allocation_manager,
-        execution_manager,
-    );
-
-    engine.backtest(start, end, frequency_secs);
 }

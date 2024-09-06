@@ -27,7 +27,7 @@ impl StrategyModule for CrossoverStrategy {
         &self.source
     }
 
-    fn calculate(&self, insights: &InsightsSnapshot) -> Vec<Signal> {
+    fn calculate(&self, _insights: &InsightsSnapshot) -> Vec<Signal> {
         // let price_spread = data.iter().find(|d| d.id == self.source[0]).expect("Missing price spread");
         // let volume_spread = data.iter().find(|d| d.id == self.source[1]).expect("Missing volume spread");
 

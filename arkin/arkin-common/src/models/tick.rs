@@ -87,8 +87,24 @@ impl From<Tick> for Event {
 impl From<Tick> for Vec<Insight> {
     fn from(value: Tick) -> Self {
         vec![
-            Insight::new("bid_price".into(), value.instrument.clone(), value.event_time, value.bid_price),
-            Insight::new("ask_price".into(), value.instrument.clone(), value.event_time, value.ask_price),
+            Insight::new(
+                "bid_price".into(),
+                value.instrument.clone(),
+                value.event_time,
+                value.bid_price(),
+            ),
+            Insight::new(
+                "ask_price".into(),
+                value.instrument.clone(),
+                value.event_time,
+                value.ask_price(),
+            ),
+            Insight::new(
+                "mid_price".into(),
+                value.instrument.clone(),
+                value.event_time,
+                value.mid_price(),
+            ),
         ]
     }
 }

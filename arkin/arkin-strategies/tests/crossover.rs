@@ -36,11 +36,15 @@ pub fn crossover(
     #[case] spread_volume: Decimal,
     #[case] expected: Decimal,
 ) {
-    let features = vec![
-        Insight::new("spread_sma_vwap".into(), perpetual_btc.clone(), event_time, spread_price),
-        Insight::new("spread_sma_volume".into(), perpetual_btc, event_time, spread_volume),
-    ];
-    let res = crossover_strategy.calculate(&features);
+    let snapshot = InsightsSnapshot::new(
+        event_time,
+        vec![
+            Insight::new("spread_sma_vwap".into(), perpetual_btc.clone(), event_time, spread_price),
+            Insight::new("spread_sma_volume".into(), perpetual_btc, event_time, spread_volume),
+        ],
+    );
+
+    let res = crossover_strategy.calculate(&snapshot);
     assert_eq!(res.len(), 1);
     assert_eq!(res[0].signal, Weight::from(expected));
 }

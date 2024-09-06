@@ -8,7 +8,7 @@ pub struct AllocationConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AllocationManagerConfig {
-    pub allocations: Vec<AllocationModuleConfig>,
+    pub module: AllocationModuleConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

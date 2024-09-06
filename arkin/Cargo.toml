@@ -67,7 +67,7 @@ rust_decimal_macros = "1.36"
 bytes = "1.7"
 
 # Data Structures
-dashmap = { version = "6.0", features = ["inline", "rayon"], default-features = false }
+dashmap = { version = "6.1", features = ["inline", "rayon"], default-features = false }
 # scc = "2.1"
 
 # Serialization

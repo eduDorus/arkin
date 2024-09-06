@@ -2,6 +2,7 @@ database:
   host: 127.0.0.1
   port: 5432
   user: arkin_admin
+  password: test1234
   database: arkin
   min_connections: 10
   max_connections: 200
@@ -95,10 +96,10 @@ strategy_manager:
         volume_spread_id: spread_sma_volume
 
 allocation_manager:
-  allocations:
-    - equal:
-        max_allocation: 0.9
-        max_allocation_per_underlier: 0.25
+  module:
+    equal:
+      max_allocation: 0.9
+      max_allocation_per_underlier: 0.25
 
 execution_manager:
   default_endpoint: simulation

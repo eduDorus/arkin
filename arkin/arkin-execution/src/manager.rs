@@ -30,7 +30,5 @@ impl ExecutionManager {
         }
     }
 
-    pub fn execute(&self, _allocations: AllocationSnapshot) {
-        todo!()
-    }
+    pub fn process(&self, _allocations: &AllocationSnapshot) {}
 }

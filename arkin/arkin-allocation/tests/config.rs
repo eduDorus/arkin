@@ -8,9 +8,8 @@ fn load_config() {
     std::env::set_var("RUN_MODE", "test");
 
     let config = load::<AllocationConfig>();
-    assert_eq!(config.allocation_manager.allocations.len(), 1);
     // Check if the config is a Crossover strategy
-    let AllocationModuleConfig::Equal(c) = &config.allocation_manager.allocations[0];
+    let AllocationModuleConfig::Equal(c) = &config.allocation_manager.module;
     assert_eq!(c.max_allocation, dec!(0.9));
     assert_eq!(c.max_allocation_per_underlier, dec!(0.25));
 }

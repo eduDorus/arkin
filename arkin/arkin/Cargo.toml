@@ -33,3 +33,4 @@ mimalloc = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true }
 tokio-rustls = { workspace = true }
+time = { workspace = true }

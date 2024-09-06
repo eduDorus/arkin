@@ -1,5 +1,4 @@
 use arkin_common::prelude::*;
-use rayon::prelude::*;
 
 use crate::{config::AllocationManagerConfig, factory::AllocationFactory};
 
@@ -12,25 +11,29 @@ pub trait AllocationModule: Send + Sync {
 }
 
 pub struct AllocationManager {
-    allocations: Vec<Box<dyn AllocationModule>>,
+    allocation: Box<dyn AllocationModule>,
 }
 
 impl AllocationManager {
     pub fn from_config(config: &AllocationManagerConfig) -> Self {
         Self {
-            allocations: AllocationFactory::from_config(&config.allocations),
+            allocation: AllocationFactory::from_config(&config.module),
         }
     }
 
-    pub fn calculate_allocations(
+    pub fn process(
         &self,
         portfolio_snapshot: &PortfolioSnapshot,
         strategy_snapshot: &StrategySnapshot,
-    ) -> Vec<Allocation> {
-        self.allocations
-            .par_iter()
-            .map(|a| a.calculate(portfolio_snapshot, strategy_snapshot))
-            .flat_map(|a| a)
-            .collect::<Vec<_>>()
+    ) -> AllocationSnapshot {
+        let timestamp = strategy_snapshot.timestamp();
+
+        // Calculate Allocations
+        let allocations = self.allocation.calculate(portfolio_snapshot, strategy_snapshot);
+
+        // Calculate Orders
+        let orders = vec![];
+
+        AllocationSnapshot::new(timestamp, allocations, orders)
     }
 }

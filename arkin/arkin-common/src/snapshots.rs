@@ -4,7 +4,7 @@ use time::OffsetDateTime;
 
 use crate::{
     models::{Allocation, ExecutionOrder, Insight, Position, Signal, Tick, Trade},
-    Instrument, StrategyId,
+    Instrument,
 };
 
 pub struct MarketSnapshot {
@@ -26,6 +26,10 @@ impl MarketSnapshot {
         }
     }
 
+    pub fn timestamp(&self) -> OffsetDateTime {
+        self.timestamp
+    }
+
     pub fn last_tick(&self, instrument: &Instrument) -> Option<Tick> {
         self.ticks
             .get(instrument)
@@ -36,6 +40,27 @@ impl MarketSnapshot {
         self.trades
             .get(instrument)
             .and_then(|trades| trades.last().map(|trade| trade.clone()))
+    }
+
+    pub fn insights(&self) -> Vec<Insight> {
+        let mut insights: Vec<Insight> = Vec::new();
+        insights.extend(
+            self.ticks
+                .values()
+                .flatten()
+                .cloned()
+                .map(|v| <Tick as Into<Vec<Insight>>>::into(v))
+                .flatten(),
+        );
+        insights.extend(
+            self.trades
+                .values()
+                .flatten()
+                .cloned()
+                .map(|v| <Trade as Into<Vec<Insight>>>::into(v))
+                .flatten(),
+        );
+        insights
     }
 }
 
@@ -92,6 +117,10 @@ pub struct StrategySnapshot {
 impl StrategySnapshot {
     pub fn new(timestamp: OffsetDateTime, signals: Vec<Signal>) -> Self {
         Self { timestamp, signals }
+    }
+
+    pub fn timestamp(&self) -> OffsetDateTime {
+        self.timestamp
     }
 }
 

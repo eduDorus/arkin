@@ -20,8 +20,8 @@ impl EqualAllocation {
 impl AllocationModule for EqualAllocation {
     fn calculate(
         &self,
-        portfolio_snapshot: &PortfolioSnapshot,
-        strategy_snapshot: &StrategySnapshot,
+        _portfolio_snapshot: &PortfolioSnapshot,
+        _strategy_snapshot: &StrategySnapshot,
     ) -> Vec<Allocation> {
         vec![]
     }

@@ -1,6 +1,6 @@
 use arkin_allocation::prelude::*;
 use arkin_common::prelude::*;
-use arkin_engine::Engine;
+use arkin_engine::{Engine, EngineBuilder};
 use arkin_execution::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_market::prelude::*;
@@ -119,12 +119,13 @@ pub fn engine(
     allocation_manager: AllocationManager,
     execution_manager: ExecutionManager,
 ) -> Engine {
-    Engine::new(
-        market_manager,
-        portfolio_manager,
-        insights_manager,
-        strategy_manager,
-        allocation_manager,
-        execution_manager,
-    )
+    EngineBuilder::default()
+        .market_manager(market_manager)
+        .portfolio_manager(portfolio_manager)
+        .insights_manager(insights_manager)
+        .strategy_manager(strategy_manager)
+        .allocation_manager(allocation_manager)
+        .execution_manager(execution_manager)
+        .build()
+        .expect("Failed to build engine")
 }

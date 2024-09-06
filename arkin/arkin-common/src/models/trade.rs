@@ -38,6 +38,14 @@ impl Trade {
             quantity,
         }
     }
+
+    pub fn price(&self) -> Price {
+        self.price
+    }
+
+    pub fn quantity(&self) -> Quantity {
+        self.quantity
+    }
 }
 
 impl EventTypeOf for Trade {
@@ -67,12 +75,17 @@ impl From<Trade> for Event {
 impl From<Trade> for Vec<Insight> {
     fn from(v: Trade) -> Self {
         vec![
-            Insight::new("trade_price".into(), v.instrument.clone(), v.event_time.clone(), v.price),
+            Insight::new(
+                "trade_price".into(),
+                v.instrument.to_owned(),
+                v.event_time.to_owned(),
+                v.price(),
+            ),
             Insight::new(
                 "trade_quantity".into(),
-                v.instrument.clone(),
-                v.event_time.clone(),
-                v.quantity.into(),
+                v.instrument.to_owned(),
+                v.event_time.to_owned(),
+                v.quantity(),
             ),
         ]
     }
