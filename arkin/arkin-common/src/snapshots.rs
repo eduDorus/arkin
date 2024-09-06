@@ -8,19 +8,19 @@ use crate::{
 };
 
 pub struct MarketSnapshot {
-    event_time: OffsetDateTime,
+    timestamp: OffsetDateTime,
     ticks: HashMap<Instrument, Vec<Tick>>,
     trades: HashMap<Instrument, Vec<Trade>>,
 }
 
 impl MarketSnapshot {
     pub fn new(
-        event_time: OffsetDateTime,
+        timestamp: OffsetDateTime,
         ticks: HashMap<Instrument, Vec<Tick>>,
         trades: HashMap<Instrument, Vec<Trade>>,
     ) -> Self {
         Self {
-            event_time,
+            timestamp,
             ticks,
             trades,
         }
@@ -41,7 +41,7 @@ impl MarketSnapshot {
 
 impl fmt::Display for MarketSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "MarketSnapshot: {}", self.event_time)?;
+        write!(f, "MarketSnapshot: {}", self.timestamp)?;
         for (i, _) in &self.ticks {
             write!(f, "\n{}: {:?}", i, &self.last_tick(i).map(|f| f.mid_price()))?;
         }
@@ -51,11 +51,11 @@ impl fmt::Display for MarketSnapshot {
 
 pub struct PortfolioSnapshot {
     pub timestamp: OffsetDateTime,
-    pub positions: HashMap<(StrategyId, Instrument), Position>,
+    pub positions: Vec<Position>,
 }
 
 impl PortfolioSnapshot {
-    pub fn new(timestamp: OffsetDateTime, positions: HashMap<(StrategyId, Instrument), Position>) -> Self {
+    pub fn new(timestamp: OffsetDateTime, positions: Vec<Position>) -> Self {
         Self {
             timestamp,
             positions,
@@ -71,54 +71,47 @@ impl fmt::Display for PortfolioSnapshot {
 }
 
 pub struct InsightsSnapshot {
-    pub event_time: OffsetDateTime,
-    pub insights: HashMap<Instrument, Insight>,
+    pub timestamp: OffsetDateTime,
+    pub insights: Vec<Insight>,
 }
 
 impl InsightsSnapshot {
-    pub fn new(event_time: OffsetDateTime, features: HashMap<Instrument, Insight>) -> Self {
+    pub fn new(timestamp: OffsetDateTime, insights: Vec<Insight>) -> Self {
         Self {
-            event_time,
-            insights: features,
+            timestamp,
+            insights,
         }
     }
 }
 
 pub struct StrategySnapshot {
-    pub event_time: OffsetDateTime,
-    pub signals: HashMap<(StrategyId, Instrument), Signal>,
+    pub timestamp: OffsetDateTime,
+    pub signals: Vec<Signal>,
 }
 
 impl StrategySnapshot {
-    pub fn new(event_time: OffsetDateTime, signals: HashMap<(StrategyId, Instrument), Signal>) -> Self {
-        Self {
-            event_time,
-            signals,
-        }
+    pub fn new(timestamp: OffsetDateTime, signals: Vec<Signal>) -> Self {
+        Self { timestamp, signals }
     }
 }
 
 impl fmt::Display for StrategySnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SignalSnapshot: {}", self.event_time)?;
+        write!(f, "SignalSnapshot: {}", self.timestamp)?;
         Ok(())
     }
 }
 
 pub struct AllocationSnapshot {
-    pub event_time: OffsetDateTime,
-    pub allocations: HashMap<(StrategyId, Instrument), Allocation>,
-    pub orders: HashMap<(StrategyId, Instrument), ExecutionOrder>,
+    pub timestamp: OffsetDateTime,
+    pub allocations: Vec<Allocation>,
+    pub orders: Vec<ExecutionOrder>,
 }
 
 impl AllocationSnapshot {
-    pub fn new(
-        event_time: OffsetDateTime,
-        allocations: HashMap<(StrategyId, Instrument), Allocation>,
-        orders: HashMap<(StrategyId, Instrument), ExecutionOrder>,
-    ) -> Self {
+    pub fn new(timestamp: OffsetDateTime, allocations: Vec<Allocation>, orders: Vec<ExecutionOrder>) -> Self {
         Self {
-            event_time,
+            timestamp,
             allocations,
             orders,
         }
@@ -127,7 +120,7 @@ impl AllocationSnapshot {
 
 impl fmt::Display for AllocationSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AllocationSnapshot: {}", self.event_time)?;
+        write!(f, "AllocationSnapshot: {}", self.timestamp)?;
         Ok(())
     }
 }

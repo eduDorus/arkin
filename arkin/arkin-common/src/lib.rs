@@ -1,5 +1,3 @@
-// In lib.rs
-
 mod config;
 mod constants;
 mod events;

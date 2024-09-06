@@ -8,8 +8,8 @@ pub fn load<T: DeserializeOwned>() -> T {
 
     let res = Config::builder()
         // .add_source(File::with_name("../configs/default"))
-        .add_source(File::with_name(&format!("../configs/{}", run_mode)).required(false))
-        .add_source(File::with_name(&format!("../configs/{}_secrets", run_mode)).required(false))
+        .add_source(File::with_name(&format!("./configs/{}", run_mode)).required(false))
+        .add_source(File::with_name(&format!("./configs/{}_secrets", run_mode)).required(false))
         .add_source(Environment::with_prefix("ARKIN"))
         .build();
 

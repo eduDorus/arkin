@@ -9,7 +9,6 @@ pub struct ExecutionConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExecutionManagerConfig {
     pub default_endpoint: String,
-    pub rebalance_threshold: Decimal,
     pub endpoints: Vec<ExecutionEndpointConfig>,
 }
 

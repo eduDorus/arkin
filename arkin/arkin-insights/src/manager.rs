@@ -41,14 +41,13 @@ impl InsightsManager {
         events.into_iter().for_each(|event| self.insert(event.into()));
     }
 
-    pub fn calculate(&self, timestamp: OffsetDateTime) -> InsightsSnapshot {
+    pub fn process(&self, timestamp: OffsetDateTime) -> InsightsSnapshot {
         let instruments = self.state.instruments();
         let insights = instruments
             .par_iter()
             .map(|instrument| self.pipeline.calculate(self.state.clone(), &timestamp, instrument))
             .flat_map(|f| f)
-            .map(|f| (f.instrument.clone(), f))
-            .collect::<HashMap<_, _>>();
+            .collect::<Vec<_>>();
 
         InsightsSnapshot::new(timestamp, insights)
     }

@@ -19,10 +19,17 @@ path = "src/bin/features.rs"
 
 [dependencies]
 arkin-common = { path = "../arkin-common" }
+arkin-engine = { path = "../arkin-engine" }
+arkin-execution = { path = "../arkin-execution" }
+arkin-persistance = { path = "../arkin-persistance" }
+arkin-insights = { path = "../arkin-insights" }
+arkin-strategies = { path = "../arkin-strategies" }
+arkin-allocation = { path = "../arkin-allocation" }
+arkin-portfolio = { path = "../arkin-portfolio" }
+arkin-market = { path = "../arkin-market" }
 
 tokio = { workspace = true }
 mimalloc = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true }
 tokio-rustls = { workspace = true }
-

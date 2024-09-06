@@ -38,6 +38,11 @@ impl PortfolioManager {
         }
     }
 
+    pub fn snapshot(&self, timestamp: &OffsetDateTime) -> PortfolioSnapshot {
+        let positions = self.positions.positions.values().cloned().collect::<Vec<_>>();
+        PortfolioSnapshot::new(timestamp.to_owned(), positions)
+    }
+
     pub fn update_position(
         &mut self,
         timestamp: OffsetDateTime,

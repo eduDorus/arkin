@@ -22,20 +22,26 @@ impl StrategyManager {
         }
     }
 
-    pub fn calculate(&self, snapshot: &InsightsSnapshot) -> StrategySnapshot {
-        if snapshot.insights.is_empty() {
-            return StrategySnapshot::new(snapshot.event_time, HashMap::new());
+    pub fn process(&self, insights: &InsightsSnapshot) -> StrategySnapshot {
+        if insights.insights.is_empty() {
+            return {
+                let timestamp = insights.timestamp;
+                let signals = Vec::new();
+                StrategySnapshot { timestamp, signals }
+            };
         }
 
         // Calculate signals for each strategy
         let signals = self
             .strategies
             .par_iter()
-            .map(|s| s.calculate(&snapshot))
+            .map(|s| s.calculate(insights))
             .flat_map(|s| s)
-            .map(|s| ((s.strategy_id.clone(), s.instrument.clone()), s))
-            .collect::<HashMap<_, _>>();
+            .collect::<Vec<_>>();
 
-        StrategySnapshot::new(snapshot.event_time, signals)
+        {
+            let timestamp = insights.timestamp;
+            StrategySnapshot { timestamp, signals }
+        }
     }
 }
