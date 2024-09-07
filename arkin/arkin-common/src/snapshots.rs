@@ -3,8 +3,8 @@ use std::{collections::HashMap, fmt};
 use time::OffsetDateTime;
 
 use crate::{
-    models::{Allocation, ExecutionOrder, Insight, Position, Signal, Tick, Trade},
-    FeatureId, Instrument,
+    models::{ExecutionOrder, Insight, Position, Signal, Tick, Trade},
+    FeatureId, Instrument, Notional,
 };
 
 pub struct MarketSnapshot {
@@ -75,16 +75,30 @@ impl fmt::Display for MarketSnapshot {
 }
 
 pub struct PortfolioSnapshot {
-    pub timestamp: OffsetDateTime,
-    pub positions: Vec<Position>,
+    timestamp: OffsetDateTime,
+    capital: Notional,
+    positions: Vec<Position>,
 }
 
 impl PortfolioSnapshot {
-    pub fn new(timestamp: OffsetDateTime, positions: Vec<Position>) -> Self {
+    pub fn new(timestamp: OffsetDateTime, capital: Notional, positions: Vec<Position>) -> Self {
         Self {
             timestamp,
+            capital,
             positions,
         }
+    }
+
+    pub fn timestamp(&self) -> OffsetDateTime {
+        self.timestamp
+    }
+
+    pub fn capital(&self) -> Notional {
+        self.capital
+    }
+
+    pub fn positions(&self) -> Vec<Position> {
+        self.positions.clone()
     }
 }
 
@@ -157,17 +171,20 @@ impl fmt::Display for StrategySnapshot {
 
 pub struct AllocationSnapshot {
     pub timestamp: OffsetDateTime,
-    pub allocations: Vec<Allocation>,
     pub orders: Vec<ExecutionOrder>,
 }
 
 impl AllocationSnapshot {
-    pub fn new(timestamp: OffsetDateTime, allocations: Vec<Allocation>, orders: Vec<ExecutionOrder>) -> Self {
-        Self {
-            timestamp,
-            allocations,
-            orders,
-        }
+    pub fn new(timestamp: OffsetDateTime, orders: Vec<ExecutionOrder>) -> Self {
+        Self { timestamp, orders }
+    }
+
+    pub fn timestamp(&self) -> OffsetDateTime {
+        self.timestamp
+    }
+
+    pub fn orders(&self) -> Vec<ExecutionOrder> {
+        self.orders.clone()
     }
 }
 

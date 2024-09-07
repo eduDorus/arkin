@@ -1,7 +1,7 @@
 mod config;
-mod equal;
 mod factory;
 mod manager;
+mod simple;
 
 pub use config::*;
 pub use manager::{AllocationManager, AllocationModule};

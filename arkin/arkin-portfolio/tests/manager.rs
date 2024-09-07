@@ -101,7 +101,7 @@ use time::OffsetDateTime;
     ]
 )]
 fn test_portfolio(
-    mut portfolio_manager: PortfolioManager,
+    portfolio_manager: PortfolioManager,
     #[case] fill_params: Vec<(StrategyId, Instrument, Side, Price, Quantity, Commission)>,
     #[case] expected_positions: Vec<(StrategyId, Instrument, PositionSide, Price, Quantity, Commission, Notional)>,
 ) {

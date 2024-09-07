@@ -8,7 +8,7 @@ use crate::{
     types::{Notional, Price, Quantity, StrategyId},
 };
 
-use super::{Instrument, Side};
+use super::{Instrument, Side, Venue};
 
 #[derive(Clone)]
 pub struct Fill {
@@ -17,6 +17,7 @@ pub struct Fill {
     pub instrument: Instrument,
     pub order_id: u64,
     pub venue_order_id: u64,
+    pub venue: Venue,
     pub side: Side,
     pub price: Price,
     pub quantity: Quantity,
@@ -30,6 +31,7 @@ impl Fill {
         instrument: Instrument,
         order_id: u64,
         venue_order_id: u64,
+        venue: Venue,
         side: Side,
         price: Price,
         quantity: Quantity,
@@ -41,6 +43,7 @@ impl Fill {
             instrument,
             order_id,
             venue_order_id,
+            venue,
             side,
             price,
             quantity,

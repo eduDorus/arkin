@@ -1,11 +1,10 @@
 use std::fmt;
 
-use rust_decimal::Decimal;
 use time::OffsetDateTime;
 
 use crate::{
     events::{Event, EventType, EventTypeOf},
-    types::{Notional, Price, Quantity, StrategyId, Weight},
+    types::{Price, Quantity, StrategyId, Weight},
 };
 
 use super::Instrument;
@@ -21,9 +20,10 @@ pub struct Allocation {
     pub target_allocation: Weight,
     pub target_price: Price,
     pub target_quantity: Quantity,
-    pub value_at_risk: Notional,
-    pub expected_shortfall: Notional,
-    pub beta: Decimal,
+    // Future fields
+    // pub value_at_risk: Notional,
+    // pub expected_shortfall: Notional,
+    // pub beta: Decimal,
 }
 
 impl EventTypeOf for Allocation {

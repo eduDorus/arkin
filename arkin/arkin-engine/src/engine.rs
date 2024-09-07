@@ -46,11 +46,21 @@ impl Engine {
         //     info!("Insights data: {}", data);
         // }
         let strategy_snapshot = self.strategy_manager.process(&insights_snapshot);
-        for signal in strategy_snapshot.signals() {
+        for signal in &strategy_snapshot.signals {
             info!("Signal: {}", signal);
         }
 
-        let allocation_snapshot = self.allocation_manager.process(&portfolio_snapshot, &strategy_snapshot);
-        self.execution_manager.process(&allocation_snapshot);
+        let allocation_snapshot =
+            self.allocation_manager
+                .process(&market_snapshot, &portfolio_snapshot, &strategy_snapshot);
+        for order in &allocation_snapshot.orders {
+            info!("Order: {}", order);
+        }
+
+        let fills = self.execution_manager.process_backtest(&allocation_snapshot, &market_snapshot);
+        for fill in fills {
+            info!("Fill: {}", fill);
+            self.portfolio_manager.update_position_from_fill(fill.clone());
+        }
     }
 }

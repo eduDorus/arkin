@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use arkin_common::prelude::*;
+use dashmap::DashMap;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tracing::debug;
@@ -15,15 +14,16 @@ pub struct PortfolioManager {
 
 #[derive(Default, Clone)]
 pub struct PositionState {
-    positions: HashMap<(StrategyId, Instrument), Position>,
+    positions: DashMap<(StrategyId, Instrument), Position>,
 }
 
 impl PositionState {
-    pub fn position(&self, strategy_id: &StrategyId, instrument: &Instrument) -> Option<&Position> {
-        self.positions.get(&(strategy_id.clone(), instrument.clone()))
+    pub fn position(&self, strategy_id: &StrategyId, instrument: &Instrument) -> Option<Position> {
+        let key = (strategy_id.clone(), instrument.clone());
+        self.positions.get(&key).map(|v| v.clone())
     }
 
-    pub fn update(&mut self, position: Position) {
+    pub fn update(&self, position: Position) {
         self.positions
             .insert((position.strategy_id.clone(), position.instrument.clone()), position);
     }
@@ -39,12 +39,24 @@ impl PortfolioManager {
     }
 
     pub fn snapshot(&self, timestamp: &OffsetDateTime) -> PortfolioSnapshot {
-        let positions = self.positions.positions.values().cloned().collect::<Vec<_>>();
-        PortfolioSnapshot::new(timestamp.to_owned(), positions)
+        let positions = self.positions.positions.iter().map(|v| v.clone()).collect();
+        PortfolioSnapshot::new(timestamp.to_owned(), self.capital, positions)
+    }
+
+    pub fn update_position_from_fill(&self, fill: Fill) {
+        self.update_position(
+            fill.event_time,
+            fill.strategy_id,
+            fill.instrument,
+            fill.side,
+            fill.price,
+            fill.quantity,
+            fill.commission,
+        );
     }
 
     pub fn update_position(
-        &mut self,
+        &self,
         timestamp: OffsetDateTime,
         strategy_id: StrategyId,
         instrument: Instrument,
@@ -62,8 +74,8 @@ impl PortfolioManager {
             if let Some(remaining) = remaining_quantity {
                 updating_position = Position::new(
                     timestamp,
-                    strategy_id,
-                    instrument,
+                    strategy_id.clone(),
+                    instrument.clone(),
                     side,
                     price,
                     remaining,
@@ -71,7 +83,12 @@ impl PortfolioManager {
                 );
             }
 
-            self.positions.update(updating_position);
+            if updating_position.status == PositionStatus::Closed {
+                debug!("Position closed, removing from state");
+                self.positions.positions.remove(&(strategy_id, instrument));
+            } else {
+                self.positions.update(updating_position);
+            }
         } else {
             debug!("No position found, inserting new position");
             let new_position = Position::new(timestamp, strategy_id, instrument, side, price, quantity, commission);
@@ -79,7 +96,7 @@ impl PortfolioManager {
         }
     }
 
-    pub fn position(&self, strategy_id: &StrategyId, instrument: &Instrument) -> Option<&Position> {
+    pub fn position(&self, strategy_id: &StrategyId, instrument: &Instrument) -> Option<Position> {
         self.positions.position(strategy_id, instrument)
     }
 

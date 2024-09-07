@@ -18,17 +18,17 @@ use test_utils::prelude::*;
 async fn test_end_to_end(
     database: DBManager,
     market_manager: MarketManager,
-    portfolio_manager: PortfolioManager,
-    insights_manager: InsightsManager,
-    strategy_manager: StrategyManager,
-    allocation_manager: AllocationManager,
-    execution_manager: ExecutionManager,
+    _portfolio_manager: PortfolioManager,
+    _insights_manager: InsightsManager,
+    _strategy_manager: StrategyManager,
+    _allocation_manager: AllocationManager,
+    _execution_manager: ExecutionManager,
 ) {
     info!("Starting end-to-end test");
 
     let start = datetime!(2024-07-01 00:00).assume_utc();
     let end = datetime!(2024-07-01 01:00).assume_utc();
-    let frequency_secs = Duration::from_secs(5);
+    let _frequency_secs = Duration::from_secs(5);
 
     // Load data
     info!("Loading trades and ticks");

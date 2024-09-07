@@ -26,6 +26,22 @@ impl Signal {
             signal,
         }
     }
+
+    pub fn event_time(&self) -> &OffsetDateTime {
+        &self.event_time
+    }
+
+    pub fn strategy_id(&self) -> &StrategyId {
+        &self.strategy_id
+    }
+
+    pub fn instrument(&self) -> &Instrument {
+        &self.instrument
+    }
+
+    pub fn weight(&self) -> &Weight {
+        &self.signal
+    }
 }
 
 impl EventTypeOf for Signal {

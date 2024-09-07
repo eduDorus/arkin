@@ -236,13 +236,14 @@ impl fmt::Display for ExecutionOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {} {} {} {} {} {}",
+            "{} {} {} {} {} {} {} {} {} {}",
             self.last_updated_at
                 .format(TIMESTAMP_FORMAT)
                 .expect("Unable to format timestamp"),
             self.strategy_id,
             self.instrument,
             self.id,
+            self.side,
             self.execution_type,
             self.total_quantity,
             self.total_quantity_filled,

@@ -13,12 +13,12 @@ pub struct AllocationManagerConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AllocationModuleConfig {
-    #[serde(rename = "equal")]
-    Equal(EqualConfig),
+    #[serde(rename = "simple")]
+    Simple(SimpleConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct EqualConfig {
+pub struct SimpleConfig {
     pub max_allocation: Decimal,
     pub max_allocation_per_underlier: Decimal,
 }

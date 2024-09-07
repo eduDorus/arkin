@@ -2,6 +2,7 @@ use std::fmt;
 
 use strum::Display;
 use time::OffsetDateTime;
+use tracing::{error, info};
 
 use crate::{types::Commission, Notional, Price, Quantity, StrategyId};
 
@@ -95,21 +96,36 @@ impl Position {
         remaining
     }
 
+    pub fn market_value(&self, price: Price) -> Notional {
+        price * self.quantity
+    }
+
     fn add_to_position(&mut self, price: Price, quantity: Quantity) {
         self.avg_open_price = (self.avg_open_price * self.quantity + price * quantity) / (self.quantity + quantity);
         self.quantity += quantity;
     }
 
     fn reduce_or_close_position(&mut self, price: Price, quantity: Quantity) -> Option<Quantity> {
+        info!("Self quantity: {} fill quantity: {}", self.quantity, quantity);
         let fillable_quantity = self.quantity.min(quantity);
         match self.side {
             PositionSide::Long => self.realized_pnl += Price::from(price - self.avg_open_price) * fillable_quantity,
             PositionSide::Short => self.realized_pnl += Price::from(self.avg_open_price - price) * fillable_quantity,
         }
-        self.avg_close_price = (self.avg_close_price * self.quantity + price * fillable_quantity) / (fillable_quantity);
+        info!("Fillable quantity {}", fillable_quantity);
+        let res = ((self.avg_close_price * self.quantity) + (price * fillable_quantity))
+            .checked_div(self.quantity + fillable_quantity);
+        match res {
+            Some(val) => self.avg_close_price = val,
+            None => {
+                error!("Error calculating avg close price");
+                return Some(quantity);
+            }
+        }
         self.quantity -= fillable_quantity;
 
         if self.quantity.is_zero() {
+            info!("Closing position");
             self.status = PositionStatus::Closed;
         }
         if fillable_quantity < quantity {

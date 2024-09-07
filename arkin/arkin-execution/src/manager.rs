@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use arkin_common::prelude::*;
+use rust_decimal::prelude::*;
 
 use crate::{config::ExecutionManagerConfig, factory::ExecutionEndpointFactory};
 
@@ -30,5 +31,37 @@ impl ExecutionManager {
         }
     }
 
-    pub fn process(&self, _allocations: &AllocationSnapshot) {}
+    pub fn process(&self, _allocations: &AllocationSnapshot) {
+        todo!("Implement me")
+    }
+
+    pub fn process_backtest(&self, allocations: &AllocationSnapshot, market_snapshot: &MarketSnapshot) -> Vec<Fill> {
+        // Fill all orders
+        allocations
+            .orders
+            .iter()
+            .map(|o| {
+                let tick = market_snapshot.last_tick(&o.instrument).unwrap();
+                let price = match &o.side {
+                    Side::Buy => tick.ask_price,
+                    Side::Sell => tick.bid_price,
+                };
+                let commission = price * &o.remaining_quantity() * Decimal::from_f64(0.0001).unwrap();
+                let strategy_id = o.strategy_id.clone();
+                let instrument = o.instrument.clone();
+                Fill::new(
+                    o.last_updated_at,
+                    strategy_id,
+                    instrument,
+                    o.id,
+                    o.id,
+                    Venue::Simulation,
+                    o.side,
+                    price,
+                    o.remaining_quantity(),
+                    commission,
+                )
+            })
+            .collect()
+    }
 }

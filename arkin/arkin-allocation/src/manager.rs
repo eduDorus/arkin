@@ -5,9 +5,10 @@ use crate::{config::AllocationManagerConfig, factory::AllocationFactory};
 pub trait AllocationModule: Send + Sync {
     fn calculate(
         &self,
+        market_snapshot: &MarketSnapshot,
         portfolio_snapshot: &PortfolioSnapshot,
         strategy_snapshot: &StrategySnapshot,
-    ) -> Vec<Allocation>;
+    ) -> Vec<ExecutionOrder>;
 }
 
 pub struct AllocationManager {
@@ -23,17 +24,15 @@ impl AllocationManager {
 
     pub fn process(
         &self,
+        market_snapshot: &MarketSnapshot,
         portfolio_snapshot: &PortfolioSnapshot,
         strategy_snapshot: &StrategySnapshot,
     ) -> AllocationSnapshot {
-        let timestamp = strategy_snapshot.timestamp();
-
         // Calculate Allocations
-        let allocations = self.allocation.calculate(portfolio_snapshot, strategy_snapshot);
+        let allocations = self
+            .allocation
+            .calculate(market_snapshot, portfolio_snapshot, strategy_snapshot);
 
-        // Calculate Orders
-        let orders = vec![];
-
-        AllocationSnapshot::new(timestamp, allocations, orders)
+        AllocationSnapshot::new(market_snapshot.timestamp(), allocations)
     }
 }

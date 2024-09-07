@@ -7,9 +7,9 @@ pub fn init_tracing() {
         .with_env_filter(EnvFilter::from_default_env())
         .with_thread_ids(false)
         .with_target(false)
-        // .with_span_events(FmtSpan::NONE)
-        .with_line_number(true)
-        .with_file(true)
+        .with_span_events(FmtSpan::NONE)
+        .with_line_number(false)
+        .with_file(false)
         .with_ansi(true)
         .compact()
         .init();
