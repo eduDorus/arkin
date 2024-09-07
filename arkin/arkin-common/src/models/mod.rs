@@ -1,7 +1,7 @@
 mod allocation;
 mod book;
-mod feature;
 mod fill;
+mod insight;
 mod instrument;
 mod order;
 mod position;
@@ -11,8 +11,8 @@ mod trade;
 
 pub use allocation::*;
 pub use book::*;
-pub use feature::*;
 pub use fill::*;
+pub use insight::*;
 pub use instrument::*;
 pub use order::*;
 pub use position::*;

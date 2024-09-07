@@ -35,11 +35,21 @@ impl Engine {
     fn run_cycle(&self, timestamp: OffsetDateTime, frequency_secs: Duration) {
         // Snapshot the market and portfolio
         let market_snapshot = self.market_manager.snapshot(&timestamp, frequency_secs);
+        // for data in market_snapshot.insights() {
+        //     info!("Market data: {}", data);
+        // }
         let portfolio_snapshot = self.portfolio_manager.snapshot(&timestamp);
 
         // Process the insights
         let insights_snapshot = self.insights_manager.process(&market_snapshot);
+        // for data in insights_snapshot.insights() {
+        //     info!("Insights data: {}", data);
+        // }
         let strategy_snapshot = self.strategy_manager.process(&insights_snapshot);
+        for signal in strategy_snapshot.signals() {
+            info!("Signal: {}", signal);
+        }
+
         let allocation_snapshot = self.allocation_manager.process(&portfolio_snapshot, &strategy_snapshot);
         self.execution_manager.process(&allocation_snapshot);
     }

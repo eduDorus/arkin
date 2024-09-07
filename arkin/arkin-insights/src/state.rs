@@ -17,14 +17,14 @@ pub struct InsightsState {
 
 impl InsightsState {
     pub fn insert(&self, event: Insight) {
-        let key = (event.instrument, event.id);
-        let mut composit_key = CompositeIndex::new(&event.event_time);
+        let key = (event.instrument().clone(), event.id().clone());
+        let mut composit_key = CompositeIndex::new(&event.event_time());
 
         let mut entry = self.features.entry(key).or_default();
         while entry.get(&composit_key).is_some() {
             composit_key.increment();
         }
-        entry.insert(composit_key, event.value);
+        entry.insert(composit_key, event.value().to_owned());
     }
 
     pub fn read_features(

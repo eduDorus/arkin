@@ -9,10 +9,10 @@ use super::Instrument;
 
 #[derive(Clone)]
 pub struct Insight {
-    pub id: FeatureId,
-    pub instrument: Instrument,
-    pub event_time: OffsetDateTime,
-    pub value: Decimal,
+    id: FeatureId,
+    instrument: Instrument,
+    event_time: OffsetDateTime,
+    value: Decimal,
 }
 
 impl Insight {
@@ -23,6 +23,22 @@ impl Insight {
             event_time,
             value,
         }
+    }
+
+    pub fn id(&self) -> &FeatureId {
+        &self.id
+    }
+
+    pub fn instrument(&self) -> &Instrument {
+        &self.instrument
+    }
+
+    pub fn event_time(&self) -> &OffsetDateTime {
+        &self.event_time
+    }
+
+    pub fn value(&self) -> &Decimal {
+        &self.value
     }
 }
 
