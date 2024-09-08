@@ -120,7 +120,7 @@ fn test_portfolio(
     for (strategy_id, instrument, side, avg_open_price, quantity, commission, realized_pnl) in
         expected_positions.into_iter()
     {
-        let position = portfolio_manager.position(&strategy_id, &instrument).unwrap();
+        let position = portfolio_manager.open_position(&strategy_id, &instrument).unwrap();
         assert_eq!(position.avg_open_price, avg_open_price);
         assert_eq!(position.side, side);
         assert_eq!(position.quantity, quantity);

@@ -30,6 +30,7 @@ impl Engine {
             info!("----------------- {:?} -----------------", timestamp);
             self.run_cycle(timestamp, frequency_secs);
         }
+        self.portfolio_manager.stats();
     }
 
     fn run_cycle(&self, timestamp: OffsetDateTime, frequency_secs: Duration) {

@@ -85,7 +85,7 @@ allocation_manager:
         max_allocation_per_underlier: 0.25
 
 portfolio_manager:
-  initial_capital: 100000
+  initial_capital: 10000
   leverage: 1
 
 market_manager:

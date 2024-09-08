@@ -88,7 +88,7 @@ impl ComputationGraph {
 
         // Step 3: Parallel processing
         let pipeline_result = Arc::new(Mutex::new(Vec::new()));
-        let pool = ThreadPoolBuilder::new().build().expect("Failed to create thread pool");
+        let pool = ThreadPoolBuilder::default().build().expect("Failed to create thread pool");
         pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
                 let state = state.clone();

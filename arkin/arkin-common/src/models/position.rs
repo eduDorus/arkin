@@ -1,5 +1,6 @@
 use std::fmt;
 
+use rust_decimal::Decimal;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::{error, info};
@@ -53,12 +54,12 @@ impl Position {
                 Side::Buy => PositionSide::Long,
                 Side::Sell => PositionSide::Short,
             },
-            avg_open_price: Price::default(),
-            avg_close_price: Price::default(),
-            quantity: Quantity::default(),
-            total_quantity: Quantity::default(),
-            realized_pnl: Commission::default(),
-            commission: Commission::default(),
+            avg_open_price: Decimal::new(18, 2),
+            avg_close_price: Decimal::new(18, 2),
+            quantity: Decimal::new(18, 4),
+            total_quantity: Decimal::new(18, 4),
+            realized_pnl: Decimal::new(18, 2),
+            commission: Decimal::new(18, 2),
             status: PositionStatus::Open,
             created_at: event_time,
             last_updated_at: event_time,
@@ -140,15 +141,15 @@ impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} avg open: {} avg close: {} quantity: {} pnl: {} commission: {} status: {}",
+            "{} {} {} avg open: {} avg close: {} pnl: {} commission: {} status: {}",
             self.strategy_id,
             self.instrument,
             self.side,
-            self.avg_open_price,
-            self.avg_close_price,
-            self.quantity,
-            self.realized_pnl,
-            self.commission,
+            self.avg_open_price.round_dp(2),
+            self.avg_close_price.round_dp(2),
+            // self.quantity.round_dp(4),
+            self.realized_pnl.round_dp(2),
+            self.commission.round_dp(2),
             self.status
         )
     }

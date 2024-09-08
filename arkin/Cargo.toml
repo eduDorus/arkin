@@ -106,7 +106,7 @@ clarabel = { version = "0.9" }
 
 # Testing
 rstest = { version = "0.22.0" }
-async-std = { version = "1.12", features = ["attributes"] }
+async-std = { version = "1.13", features = ["attributes"] }
 ctor = "0.2.8"
 
 [profile.release]

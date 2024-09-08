@@ -67,7 +67,7 @@ impl AllocationModule for SimpleAllocation {
             .map(|(key, expected_amount)| {
                 let current_amount = current_positions.get(&key).unwrap_or(&Decimal::zero()).to_owned();
                 info!("Expected Amount: {} Current Amount: {}", expected_amount, current_amount);
-                let diff = expected_amount - current_amount;
+                let diff = (expected_amount - current_amount).round_dp(4);
                 (key, diff)
             })
             .collect::<HashMap<_, _>>();

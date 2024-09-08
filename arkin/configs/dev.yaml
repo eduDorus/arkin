@@ -9,7 +9,7 @@ database:
   idle_timeout: 300
 
 portfolio_manager:
-  initial_capital: 10000
+  initial_capital: 100000
   leverage: 1
 
 market_manager:

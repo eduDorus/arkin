@@ -78,9 +78,9 @@ impl fmt::Display for Fill {
             self.event_time.format(TIMESTAMP_FORMAT).unwrap(),
             self.instrument,
             self.side,
-            self.price,
-            self.quantity,
-            self.commission
+            self.price.round_dp(2),
+            self.quantity.round_dp(4),
+            self.commission.round_dp(2)
         )
     }
 }
