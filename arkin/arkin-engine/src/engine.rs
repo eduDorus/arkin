@@ -30,7 +30,8 @@ impl Engine {
             info!("----------------- {:?} -----------------", timestamp);
             self.run_cycle(timestamp, frequency_secs);
         }
-        self.portfolio_manager.stats();
+        self.portfolio_manager.print_stats();
+        // self.portfolio_manager.print_trades()
     }
 
     fn run_cycle(&self, timestamp: OffsetDateTime, frequency_secs: Duration) {

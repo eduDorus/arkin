@@ -68,13 +68,39 @@ impl Position {
     pub fn market_value(&self, price: Price) -> Notional {
         price * self.quantity
     }
+
+    pub fn quantity_with_side(&self) -> Quantity {
+        match self.side {
+            PositionSide::Long => self.quantity,
+            PositionSide::Short => -self.quantity,
+        }
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.status == PositionStatus::Open
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.status == PositionStatus::Closed
+    }
+
+    pub fn is_profitable(&self) -> bool {
+        self.realized_pnl > Decimal::ZERO
+    }
+
+    pub fn return_pct(&self) -> Decimal {
+        match self.side {
+            PositionSide::Long => (self.avg_close_price - self.avg_open_price) / self.avg_open_price,
+            PositionSide::Short => (self.avg_open_price - self.avg_close_price) / self.avg_open_price,
+        }
+    }
 }
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} avg open: {} avg close: {} pnl: {} commission: {} status: {}",
+            "{} {} {} avg open: {} avg close: {} pnl: {} commission: {} return: {}",
             self.strategy_id,
             self.instrument,
             self.side,
@@ -83,7 +109,7 @@ impl fmt::Display for Position {
             // self.quantity.round_dp(4),
             self.realized_pnl.round_dp(2),
             self.commission.round_dp(2),
-            self.status
+            self.return_pct().round_dp(4),
         )
     }
 }
