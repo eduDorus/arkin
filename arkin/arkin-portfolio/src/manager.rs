@@ -469,7 +469,7 @@ impl PortfolioManager {
 
     pub fn profit_factor(&self) -> Decimal {
         let profit = self.profit();
-        let loss = self.loss();
+        let loss = self.loss().abs();
         if loss == Decimal::ZERO {
             Decimal::MAX
         } else {

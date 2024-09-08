@@ -212,7 +212,7 @@ impl DBManager {
                 ticks.ask_quantity
             FROM ticks
             JOIN instruments as i ON ticks.instrument_id = i.instrument_id
-            WHERE i.instrument_id in (1, 2, 3) AND ticks.event_time >= $1 AND ticks.event_time < $2
+            WHERE i.instrument_id in (1, 2) AND ticks.event_time >= $1 AND ticks.event_time < $2
             "#,
         )
         .bind(from)

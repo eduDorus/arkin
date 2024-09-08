@@ -151,7 +151,7 @@ impl DBManager {
                 t.quantity
             FROM trades as t
             JOIN instruments as i ON t.instrument_id = i.instrument_id
-            WHERE i.instrument_id in (1, 2, 3) AND t.event_time >= $1 AND t.event_time < $2
+            WHERE i.instrument_id in (1, 2) AND t.event_time >= $1 AND t.event_time < $2
             "#,
             from,
             to
