@@ -29,7 +29,7 @@ async fn main() {
 
     let start = datetime!(2024-07-01 00:00).assume_utc();
     let end = datetime!(2024-07-01 01:00).assume_utc();
-    let frequency_secs = Duration::from_secs(5);
+    let frequency_secs = Duration::from_secs(1);
 
     // Market Manager
     let market_manager = MarketManager::from_config(&load::<MarketConfig>().market_manager);
