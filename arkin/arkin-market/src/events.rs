@@ -41,36 +41,6 @@ impl MarketState {
             .collect()
     }
 
-    pub fn last_entry<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Option<T>
-    where
-        T: TryFrom<Event, Error = ()> + EventTypeOf,
-    {
-        let event_type = T::event_type();
-        let index = CompositeIndex::new_max(timestamp);
-        self.events
-            .get(&(instrument.clone(), event_type))
-            .and_then(|tree| tree.value().range(..index).next_back().map(|entry| entry.1.clone()))
-            .and_then(|event| event.try_into().ok())
-    }
-
-    pub fn list_entries_since_start<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Vec<T>
-    where
-        T: TryFrom<Event, Error = ()> + EventTypeOf,
-    {
-        let event_type = T::event_type();
-        let index = CompositeIndex::new_max(timestamp);
-
-        self.events
-            .get(&(instrument.clone(), event_type))
-            .map(|set| {
-                // Perform a range query up to the maximum key
-                set.range(..index)
-                    .filter_map(|(_, entry)| entry.clone().try_into().ok())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
     pub fn list_entries_window<T>(
         &self,
         instrument: &Instrument,
@@ -89,6 +59,38 @@ impl MarketState {
             .map(|set| {
                 // Perform a range query up to the maximum key
                 set.range(end_index..index)
+                    .filter_map(|(_, entry)| entry.clone().try_into().ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[allow(dead_code)]
+    pub fn last_entry<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Option<T>
+    where
+        T: TryFrom<Event, Error = ()> + EventTypeOf,
+    {
+        let event_type = T::event_type();
+        let index = CompositeIndex::new_max(timestamp);
+        self.events
+            .get(&(instrument.clone(), event_type))
+            .and_then(|tree| tree.value().range(..index).next_back().map(|entry| entry.1.clone()))
+            .and_then(|event| event.try_into().ok())
+    }
+
+    #[allow(dead_code)]
+    pub fn list_entries_since_start<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Vec<T>
+    where
+        T: TryFrom<Event, Error = ()> + EventTypeOf,
+    {
+        let event_type = T::event_type();
+        let index = CompositeIndex::new_max(timestamp);
+
+        self.events
+            .get(&(instrument.clone(), event_type))
+            .map(|set| {
+                // Perform a range query up to the maximum key
+                set.range(..index)
                     .filter_map(|(_, entry)| entry.clone().try_into().ok())
                     .collect()
             })

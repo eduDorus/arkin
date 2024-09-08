@@ -8,14 +8,14 @@ use crate::{config::SimpleConfig, manager::AllocationModule};
 
 pub struct SimpleAllocation {
     max_allocation: Decimal,
-    max_allocation_per_underlier: Decimal,
+    max_allocation_per_signal: Decimal,
 }
 
 impl SimpleAllocation {
     pub fn from_config(config: &SimpleConfig) -> Self {
         SimpleAllocation {
             max_allocation: config.max_allocation,
-            max_allocation_per_underlier: config.max_allocation_per_underlier,
+            max_allocation_per_signal: config.max_allocation_per_signal,
         }
     }
 }
@@ -35,7 +35,9 @@ impl AllocationModule for SimpleAllocation {
         }
 
         // Calculate money allocated to each signal
-        let allocation_per_signal = (portfolio_snapshot.capital() / Decimal::from(signals.len())).round_dp(0);
+        let max_allocation = portfolio_snapshot.capital() * self.max_allocation;
+        let max_allocation_per_signal = portfolio_snapshot.capital() * self.max_allocation_per_signal;
+        let allocation_per_signal = (max_allocation / Decimal::from(signals.len())).min(max_allocation_per_signal);
 
         // Calculate current position size for each signal
         let current_positions = portfolio_snapshot
@@ -56,18 +58,18 @@ impl AllocationModule for SimpleAllocation {
             .map(|signal| {
                 let signal_allocation = allocation_per_signal * signal.weight();
                 let current_tick = market_snapshot.last_tick(&signal.instrument()).unwrap();
-                let amount = signal_allocation / current_tick.mid_price();
-                ((signal.strategy_id, signal.instrument), amount)
+                let quantityu = signal_allocation / current_tick.mid_price();
+                ((signal.strategy_id, signal.instrument), quantityu)
             })
             .collect::<HashMap<_, _>>();
 
         // Calculate the difference between current and expected positions
         let position_diff = expected_positions
             .into_iter()
-            .map(|(key, expected_amount)| {
-                let current_amount = current_positions.get(&key).unwrap_or(&Decimal::zero()).to_owned();
-                info!("Expected Amount: {} Current Amount: {}", expected_amount, current_amount);
-                let diff = (expected_amount - current_amount).round_dp(4);
+            .map(|(key, expected_quantity)| {
+                let current_quantity = current_positions.get(&key).unwrap_or(&Decimal::zero()).to_owned();
+                info!("Expected Amount: {} Current Amount: {}", expected_quantity, current_quantity);
+                let diff = (expected_quantity - current_quantity).round_dp(4);
                 (key, diff)
             })
             .collect::<HashMap<_, _>>();

@@ -11,5 +11,5 @@ fn load_config() {
     // Check if the config is a Crossover strategy
     let AllocationModuleConfig::Simple(c) = &config.allocation_manager.module;
     assert_eq!(c.max_allocation, dec!(0.9));
-    assert_eq!(c.max_allocation_per_underlier, dec!(0.25));
+    assert_eq!(c.max_allocation_per_signal, dec!(0.25));
 }

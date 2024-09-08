@@ -20,5 +20,5 @@ pub enum AllocationModuleConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SimpleConfig {
     pub max_allocation: Decimal,
-    pub max_allocation_per_underlier: Decimal,
+    pub max_allocation_per_signal: Decimal,
 }

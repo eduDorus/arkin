@@ -80,9 +80,9 @@ strategy_manager:
 
 allocation_manager:
   allocations:
-    - equal:
+    - simple:
         max_allocation: 0.9
-        max_allocation_per_underlier: 0.25
+        max_allocation_per_signal: 0.1
 
 portfolio_manager:
   initial_capital: 10000
