@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+};
 
 use time::OffsetDateTime;
 
@@ -130,16 +133,19 @@ impl InsightsSnapshot {
         self.insights.clone()
     }
 
-    pub fn instrument_insights(&self, instrument: &Instrument) -> Vec<Insight> {
-        self.insights
-            .iter()
-            .filter(|insight| insight.instrument() == instrument)
-            .cloned()
-            .collect()
+    pub fn instruments(&self) -> HashSet<Instrument> {
+        self.insights.iter().map(|i| i.instrument.clone()).collect()
     }
 
     pub fn get_insight(&self, id: &FeatureId) -> Option<Insight> {
         self.insights.iter().find(|i| i.id() == id).cloned()
+    }
+
+    pub fn get_instrument_insight(&self, instrument: &Instrument, id: &FeatureId) -> Option<Insight> {
+        self.insights
+            .iter()
+            .find(|insight| insight.instrument() == instrument && insight.id() == id)
+            .cloned()
     }
 }
 

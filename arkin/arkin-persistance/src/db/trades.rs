@@ -105,11 +105,11 @@ impl DBManager {
             INSERT INTO trades (
                 received_time, event_time, instrument_id, trade_id, price, quantity
             )
-            SELECT 
+            SELECT
                 $1, $2, COALESCE(ei.instrument_id, ii.instrument_id), $10, $11, $12
-            FROM 
+            FROM
                 existing_instrument ei
-            FULL OUTER JOIN 
+            FULL OUTER JOIN
                 insert_instrument ii ON true
             LIMIT 1
             "#,
@@ -136,22 +136,22 @@ impl DBManager {
         let stream = sqlx::query_as!(
             TradeRow,
             r#"
-            SELECT 
-                t.received_time, 
-                t.event_time, 
-                i.instrument_type, 
-                i.venue, 
-                i.base, 
-                i.quote, 
-                i.maturity, 
-                i.strike, 
-                i.option_type, 
-                t.trade_id, 
-                t.price, 
+            SELECT
+                t.received_time,
+                t.event_time,
+                i.instrument_type,
+                i.venue,
+                i.base,
+                i.quote,
+                i.maturity,
+                i.strike,
+                i.option_type,
+                t.trade_id,
+                t.price,
                 t.quantity
             FROM trades as t
             JOIN instruments as i ON t.instrument_id = i.instrument_id
-            WHERE i.instrument_id = 2 AND t.event_time >= $1 AND t.event_time < $2
+            WHERE i.instrument_id in (1, 2, 3) AND t.event_time >= $1 AND t.event_time < $2
             "#,
             from,
             to

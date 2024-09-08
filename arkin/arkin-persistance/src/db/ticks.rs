@@ -109,11 +109,11 @@ impl DBManager {
             INSERT INTO ticks (
                 event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity
             )
-            SELECT 
+            SELECT
                 $1, COALESCE(ei.instrument_id, ii.instrument_id), $9, $10, $11, $12, $13
-            FROM 
+            FROM
                 existing_instrument ei
-            FULL OUTER JOIN 
+            FULL OUTER JOIN
                 insert_instrument ii ON true
             LIMIT 1
             "#,
@@ -161,13 +161,13 @@ impl DBManager {
                     RETURNING instrument_id
                 )
                 INSERT INTO ticks (
-                    received_time, event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity 
+                    received_time, event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity
                 )
-                SELECT 
+                SELECT
                     $1, COALESCE(ei.instrument_id, ii.instrument_id), $9, $10, $11, $12, $13
-                FROM 
+                FROM
                     existing_instrument ei
-                FULL OUTER JOIN 
+                FULL OUTER JOIN
                     insert_instrument ii ON true
                 LIMIT 1
                 "#,
@@ -196,23 +196,23 @@ impl DBManager {
     pub async fn read_ticks(&self, from: &OffsetDateTime, till: &OffsetDateTime) -> Vec<Tick> {
         let stream = sqlx::query_as::<_, TickRow>(
             r#"
-            SELECT 
-                ticks.event_time, 
-                i.instrument_type, 
-                i.venue, 
-                i.base, 
-                i.quote, 
-                i.maturity, 
-                i.strike, 
-                i.option_type, 
+            SELECT
+                ticks.event_time,
+                i.instrument_type,
+                i.venue,
+                i.base,
+                i.quote,
+                i.maturity,
+                i.strike,
+                i.option_type,
                 ticks.tick_id,
-                ticks.bid_price, 
-                ticks.bid_quantity, 
-                ticks.ask_price, 
-                ticks.ask_quantity 
+                ticks.bid_price,
+                ticks.bid_quantity,
+                ticks.ask_price,
+                ticks.ask_quantity
             FROM ticks
             JOIN instruments as i ON ticks.instrument_id = i.instrument_id
-            WHERE i.instrument_id = 2 AND ticks.event_time >= $1 AND ticks.event_time < $2
+            WHERE i.instrument_id in (1, 2, 3) AND ticks.event_time >= $1 AND ticks.event_time < $2
             "#,
         )
         .bind(from)

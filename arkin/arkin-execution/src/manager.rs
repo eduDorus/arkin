@@ -46,7 +46,7 @@ impl ExecutionManager {
                     Side::Buy => tick.ask_price,
                     Side::Sell => tick.bid_price,
                 };
-                let commission = price * &o.remaining_quantity() * Decimal::from_f64(0.0001).unwrap();
+                let commission = price * &o.remaining_quantity() * Decimal::from_f64(0.0002).unwrap();
                 let strategy_id = o.strategy_id.clone();
                 let instrument = o.instrument.clone();
                 Fill::new(

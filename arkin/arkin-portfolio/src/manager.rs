@@ -31,7 +31,14 @@ impl PortfolioManager {
         let commission = self.position_history.iter().fold(Decimal::ZERO, |acc, e| {
             acc + e.value().iter().fold(Decimal::ZERO, |acc, p| acc + p.commission)
         });
-        info!("Traded {trade_count} times with PnL {pnl} and commission {commission}");
+        let trade_volume = self.position_history.iter().fold(Decimal::ZERO, |acc, e| {
+            acc + e.value().iter().fold(Decimal::ZERO, |acc, p| acc + p.trade_volume)
+        });
+        info!("------------------ Portfolio Stats --------------------");
+        info!("Trade Count: {}", trade_count);
+        info!("Trade Volume: {}", trade_volume);
+        info!("PnL: {}", pnl);
+        info!("Commission: {}", commission);
         for entry in self.position_history.iter() {
             let strategy = entry.key().0.clone();
             let instrument = entry.key().1.clone();
@@ -120,7 +127,7 @@ impl PortfolioManager {
         let new_total_quantity = position.quantity + quantity;
         position.avg_open_price = (position.avg_open_price * position.quantity + price * quantity) / new_total_quantity;
         position.quantity = new_total_quantity;
-        position.total_quantity += quantity;
+        position.trade_volume += price * quantity;
         position.commission += commission;
         position.last_updated_at = event_time;
 
@@ -139,6 +146,7 @@ impl PortfolioManager {
         let pnl = self.calculate_pnl(position, price, close_quantity);
 
         position.realized_pnl += pnl;
+        position.trade_volume += price * close_quantity;
         position.quantity -= close_quantity;
         position.avg_close_price = price;
         position.commission += commission;
@@ -176,7 +184,7 @@ impl PortfolioManager {
             avg_open_price: price,
             avg_close_price: Price::default(),
             quantity,
-            total_quantity: quantity,
+            trade_volume: price * quantity,
             realized_pnl: Notional::default(),
             commission,
             status: PositionStatus::Open,
