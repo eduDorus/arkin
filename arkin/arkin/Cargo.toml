@@ -13,15 +13,21 @@ path = "src/bin/server.rs"
 name = "features"
 path = "src/bin/features.rs"
 
+[[bin]]
+name = "ingestors"
+path = "src/bin/ingestors.rs"
+
 #[[bin]]
 #name = "utils"
 #path = "src/bin/utils.rs"
+
 
 [dependencies]
 arkin-common = { path = "../arkin-common" }
 arkin-engine = { path = "../arkin-engine" }
 arkin-execution = { path = "../arkin-execution" }
 arkin-persistance = { path = "../arkin-persistance" }
+arkin-ingestors = { path = "../arkin-ingestors" }
 arkin-insights = { path = "../arkin-insights" }
 arkin-strategies = { path = "../arkin-strategies" }
 arkin-allocation = { path = "../arkin-allocation" }

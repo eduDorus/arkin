@@ -1,5 +1,5 @@
-use crate::models::{Event, Instrument, Venue};
 use anyhow::Result;
+use arkin_common::prelude::*;
 use tracing::error;
 
 use super::swaps::BinanceSwapsEvent;

@@ -1,18 +1,21 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum IngestorConfig {
-    #[serde(rename = "backtest")]
-    Backtest(BacktestIngestorConfig),
-    #[serde(rename = "binance")]
-    Binance(BinanceIngestorConfig),
-    // #[serde(rename = "tardis")]
-    // Tardis(TardisIngestorConfig),
+pub struct IngestorConfig {
+    pub ingestor_manager: IngestorManagerConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BacktestIngestorConfig {
-    pub market_data: bool,
+pub struct IngestorManagerConfig {
+    pub ingestors: Vec<IngestorModuleConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum IngestorModuleConfig {
+    #[serde(rename = "binance")]
+    Binance(BinanceIngestorConfig),
+    #[serde(rename = "tardis")]
+    Tardis(TardisIngestorConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

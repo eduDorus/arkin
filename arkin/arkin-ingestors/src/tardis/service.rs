@@ -17,8 +17,9 @@ use tokio::io::BufReader;
 use tracing::debug;
 use tracing::error;
 
+use arkin_common::prelude::*;
+
 use crate::config::TardisIngestorConfig;
-use crate::utils;
 
 use super::http::TardisHttpClient;
 
@@ -246,7 +247,7 @@ impl TardisService {
         &self,
         req: TardisRequest,
     ) -> impl Stream<Item = impl Future<Output = Result<Vec<(OffsetDateTime, String)>>> + '_> + '_ {
-        let dates = utils::datetime_range_minute(&req.start, &req.end).expect("Invalid date range");
+        let dates = datetime_range_minute(&req.start, &req.end).expect("Invalid date range");
         stream::iter(dates.into_iter().map(move |datetime| {
             let client = self.client.clone();
             let exchange_str = req.exchange.to_string();

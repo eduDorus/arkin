@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
+use arkin_common::prelude::*;
 use async_tungstenite::{
     stream::Stream,
     tokio::{connect_async, TokioAdapter},
@@ -18,8 +19,6 @@ use tokio::{
 use tokio_rustls::client::TlsStream;
 use tracing::{debug, error, info};
 use url::Url;
-
-use crate::utils::Deduplicator;
 
 use super::binance::Subscription;
 

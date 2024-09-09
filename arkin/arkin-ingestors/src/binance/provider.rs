@@ -1,20 +1,16 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use async_tungstenite::tungstenite::Message;
 use serde::Serialize;
 use tracing::{error, info, warn};
 use url::Url;
 
-use crate::{
-    config::BinanceIngestorConfig,
-    ingestors::{models::BinanceParser, ws::WebSocketManager, Ingestor},
-    state::StateManager,
-};
+use crate::config::BinanceIngestorConfig;
+use crate::manager::IngestorModule;
+use crate::ws::WebSocketManager;
+use crate::BinanceParser;
 
 #[derive(Clone)]
 pub struct BinanceIngestor {
-    state: Arc<StateManager>,
     url: Url,
     channels: Vec<String>,
     api_key: Option<String>,
@@ -24,9 +20,8 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    pub fn new(state: Arc<StateManager>, config: &BinanceIngestorConfig) -> Self {
+    pub fn new(config: &BinanceIngestorConfig) -> Self {
         Self {
-            state,
             url: config.ws_url.parse().expect("Failed to parse ws binance URL"),
             channels: config.ws_channels.to_owned(),
             api_key: config.api_key.to_owned(),
@@ -38,7 +33,7 @@ impl BinanceIngestor {
 }
 
 #[async_trait]
-impl Ingestor for BinanceIngestor {
+impl IngestorModule for BinanceIngestor {
     async fn start(&self) {
         info!("Starting binance ingestor...");
 

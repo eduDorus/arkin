@@ -5,6 +5,7 @@ members = [
    "arkin-common", 
    "arkin-engine",
    "arkin-execution",
+   "arkin-ingestors",
    "arkin-insights", 
    "arkin-market",
    "arkin-persistance", 
