@@ -7,12 +7,12 @@ use tokio_rustls::rustls::crypto::CryptoProvider;
 use tracing::info;
 
 use arkin_allocation::prelude::*;
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use arkin_engine::prelude::*;
 use arkin_execution::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_market::prelude::*;
-use arkin_persistance::prelude::*;
+// use arkin_persistance::prelude::*;
 use arkin_portfolio::prelude::*;
 use arkin_strategies::prelude::*;
 
@@ -36,12 +36,12 @@ async fn main() {
 
     // Load data
     info!("Loading trades and ticks");
-    let database = DBManager::from_config(&load::<PersistanceConfig>().database);
-    let ticks = database.read_ticks(&start, &end).await;
-    let trades = database.read_trades(&start, &end).await;
-    info!("Loaded {} trades and {} ticks", trades.len(), ticks.len());
-    market_manager.insert_batch(ticks.into_iter().map(|v| v.into()).collect());
-    market_manager.insert_batch(trades.into_iter().map(|v| v.into()).collect());
+    // let database = DBManager::from_config(&load::<PersistanceConfig>().database);
+    // let ticks = database.read_ticks(&start, &end).await;
+    // let trades = database.read_trades(&start, &end).await;
+    // info!("Loaded {} trades and {} ticks", trades.len(), ticks.len());
+    // market_manager.insert_batch(ticks.into_iter().map(|v| v.into()).collect());
+    // market_manager.insert_batch(trades.into_iter().map(|v| v.into()).collect());
 
     // Create the engine
     let engine = EngineBuilder::default()

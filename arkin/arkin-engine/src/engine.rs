@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use arkin_allocation::AllocationManager;
-use arkin_common::prelude::Clock;
+use arkin_core::prelude::Clock;
 use arkin_execution::ExecutionManager;
 use arkin_insights::InsightsManager;
 use arkin_market::MarketManager;

@@ -1,8 +1,4 @@
-use crate::{
-    ingestors::IngestorID,
-    models::{Book, BookUpdateSide, Event, Tick, Trade},
-    utils::custom_serde,
-};
+use arkin_core::prelude::*;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use time::OffsetDateTime;

@@ -1,4 +1,4 @@
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use rust_decimal::Decimal;
 
 use crate::{config::BinanceExecutionConfig, ExecutionEndpoint};

@@ -17,7 +17,7 @@ use tokio::io::BufReader;
 use tracing::debug;
 use tracing::error;
 
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 
 use crate::config::TardisIngestorConfig;
 

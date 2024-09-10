@@ -1,4 +1,4 @@
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

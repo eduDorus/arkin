@@ -1,4 +1,4 @@
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use rayon::prelude::*;
 
 use crate::{config::StrategyManagerConfig, factory::StrategyFactory};

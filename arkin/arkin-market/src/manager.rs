@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use time::OffsetDateTime;
 
 use crate::{events::MarketState, MarketManagerConfig};

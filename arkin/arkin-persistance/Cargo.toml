@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-arkin-common = { path = "../arkin-common" }
+arkin-core = { path = "../arkin-core" }
 
 tokio = { workspace = true }
 time = { workspace = true }
@@ -16,6 +16,7 @@ tracing = { workspace = true }
 anyhow = { workspace = true }
 rust_decimal = { workspace = true }
 futures-util = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
 test-utils = { path = "../test-utils" }

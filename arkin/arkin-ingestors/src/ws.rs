@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use async_tungstenite::{
     stream::Stream,
     tokio::{connect_async, TokioAdapter},

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use rust_decimal::prelude::*;
 
 use crate::{config::SimulationConfig, ExecutionEndpoint};

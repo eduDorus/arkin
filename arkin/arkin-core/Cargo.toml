@@ -1,5 +1,5 @@
 [package]
-name = "arkin-common"
+name = "arkin-core"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true

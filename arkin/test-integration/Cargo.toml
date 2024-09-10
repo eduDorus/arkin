@@ -10,7 +10,7 @@ license.workspace = true
 
 
 [dev-dependencies]
-arkin-common = { path = "../arkin-common" }
+arkin-core = { path = "../arkin-core" }
 arkin-engine = { path = "../arkin-engine" }
 arkin-execution = { path = "../arkin-execution" }
 arkin-persistance = { path = "../arkin-persistance" }

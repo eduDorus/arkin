@@ -1,5 +1,5 @@
 use anyhow::Result;
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use tracing::error;
 
 use super::swaps::BinanceSwapsEvent;

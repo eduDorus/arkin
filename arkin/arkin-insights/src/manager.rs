@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use rayon::prelude::*;
 use rust_decimal::Decimal;
 

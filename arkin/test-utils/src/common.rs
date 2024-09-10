@@ -1,5 +1,5 @@
 use arkin_allocation::prelude::*;
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use arkin_engine::{Engine, EngineBuilder};
 use arkin_execution::prelude::*;
 use arkin_insights::prelude::*;

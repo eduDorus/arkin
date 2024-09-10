@@ -23,11 +23,11 @@ path = "src/bin/ingestors.rs"
 
 
 [dependencies]
-arkin-common = { path = "../arkin-common" }
+arkin-core = { path = "../arkin-core" }
 arkin-engine = { path = "../arkin-engine" }
 arkin-execution = { path = "../arkin-execution" }
 arkin-persistance = { path = "../arkin-persistance" }
-arkin-ingestors = { path = "../arkin-ingestors" }
+#arkin-ingestors = { path = "../arkin-ingestors" }
 arkin-insights = { path = "../arkin-insights" }
 arkin-strategies = { path = "../arkin-strategies" }
 arkin-allocation = { path = "../arkin-allocation" }

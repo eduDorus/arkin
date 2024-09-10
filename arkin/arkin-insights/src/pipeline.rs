@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use parking_lot::Mutex;
 use petgraph::graph::NodeIndex;
 use petgraph::{

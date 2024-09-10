@@ -1,14 +1,23 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use arkin_common::prelude::*;
+use async_trait::async_trait;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgSslMode},
-    PgPool,
+    PgPool, Pool, Postgres, Transaction,
 };
-use tracing::error;
 
 use crate::config::DatabaseConfig;
+
+#[async_trait]
+pub trait Persistable {
+    async fn save(&self, tx: &mut Transaction<Postgres>) -> Result<()>;
+}
+
+#[async_trait]
+pub trait Readable {
+    async fn read(&self, pool: &Pool<Postgres>) -> Result<()>;
+}
 
 pub struct DBManager {
     pub pool: PgPool,
@@ -33,27 +42,19 @@ impl DBManager {
         Self { pool }
     }
 
-    pub async fn insert(&self, event: Event) -> Result<()> {
-        match event {
-            Event::Tick(t) => self.insert_tick(t).await?,
-            Event::Trade(t) => self.insert_trade(t).await?,
-            _ => {
-                error!("Event type not supported: {}", event.event_type());
-            }
-        }
+    pub async fn insert(&self, event: &dyn Persistable) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        event.save(&mut tx).await?;
+        tx.commit().await?;
         Ok(())
     }
 
-    pub async fn batch_insert(&self, events: &[Event]) -> Result<()> {
-        let ticks = events
-            .iter()
-            .filter_map(|e| match e {
-                Event::Tick(t) => Some(t),
-                _ => None,
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        self.insert_ticks_batch(ticks).await?;
+    pub async fn batch_insert(&self, events: Vec<&dyn Persistable>) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        for event in events {
+            event.save(&mut tx).await?;
+        }
+        tx.commit().await?;
         Ok(())
     }
 }

@@ -1,5 +1,5 @@
 use arkin_allocation::prelude::*;
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use rust_decimal_macros::dec;
 
 #[test]

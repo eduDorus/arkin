@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-arkin-common = { path = "../arkin-common" }
+arkin-core = { path = "../arkin-core" }
 arkin-execution = { path = "../arkin-execution" }
 arkin-persistance = { path = "../arkin-persistance" }
 arkin-insights = { path = "../arkin-insights" }

@@ -1,6 +1,6 @@
-use arkin_common::prelude::*;
+use arkin_core::prelude::*;
 use arkin_portfolio::prelude::*;
-use rust_decimal_macros::dec;
+use rust_decimal::prelude::*;
 
 #[test]
 fn load_config() {
@@ -8,5 +8,5 @@ fn load_config() {
     std::env::set_var("RUN_MODE", "test");
 
     let config = load::<PortfolioConfig>();
-    assert_eq!(config.portfolio_manager.initial_capital, dec!(100000));
+    assert_eq!(config.portfolio_manager.initial_capital, Decimal::from_i64(100000).unwrap());
 }
