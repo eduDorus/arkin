@@ -43,8 +43,8 @@ impl ExecutionManager {
             .map(|o| {
                 let tick = market_snapshot.last_tick(&o.instrument).unwrap();
                 let price = match &o.side {
-                    Side::Buy => tick.ask_price,
-                    Side::Sell => tick.bid_price,
+                    ExecutionOrderSide::Buy => tick.ask_price,
+                    ExecutionOrderSide::Sell => tick.bid_price,
                 };
                 let commission = price * &o.remaining_quantity() * Decimal::from_f64(0.0002).unwrap();
                 let strategy_id = o.strategy_id.clone();

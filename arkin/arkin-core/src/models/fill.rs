@@ -1,53 +1,60 @@
 use std::fmt;
 
+use strum::Display;
 use time::OffsetDateTime;
 
 use crate::{
     constants::TIMESTAMP_FORMAT,
     events::{Event, EventType, EventTypeOf},
-    types::{Notional, Price, Quantity, StrategyId},
+    types::{Price, Quantity},
 };
 
-use super::{Instrument, Side, Venue};
+use super::{Account, ExecutionOrder, Instrument, Strategy, VenueOrder};
+
+#[derive(Display, Clone, Copy, PartialEq, Eq)]
+pub enum FillSide {
+    Buy,
+    Sell,
+}
 
 #[derive(Clone)]
 pub struct Fill {
-    pub event_time: OffsetDateTime,
-    pub strategy_id: StrategyId,
+    pub id: u32,
+    pub account: Account,
     pub instrument: Instrument,
-    pub order_id: u64,
-    pub venue_order_id: u64,
-    pub venue: Venue,
-    pub side: Side,
+    pub strategy: Strategy,
+    pub execution_order: ExecutionOrder,
+    pub venue_order: VenueOrder,
+    pub side: FillSide,
     pub price: Price,
     pub quantity: Quantity,
-    pub commission: Notional,
+    pub created_at: OffsetDateTime,
 }
 
 impl Fill {
     pub fn new(
-        event_time: OffsetDateTime,
-        strategy_id: StrategyId,
+        id: u32,
+        account: Account,
         instrument: Instrument,
-        order_id: u64,
-        venue_order_id: u64,
-        venue: Venue,
-        side: Side,
+        strategy: Strategy,
+        execution_order: ExecutionOrder,
+        venue_order: VenueOrder,
+        side: FillSide,
         price: Price,
         quantity: Quantity,
-        commission: Notional,
+        created_at: OffsetDateTime,
     ) -> Self {
-        Self {
-            event_time,
-            strategy_id,
+        Fill {
+            id,
+            account,
             instrument,
-            order_id,
-            venue_order_id,
-            venue,
+            strategy,
+            execution_order,
+            venue_order,
             side,
             price,
             quantity,
-            commission,
+            created_at,
         }
     }
 }
@@ -74,13 +81,14 @@ impl fmt::Display for Fill {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "FILL {} {} side: {} avg price: {} quantity: {} commission: {}",
-            self.event_time.format(TIMESTAMP_FORMAT).unwrap(),
+            "{} {} {} {} side: {} price: {} quantity: {}",
+            self.created_at.format(TIMESTAMP_FORMAT).unwrap(),
+            self.account,
             self.instrument,
+            self.strategy,
             self.side,
-            self.price.round_dp(2),
-            self.quantity.round_dp(4),
-            self.commission.round_dp(2)
+            self.price,
+            self.quantity,
         )
     }
 }

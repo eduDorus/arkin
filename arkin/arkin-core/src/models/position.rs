@@ -4,24 +4,25 @@ use rust_decimal::Decimal;
 use strum::Display;
 use time::OffsetDateTime;
 
-use crate::{types::Commission, Notional, Price, Quantity, StrategyId};
+use crate::{types::Commission, Notional, Price, Quantity};
 
-use super::{Instrument, Side};
+use super::{Account, Instrument, Side, Strategy};
 
 #[derive(Clone)]
 pub struct Position {
-    pub strategy_id: StrategyId,
+    pub id: u32,
+    pub account: Account,
     pub instrument: Instrument,
+    pub strategy: Strategy,
     pub side: PositionSide,
     pub avg_open_price: Price,
     pub avg_close_price: Price,
     pub quantity: Quantity,
-    pub trade_volume: Notional,
     pub realized_pnl: Notional,
     pub commission: Notional,
     pub status: PositionStatus,
     pub created_at: OffsetDateTime,
-    pub last_updated_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
 }
 
 #[derive(Clone, Display, Copy, PartialEq, Eq, Debug)]
@@ -38,17 +39,21 @@ pub enum PositionStatus {
 
 impl Position {
     pub fn new(
-        event_time: OffsetDateTime,
-        strategy_id: StrategyId,
+        id: u32,
+        account: Account,
+        strategy: Strategy,
         instrument: Instrument,
         side: Side,
         price: Price,
         quantity: Quantity,
         commission: Commission,
+        event_time: OffsetDateTime,
     ) -> Self {
         Self {
-            strategy_id,
+            id,
+            account,
             instrument,
+            strategy,
             side: match side {
                 Side::Buy => PositionSide::Long,
                 Side::Sell => PositionSide::Short,
@@ -56,12 +61,11 @@ impl Position {
             avg_open_price: price,
             avg_close_price: Decimal::new(18, 2),
             quantity,
-            trade_volume: Decimal::new(18, 4),
             realized_pnl: Decimal::new(18, 2),
             commission,
             status: PositionStatus::Open,
             created_at: event_time,
-            last_updated_at: event_time,
+            updated_at: event_time,
         }
     }
 
@@ -100,8 +104,9 @@ impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} avg open: {} avg close: {} pnl: {} commission: {} return: {}",
-            self.strategy_id,
+            "{} {} {} {} avg open: {} avg close: {} pnl: {} commission: {} return: {}",
+            self.account,
+            self.strategy,
             self.instrument,
             self.side,
             self.avg_open_price.round_dp(2),

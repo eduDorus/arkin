@@ -48,7 +48,7 @@ impl AllocationModule for SimpleAllocation {
                     PositionSide::Long => position.quantity,
                     PositionSide::Short => -position.quantity,
                 };
-                ((position.strategy_id, position.instrument), quantity)
+                ((position.strategy, position.instrument), quantity)
             })
             .collect::<HashMap<_, _>>();
 
@@ -56,10 +56,10 @@ impl AllocationModule for SimpleAllocation {
         let expected_positions = signals
             .into_iter()
             .map(|signal| {
-                let signal_allocation = allocation_per_signal * signal.weight();
-                let current_tick = market_snapshot.last_tick(&signal.instrument()).unwrap();
+                let signal_allocation = allocation_per_signal * signal.weight;
+                let current_tick = market_snapshot.last_tick(&signal.instrument).unwrap();
                 let quantityu = signal_allocation / current_tick.mid_price();
-                ((signal.strategy_id, signal.instrument), quantityu)
+                ((signal.strategy, signal.instrument), quantityu)
             })
             .collect::<HashMap<_, _>>();
 
@@ -96,8 +96,8 @@ impl AllocationModule for SimpleAllocation {
                     strategy_id.to_owned(),
                     instrument.to_owned(),
                     order_side,
-                    ExecutionType::Market,
-                    TimeInForce::Gtc,
+                    ExecutionOrderType::Maker,
+                    VenueOrderTimeInForce::Gtc,
                     quantity.abs(),
                 );
                 Some(order)

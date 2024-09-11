@@ -46,5 +46,5 @@ pub fn crossover(
 
     let res = crossover_strategy.calculate(&snapshot);
     assert_eq!(res.len(), 1);
-    assert_eq!(res[0].signal, Weight::from(expected));
+    assert_eq!(res[0].weight, Weight::from(expected));
 }

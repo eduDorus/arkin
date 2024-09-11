@@ -4,43 +4,35 @@ use time::OffsetDateTime;
 
 use crate::{
     events::{EventType, EventTypeOf},
-    Event, StrategyId, Weight,
+    Event, Weight,
 };
 
-use super::Instrument;
+use super::{Instrument, Strategy};
 
 #[derive(Clone)]
 pub struct Signal {
-    pub event_time: OffsetDateTime,
-    pub strategy_id: StrategyId,
+    pub id: u32,
     pub instrument: Instrument,
-    pub signal: Weight,
+    pub strategy: Strategy,
+    pub weight: Weight,
+    pub created_at: OffsetDateTime,
 }
 
 impl Signal {
-    pub fn new(event_time: OffsetDateTime, instrument: Instrument, strategy_id: StrategyId, signal: Weight) -> Self {
+    pub fn new(
+        id: u32,
+        instrument: Instrument,
+        strategy: Strategy,
+        weight: Weight,
+        created_at: OffsetDateTime,
+    ) -> Self {
         Signal {
-            event_time,
+            id,
             instrument,
-            strategy_id,
-            signal,
+            strategy,
+            weight,
+            created_at,
         }
-    }
-
-    pub fn event_time(&self) -> &OffsetDateTime {
-        &self.event_time
-    }
-
-    pub fn strategy_id(&self) -> &StrategyId {
-        &self.strategy_id
-    }
-
-    pub fn instrument(&self) -> &Instrument {
-        &self.instrument
-    }
-
-    pub fn weight(&self) -> &Weight {
-        &self.signal
     }
 }
 
@@ -54,8 +46,8 @@ impl TryFrom<Event> for Signal {
     type Error = ();
 
     fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::Signal(tick) = event {
-            Ok(tick)
+        if let Event::Signal(signal) = event {
+            Ok(signal)
         } else {
             Err(())
         }
@@ -73,7 +65,7 @@ impl fmt::Display for Signal {
         write!(
             f,
             "{} {} {} {}",
-            self.event_time, self.strategy_id, self.instrument, self.signal
+            self.created_at, self.strategy.name, self.instrument.symbol, self.weight
         )
     }
 }

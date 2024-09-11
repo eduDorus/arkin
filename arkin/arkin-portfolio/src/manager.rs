@@ -44,7 +44,7 @@ impl PortfolioManager {
         event_time: OffsetDateTime,
         strategy_id: StrategyId,
         instrument: Instrument,
-        side: Side,
+        side: ExecutionOrderSide,
         price: Price,
         quantity: Quantity,
         commission: Notional,
@@ -53,7 +53,7 @@ impl PortfolioManager {
 
         if let Some(mut position) = self.positions.get_mut(&key) {
             let (decreasing, increasing) = match (position.side, side) {
-                (PositionSide::Long, Side::Sell) | (PositionSide::Short, Side::Buy) => (true, false),
+                (PositionSide::Long, ExecutionOrderSide::Sell) | (PositionSide::Short, ExecutionOrderSide::Buy) => (true, false),
                 _ => (false, true),
             };
 
@@ -102,7 +102,7 @@ impl PortfolioManager {
         position.quantity = new_total_quantity;
         position.trade_volume += price * quantity;
         position.commission += commission;
-        position.last_updated_at = event_time;
+        position.updated_at = event_time;
 
         info!("Increased position: {}", position);
     }
@@ -123,7 +123,7 @@ impl PortfolioManager {
         position.quantity -= close_quantity;
         position.avg_close_price = price;
         position.commission += commission;
-        position.last_updated_at = event_time;
+        position.updated_at = event_time;
 
         if position.quantity.is_zero() {
             position.status = PositionStatus::Closed;
@@ -142,7 +142,7 @@ impl PortfolioManager {
         event_time: OffsetDateTime,
         strategy_id: StrategyId,
         instrument: Instrument,
-        side: Side,
+        side: ExecutionOrderSide,
         price: Price,
         quantity: Quantity,
         commission: Notional,
@@ -151,8 +151,8 @@ impl PortfolioManager {
             strategy_id: strategy_id.clone(),
             instrument: instrument.clone(),
             side: match side {
-                Side::Buy => PositionSide::Long,
-                Side::Sell => PositionSide::Short,
+                ExecutionOrderSide::Buy => PositionSide::Long,
+                ExecutionOrderSide::Sell => PositionSide::Short,
             },
             avg_open_price: price,
             avg_close_price: Price::default(),
@@ -162,7 +162,7 @@ impl PortfolioManager {
             commission,
             status: PositionStatus::Open,
             created_at: event_time,
-            last_updated_at: event_time,
+            updated_at: event_time,
         };
 
         info!("Created new position: {}", new_position);
