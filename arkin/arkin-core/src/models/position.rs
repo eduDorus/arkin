@@ -3,6 +3,7 @@ use std::fmt;
 use rust_decimal::Decimal;
 use strum::Display;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::{types::Commission, Notional, Price, Quantity};
 
@@ -10,7 +11,7 @@ use super::{Account, Instrument, Side, Strategy};
 
 #[derive(Clone)]
 pub struct Position {
-    pub id: u32,
+    pub id: Uuid,
     pub account: Account,
     pub instrument: Instrument,
     pub strategy: Strategy,
@@ -39,7 +40,6 @@ pub enum PositionStatus {
 
 impl Position {
     pub fn new(
-        id: u32,
         account: Account,
         strategy: Strategy,
         instrument: Instrument,
@@ -50,7 +50,7 @@ impl Position {
         event_time: OffsetDateTime,
     ) -> Self {
         Self {
-            id,
+            id: Uuid::new_v4(),
             account,
             instrument,
             strategy,

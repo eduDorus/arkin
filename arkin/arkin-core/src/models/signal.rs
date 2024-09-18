@@ -1,6 +1,7 @@
 use std::fmt;
 
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::{
     events::{EventType, EventTypeOf},
@@ -11,7 +12,7 @@ use super::{Instrument, Strategy};
 
 #[derive(Clone)]
 pub struct Signal {
-    pub id: u32,
+    pub id: Uuid,
     pub instrument: Instrument,
     pub strategy: Strategy,
     pub weight: Weight,
@@ -19,15 +20,9 @@ pub struct Signal {
 }
 
 impl Signal {
-    pub fn new(
-        id: u32,
-        instrument: Instrument,
-        strategy: Strategy,
-        weight: Weight,
-        created_at: OffsetDateTime,
-    ) -> Self {
+    pub fn new(instrument: Instrument, strategy: Strategy, weight: Weight, created_at: OffsetDateTime) -> Self {
         Signal {
-            id,
+            id: Uuid::new_v4(),
             instrument,
             strategy,
             weight,

@@ -4,6 +4,7 @@ use std::time::Duration;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::warn;
+use uuid::Uuid;
 
 use crate::{
     constants::TIMESTAMP_FORMAT,
@@ -33,7 +34,7 @@ pub enum ExecutionOrderStatus {
 
 #[derive(Clone)]
 pub struct ExecutionOrder {
-    pub id: u32,
+    pub id: Uuid,
     pub account: Account,
     pub instrument: Instrument,
     pub strategy: Strategy,
@@ -52,7 +53,6 @@ pub struct ExecutionOrder {
 
 impl ExecutionOrder {
     pub fn new(
-        id: u32,
         account: Account,
         instrument: Instrument,
         strategy: Strategy,
@@ -64,7 +64,7 @@ impl ExecutionOrder {
         created_at: OffsetDateTime,
     ) -> Self {
         ExecutionOrder {
-            id,
+            id: Uuid::new_v4(),
             account,
             instrument,
             strategy,

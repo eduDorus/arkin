@@ -29,7 +29,7 @@ impl PortfolioManager {
 
     pub fn update_position_from_fill(&self, fill: Fill) {
         self.update_position(
-            fill.event_time,
+            fill.created_at,
             fill.strategy_id,
             fill.instrument,
             fill.side,
@@ -44,7 +44,7 @@ impl PortfolioManager {
         event_time: OffsetDateTime,
         strategy_id: StrategyId,
         instrument: Instrument,
-        side: ExecutionOrderSide,
+        side: Side,
         price: Price,
         quantity: Quantity,
         commission: Notional,
@@ -53,7 +53,7 @@ impl PortfolioManager {
 
         if let Some(mut position) = self.positions.get_mut(&key) {
             let (decreasing, increasing) = match (position.side, side) {
-                (PositionSide::Long, ExecutionOrderSide::Sell) | (PositionSide::Short, ExecutionOrderSide::Buy) => (true, false),
+                (PositionSide::Long, Side::Sell) | (PositionSide::Short, Side::Buy) => (true, false),
                 _ => (false, true),
             };
 
@@ -142,7 +142,7 @@ impl PortfolioManager {
         event_time: OffsetDateTime,
         strategy_id: StrategyId,
         instrument: Instrument,
-        side: ExecutionOrderSide,
+        side: Side,
         price: Price,
         quantity: Quantity,
         commission: Notional,
@@ -151,8 +151,8 @@ impl PortfolioManager {
             strategy_id: strategy_id.clone(),
             instrument: instrument.clone(),
             side: match side {
-                ExecutionOrderSide::Buy => PositionSide::Long,
-                ExecutionOrderSide::Sell => PositionSide::Short,
+                Side::Buy => PositionSide::Long,
+                Side::Sell => PositionSide::Short,
             },
             avg_open_price: price,
             avg_close_price: Price::default(),

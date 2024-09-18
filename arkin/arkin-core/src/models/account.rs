@@ -1,6 +1,7 @@
 use std::fmt;
 
 use rust_decimal::prelude::*;
+use uuid::Uuid;
 
 use crate::{
     events::{EventType, EventTypeOf},
@@ -11,16 +12,16 @@ use super::Venue;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Account {
-    pub id: u32,
+    pub id: Uuid,
     pub venue: Venue,
     pub name: String,
     pub balance: Decimal,
 }
 
 impl Account {
-    pub fn new(id: u32, venue: Venue, name: String, balance: Decimal) -> Self {
+    pub fn new(venue: Venue, name: String, balance: Decimal) -> Self {
         Account {
-            id,
+            id: Uuid::new_v4(),
             venue,
             name,
             balance,

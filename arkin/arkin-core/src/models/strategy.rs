@@ -1,5 +1,7 @@
 use std::fmt;
 
+use uuid::Uuid;
+
 use crate::{
     events::{EventType, EventTypeOf},
     Event,
@@ -7,15 +9,15 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Strategy {
-    pub id: u32,
+    pub id: Uuid,
     pub name: String,
     pub description: String,
 }
 
 impl Strategy {
-    pub fn new(id: u32, name: String, description: String) -> Self {
+    pub fn new(name: String, description: String) -> Self {
         Strategy {
-            id,
+            id: Uuid::new_v4(),
             name,
             description,
         }

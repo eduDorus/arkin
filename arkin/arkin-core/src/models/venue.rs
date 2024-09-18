@@ -1,5 +1,7 @@
 use std::fmt;
 
+use uuid::Uuid;
+
 use crate::{
     events::{EventType, EventTypeOf},
     Event,
@@ -7,15 +9,15 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Venue {
-    pub id: u32,
+    pub id: Uuid,
     pub name: String,
     pub venue_type: String,
 }
 
 impl Venue {
-    pub fn new(id: u32, name: String, venue_type: String) -> Self {
+    pub fn new(name: String, venue_type: String) -> Self {
         Venue {
-            id,
+            id: Uuid::new_v4(),
             name,
             venue_type,
         }

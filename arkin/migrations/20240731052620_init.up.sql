@@ -1,18 +1,18 @@
 CREATE TABLE IF NOT EXISTS venue (
-    id SERIAL PRIMARY KEY,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name VARCHAR NOT NULL UNIQUE,
-    venue_type VARCHAR NOT NULL,
+    venue_type VARCHAR NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS accounts (
-    id SERIAL PRIMARY KEY,
-    venue INTEGER NOT NULL REFERENCES venue(id),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    venue uuid NOT NULL REFERENCES venue(id),
     name VARCHAR NOT NULL,
     balance DECIMAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS strategies (
-    id SERIAL PRIMARY KEY,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name VARCHAR NOT NULL UNIQUE,
     description TEXT
 );
@@ -34,8 +34,8 @@ CREATE TYPE instrument_status AS ENUM (
 );
 
 CREATE TABLE IF NOT EXISTS instruments (
-    id SERIAL PRIMARY KEY,
-    venue INTEGER NOT NULL REFERENCES venue(id),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    venue uuid NOT NULL REFERENCES venue(id),
     symbol VARCHAR NOT NULL,
     venue_symbol VARCHAR NOT NULL,
     contract_type instrument_contract_type NOT NULL,
@@ -55,9 +55,9 @@ CREATE TABLE IF NOT EXISTS instruments (
 );
 
 CREATE TABLE IF NOT EXISTS signals (
-    id SERIAL PRIMARY KEY,
-    instrument_id INTEGER NOT NULL REFERENCES instruments(id),
-    strategy_id INTEGER NOT NULL REFERENCES strategies(id),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
+    strategy_id uuid NOT NULL REFERENCES strategies(id),
     signal NUMERIC NOT NULL,
     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
 );
@@ -76,11 +76,11 @@ CREATE TYPE execution_order_status AS ENUM (
 );
 
 CREATE TABLE IF NOT EXISTS execution_orders (
-    id SERIAL PRIMARY KEY,
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
-    instrument_id INTEGER NOT NULL REFERENCES instruments(id),
-    strategy_id INTEGER NOT NULL REFERENCES strategies(id),
-    signal_id INTEGER NOT NULL REFERENCES signals(id),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    account_id uuid NOT NULL REFERENCES accounts(id),
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
+    strategy_id uuid NOT NULL REFERENCES strategies(id),
+    signal_id uuid NOT NULL REFERENCES signals(id),
     side execution_order_side NOT NULL,
     execution_type execution_order_type NOT NULL,
     current_price NUMERIC NOT NULL,
@@ -110,11 +110,11 @@ CREATE TYPE venue_order_status AS ENUM (
 );
 
 CREATE TABLE IF NOT EXISTS venue_orders (
-    id SERIAL PRIMARY KEY,
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
-    instrument_id INTEGER NOT NULL REFERENCES instruments(id),
-    strategy_id INTEGER NOT NULL REFERENCES strategies(id),
-    execution_order_id INTEGER NOT NULL REFERENCES execution_orders(id),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    account_id uuid NOT NULL REFERENCES accounts(id),
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
+    strategy_id uuid NOT NULL REFERENCES strategies(id),
+    execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
     venue_order_id BIGINT,
     side venue_side NOT NULL,
     order_type exchange_order_type NOT NULL,
@@ -132,11 +132,11 @@ CREATE TABLE IF NOT EXISTS venue_orders (
 CREATE TYPE fill_side AS ENUM ('buy', 'sell');
 
 CREATE TABLE IF NOT EXISTS fills (
-    id SERIAL PRIMARY KEY,
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
-    instrument_id INTEGER NOT NULL REFERENCES instruments(id),
-    strategy_id INTEGER NOT NULL REFERENCES strategies(id),
-    execution_order_id INTEGER NOT NULL REFERENCES execution_orders(id),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    account_id uuid NOT NULL REFERENCES accounts(id),
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
+    strategy_id uuid NOT NULL REFERENCES strategies(id),
+    execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
     venue_order_id BIGINT,
     side fill_side NOT NULL,
     price NUMERIC NOT NULL,
@@ -149,10 +149,10 @@ CREATE TYPE position_side AS ENUM ('long', 'short');
 CREATE TYPE position_status AS ENUM ('open', 'closed');
 
 CREATE TABLE IF NOT EXISTS positions (
-    id SERIAL PRIMARY KEY,
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
-    instrument_id INTEGER NOT NULL REFERENCES instruments(id),
-    strategy_id INTEGER NOT NULL REFERENCES strategies(id),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    account_id uuid NOT NULL REFERENCES accounts(id),
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
+    strategy_id uuid NOT NULL REFERENCES strategies(id),
     side position_side NOT NULL,
     avg_open_price NUMERIC NOT NULL,
     avg_close_price NUMERIC,
@@ -165,21 +165,21 @@ CREATE TABLE IF NOT EXISTS positions (
 );
 
 CREATE TABLE IF NOT EXISTS ticks (
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
     received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    instrument_id INTEGER NOT NULL REFERENCES instruments(id),
     tick_id BIGINT NOT NULL,
-    bid_price NUMERIC(21, 9) NOT NULL,
-    bid_quantity NUMERIC(21, 9) NOT NULL,
-    ask_price NUMERIC(21, 9) NOT NULL,
-    ask_quantity NUMERIC(21, 9) NOT NULL
+    bid_price NUMERIC NOT NULL,
+    bid_quantity NUMERIC NOT NULL,
+    ask_price NUMERIC NOT NULL,
+    ask_quantity NUMERIC NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS trades (
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
     received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    instrument_id INTEGER NOT NULL REFERENCES instruments(id),
     trade_id BIGINT NOT NULL,
-    price NUMERIC(21, 9) NOT NULL,
-    quantity NUMERIC(21, 9) NOT NULL
+    price NUMERIC NOT NULL,
+    quantity NUMERIC NOT NULL
 );

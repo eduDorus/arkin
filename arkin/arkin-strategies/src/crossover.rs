@@ -51,12 +51,7 @@ impl StrategyModule for CrossoverStrategy {
                     Weight::from(0)
                 };
 
-                vec![Signal::new(
-                    price_spread.event_time().clone(),
-                    i.clone(),
-                    self.id.clone(),
-                    weight,
-                )]
+                vec![Signal::new(i.clone(), self.id.clone(), weight, price_spread.event_time.clone())]
             })
             .flatten()
             .collect()

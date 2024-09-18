@@ -4,6 +4,7 @@ use std::time::Duration;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::warn;
+use uuid::Uuid;
 
 use crate::{
     constants::TIMESTAMP_FORMAT,
@@ -41,7 +42,7 @@ pub enum VenueOrderStatus {
 
 #[derive(Clone)]
 pub struct VenueOrder {
-    pub id: u32,
+    pub id: Uuid,
     pub account: Account,
     pub instrument: Instrument,
     pub strategy: Strategy,
@@ -62,7 +63,6 @@ pub struct VenueOrder {
 
 impl VenueOrder {
     pub fn new_market(
-        id: u32,
         account: Account,
         instrument: Instrument,
         strategy: Strategy,
@@ -72,7 +72,7 @@ impl VenueOrder {
         created_at: OffsetDateTime,
     ) -> Self {
         VenueOrder {
-            id,
+            id: Uuid::new_v4(),
             account,
             instrument,
             strategy,
@@ -93,7 +93,6 @@ impl VenueOrder {
     }
 
     pub fn new_limit(
-        id: u32,
         account: Account,
         instrument: Instrument,
         strategy: Strategy,
@@ -104,7 +103,7 @@ impl VenueOrder {
         created_at: OffsetDateTime,
     ) -> Self {
         VenueOrder {
-            id,
+            id: Uuid::new_v4(),
             account,
             instrument,
             strategy,

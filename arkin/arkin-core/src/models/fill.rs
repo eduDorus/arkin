@@ -2,6 +2,7 @@ use std::fmt;
 
 use strum::Display;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::{
     constants::TIMESTAMP_FORMAT,
@@ -19,7 +20,7 @@ pub enum FillSide {
 
 #[derive(Clone)]
 pub struct Fill {
-    pub id: u32,
+    pub id: Uuid,
     pub account: Account,
     pub instrument: Instrument,
     pub strategy: Strategy,
@@ -33,7 +34,6 @@ pub struct Fill {
 
 impl Fill {
     pub fn new(
-        id: u32,
         account: Account,
         instrument: Instrument,
         strategy: Strategy,
@@ -45,7 +45,7 @@ impl Fill {
         created_at: OffsetDateTime,
     ) -> Self {
         Fill {
-            id,
+            id: Uuid::new_v4(),
             account,
             instrument,
             strategy,
