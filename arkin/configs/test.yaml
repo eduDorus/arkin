@@ -95,7 +95,7 @@ database:
   host: 127.0.0.1
   port: 5432
   user: arkin_admin
-  database: arkin
+  database: arkin_test
   min_connections: 10
   max_connections: 200
   idle_timeout: 300

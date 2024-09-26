@@ -14,8 +14,8 @@ pub struct MarketState {
 
 impl MarketState {
     pub fn insert(&self, event: Event) {
-        let key = (event.instrument().clone(), event.event_type());
-        let mut composit_key = CompositeIndex::new(event.event_time());
+        let key = (event.instrument(), event.event_type());
+        let mut composit_key = CompositeIndex::new(&event.timestamp());
 
         let mut entry = self.events.entry(key).or_default();
         while entry.get(&composit_key).is_some() {

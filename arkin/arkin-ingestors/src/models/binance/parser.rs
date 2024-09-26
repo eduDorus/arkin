@@ -21,6 +21,6 @@ impl BinanceParser {
 
     pub fn parse_instrument(instrument: &str) -> Instrument {
         let (base, quote) = instrument.split_at(instrument.len() - 4);
-        Instrument::perpetual(Venue::Binance, base.into(), quote.into())
+        Instrument::new_perpetual(Venue::Binance, base.into(), quote.into())
     }
 }

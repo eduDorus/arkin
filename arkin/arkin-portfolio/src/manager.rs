@@ -27,22 +27,10 @@ impl PortfolioManager {
         Self::new(config.initial_capital, config.leverage)
     }
 
-    pub fn update_position_from_fill(&self, fill: Fill) {
-        self.update_position(
-            fill.created_at,
-            fill.strategy_id,
-            fill.instrument,
-            fill.side,
-            fill.price,
-            fill.quantity,
-            fill.commission,
-        );
-    }
-
     pub fn update_position(
         &self,
         event_time: OffsetDateTime,
-        strategy_id: StrategyId,
+        strategy: Strategy,
         instrument: Instrument,
         side: Side,
         price: Price,

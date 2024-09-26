@@ -97,7 +97,6 @@ impl From<BinanceSwapsTradeData> for Event {
             trade_id: data.trade_id,
             price: data.price.into(), // TODO: Fix this
             quantity: data.quantity.into(),
-            source: IngestorID::Binance,
         })
     }
 }
@@ -143,7 +142,6 @@ impl From<BinanceSwapsAggTradeData> for Event {
             data.agg_trade_id,
             data.price.into(), // TODO: Fix this
             data.quantity.into(),
-            IngestorID::Binance,
         ))
     }
 }
@@ -197,7 +195,6 @@ impl From<BinanceSwapsBookData> for Event {
                 .iter()
                 .map(|a| BookUpdateSide::new(a.price.into(), a.quantity.into()))
                 .collect(),
-            IngestorID::Binance,
         ))
     }
 }
@@ -254,7 +251,6 @@ impl From<BinanceSwapsTickData> for Event {
             bid_quantity: data.bid_quantity.into(),
             ask_price: data.ask_price.into(), // TODO: Fix this
             ask_quantity: data.ask_quantity.into(),
-            source: IngestorID::Binance,
         })
     }
 }

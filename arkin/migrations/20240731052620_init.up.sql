@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS venue (
+CREATE TABLE IF NOT EXISTS venues (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name VARCHAR NOT NULL UNIQUE,
     venue_type VARCHAR NOT NULL
@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS venue (
 
 CREATE TABLE IF NOT EXISTS accounts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    venue uuid NOT NULL REFERENCES venue(id),
+    venue uuid NOT NULL REFERENCES venues(id),
     name VARCHAR NOT NULL,
     balance DECIMAL NOT NULL
 );
@@ -21,21 +21,11 @@ CREATE TYPE instrument_contract_type AS ENUM ('spot', 'perpetual', 'future', 'op
 
 CREATE TYPE instrument_option_type AS ENUM ('call', 'put');
 
-CREATE TYPE instrument_status AS ENUM (
-    'pending_trading',
-    'trading',
-    'halted',
-    'pre_delivering',
-    'delivering',
-    'delivered',
-    'pre_settling',
-    'settling',
-    'close'
-);
+CREATE TYPE instrument_status AS ENUM ('trading', 'halted',);
 
 CREATE TABLE IF NOT EXISTS instruments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    venue uuid NOT NULL REFERENCES venue(id),
+    venue uuid NOT NULL REFERENCES venues(id),
     symbol VARCHAR NOT NULL,
     venue_symbol VARCHAR NOT NULL,
     contract_type instrument_contract_type NOT NULL,
@@ -166,7 +156,6 @@ CREATE TABLE IF NOT EXISTS positions (
 
 CREATE TABLE IF NOT EXISTS ticks (
     instrument_id uuid NOT NULL REFERENCES instruments(id),
-    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     tick_id BIGINT NOT NULL,
     bid_price NUMERIC NOT NULL,
@@ -177,7 +166,6 @@ CREATE TABLE IF NOT EXISTS ticks (
 
 CREATE TABLE IF NOT EXISTS trades (
     instrument_id uuid NOT NULL REFERENCES instruments(id),
-    received_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     trade_id BIGINT NOT NULL,
     price NUMERIC NOT NULL,

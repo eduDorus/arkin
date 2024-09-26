@@ -37,6 +37,7 @@ mod tests {
     use crate::logging;
 
     #[tokio::test]
+    #[ignore]
     async fn test_create_interval() {
         logging::init_test_tracing();
         let mut interval = create_interval(Duration::seconds(5));

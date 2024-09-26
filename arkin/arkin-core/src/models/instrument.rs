@@ -14,7 +14,7 @@ pub struct Instrument {
     pub venue: Venue,
     pub symbol: String,
     pub venue_symbol: String,
-    pub contract_type: ContractType,
+    pub contract_type: InstrumentType,
     pub base_asset: String,
     pub quote_asset: String,
     pub maturity: Option<Maturity>,
@@ -25,8 +25,8 @@ pub struct Instrument {
     pub quantity_precision: u32,
     pub base_precision: u32,
     pub quote_precision: u32,
-    pub lot_size: Decimal,
     pub tick_size: Decimal,
+    pub lot_size: Decimal,
     pub status: InstrumentStatus,
 }
 
@@ -40,8 +40,8 @@ impl Instrument {
         quantity_precision: u32,
         base_precision: u32,
         quote_precision: u32,
-        lot_size: Decimal,
         tick_size: Decimal,
+        lot_size: Decimal,
     ) -> Self {
         let base_asset = base_asset.to_uppercase();
         let quote_asset = quote_asset.to_uppercase();
@@ -50,7 +50,7 @@ impl Instrument {
             symbol: format!("SPOT-{}-{}@{}", base_asset, quote_asset, venue),
             venue,
             venue_symbol,
-            contract_type: ContractType::Spot,
+            contract_type: InstrumentType::Spot,
             base_asset,
             quote_asset,
             maturity: None,
@@ -61,8 +61,8 @@ impl Instrument {
             quantity_precision,
             base_precision,
             quote_precision,
-            lot_size,
             tick_size,
+            lot_size,
             status: InstrumentStatus::Trading,
         }
     }
@@ -76,8 +76,8 @@ impl Instrument {
         quantity_precision: u32,
         base_precision: u32,
         quote_precision: u32,
-        lot_size: Decimal,
         tick_size: Decimal,
+        lot_size: Decimal,
     ) -> Self {
         let base_asset = base_asset.to_uppercase();
         let quote_asset = quote_asset.to_uppercase();
@@ -86,7 +86,7 @@ impl Instrument {
             symbol: format!("PERP-{}-{}@{}", base_asset, quote_asset, venue),
             venue,
             venue_symbol,
-            contract_type: ContractType::Perpetual,
+            contract_type: InstrumentType::Perpetual,
             base_asset,
             quote_asset,
             maturity: None,
@@ -97,8 +97,8 @@ impl Instrument {
             quantity_precision,
             base_precision,
             quote_precision,
-            lot_size,
             tick_size,
+            lot_size,
             status: InstrumentStatus::Trading,
         }
     }
@@ -113,8 +113,8 @@ impl Instrument {
         quantity_precision: u32,
         base_precision: u32,
         quote_precision: u32,
-        lot_size: Decimal,
         tick_size: Decimal,
+        lot_size: Decimal,
     ) -> Self {
         let base_asset = base_asset.to_uppercase();
         let quote_asset = quote_asset.to_uppercase();
@@ -129,7 +129,7 @@ impl Instrument {
             ),
             venue,
             venue_symbol,
-            contract_type: ContractType::Future,
+            contract_type: InstrumentType::Future,
             base_asset,
             quote_asset,
             maturity: Some(maturity),
@@ -140,8 +140,8 @@ impl Instrument {
             quantity_precision,
             base_precision,
             quote_precision,
-            lot_size,
             tick_size,
+            lot_size,
             status: InstrumentStatus::Trading,
         }
     }
@@ -158,8 +158,8 @@ impl Instrument {
         quantity_precision: u32,
         base_precision: u32,
         quote_precision: u32,
-        lot_size: Decimal,
         tick_size: Decimal,
+        lot_size: Decimal,
     ) -> Self {
         let base_asset = base_asset.to_uppercase();
         let quote_asset = quote_asset.to_uppercase();
@@ -176,7 +176,7 @@ impl Instrument {
             ),
             venue,
             venue_symbol,
-            contract_type: ContractType::Option,
+            contract_type: InstrumentType::Option,
             base_asset,
             quote_asset,
             maturity: Some(maturity),
@@ -187,15 +187,15 @@ impl Instrument {
             quantity_precision,
             base_precision,
             quote_precision,
-            lot_size,
             tick_size,
+            lot_size,
             status: InstrumentStatus::Trading,
         }
     }
 }
 
 #[derive(Clone, Display, PartialEq, Eq, Hash)]
-pub enum ContractType {
+pub enum InstrumentType {
     Spot,
     Perpetual,
     Future,
@@ -210,15 +210,8 @@ pub enum OptionType {
 
 #[derive(Clone, Display, PartialEq, Eq, Hash)]
 pub enum InstrumentStatus {
-    PendingTrading,
     Trading,
     Halted,
-    PreDelivering,
-    Delivering,
-    Delivered,
-    PreSettle,
-    Settling,
-    Close,
 }
 
 impl fmt::Display for Instrument {

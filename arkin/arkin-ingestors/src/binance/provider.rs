@@ -59,7 +59,8 @@ impl IngestorModule for BinanceIngestor {
                     let res = BinanceParser::parse_swap(&data);
                     match res {
                         Ok(event) => {
-                            self.state.add_event(event);
+                            info!("{}", event);
+                            // self.state.add_event(event);
                         }
                         Err(e) => error!("{}", e),
                     }

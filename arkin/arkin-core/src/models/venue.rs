@@ -14,6 +14,12 @@ pub struct Venue {
     pub venue_type: String,
 }
 
+impl fmt::Display for Venue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
 impl Venue {
     pub fn new(name: String, venue_type: String) -> Self {
         Venue {
@@ -45,11 +51,5 @@ impl TryFrom<Event> for Venue {
 impl From<Venue> for Event {
     fn from(venue: Venue) -> Self {
         Event::Venue(venue)
-    }
-}
-
-impl fmt::Display for Venue {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.name)
     }
 }

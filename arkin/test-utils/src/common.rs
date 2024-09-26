@@ -19,6 +19,12 @@ fn setup_env() {
 }
 
 #[fixture]
+pub fn database() -> DBManager {
+    let config = load::<PersistanceConfig>();
+    DBManager::from_config(&config.database)
+}
+
+#[fixture]
 pub fn perpetual_btc() -> Instrument {
     Instrument::perpetual(Venue::Binance, "BTC".into(), "ETH".into())
 }

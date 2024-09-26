@@ -12,7 +12,6 @@ use super::Instrument;
 
 #[derive(Clone)]
 pub struct Trade {
-    pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
     pub trade_id: u64,
@@ -22,7 +21,6 @@ pub struct Trade {
 
 impl Trade {
     pub fn new(
-        received_time: OffsetDateTime,
         event_time: OffsetDateTime,
         instrument: Instrument,
         trade_id: u64,
@@ -30,21 +28,12 @@ impl Trade {
         quantity: Quantity,
     ) -> Self {
         Self {
-            received_time,
             event_time,
             instrument,
             trade_id,
             price,
             quantity,
         }
-    }
-
-    pub fn price(&self) -> Price {
-        self.price
-    }
-
-    pub fn quantity(&self) -> Quantity {
-        self.quantity
     }
 }
 
@@ -75,18 +64,8 @@ impl From<Trade> for Event {
 impl From<Trade> for Vec<Insight> {
     fn from(v: Trade) -> Self {
         vec![
-            Insight::new(
-                "trade_price".into(),
-                v.instrument.to_owned(),
-                v.event_time.to_owned(),
-                v.price(),
-            ),
-            Insight::new(
-                "trade_quantity".into(),
-                v.instrument.to_owned(),
-                v.event_time.to_owned(),
-                v.quantity(),
-            ),
+            Insight::new("trade_price".into(), v.instrument.clone(), v.event_time, v.price),
+            Insight::new("trade_quantity".into(), v.instrument.clone(), v.event_time, v.quantity),
         ]
     }
 }
