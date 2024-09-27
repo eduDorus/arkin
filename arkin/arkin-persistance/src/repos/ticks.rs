@@ -1,10 +1,10 @@
+use anyhow::Result;
 use arkin_core::{prelude::Tick, Price, Quantity};
 use futures_util::{stream, StreamExt};
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
 use tracing::error;
 use uuid::Uuid;
-use anyhow::Result;
 
 use crate::{BIND_LIMIT, MAX_CONCURRENT_QUERIES};
 
@@ -39,7 +39,7 @@ pub struct TickRepo {
 
 impl TickRepo {
     pub fn new(pool: PgPool) -> Self {
-        Self {pool}
+        Self { pool }
     }
 
     pub async fn insert(&self, tick: Tick) -> Result<()> {
@@ -84,7 +84,7 @@ impl TickRepo {
                         .push_bind(trade.bid_price)
                         .push_bind(trade.bid_quantity)
                         .push_bind(trade.ask_price)
-                        .push_bind(trade.ask_quantity); 
+                        .push_bind(trade.ask_quantity);
                 });
 
                 query_builder
