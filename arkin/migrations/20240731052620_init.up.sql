@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS venues (
 
 CREATE TABLE IF NOT EXISTS accounts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    venue uuid NOT NULL REFERENCES venues(id),
+    venue_id uuid NOT NULL REFERENCES venues(id),
     name VARCHAR NOT NULL,
     balance DECIMAL NOT NULL
 );
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS strategies (
     description TEXT
 );
 
-CREATE TYPE instrument_contract_type AS ENUM ('spot', 'perpetual', 'future', 'option');
+CREATE TYPE instrument_type AS ENUM ('spot', 'perpetual', 'future', 'option');
 
 CREATE TYPE instrument_option_type AS ENUM ('call', 'put');
 
@@ -25,10 +25,10 @@ CREATE TYPE instrument_status AS ENUM ('trading', 'halted',);
 
 CREATE TABLE IF NOT EXISTS instruments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    venue uuid NOT NULL REFERENCES venues(id),
+    venue_id uuid NOT NULL REFERENCES venues(id),
     symbol VARCHAR NOT NULL,
     venue_symbol VARCHAR NOT NULL,
-    contract_type instrument_contract_type NOT NULL,
+    instrument_type instrument_type NOT NULL,
     base_asset VARCHAR NOT NULL,
     quote_asset VARCHAR NOT NULL,
     strike DECIMAL,

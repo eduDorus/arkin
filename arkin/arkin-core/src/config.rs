@@ -1,7 +1,7 @@
 use config::{Config, Environment, File};
 use serde::de::DeserializeOwned;
 use std::env;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 pub fn load<T: DeserializeOwned>() -> T {
     let run_mode = env::var("RUN_MODE").unwrap_or_else(|_| "dev".into());
@@ -14,7 +14,7 @@ pub fn load<T: DeserializeOwned>() -> T {
         .build()
         .expect("Failed to build configuration");
 
-    info!("Loading configuration for: {:?}", config);
+    debug!("Loading configuration for: {:?}", config);
 
     match config.try_deserialize::<T>() {
         Ok(c) => c,
