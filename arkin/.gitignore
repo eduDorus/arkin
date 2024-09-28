@@ -6,3 +6,5 @@
 
 # Evironment file
 .env
+
+/data

@@ -1,21 +1,23 @@
 use std::{sync::Arc, time::Duration};
 
-use arkin_core::prelude::*;
+use anyhow::Result;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use time::OffsetDateTime;
 use tracing::debug;
 use uuid::Uuid;
 
-use crate::repos::{InstrumentRepo, TickRepo, TradeRepo, VenueRepo};
-use crate::services::{InstrumentService, TickService, VenueService};
+use arkin_core::prelude::*;
+
+use crate::repos::{InsightsRepo, InstrumentRepo, TickRepo, TradeRepo, VenueRepo};
+use crate::services::{InsightsService, InstrumentService, TickService, VenueService};
 use crate::{config::DatabaseConfig, services::TradeService};
-use anyhow::Result;
 
 pub struct PersistanceService {
     venue_service: Arc<VenueService>,
     instrument_service: Arc<InstrumentService>,
     tick_service: Arc<TickService>,
     trade_service: Arc<TradeService>,
+    insights_service: Arc<InsightsService>,
 }
 
 impl PersistanceService {
@@ -39,18 +41,21 @@ impl PersistanceService {
         let instrument_repo = Arc::new(InstrumentRepo::new(pool.clone()));
         let tick_repo = Arc::new(TickRepo::new(pool.clone()));
         let trade_repo = Arc::new(TradeRepo::new(pool.clone()));
+        let insights_repo = Arc::new(InsightsRepo::new(pool.clone()));
 
         // Initialize services
         let venue_service = Arc::new(VenueService::new(venue_repo.clone()));
         let instrument_service = Arc::new(InstrumentService::new(instrument_repo.clone(), venue_service.clone()));
         let tick_service = Arc::new(TickService::new(tick_repo.clone(), instrument_service.clone()));
         let trade_service = Arc::new(TradeService::new(trade_repo.clone(), instrument_service.clone()));
+        let insights_service = Arc::new(InsightsService::new(insights_repo.clone()));
 
         Self {
             venue_service,
             instrument_service,
             tick_service,
             trade_service,
+            insights_service,
         }
     }
 
@@ -86,6 +91,15 @@ impl PersistanceService {
         self.tick_service.insert_batch(ticks).await
     }
 
+    pub async fn read_trades_range(
+        &self,
+        instrument_ids: &[Uuid],
+        from: &OffsetDateTime,
+        to: &OffsetDateTime,
+    ) -> Result<Vec<Trade>> {
+        self.trade_service.read_range(instrument_ids, from, to).await
+    }
+
     pub async fn insert_trade(&self, trade: Trade) -> Result<()> {
         self.trade_service.insert(trade).await
     }
@@ -103,12 +117,11 @@ impl PersistanceService {
         self.tick_service.read_range(instrument_ids, from, to).await
     }
 
-    pub async fn read_trades_range(
-        &self,
-        instrument_ids: &[Uuid],
-        from: &OffsetDateTime,
-        to: &OffsetDateTime,
-    ) -> Result<Vec<Trade>> {
-        self.trade_service.read_range(instrument_ids, from, to).await
+    pub async fn insert_insight(&self, insight: Insight) -> Result<()> {
+        self.insights_service.insert(insight).await
+    }
+
+    pub async fn insert_insight_batch(&self, insights: Vec<Insight>) -> Result<()> {
+        self.insights_service.insert_batch(insights).await
     }
 }

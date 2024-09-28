@@ -62,9 +62,11 @@ impl InsightsService {
             .flat_map(|f| f)
             .collect::<Vec<_>>();
 
-        for insight in insights {
+        for insight in &insights {
             info!("Generated insight: {}", insight);
         }
+
+        self.persistance_service.insert_insight_batch(insights).await?;
         Ok(())
     }
 }

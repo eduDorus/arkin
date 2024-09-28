@@ -4,7 +4,7 @@ CREATE TYPE option_type AS ENUM ('call', 'put');
 
 CREATE TYPE instrument_type AS ENUM ('spot', 'perpetual', 'future', 'option');
 
-CREATE TYPE instrument_status AS ENUM ('trading', 'halted',);
+CREATE TYPE instrument_status AS ENUM ('trading', 'halted');
 
 CREATE TYPE execution_order_type AS ENUM ('maker', 'taker', 'vwap');
 
@@ -14,7 +14,7 @@ CREATE TYPE execution_order_status AS ENUM (
     'partially_filled',
     'filled',
     'cancelled',
-    'rejected',
+    'rejected'
 );
 
 CREATE TYPE venue_order_type AS ENUM ('market', 'limit');
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS signals (
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     strategy_id uuid NOT NULL REFERENCES strategies(id),
     signal NUMERIC NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS execution_orders (
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS execution_orders (
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     strategy_id uuid NOT NULL REFERENCES strategies(id),
     signal_id uuid NOT NULL REFERENCES signals(id),
-    side side NOT NULL,
+    side market_side NOT NULL,
     execution_type execution_order_type NOT NULL,
     current_price NUMERIC NOT NULL,
     avg_fill_price NUMERIC NOT NULL,
@@ -108,9 +108,9 @@ CREATE TABLE IF NOT EXISTS venue_orders (
     strategy_id uuid NOT NULL REFERENCES strategies(id),
     execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
     venue_order_id BIGINT,
-    side side NOT NULL,
-    order_type exchange_order_type NOT NULL,
-    time_in_force exchange_order_time_in_force NOT NULL,
+    side market_side NOT NULL,
+    order_type venue_order_type NOT NULL,
+    time_in_force venue_order_time_in_force NOT NULL,
     price NUMERIC NOT NULL,
     avg_fill_price NUMERIC NOT NULL,
     quantity NUMERIC NOT NULL,
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS fills (
     strategy_id uuid NOT NULL REFERENCES strategies(id),
     execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
     venue_order_id BIGINT,
-    side fill_side NOT NULL,
+    side market_side NOT NULL,
     price NUMERIC NOT NULL,
     quantity NUMERIC NOT NULL,
     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
@@ -164,7 +164,17 @@ CREATE TABLE IF NOT EXISTS trades (
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     trade_id BIGINT NOT NULL,
-    side side NOT NULL,
+    side market_side NOT NULL,
     price NUMERIC NOT NULL,
     quantity NUMERIC NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS insights (
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    feature_id VARCHAR NOT NULL,
+    value NUMERIC NOT NULL
+);
+
+f5dd7db6-89da-4c68-b62e-6f80b763bef6,48adfe42-29fb-4402-888a-0204bf417e32,perp-btc-usdt@binance,BTCUSDT,perpetual,btc,usdt,,,,1,2,3,8,8,0.001,0.1,trading
+0a6400f4-abb5-4ff3-8720-cf2eeebef26e,48adfe42-29fb-4402-888a-0204bf417e32,perp-eth-usdt@binance,ETHUSDT,perpetual,eth,usdt,,,,1,2,3,8,8,0.001,0.01,trading

@@ -7,7 +7,7 @@ This software is proprietary and not open-source. For more information on licens
 ## Database
 ### Setup (TimescaleDB)
 ```bash
-docker run -d -v "$(pwd)/timescaledb/data:/var/lib/postgresql/data" -v "$(pwd)/timescaledb/logs:/var/logs" -e POSTGRES_DB=arkin -e POSTGRES_USER=arkin_admin -e POSTGRES_PASSWORD=<PASSWORD> -p 5432:5432 --user ${UID}:${GID} --name timescaledb-server timescale/timescaledb:latest-pg16
+docker run -d -v "$(pwd)/timescaledb/data:/var/lib/postgresql/data" -v "$(pwd)/timescaledb/logs:/var/logs" -e POSTGRES_DB=arkin_test -e POSTGRES_USER=arkin_admin -e POSTGRES_PASSWORD=<PASSWORD> -p 5432:5432 --user ${UID}:${GID} --name timescaledb-server timescale/timescaledb:latest-pg16
 ```
 
 ### Sqlx CLI
@@ -35,3 +35,12 @@ Rollback migration
 ```bash
 sqlx migrate revert
 ```
+
+## Grafana
+### Setup
+```bash
+# create a directory for your data
+mkdir data
+
+# start grafana with your user id and using the data directory
+docker run -d -p 3000:3000 --user ${UID}:${GID} -v "$(pwd)/grafana:/var/lib/grafana" --name=grafana grafana/grafana-oss
