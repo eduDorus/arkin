@@ -7,7 +7,7 @@ use tracing::debug;
 
 use crate::{
     config::MeanFeatureConfig,
-    manager::FeatureModule,
+    service::FeatureModule,
     state::{DataRequest, DataResponse},
 };
 

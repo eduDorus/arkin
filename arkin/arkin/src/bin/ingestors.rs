@@ -24,6 +24,6 @@ async fn main() {
     let persistance_service = Arc::new(PersistanceService::from_config(&config.database));
 
     let config = load::<IngestorConfig>();
-    let service = IngestorService::from_config(&config.ingestor_service, persistance_service);
-    service.start().await;
+    let ingestor_service = IngestorService::from_config(&config.ingestor_service, persistance_service);
+    ingestor_service.start().await;
 }

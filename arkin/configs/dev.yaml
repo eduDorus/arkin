@@ -1,3 +1,13 @@
+database:
+  host: 127.0.0.1
+  port: 5432
+  user: arkin_admin
+  password: test1234
+  database: arkin_test
+  min_connections: 10
+  max_connections: 200
+  idle_timeout: 300
+
 ingestor_service:
   ingestors:
     - binance:
@@ -20,26 +30,8 @@ ingestor_service:
   #         symbols:
   #           - btcusdt
 
-database:
-  host: 127.0.0.1
-  port: 5432
-  user: arkin_admin
-  password: test1234
-  database: arkin_test
-  min_connections: 10
-  max_connections: 200
-  idle_timeout: 300
-
-portfolio_manager:
-  initial_capital: 100000
-  leverage: 1
-
-market_manager:
-  lookback_min: 1440
-
-insights_manager:
+insights_service:
   pipeline:
-    frequency: 1 # In seconds
     features:
       # Volume
       - sum:
@@ -109,6 +101,13 @@ insights_manager:
             feature: sma_60_vwap
           output: spread_sma_vwap
           absolute: false
+
+portfolio_manager:
+  initial_capital: 100000
+  leverage: 1
+
+market_manager:
+  lookback_min: 1440
 
 strategy_manager:
   strategies:

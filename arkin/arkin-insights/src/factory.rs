@@ -1,4 +1,4 @@
-use crate::{config::FeatureConfig, manager::FeatureModule};
+use crate::{config::FeatureConfig, service::FeatureModule};
 
 use super::{CountFeature, MeanFeature, SMAFeature, SpreadFeature, SumFeature, VWAPFeature};
 

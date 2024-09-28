@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
+arkin-persistance = { path = "../arkin-persistance" }
 
 dashmap = { workspace = true }
 anyhow = { workspace = true }
@@ -18,7 +19,8 @@ parking_lot = { workspace = true }
 rayon = { workspace = true }
 flume = { workspace = true }
 rust_decimal = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
-test-utils = { path = "../test-utils" }
+# test-utils = { path = "../test-utils" }
 rstest = { workspace = true }

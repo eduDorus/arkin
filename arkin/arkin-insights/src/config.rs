@@ -3,17 +3,16 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InsightsConfig {
-    pub insights_manager: InsightsManagerConfig,
+    pub insights_service: InsightsServiceConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct InsightsManagerConfig {
+pub struct InsightsServiceConfig {
     pub pipeline: PipelineConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PipelineConfig {
-    pub frequency: u64,
     pub features: Vec<FeatureConfig>,
 }
 

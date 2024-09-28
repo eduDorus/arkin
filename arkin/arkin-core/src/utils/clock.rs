@@ -11,7 +11,7 @@ pub struct Clock {
 }
 
 impl Clock {
-    pub fn new(start: OffsetDateTime, end: OffsetDateTime, frequency_secs: Duration) -> Self {
+    pub fn new(start: &OffsetDateTime, end: &OffsetDateTime, frequency_secs: &Duration) -> Self {
         info!(
             "Creating new clock with start: {}, end: {}, frequency_secs: {}",
             start,
@@ -19,21 +19,21 @@ impl Clock {
             frequency_secs.as_secs()
         );
         Self {
-            start,
-            end,
-            frequency_secs,
-            current_timestamp: start,
+            start: start.clone(),
+            end: end.clone(),
+            frequency_secs: frequency_secs.clone(),
+            current_timestamp: start.clone(),
         }
     }
 
-    pub fn next(&mut self) -> Option<OffsetDateTime> {
+    pub fn next(&mut self) -> Option<(OffsetDateTime, OffsetDateTime)> {
         if self.current_timestamp >= self.end {
             return None;
         }
 
         let next_timestamp = self.current_timestamp;
         self.current_timestamp += self.frequency_secs;
-        Some(next_timestamp)
+        Some((next_timestamp, next_timestamp + self.frequency_secs))
     }
 
     pub fn reset(&mut self) {

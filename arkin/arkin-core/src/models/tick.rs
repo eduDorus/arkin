@@ -43,6 +43,15 @@ impl Tick {
         }
     }
 
+    pub fn to_insights(&self) -> Vec<Insight> {
+        vec![
+            Insight::new("bid_price".into(), self.instrument.clone(), self.event_time, self.bid_price),
+            Insight::new("ask_price".into(), self.instrument.clone(), self.event_time, self.ask_price),
+            Insight::new("mid_price".into(), self.instrument.clone(), self.event_time, self.mid_price()),
+            Insight::new("spread".into(), self.instrument.clone(), self.event_time, self.spread()),
+        ]
+    }
+
     pub fn spread(&self) -> Decimal {
         self.ask_price - self.bid_price
     }

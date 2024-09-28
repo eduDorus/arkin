@@ -10,30 +10,17 @@ name = "ingestors"
 path = "src/bin/ingestors.rs"
 
 [[bin]]
-name = "cli"
-path = "src/bin/cli.rs"
-
-#[[bin]]
-#name = "server"
-#path = "src/bin/server.rs"
-
-#[[bin]]
-#name = "features"
-#path = "src/bin/features.rs"
-
-
-#[[bin]]
-#name = "utils"
-#path = "src/bin/utils.rs"
+name = "insights"
+path = "src/bin/insights.rs"
 
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 arkin-persistance = { path = "../arkin-persistance" }
 arkin-ingestors = { path = "../arkin-ingestors" }
+arkin-insights = { path = "../arkin-insights" }
 #arkin-engine = { path = "../arkin-engine" }
 #arkin-execution = { path = "../arkin-execution" }
-#arkin-insights = { path = "../arkin-insights" }
 #arkin-strategies = { path = "../arkin-strategies" }
 #arkin-allocation = { path = "../arkin-allocation" }
 #arkin-portfolio = { path = "../arkin-portfolio" }
@@ -45,3 +32,4 @@ tracing = { workspace = true }
 clap = { workspace = true }
 tokio-rustls = { workspace = true }
 time = { workspace = true }
+anyhow = { workspace = true }

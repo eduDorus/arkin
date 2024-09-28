@@ -7,7 +7,7 @@ use tracing::debug;
 
 use crate::{
     config::SMAFeatureConfig,
-    manager::FeatureModule,
+    service::FeatureModule,
     state::{DataRequest, DataResponse},
 };
 

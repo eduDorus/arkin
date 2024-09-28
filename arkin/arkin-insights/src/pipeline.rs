@@ -14,7 +14,7 @@ use tracing::{debug, info};
 
 use crate::config::PipelineConfig;
 use crate::factory::FeatureFactory;
-use crate::manager::FeatureModule;
+use crate::service::FeatureModule;
 use crate::state::InsightsState;
 
 pub struct ComputationGraph {

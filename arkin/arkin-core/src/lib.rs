@@ -4,7 +4,7 @@ mod events;
 mod fixtures;
 mod logging;
 mod models;
-mod snapshots;
+// mod snapshots;
 mod types;
 mod utils;
 
@@ -17,9 +17,7 @@ pub use types::{FeatureId, Maturity, Notional, Price, Quantity, StrategyId, Weig
 
 // Prelude module
 pub mod prelude {
-    pub use crate::{
-        config::*, constants::*, events::*, fixtures::*, logging::*, models::*, snapshots::*, types::*, utils::*,
-    };
+    pub use crate::{config::*, constants::*, events::*, fixtures::*, logging::*, models::*, types::*, utils::*};
 
     // Re-export commonly used traits
 }
