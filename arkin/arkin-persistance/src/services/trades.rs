@@ -44,13 +44,14 @@ impl TradeService {
         for trade in &db_trades {
             if let Ok(instrument) = self.instrument_service.read_by_id(&trade.instrument_id).await {
                 if let Some(instrument) = instrument {
-                    trades.push(Trade {
+                    trades.push(Trade::new(
+                        trade.event_time,
                         instrument,
-                        event_time: trade.event_time,
-                        trade_id: trade.trade_id as u64,
-                        price: trade.price,
-                        quantity: trade.quantity,
-                    });
+                        trade.trade_id as u64,
+                        MarketSide::from(trade.side.clone()),
+                        trade.price,
+                        trade.quantity,
+                    ));
                 } else {
                     error!("Instrument not found: {}", trade.instrument_id);
                 }

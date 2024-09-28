@@ -6,7 +6,7 @@ members = [
     # "arkin-allocation",
     # "arkin-engine",
     # "arkin-execution",
-    # "arkin-ingestors",
+    "arkin-ingestors",
     # "arkin-insights",
     #"arkin-market",
     # "arkin-portfolio",

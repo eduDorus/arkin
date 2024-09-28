@@ -1,3 +1,40 @@
+CREATE TYPE market_side AS ENUM ('buy', 'sell');
+
+CREATE TYPE option_type AS ENUM ('call', 'put');
+
+CREATE TYPE instrument_type AS ENUM ('spot', 'perpetual', 'future', 'option');
+
+CREATE TYPE instrument_status AS ENUM ('trading', 'halted',);
+
+CREATE TYPE execution_order_type AS ENUM ('maker', 'taker', 'vwap');
+
+CREATE TYPE execution_order_status AS ENUM (
+    'new',
+    'open',
+    'partially_filled',
+    'filled',
+    'cancelled',
+    'rejected',
+);
+
+CREATE TYPE venue_order_type AS ENUM ('market', 'limit');
+
+CREATE TYPE venue_order_time_in_force AS ENUM ('gtc', 'ioc', 'fok', 'gtd');
+
+CREATE TYPE venue_order_status AS ENUM (
+    'new',
+    'open',
+    'partially_filled',
+    'filled',
+    'cancelled',
+    'rejected',
+    'expired'
+);
+
+CREATE TYPE position_side AS ENUM ('long', 'short');
+
+CREATE TYPE position_status AS ENUM ('open', 'closed');
+
 CREATE TABLE IF NOT EXISTS venues (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name VARCHAR NOT NULL UNIQUE,
@@ -17,12 +54,6 @@ CREATE TABLE IF NOT EXISTS strategies (
     description TEXT
 );
 
-CREATE TYPE instrument_type AS ENUM ('spot', 'perpetual', 'future', 'option');
-
-CREATE TYPE instrument_option_type AS ENUM ('call', 'put');
-
-CREATE TYPE instrument_status AS ENUM ('trading', 'halted',);
-
 CREATE TABLE IF NOT EXISTS instruments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     venue_id uuid NOT NULL REFERENCES venues(id),
@@ -33,7 +64,7 @@ CREATE TABLE IF NOT EXISTS instruments (
     quote_asset VARCHAR NOT NULL,
     strike DECIMAL,
     maturity TIMESTAMPTZ,
-    option_type instrument_option_type,
+    option_type option_type,
     contract_size NUMERIC NOT NULL,
     price_precision INTEGER NOT NULL,
     quantity_precision INTEGER NOT NULL,
@@ -52,26 +83,13 @@ CREATE TABLE IF NOT EXISTS signals (
     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
 );
 
-CREATE TYPE execution_order_side AS ENUM ('buy', 'sell');
-
-CREATE TYPE execution_order_type AS ENUM ('maker', 'taker', 'vwap');
-
-CREATE TYPE execution_order_status AS ENUM (
-    'new',
-    'open',
-    'partially_filled',
-    'filled',
-    'cancelled',
-    'rejected',
-);
-
 CREATE TABLE IF NOT EXISTS execution_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     account_id uuid NOT NULL REFERENCES accounts(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     strategy_id uuid NOT NULL REFERENCES strategies(id),
     signal_id uuid NOT NULL REFERENCES signals(id),
-    side execution_order_side NOT NULL,
+    side side NOT NULL,
     execution_type execution_order_type NOT NULL,
     current_price NUMERIC NOT NULL,
     avg_fill_price NUMERIC NOT NULL,
@@ -83,22 +101,6 @@ CREATE TABLE IF NOT EXISTS execution_orders (
     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 
-CREATE TYPE venue_side AS ENUM ('buy', 'sell');
-
-CREATE TYPE venue_order_type AS ENUM ('market', 'limit');
-
-CREATE TYPE venue_order_time_in_force AS ENUM ('gtc', 'ioc', 'fok', 'gtd');
-
-CREATE TYPE venue_order_status AS ENUM (
-    'new',
-    'open',
-    'partially_filled',
-    'filled',
-    'cancelled',
-    'rejected',
-    'expired'
-);
-
 CREATE TABLE IF NOT EXISTS venue_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     account_id uuid NOT NULL REFERENCES accounts(id),
@@ -106,7 +108,7 @@ CREATE TABLE IF NOT EXISTS venue_orders (
     strategy_id uuid NOT NULL REFERENCES strategies(id),
     execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
     venue_order_id BIGINT,
-    side venue_side NOT NULL,
+    side side NOT NULL,
     order_type exchange_order_type NOT NULL,
     time_in_force exchange_order_time_in_force NOT NULL,
     price NUMERIC NOT NULL,
@@ -118,8 +120,6 @@ CREATE TABLE IF NOT EXISTS venue_orders (
     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
-
-CREATE TYPE fill_side AS ENUM ('buy', 'sell');
 
 CREATE TABLE IF NOT EXISTS fills (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -133,10 +133,6 @@ CREATE TABLE IF NOT EXISTS fills (
     quantity NUMERIC NOT NULL,
     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
-
-CREATE TYPE position_side AS ENUM ('long', 'short');
-
-CREATE TYPE position_status AS ENUM ('open', 'closed');
 
 CREATE TABLE IF NOT EXISTS positions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -168,6 +164,7 @@ CREATE TABLE IF NOT EXISTS trades (
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     trade_id BIGINT NOT NULL,
+    side side NOT NULL,
     price NUMERIC NOT NULL,
     quantity NUMERIC NOT NULL
 );

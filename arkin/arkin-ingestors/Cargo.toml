@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
+arkin-persistance = { path = "../arkin-persistance" }
 
 anyhow = { workspace = true }
 async-tungstenite = { workspace = true }

@@ -2,11 +2,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IngestorConfig {
-    pub ingestor_manager: IngestorManagerConfig,
+    pub ingestor_service: IngestorServiceConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct IngestorManagerConfig {
+pub struct IngestorServiceConfig {
     pub ingestors: Vec<IngestorModuleConfig>,
 }
 

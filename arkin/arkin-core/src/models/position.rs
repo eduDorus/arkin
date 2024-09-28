@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Notional, Price, Quantity};
 
-use super::{Account, Instrument, Side, Strategy};
+use super::{Account, Instrument, MarketSide, Strategy};
 
 #[derive(Clone)]
 pub struct Position {
@@ -43,7 +43,7 @@ impl Position {
         account: Account,
         strategy: Strategy,
         instrument: Instrument,
-        side: Side,
+        side: MarketSide,
         price: Price,
         quantity: Quantity,
         commission: Commission,
@@ -55,8 +55,8 @@ impl Position {
             instrument,
             strategy,
             side: match side {
-                Side::Buy => PositionSide::Long,
-                Side::Sell => PositionSide::Short,
+                MarketSide::Buy => PositionSide::Long,
+                MarketSide::Sell => PositionSide::Short,
             },
             avg_open_price: price,
             avg_close_price: Decimal::new(18, 2),

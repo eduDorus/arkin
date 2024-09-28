@@ -13,7 +13,7 @@ use crate::{
     Event, Notional, Price, Quantity,
 };
 
-use super::{Account, ExecutionOrder, Instrument, Side, Strategy};
+use super::{Account, ExecutionOrder, Instrument, MarketSide, Strategy};
 
 #[derive(Display, Clone)]
 pub enum VenueOrderType {
@@ -48,7 +48,7 @@ pub struct VenueOrder {
     pub strategy: Strategy,
     pub execution_order: ExecutionOrder,
     pub venue_order_id: u64,
-    pub side: Side,
+    pub side: MarketSide,
     pub order_type: VenueOrderType,
     pub time_in_force: VenueOrderTimeInForce,
     pub price: Price,
@@ -67,7 +67,7 @@ impl VenueOrder {
         instrument: Instrument,
         strategy: Strategy,
         execution_order: ExecutionOrder,
-        side: Side,
+        side: MarketSide,
         quantity: Quantity,
         created_at: OffsetDateTime,
     ) -> Self {
@@ -97,7 +97,7 @@ impl VenueOrder {
         instrument: Instrument,
         strategy: Strategy,
         execution_order: ExecutionOrder,
-        side: Side,
+        side: MarketSide,
         price: Price,
         quantity: Quantity,
         created_at: OffsetDateTime,

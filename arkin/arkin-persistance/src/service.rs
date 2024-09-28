@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use arkin_core::prelude::*;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use time::OffsetDateTime;
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::repos::{InstrumentRepo, TickRepo, TradeRepo, VenueRepo};
@@ -67,6 +68,14 @@ impl PersistanceService {
 
     pub async fn read_instrument_by_id(&self, id: &Uuid) -> Result<Option<Instrument>> {
         self.instrument_service.read_by_id(id).await
+    }
+
+    pub async fn read_instrument_by_venue_symbol(&self, venue_symbol: &str) -> Result<Option<Instrument>> {
+        debug!(
+            "PersistanceService asking instrument service for venue symbol: {}",
+            venue_symbol
+        );
+        self.instrument_service.read_by_venue_symbol(venue_symbol).await
     }
 
     pub async fn insert_tick(&self, tick: Tick) -> Result<()> {

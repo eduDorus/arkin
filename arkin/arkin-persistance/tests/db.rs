@@ -124,6 +124,7 @@ async fn test_insert_trade(persistance_service: PersistanceService, binance_btc_
         datetime!(2024-07-01 00:01).assume_utc(),
         binance_btc_usdt_perp.clone(),
         1,
+        MarketSide::Buy,
         Decimal::from_f64(100.0).expect("Invalid decimal"),
         Decimal::from_f64(4.3).expect("Invalid decimal"),
     );
@@ -149,6 +150,7 @@ async fn test_insert_trade_batch(
                 datetime!(2024-07-01 00:01).assume_utc() + time::Duration::seconds(i),
                 binance_btc_usdt_perp.clone(),
                 i as u64,
+                MarketSide::Buy,
                 Decimal::from_f64(100.0).expect("Invalid decimal"),
                 Decimal::from_f64(4.3).expect("Invalid decimal"),
             )

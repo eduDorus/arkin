@@ -2,6 +2,7 @@ use anyhow::Result;
 use arkin_core::prelude::*;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
+use tracing::debug;
 use uuid::Uuid;
 
 #[derive(Debug, sqlx::Type)]
@@ -204,6 +205,41 @@ impl InstrumentRepo {
             WHERE id = $1
             "#,
             id,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(instrument)
+    }
+
+    pub async fn read_by_venue_symbol(&self, symbol: &str) -> Result<Option<DBInstrument>> {
+        debug!("Instrument repo reading instrument by venue symbol: {}", symbol);
+        let instrument = sqlx::query_as!(
+            DBInstrument,
+            r#"
+            SELECT
+                id,
+                venue_id,
+                symbol,
+                venue_symbol,
+                instrument_type AS "instrument_type:DBInstrumentType",
+                base_asset,
+                quote_asset,
+                strike,
+                maturity,
+                option_type AS "option_type:DBOptionType",
+                contract_size,
+                price_precision,
+                quantity_precision,
+                base_precision,
+                quote_precision,
+                lot_size,
+                tick_size,
+                status AS "status:DBInstrumentStatus"
+            FROM instruments
+            WHERE venue_symbol = $1
+            "#,
+            symbol,
         )
         .fetch_optional(&self.pool)
         .await?;

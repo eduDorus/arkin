@@ -8,15 +8,16 @@ use crate::{
     Event, Price, Quantity,
 };
 
-use super::Instrument;
+use super::{Instrument, MarketSide};
 
 #[derive(Clone)]
 pub struct Trade {
     pub event_time: OffsetDateTime,
     pub instrument: Instrument,
     pub trade_id: u64,
+    pub side: MarketSide,
     pub price: Price,
-    pub quantity: Quantity, // Negative for sell, positive for buy
+    pub quantity: Quantity,
 }
 
 impl Trade {
@@ -24,6 +25,7 @@ impl Trade {
         event_time: OffsetDateTime,
         instrument: Instrument,
         trade_id: u64,
+        side: MarketSide,
         price: Price,
         quantity: Quantity,
     ) -> Self {
@@ -31,6 +33,7 @@ impl Trade {
             event_time,
             instrument,
             trade_id,
+            side,
             price,
             quantity,
         }

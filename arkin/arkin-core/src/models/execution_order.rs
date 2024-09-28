@@ -13,7 +13,7 @@ use crate::{
     Event, Notional, Price, Quantity,
 };
 
-use super::{Account, Instrument, Side, Signal, Strategy};
+use super::{Account, Instrument, MarketSide, Signal, Strategy};
 
 #[derive(Display, Clone)]
 pub enum ExecutionOrderType {
@@ -39,7 +39,7 @@ pub struct ExecutionOrder {
     pub instrument: Instrument,
     pub strategy: Strategy,
     pub signal: Signal,
-    pub side: Side,
+    pub side: MarketSide,
     pub execution_type: ExecutionOrderType,
     pub current_price: Price,
     pub avg_fill_price: Price,
@@ -57,7 +57,7 @@ impl ExecutionOrder {
         instrument: Instrument,
         strategy: Strategy,
         signal: Signal,
-        side: Side,
+        side: MarketSide,
         execution_type: ExecutionOrderType,
         current_price: Price,
         quantity: Quantity,
