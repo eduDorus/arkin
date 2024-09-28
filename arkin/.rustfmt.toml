@@ -34,6 +34,7 @@ reorder_modules = true
 reorder_impl_items = false
 type_punctuation_density = "Wide"
 space_before_colon = false
+style_edition = "2021"
 space_after_colon = true
 spaces_around_ranges = false
 binop_separator = "Front"
