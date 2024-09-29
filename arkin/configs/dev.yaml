@@ -33,6 +33,27 @@ ingestor_service:
 insights_service:
   pipeline:
     features:
+      - pct_change:
+          id: returns
+          input:
+            from: base
+            feature: trade_price
+            window: 60
+          output: returns
+      - cum_sum:
+          id: cumulative_returns
+          input:
+            from: returns
+            feature: returns
+            window: 3600
+          output: cumulative_returns
+      - std_dev:
+          id: hist_vol
+          input:
+            from: returns
+            feature: returns
+            window: 3600
+          output: hist_vol
       # Volume
       - sum:
           id: volume

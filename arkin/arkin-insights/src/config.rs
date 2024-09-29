@@ -47,6 +47,12 @@ pub enum FeatureConfig {
     Sum(SumFeatureConfig),
     #[serde(rename = "mean")]
     Mean(MeanFeatureConfig),
+    #[serde(rename = "cum_sum")]
+    CumSum(CumSumFeatureConfig),
+    #[serde(rename = "pct_change")]
+    PctChange(PctChangeFeatureConfig),
+    #[serde(rename = "std_dev")]
+    StdDev(StdDevFeatureConfig),
     #[serde(rename = "vwap")]
     VWAP(VWAPFeatureConfig),
     #[serde(rename = "sma")]
@@ -71,6 +77,27 @@ pub struct SumFeatureConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MeanFeatureConfig {
+    pub id: NodeId,
+    pub input: WindowInputConfig,
+    pub output: FeatureId,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CumSumFeatureConfig {
+    pub id: NodeId,
+    pub input: WindowInputConfig,
+    pub output: FeatureId,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PctChangeFeatureConfig {
+    pub id: NodeId,
+    pub input: WindowInputConfig,
+    pub output: FeatureId,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StdDevFeatureConfig {
     pub id: NodeId,
     pub input: WindowInputConfig,
     pub output: FeatureId,

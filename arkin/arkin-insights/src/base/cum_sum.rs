@@ -2,26 +2,26 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use arkin_core::prelude::*;
-use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 use tracing::debug;
 
 use crate::{
-    config::MeanFeatureConfig,
+    config::CumSumFeatureConfig,
     service::FeatureModule,
     state::{DataRequest, DataResponse},
 };
 
 #[derive(Debug)]
-pub struct MeanFeature {
+pub struct CumSumFeature {
     id: NodeId,
     sources: Vec<NodeId>,
     inputs: Vec<DataRequest>,
     output: FeatureId,
 }
 
-impl MeanFeature {
-    pub fn from_config(config: &MeanFeatureConfig) -> Self {
-        MeanFeature {
+impl CumSumFeature {
+    pub fn from_config(config: &CumSumFeatureConfig) -> Self {
+        CumSumFeature {
             id: config.id.to_owned(),
             sources: vec![config.input.from.clone()],
             inputs: vec![config.input.to_owned().into()],
@@ -30,7 +30,7 @@ impl MeanFeature {
     }
 }
 
-impl FeatureModule for MeanFeature {
+impl FeatureModule for CumSumFeature {
     fn id(&self) -> &NodeId {
         &self.id
     }
@@ -44,19 +44,21 @@ impl FeatureModule for MeanFeature {
     }
 
     fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
-        debug!("Calculating mean with id: {}", self.id);
+        debug!("Calculating cumulative sum with id: {}", self.id);
 
+        // Retrieve the values for the feature over the window period
         let values = data.get(self.inputs[0].feature_id());
 
-        // No values to calculate the mean
+        // No values to calculate the cumulative sum
         if values.is_empty() {
             return Ok(HashMap::new());
         }
 
-        let mean = values.iter().sum::<Decimal>() / Decimal::from(values.len());
+        // Calculate the cumulative sum
+        let sum = values.iter().sum::<Decimal>();
 
         let mut res = HashMap::new();
-        res.insert(self.output.clone(), mean);
+        res.insert(self.output.clone(), sum);
         Ok(res)
     }
 }

@@ -2,26 +2,26 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use arkin_core::prelude::*;
-use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 use tracing::debug;
 
 use crate::{
-    config::MeanFeatureConfig,
+    config::PctChangeFeatureConfig,
     service::FeatureModule,
     state::{DataRequest, DataResponse},
 };
 
 #[derive(Debug)]
-pub struct MeanFeature {
+pub struct PctChangeFeature {
     id: NodeId,
     sources: Vec<NodeId>,
     inputs: Vec<DataRequest>,
     output: FeatureId,
 }
 
-impl MeanFeature {
-    pub fn from_config(config: &MeanFeatureConfig) -> Self {
-        MeanFeature {
+impl PctChangeFeature {
+    pub fn from_config(config: &PctChangeFeatureConfig) -> Self {
+        PctChangeFeature {
             id: config.id.to_owned(),
             sources: vec![config.input.from.clone()],
             inputs: vec![config.input.to_owned().into()],
@@ -30,7 +30,7 @@ impl MeanFeature {
     }
 }
 
-impl FeatureModule for MeanFeature {
+impl FeatureModule for PctChangeFeature {
     fn id(&self) -> &NodeId {
         &self.id
     }
@@ -44,19 +44,19 @@ impl FeatureModule for MeanFeature {
     }
 
     fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>> {
-        debug!("Calculating mean with id: {}", self.id);
+        debug!("Calculating percentage change with id: {}", self.id);
 
+        // Retrieve the values for the feature over the window period
         let values = data.get(self.inputs[0].feature_id());
+        let first_value = values.first().unwrap_or(&Decimal::ZERO);
+        let last_value = values.last().unwrap_or(&Decimal::ZERO);
 
-        // No values to calculate the mean
-        if values.is_empty() {
-            return Ok(HashMap::new());
-        }
-
-        let mean = values.iter().sum::<Decimal>() / Decimal::from(values.len());
+        // Calculate the percentage change
+        let change = last_value - first_value;
+        let percentage_change = change / first_value;
 
         let mut res = HashMap::new();
-        res.insert(self.output.clone(), mean);
+        res.insert(self.output.clone(), percentage_change);
         Ok(res)
     }
 }
