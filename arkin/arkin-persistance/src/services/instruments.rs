@@ -1,16 +1,44 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Error, Result};
 use arkin_core::prelude::*;
-use tracing::debug;
+use parking_lot::RwLock;
 use uuid::Uuid;
 
 use crate::repos::InstrumentRepo;
 
 use super::venues::VenueService;
 
+pub struct InstrumentCache {
+    by_id: RwLock<HashMap<Uuid, Instrument>>,
+    by_venue_symbol: RwLock<HashMap<String, Instrument>>,
+}
+
+impl InstrumentCache {
+    pub fn new() -> Self {
+        Self {
+            by_id: RwLock::new(HashMap::new()),
+            by_venue_symbol: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub fn insert(&self, instrument: Instrument) {
+        self.by_id.write().insert(instrument.id, instrument.clone());
+        self.by_venue_symbol.write().insert(instrument.venue_symbol.clone(), instrument);
+    }
+
+    pub fn get_by_id(&self, id: &Uuid) -> Option<Instrument> {
+        self.by_id.read().get(id).cloned()
+    }
+
+    pub fn get_by_venue_symbol(&self, venue_symbol: &str) -> Option<Instrument> {
+        self.by_venue_symbol.read().get(venue_symbol).cloned()
+    }
+}
+
 pub struct InstrumentService {
     instrument_repo: Arc<InstrumentRepo>,
+    instrument_cache: InstrumentCache,
     venue_service: Arc<VenueService>,
 }
 
@@ -18,6 +46,7 @@ impl InstrumentService {
     pub fn new(instrument_repo: Arc<InstrumentRepo>, venue_service: Arc<VenueService>) -> Self {
         Self {
             instrument_repo,
+            instrument_cache: InstrumentCache::new(),
             venue_service,
         }
     }
@@ -27,6 +56,12 @@ impl InstrumentService {
     }
 
     pub async fn read_by_id(&self, id: &Uuid) -> Result<Option<Instrument>> {
+        // Check cache
+        if let Some(instrument) = self.instrument_cache.get_by_id(id) {
+            return Ok(Some(instrument));
+        }
+
+        // Read from db
         if let Some(db_instrument) = self.instrument_repo.read_by_id(id).await? {
             let venue = self
                 .venue_service
@@ -54,6 +89,10 @@ impl InstrumentService {
                 lot_size: db_instrument.lot_size,
                 status: db_instrument.status.into(),
             };
+
+            // Update cache
+            self.instrument_cache.insert(instrument.clone());
+
             Ok(Some(instrument))
         } else {
             Ok(None)
@@ -61,7 +100,12 @@ impl InstrumentService {
     }
 
     pub async fn read_by_venue_symbol(&self, venue_symbol: &str) -> Result<Option<Instrument>> {
-        debug!("Reading instrument by venue symbol: {}", venue_symbol);
+        // Read from cache
+        if let Some(instrument) = self.instrument_cache.get_by_venue_symbol(venue_symbol) {
+            return Ok(Some(instrument));
+        }
+
+        // Read from db
         if let Some(db_instrument) = self.instrument_repo.read_by_venue_symbol(venue_symbol).await? {
             let venue = self
                 .venue_service
@@ -89,6 +133,10 @@ impl InstrumentService {
                 lot_size: db_instrument.lot_size,
                 status: db_instrument.status.into(),
             };
+
+            // Update cache
+            self.instrument_cache.insert(instrument.clone());
+
             Ok(Some(instrument))
         } else {
             Ok(None)
