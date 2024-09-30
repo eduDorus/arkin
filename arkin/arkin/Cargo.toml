@@ -13,6 +13,14 @@ path = "src/bin/ingestors.rs"
 name = "insights"
 path = "src/bin/insights.rs"
 
+[[bin]]
+name = "transformer"
+path = "src/bin/transformer.rs"
+
+[[bin]]
+name = "burn_example"
+path = "src/bin/burn_example.rs"
+
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
@@ -33,3 +41,5 @@ clap = { workspace = true }
 tokio-rustls = { workspace = true }
 time = { workspace = true }
 anyhow = { workspace = true }
+# candle-core = { version = "0.7.2", features = [ "metal" ] }
+burn = { version = "0.14.0", features = [ "dataset", "metal", "metrics", "train", "tui", "wgpu" ] }

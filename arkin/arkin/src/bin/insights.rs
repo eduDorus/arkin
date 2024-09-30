@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
         .expect("Instrument not found");
 
     let start = datetime!(2024-09-29 03:30).assume_utc();
-    let end = datetime!(2024-09-29 12:15).assume_utc();
+    let end = datetime!(2024-09-30 13:00).assume_utc();
     let frequency_secs = Duration::from_secs(60);
 
     let mut clock = Clock::new(&start, &end, &frequency_secs);

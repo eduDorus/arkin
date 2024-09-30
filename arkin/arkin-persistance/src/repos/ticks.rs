@@ -10,8 +10,8 @@ use crate::{BIND_LIMIT, MAX_CONCURRENT_QUERIES};
 
 #[derive(Debug, FromRow)]
 pub struct DBTick {
-    pub instrument_id: Uuid,
     pub event_time: OffsetDateTime,
+    pub instrument_id: Uuid,
     pub tick_id: i64,
     pub bid_price: Price,
     pub bid_quantity: Quantity,
@@ -22,8 +22,8 @@ pub struct DBTick {
 impl From<Tick> for DBTick {
     fn from(tick: Tick) -> Self {
         Self {
-            instrument_id: tick.instrument.id,
             event_time: tick.event_time,
+            instrument_id: tick.instrument.id,
             tick_id: tick.tick_id as i64,
             bid_price: tick.bid_price,
             bid_quantity: tick.bid_quantity,
@@ -46,11 +46,13 @@ impl TickRepo {
         let tick = DBTick::from(tick);
         sqlx::query!(
             r#"
-            INSERT INTO ticks (instrument_id, event_time, tick_id, bid_price, bid_quantity, ask_price, ask_quantity)
+            INSERT INTO ticks (event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (event_time, instrument_id, tick_id)
+            DO NOTHING
             "#,
-            tick.instrument_id,
             tick.event_time,
+            tick.instrument_id,
             tick.tick_id,
             tick.bid_price,
             tick.bid_quantity,
@@ -70,7 +72,7 @@ impl TickRepo {
             .map(|batch| {
                 // Create a query builder
                 let mut query_builder = sqlx::QueryBuilder::new(
-                    "INSERT INTO ticks (instrument_id, event_time, tick_id, bid_price, bid_quantity, ask_price, ask_quantity) ",
+                    "INSERT INTO ticks (event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity) ",
                 );
 
                 // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
@@ -78,8 +80,8 @@ impl TickRepo {
                     // If you wanted to bind these by-reference instead of by-value,
                     // you'd need an iterator that yields references that live as long as `query_builder`,
                     // e.g. collect it to a `Vec` first.
-                    b.push_bind(trade.instrument_id)
-                        .push_bind(trade.event_time)
+                    b.push_bind(trade.event_time)
+                        .push_bind(trade.instrument_id)
                         .push_bind(trade.tick_id)
                         .push_bind(trade.bid_price)
                         .push_bind(trade.bid_quantity)
@@ -121,7 +123,8 @@ impl TickRepo {
             DBTick,
             r#"
             SELECT * FROM ticks
-            WHERE event_time >= $1 AND event_time <= $2 AND instrument_id = ANY($3)
+            WHERE instrument_id = ANY($3) AND event_time >= $1 AND event_time < $2 
+            ORDER BY event_time ASC
             "#,
             start,
             end,

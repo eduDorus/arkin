@@ -114,7 +114,7 @@ impl ComputationGraph {
                             // Save data to state and result set
                             data.into_iter().for_each(|(id, value)| {
                                 debug!("Saving: {} => {}", id, value);
-                                let event = Insight::new(id, instrument.to_owned(), timestamp.to_owned(), value);
+                                let event = Insight::new(timestamp.to_owned(), instrument.to_owned(), id, value);
                                 state.insert(event.clone());
                                 pipeline_result.lock().push(event);
                             });

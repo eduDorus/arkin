@@ -35,8 +35,8 @@ impl From<DBMarketSide> for MarketSide {
 
 #[derive(Debug, FromRow)]
 pub struct DBTrade {
-    pub instrument_id: Uuid,
     pub event_time: OffsetDateTime,
+    pub instrument_id: Uuid,
     pub trade_id: i64,
     pub side: DBMarketSide,
     pub price: Price,
@@ -46,8 +46,8 @@ pub struct DBTrade {
 impl From<Trade> for DBTrade {
     fn from(trade: Trade) -> Self {
         Self {
-            instrument_id: trade.instrument.id,
             event_time: trade.event_time,
+            instrument_id: trade.instrument.id,
             trade_id: trade.trade_id as i64,
             side: DBMarketSide::from(trade.side),
             price: trade.price,
@@ -69,11 +69,13 @@ impl TradeRepo {
         let trade = DBTrade::from(trade);
         sqlx::query!(
             r#"
-            INSERT INTO trades (instrument_id,  event_time, trade_id, side, price, quantity)
+            INSERT INTO trades (event_time, instrument_id, trade_id, side, price, quantity)
             VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (event_time, instrument_id, trade_id)
+            DO NOTHING
             "#,
-            trade.instrument_id,
             trade.event_time,
+            trade.instrument_id,
             trade.trade_id,
             trade.side as DBMarketSide,
             trade.price,
@@ -92,7 +94,7 @@ impl TradeRepo {
             .map(|batch| {
                 // Create a query builder
                 let mut query_builder = sqlx::QueryBuilder::new(
-                    "INSERT INTO trades (instrument_id,  event_time, trade_id, side, price, quantity) ",
+                    "INSERT INTO trades (event_time, instrument_id, trade_id, side, price, quantity) ",
                 );
 
                 // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
@@ -100,8 +102,8 @@ impl TradeRepo {
                     // If you wanted to bind these by-reference instead of by-value,
                     // you'd need an iterator that yields references that live as long as `query_builder`,
                     // e.g. collect it to a `Vec` first.
-                    b.push_bind(trade.instrument_id)
-                        .push_bind(trade.event_time)
+                    b.push_bind(trade.event_time)
+                        .push_bind(trade.instrument_id)
                         .push_bind(trade.trade_id)
                         .push_bind(trade.side.clone())
                         .push_bind(trade.price)
@@ -142,18 +144,19 @@ impl TradeRepo {
             DBTrade,
             r#"
             SELECT 
-                instrument_id, 
                 event_time, 
+                instrument_id, 
                 trade_id, 
                 side as "side:DBMarketSide", 
                 price, 
                 quantity
             FROM trades
-            WHERE event_time >= $1 AND event_time <= $2 AND instrument_id = ANY($3)
+            WHERE instrument_id = ANY($1) AND event_time >= $2 AND event_time < $3 
+            ORDER BY event_time ASC
             "#,
+            instrument_ids,
             from,
             to,
-            instrument_ids
         )
         .fetch_all(&self.pool)
         .await?;

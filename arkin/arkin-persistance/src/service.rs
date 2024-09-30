@@ -48,7 +48,7 @@ impl PersistanceService {
         let instrument_service = Arc::new(InstrumentService::new(instrument_repo.clone(), venue_service.clone()));
         let tick_service = Arc::new(TickService::new(tick_repo.clone(), instrument_service.clone()));
         let trade_service = Arc::new(TradeService::new(trade_repo.clone(), instrument_service.clone()));
-        let insights_service = Arc::new(InsightsService::new(insights_repo.clone()));
+        let insights_service = Arc::new(InsightsService::new(insights_repo.clone(), instrument_service.clone()));
 
         Self {
             venue_service,
@@ -123,5 +123,17 @@ impl PersistanceService {
 
     pub async fn insert_insight_batch(&self, insights: Vec<Insight>) -> Result<()> {
         self.insights_service.insert_batch(insights).await
+    }
+
+    pub async fn read_insights_range_by_instrument_id_and_feature_id(
+        &self,
+        instrument_id: &Uuid,
+        feature_id: &str,
+        from: &OffsetDateTime,
+        to: &OffsetDateTime,
+    ) -> Result<Vec<Insight>> {
+        self.insights_service
+            .read_range_by_instrument_id_and_feature_id(instrument_id, feature_id, from, to)
+            .await
     }
 }

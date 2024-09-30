@@ -23,7 +23,7 @@ impl From<Insight> for DBInsight {
         Self {
             instrument_id: insight.instrument.id,
             event_time: insight.event_time,
-            feature_id: insight.id,
+            feature_id: insight.feature_id,
             value: insight.value,
         }
     }
@@ -42,11 +42,13 @@ impl InsightsRepo {
         let insight = DBInsight::from(insight);
         sqlx::query!(
             r#"
-            INSERT INTO insights (instrument_id, event_time, feature_id, value)
+            INSERT INTO insights (event_time, instrument_id, feature_id, value)
             VALUES ($1, $2, $3, $4)
+            ON CONFLICT (event_time, instrument_id, feature_id)
+            DO UPDATE SET value = EXCLUDED.value 
             "#,
-            insight.instrument_id,
             insight.event_time,
+            insight.instrument_id,
             insight.feature_id,
             insight.value,
         )
@@ -63,18 +65,22 @@ impl InsightsRepo {
             .map(|batch| {
                 // Create a query builder
                 let mut query_builder =
-                    sqlx::QueryBuilder::new("INSERT INTO insights (instrument_id, event_time, feature_id, value) ");
+                    sqlx::QueryBuilder::new("INSERT INTO insights (event_time, instrument_id, feature_id, value) ");
 
                 // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
                 query_builder.push_values(batch, |mut b, insight| {
                     // If you wanted to bind these by-reference instead of by-value,
                     // you'd need an iterator that yields references that live as long as `query_builder`,
                     // e.g. collect it to a `Vec` first.
-                    b.push_bind(insight.instrument_id)
-                        .push_bind(insight.event_time)
+                    b.push_bind(insight.event_time)
+                        .push_bind(insight.instrument_id)
                         .push_bind(insight.feature_id.clone())
                         .push_bind(insight.value);
                 });
+
+                // Add the `ON CONFLICT` clause
+                query_builder
+                    .push("ON CONFLICT (event_time, instrument_id, feature_id) DO UPDATE SET value = EXCLUDED.value");
 
                 query_builder
             })
@@ -98,5 +104,30 @@ impl InsightsRepo {
         }
 
         Ok(())
+    }
+
+    pub async fn read_range_by_instrument_id_and_feature_id(
+        &self,
+        instrument_id: &Uuid,
+        feature_id: &str,
+        start: &OffsetDateTime,
+        end: &OffsetDateTime,
+    ) -> Result<Vec<DBInsight>> {
+        let insights = sqlx::query_as!(
+            DBInsight,
+            r#"
+            SELECT * FROM insights
+            WHERE instrument_id = $1 AND feature_id = $2 AND event_time >= $3 AND event_time < $4
+            ORDER BY event_time ASC
+            "#,
+            instrument_id,
+            feature_id,
+            start,
+            end,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(insights)
     }
 }

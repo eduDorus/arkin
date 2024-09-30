@@ -45,10 +45,10 @@ impl Tick {
 
     pub fn to_insights(&self) -> Vec<Insight> {
         vec![
-            Insight::new("bid_price".into(), self.instrument.clone(), self.event_time, self.bid_price),
-            Insight::new("ask_price".into(), self.instrument.clone(), self.event_time, self.ask_price),
-            Insight::new("mid_price".into(), self.instrument.clone(), self.event_time, self.mid_price()),
-            Insight::new("spread".into(), self.instrument.clone(), self.event_time, self.spread()),
+            Insight::new(self.event_time, self.instrument.clone(), "bid_price".into(), self.bid_price),
+            Insight::new(self.event_time, self.instrument.clone(), "ask_price".into(), self.ask_price),
+            Insight::new(self.event_time, self.instrument.clone(), "mid_price".into(), self.mid_price()),
+            Insight::new(self.event_time, self.instrument.clone(), "spread".into(), self.spread()),
         ]
     }
 
@@ -97,21 +97,21 @@ impl From<Tick> for Vec<Insight> {
     fn from(value: Tick) -> Self {
         vec![
             Insight::new(
-                "bid_price".into(),
-                value.instrument.clone(),
                 value.event_time,
+                value.instrument.clone(),
+                "bid_price".into(),
                 value.bid_price(),
             ),
             Insight::new(
-                "ask_price".into(),
-                value.instrument.clone(),
                 value.event_time,
+                value.instrument.clone(),
+                "ask_price".into(),
                 value.ask_price(),
             ),
             Insight::new(
-                "mid_price".into(),
-                value.instrument.clone(),
                 value.event_time,
+                value.instrument.clone(),
+                "mid_price".into(),
                 value.mid_price(),
             ),
         ]
