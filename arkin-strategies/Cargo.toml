@@ -1,0 +1,19 @@
+[package]
+name = "arkin-strategies"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-core = { path = "../arkin-core" }
+
+rayon = { workspace = true }
+time = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+test-utils = { path = "../test-utils" }
+rstest = { workspace = true }

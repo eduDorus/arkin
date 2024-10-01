@@ -1,9 +1,0 @@
-target/
-.github/
-.vscode/
-.idea/
-.configs/
-configs/
-.gitignore
-README.md
-Dockerfile

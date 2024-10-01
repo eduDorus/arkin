@@ -1,0 +1,144 @@
+# server:
+#   name: arkin
+
+# clock:
+#   tick_frequency: 1 # In seconds
+
+# db:
+#   host: 127.0.0.1
+#   port: 5432
+#   user: arkin_admin
+#   database: arkin
+#   min_connections: 10
+#   max_connections: 200
+#   idle_timeout: 300
+
+# portfolio_manager:
+#   initial_capital: 10000.
+#   leverage: 1.
+#   initial_margin: .2
+#   maintenance_margin: .1
+
+# state_manager:
+#   lookback: 60
+
+# ingestors:
+#   - binance:
+#       ws_url: wss://fstream.binance.com/ws
+#       ws_channels:
+#         - btcusdt@aggTrade
+#         - btcusdt@bookTicker
+#       connections_per_manager: 1
+#       duplicate_lookback: 100
+#   # - tardis:
+#   #     base_url: https://api.tardis.dev/v1/data-feeds
+#   #     max_concurrent_requests: 1
+#   #     subscriptions:
+#   #       - exchange: binance_swap
+#   #         start: 2024-06-01 00:00:00
+#   #         channels:
+#   #           - agg_trade
+#   #           - ticker
+#   #           - book
+#   #         symbols:
+#   #           - btcusdt
+
+# feature_manager:
+#   pipeline:
+#     frequency: 1 # In seconds
+#     features:
+#       # Volume
+#       - sum:
+#           id: volume
+#           input:
+#             from: base
+#             feature: trade_quantity
+#             window: 1
+#           output: volume
+#       - sma:
+#           id: sma_5_volume
+#           input:
+#             from: volume
+#             feature: volume
+#             periods: 5
+#           output: sma_5_volume
+#       - sma:
+#           id: sma_60_volume
+#           input:
+#             from: volume
+#             feature: volume
+#             periods: 60
+#           output: sma_60_volume
+#       - spread:
+#           id: spread_sma_volume
+#           input_front:
+#             from: sma_5_volume
+#             feature: sma_5_volume
+#           input_back:
+#             from: sma_60_volume
+#             feature: sma_60_volume
+#           output: spread_sma_volume
+#           absolute: false
+#       # VWAP
+#       - vwap:
+#           id: vwap
+#           input_price:
+#             from: base
+#             feature: trade_price
+#             window: 1
+#           input_quantity:
+#             from: base
+#             feature: trade_quantity
+#             window: 1
+#           output: vwap
+#       - sma:
+#           id: sma_5_vwap
+#           input:
+#             from: vwap
+#             feature: vwap
+#             periods: 5
+#           output: sma_5_vwap
+#       - sma:
+#           id: sma_60_vwap
+#           input:
+#             from: vwap
+#             feature: vwap
+#             periods: 60
+#           output: sma_60_vwap
+#       - spread:
+#           id: spread_sma_vwap
+#           input_front:
+#             from: sma_5_vwap
+#             feature: sma_5_vwap
+#           input_back:
+#             from: sma_60_vwap
+#             feature: sma_60_vwap
+#           output: spread_sma_vwap
+#           absolute: false
+
+# strategy_manager:
+#   strategies:
+#     - crossover:
+#         id: crossover
+#         price_spread_id: spread_sma_vwap
+#         volume_spread_id: spread_sma_volume
+# allocation_manager:
+#   allocations:
+#     - equal:
+#         capital: 10000.
+#         max_allocation: 0.9
+#         max_allocation_per_instrument: 0.1
+#         strategies:
+#           - crossover
+
+# execution_manager:
+#   default_endpoint: simulation
+#   rebalance_threshold: 50 # In percentage of allocation
+#   endpoints:
+#     - simulation:
+#         latency: 500 # In ms
+#         commission_maker: 0.00012
+#         commission_taker: 0.0003
+#         max_orders_per_minute: 5
+#         max_order_size_notional: 10000.
+#         min_order_size_notional: 200.
