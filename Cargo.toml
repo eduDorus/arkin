@@ -100,6 +100,9 @@ petgraph = { version = "0.6", features = [ "graphmap" ], default-features = fals
 # Optimization
 # clarabel = { version = "0.9" }
 
+# Statistics & Math
+tch = { version = "0.17.0", features = [ "download-libtorch" ] }
+
 # Testing
 rstest = { version = "0.23.0" }
 async-std = { version = "1.13", features = [ "attributes" ] }

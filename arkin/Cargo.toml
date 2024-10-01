@@ -32,7 +32,14 @@ tracing = { workspace = true }
 tokio-rustls = { workspace = true }
 time = { workspace = true }
 anyhow = { workspace = true }
+tch = { workspace = true }
 
 # Test DL
 # candle-core = { version = "0.7.2", features = [ "metal" ] }
 # burn = { version = "0.14.0", features = [ "dataset", "metal", "metrics", "train", "tui", "wgpu" ] }
+# linalg test
+# ndarray = { version = "0.16.1", features = [ "blas" ] }
+# blas-src = { version = "0.9", features = [ "accelerate" ] }
+# ndarray-rand = "0.15.0"
+# ndarray-stats = "0.6.0"
+# rand = { workspace = true }

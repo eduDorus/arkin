@@ -1,0 +1,253 @@
+extern crate blas_src;
+extern crate ndarray;
+
+use ndarray_rand::rand_distr::StandardNormal;
+use ndarray_rand::RandomExt;
+use rand::Rng;
+use std::time::Instant;
+use tch::{Device, Kind, Tensor};
+
+use ndarray::linalg::general_mat_mul;
+use ndarray::{iter, Array1, Array2};
+
+fn benchmark_ndarray_matrix_multiplication(size: usize) {
+    // Create two large random matrices of size `size x size`
+    let a = Array2::<f32>::random((size, size), StandardNormal);
+    let b = Array2::<f32>::random((size, size), StandardNormal);
+
+    // Start the timer
+    let start = Instant::now();
+
+    // Perform matrix multiplication using general_mat_mul (BLAS-accelerated)
+    let mut c = Array2::<f32>::zeros((size, size));
+    general_mat_mul(1.0, &a, &b, 0.0, &mut c);
+    let mean = c.mean().expect("Failed to calculate mean");
+    print!("Mean: {:?} ", mean);
+
+    // Stop the timer
+    let duration = start.elapsed();
+    println!("ndarray matrix multiplication ({}x{}): {:?}", size, size, duration);
+}
+
+fn benchmark_ndarray_correlation_coefficient(size: usize) {
+    // Create two random vectors of size `size`
+    let a = Array1::<f32>::random(size, StandardNormal);
+    let b = Array1::<f32>::random(size, StandardNormal);
+
+    // Start the timer
+    let start = Instant::now();
+
+    // Calculate the mean of a and b
+    let mean_a = a.mean().unwrap();
+    let mean_b = b.mean().unwrap();
+
+    // Center the vectors by subtracting the mean
+    let a_centered = &a - mean_a;
+    let b_centered = &b - mean_b;
+
+    // Calculate the covariance between a and b
+    let covariance = (&a_centered * &b_centered).mean().unwrap();
+    print!("Covariance: {:?} ", covariance);
+
+    // Calculate the variance of a and b
+    let variance_a = a.var(0.0);
+    let variance_b = b.var(0.0);
+
+    // Calculate the correlation coefficient
+    let correlation_coefficient = covariance / (variance_a.sqrt() * variance_b.sqrt());
+    print!("Correlation coefficient: {:?} ", correlation_coefficient);
+
+    // Stop the timer
+    let duration = start.elapsed();
+    println!("ndarray correlation coefficient ({}): {:?}", size, duration);
+}
+
+fn benchmark_tch_matrix_mul(size: i64, device: Device) {
+    // Create two large random matrices of size `size x size`
+    let a = Tensor::randn(&[size, size], (tch::Kind::Float, device));
+    let b = Tensor::randn(&[size, size], (tch::Kind::Float, device));
+
+    // Start the timer
+    let start = Instant::now();
+
+    // Perform matrix multiplication
+    let c = a.matmul(&b);
+    let mean = c.mean(Kind::Float);
+    print!("Mean: {:?} ", mean);
+
+    // Stop the timer
+    let duration = start.elapsed();
+    println!(
+        "tch matrix multiplication on device {:?} ({}x{}): {:?}",
+        device, size, size, duration
+    );
+}
+
+fn benchmark_tch_correlation_coefficient(size: i64, device: Device) {
+    // Create two random tensors of size `size`
+    let a = Tensor::randn(&[size], (Kind::Float, device)).set_requires_grad(false);
+    let b = Tensor::randn(&[size], (Kind::Float, device)).set_requires_grad(false);
+
+    // Start the timer
+    let start = Instant::now();
+
+    // Calculate the mean of a and b
+    let mean_a = a.mean(Kind::Float);
+    let mean_b = b.mean(Kind::Float);
+
+    // Subtract the mean from each tensor
+    let a_centered = &a - &mean_a;
+    let b_centered = &b - &mean_b;
+
+    // Calculate covariance of a and b
+    let covariance = (&a_centered * &b_centered).mean(Kind::Float);
+    print!("Covariance: {:?} ", covariance.double_value(&[]));
+
+    // Calculate variance of a and b
+    let variance_a = a.var(false);
+    let variance_b = b.var(false);
+
+    // Calculate the correlation coefficient
+    let correlation_coefficient = &covariance / (variance_a.sqrt() * variance_b.sqrt());
+    print!("Correlation coefficient: {:?} ", correlation_coefficient);
+
+    // Stop the timer
+    let duration = start.elapsed();
+    println!("tch correlation coefficient on device {:?} ({}): {:?}", device, size, duration);
+}
+
+fn benchmark_correlation_coefficient(size: i64) {
+    let mut rng = rand::thread_rng();
+
+    // Two random vectors of size `size`
+    let a = (0..size).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
+    let b = (0..size).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
+
+    // Start the timer
+    let start = Instant::now();
+
+    // Calculate the mean of each vector
+    let mean_a = a.iter().sum::<f32>() / size as f32;
+    let mean_b = b.iter().sum::<f32>() / size as f32;
+
+    // Calculate the covariance between a and b
+    let covariance = a.iter().zip(b.iter()).map(|(x, y)| (x - mean_a) * (y - mean_b)).sum::<f32>() / size as f32;
+    print!("Covariance: {:?} ", covariance);
+
+    // Calculate the variance of a and b
+    let variance_a = a.iter().map(|x| (x - mean_a).powi(2)).sum::<f32>() / size as f32;
+    let variance_b = b.iter().map(|x| (x - mean_b).powi(2)).sum::<f32>() / size as f32;
+
+    // Calculate the correlation coefficient
+    let correlation_coefficient = covariance / (variance_a.sqrt() * variance_b.sqrt());
+    print!("Correlation coefficient: {:?} ", correlation_coefficient);
+
+    // Stop the timer
+    let duration = start.elapsed();
+    println!("native correlation coefficient calculation ({}): {:?}", size, duration);
+}
+
+fn main() {
+    let iterations = 5;
+    let matrix_size = 1000; // Set matrix size for benchmark
+    let sum_size = 100000; // Set matrix size for benchmark
+
+    println!("Benchmarking sum operation");
+    let mut rng = rand::thread_rng();
+    let a = (0..sum_size).map(|_| rng.gen::<f64>()).collect::<Vec<f64>>();
+    let ax = Tensor::from(a.as_slice()).to_device(Device::Cpu);
+    for _ in 0..iterations {
+        let timer = Instant::now();
+        let sum = ax.sum(Kind::Double);
+        print!("Sum: {:?} ", sum.double_value(&[]));
+        println!("Tch Duration: {:?}", timer.elapsed());
+
+        let timer = Instant::now();
+        let sum = a.iter().sum::<f64>();
+        print!("Sum: {:?} ", sum);
+        println!("Native Duration: {:?}", timer.elapsed());
+        println!("----------------------------------------");
+    }
+
+    println!("Benchmarking matrix multiplication");
+    for _ in 0..iterations {
+        benchmark_tch_matrix_mul(matrix_size, Device::Cpu);
+        benchmark_tch_matrix_mul(matrix_size, Device::Mps);
+        benchmark_ndarray_matrix_multiplication(matrix_size as usize);
+        println!("----------------------------------------");
+    }
+
+    println!("Benchmarking correlation coefficient calculation");
+    for _ in 0..iterations {
+        benchmark_tch_correlation_coefficient(sum_size, Device::Cpu);
+        benchmark_tch_correlation_coefficient(sum_size, Device::Mps);
+        benchmark_ndarray_correlation_coefficient(sum_size as usize);
+        benchmark_correlation_coefficient(sum_size);
+        println!("----------------------------------------");
+    }
+}
+
+// use tch::{
+//     nn::{self, OptimizerConfig},
+//     Kind, Tensor,
+// };
+
+// fn norm_cdf(x: &Tensor) -> Tensor {
+//     0.5 * (1.0 + (x / Tensor::from(2.0).sqrt()).erf())
+// }
+
+// fn black76(epsilon: &Tensor, f: &Tensor, k: &Tensor, t: &Tensor, sigma: &Tensor, r: &Tensor) -> Tensor {
+//     let d1 = ((f / k).log() + Tensor::from(0.5) * sigma.pow(&Tensor::from(2.0)) * t) / (sigma * t.sqrt());
+//     let d2 = &d1 - sigma * t.sqrt();
+//     epsilon * (-r * t).exp() * (f * norm_cdf(&(epsilon * d1)) - k * norm_cdf(&(epsilon * d2)))
+// }
+
+// fn func_builder(p: nn::Path) -> impl Fn(&Tensor, &Tensor, &Tensor, &Tensor, &Tensor) -> Tensor {
+//     let sigma = p.randn_standard("sigma", &[1]).set_requires_grad(true);
+//     move |epsilon, f, k, t, r| black76(&epsilon, &f, &k, &t, &sigma, &r)
+// }
+
+// fn main() {
+//     tch::manual_seed(0);
+
+//     let vs = nn::VarStore::new(tch::Device::Mps);
+//     let black76_volsolver = func_builder(vs.root());
+//     let mut opt = nn::Adam::default().build(&vs, 1e-2).unwrap();
+
+//     let epsilon = Tensor::from(1_f32);
+//     let f = Tensor::from(63373_f32).set_requires_grad(true);
+//     let k = Tensor::from(62000_f32);
+//     let t = Tensor::from(0.25);
+//     let r = Tensor::from(0.04);
+//     let price = Tensor::from(7365.0);
+
+//     loop {
+//         let square_loss = (black76_volsolver(&epsilon, &f, &k, &t, &r) - &price)
+//             .pow(&Tensor::from(2.0))
+//             .sum(Kind::Float);
+//         opt.backward_step(&square_loss);
+//         println!("{}", &square_loss.double_value(&[]));
+//         if square_loss.double_value(&[]) < 0.0001 {
+//             break;
+//         }
+//     }
+
+//     let sigma = &vs.root().get("sigma").unwrap();
+//     let price = &black76(&epsilon, &f, &k, &t, &sigma, &r);
+//     let price_grad = Tensor::run_backward(&[price], &[&f, &sigma], true, true);
+//     let delta = &price_grad[0]; // 0.5540
+//     let vega = &price_grad[1]; // 39.0554
+//     let delta_grad = Tensor::run_backward(&[delta], &[&f], true, false);
+//     let gamma = &delta_grad[0]; // 0.013
+//     let vega_grad = Tensor::run_backward(&[vega], &[&f, &sigma], false, false);
+//     let vanna = &vega_grad[0]; // 0.1953
+//     let volga = &vega_grad[1]; // -2.9292
+
+//     println!("Price: {}", price.double_value(&[]));
+//     println!("Sigma: {}", sigma.double_value(&[]));
+//     println!("Delta: {}", delta.double_value(&[]));
+//     println!("Gamma: {}", gamma.double_value(&[]));
+//     println!("Vega: {}", vega.double_value(&[]));
+//     println!("Vanna: {}", vanna.double_value(&[]));
+//     println!("Volga: {}", volga.double_value(&[]));
+// }
