@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     time::Duration,
 };
 
@@ -8,7 +8,7 @@ use dashmap::DashMap;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
-use crate::config::{LatestInputConfig, PeriodInputConfig, WindowInputConfig};
+// use crate::config::{LatestInputConfig, PeriodInputConfig, WindowInputConfig};
 
 #[derive(Default)]
 pub struct InsightsState {
@@ -27,37 +27,46 @@ impl InsightsState {
         entry.insert(composit_key, event.value().to_owned());
     }
 
-    pub fn read_features(
-        &self,
-        instrument: &Instrument,
-        timestamp: &OffsetDateTime,
-        request: &[DataRequest],
-    ) -> DataResponse {
-        DataResponse::new(
-            request
-                .iter()
-                .map(|r| {
-                    let data = match &r {
-                        DataRequest::Latest { feature_id } => self.last_entry(instrument, feature_id, timestamp),
-                        DataRequest::Window { feature_id, window } => {
-                            self.list_entries_window(instrument, feature_id, timestamp, window)
-                        }
-                        DataRequest::Period {
-                            feature_id,
-                            periods,
-                        } => self.list_entries_periods(instrument, feature_id, timestamp, periods),
-                    };
-                    (r.feature_id().clone(), data)
-                })
-                .collect(),
-        )
+    pub fn insert_batch(&self, events: Vec<Insight>) {
+        events.into_iter().for_each(|event| self.insert(event));
     }
+
+    // pub fn read_features(
+    //     &self,
+    //     instrument: &Instrument,
+    //     timestamp: &OffsetDateTime,
+    //     request: &[DataRequest],
+    // ) -> DataResponse {
+    //     DataResponse::new(
+    //         request
+    //             .iter()
+    //             .map(|r| {
+    //                 let data = match &r {
+    //                     DataRequest::Latest { feature_id } => self.last_entry(instrument, feature_id, timestamp),
+    //                     DataRequest::Window { feature_id, window } => {
+    //                         self.list_entries_window(instrument, feature_id, timestamp, window)
+    //                     }
+    //                     DataRequest::Period {
+    //                         feature_id,
+    //                         periods,
+    //                     } => self.list_entries_periods(instrument, feature_id, timestamp, periods),
+    //                 };
+    //                 (r.feature_id().clone(), data)
+    //             })
+    //             .collect(),
+    //     )
+    // }
 
     pub fn instruments(&self) -> HashSet<Instrument> {
         self.features.iter().map(|v| v.key().0.clone()).collect::<HashSet<_>>()
     }
 
-    fn last_entry(&self, instrument: &Instrument, feature_id: &FeatureId, timestamp: &OffsetDateTime) -> Vec<Decimal> {
+    pub fn last_entry(
+        &self,
+        instrument: &Instrument,
+        feature_id: &FeatureId,
+        timestamp: &OffsetDateTime,
+    ) -> Vec<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
 
         if let Some(tree) = self.features.get(&(instrument.to_owned(), feature_id.to_owned())) {
@@ -67,7 +76,7 @@ impl InsightsState {
         }
     }
 
-    fn list_entries_window(
+    pub fn list_entries_window(
         &self,
         instrument: &Instrument,
         feature_id: &FeatureId,
@@ -84,7 +93,7 @@ impl InsightsState {
         }
     }
 
-    fn list_entries_periods(
+    pub fn list_entries_periods(
         &self,
         instrument: &Instrument,
         feature_id: &FeatureId,
@@ -109,89 +118,89 @@ impl InsightsState {
     }
 }
 
-#[derive(Debug)]
-pub enum DataRequest {
-    Latest {
-        feature_id: FeatureId,
-    },
-    Window {
-        feature_id: FeatureId,
-        window: Duration,
-    },
-    Period {
-        feature_id: FeatureId,
-        periods: usize,
-    },
-}
+// #[derive(Debug)]
+// pub enum DataRequest {
+//     Latest {
+//         feature_id: FeatureId,
+//     },
+//     Window {
+//         feature_id: FeatureId,
+//         window: Duration,
+//     },
+//     Period {
+//         feature_id: FeatureId,
+//         periods: usize,
+//     },
+// }
 
-impl From<LatestInputConfig> for DataRequest {
-    fn from(v: LatestInputConfig) -> Self {
-        DataRequest::Latest {
-            feature_id: v.feature_id,
-        }
-    }
-}
+// impl From<LatestInputConfig> for DataRequest {
+//     fn from(v: LatestInputConfig) -> Self {
+//         DataRequest::Latest {
+//             feature_id: v.feature_id,
+//         }
+//     }
+// }
 
-impl From<WindowInputConfig> for DataRequest {
-    fn from(v: WindowInputConfig) -> Self {
-        DataRequest::Window {
-            feature_id: v.feature_id,
-            window: Duration::from_secs(v.window),
-        }
-    }
-}
+// impl From<WindowInputConfig> for DataRequest {
+//     fn from(v: WindowInputConfig) -> Self {
+//         DataRequest::Window {
+//             feature_id: v.feature_id,
+//             window: Duration::from_secs(v.window),
+//         }
+//     }
+// }
 
-impl From<PeriodInputConfig> for DataRequest {
-    fn from(v: PeriodInputConfig) -> Self {
-        DataRequest::Period {
-            feature_id: v.feature_id,
-            periods: v.periods,
-        }
-    }
-}
+// impl From<PeriodInputConfig> for DataRequest {
+//     fn from(v: PeriodInputConfig) -> Self {
+//         DataRequest::Period {
+//             feature_id: v.feature_id,
+//             periods: v.periods,
+//         }
+//     }
+// }
 
-impl DataRequest {
-    pub fn feature_id(&self) -> &FeatureId {
-        match self {
-            DataRequest::Latest { feature_id } => feature_id,
-            DataRequest::Window { feature_id, .. } => feature_id,
-            DataRequest::Period { feature_id, .. } => feature_id,
-        }
-    }
-}
+// impl DataRequest {
+//     pub fn feature_id(&self) -> &FeatureId {
+//         match self {
+//             DataRequest::Latest { feature_id } => feature_id,
+//             DataRequest::Window { feature_id, .. } => feature_id,
+//             DataRequest::Period { feature_id, .. } => feature_id,
+//         }
+//     }
+// }
 
-#[derive(Debug, Clone)]
-pub struct DataResponse {
-    data: HashMap<FeatureId, Vec<Decimal>>,
-}
+// #[derive(Debug, Clone)]
+// pub struct DataResponse {
+//     data: HashMap<FeatureId, Vec<Decimal>>,
+// }
 
-impl DataResponse {
-    pub fn new(data: HashMap<FeatureId, Vec<Decimal>>) -> Self {
-        DataResponse { data }
-    }
+// impl DataResponse {
+//     pub fn new(data: HashMap<FeatureId, Vec<Decimal>>) -> Self {
+//         DataResponse { data }
+//     }
 
-    // Convenience method to get the last value for a feature ID
-    pub fn last(&self, feature_id: &FeatureId) -> Option<Decimal> {
-        self.data.get(feature_id).and_then(|values| values.last().cloned())
-    }
+//     // Convenience method to get the last value for a feature ID
+//     pub fn last(&self, feature_id: &FeatureId) -> Option<Decimal> {
+//         self.data.get(feature_id).and_then(|values| values.last().cloned())
+//     }
 
-    pub fn count(&self, feature_id: &FeatureId) -> Option<Decimal> {
-        self.data.get(feature_id).map(|values| values.len().into())
-    }
+//     pub fn count(&self, feature_id: &FeatureId) -> Option<Decimal> {
+//         self.data.get(feature_id).map(|values| values.len().into())
+//     }
 
-    // Convenience method to get the sum of values for a feature ID
-    pub fn sum(&self, feature_id: &FeatureId) -> Option<Decimal> {
-        self.data.get(feature_id).map(|values| values.iter().sum())
-    }
+//     // Convenience method to get the sum of values for a feature ID
+//     pub fn sum(&self, feature_id: &FeatureId) -> Option<Decimal> {
+//         self.data.get(feature_id).map(|values| values.iter().sum())
+//     }
 
-    pub fn mean(&self, feature_id: &FeatureId) -> Option<Decimal> {
-        self.data.get(feature_id).map(|values| {
-            let sum = values.iter().sum::<Decimal>();
-            sum / Decimal::from(values.len())
-        })
-    }
+//     pub fn mean(&self, feature_id: &FeatureId) -> Option<Decimal> {
+//         self.data.get(feature_id).map(|values| {
+//             let sum = values.iter().sum::<Decimal>();
+//             sum / Decimal::from(values.len())
+//         })
+//     }
 
-    pub fn get(&self, feature_id: &FeatureId) -> Vec<Decimal> {
-        self.data.get(feature_id).unwrap_or(&vec![]).to_vec()
-    }
-}
+//     pub fn get(&self, feature_id: &FeatureId) -> Vec<Decimal> {
+//         self.data.get(feature_id).unwrap_or(&vec![]).to_vec()
+//     }
+// }

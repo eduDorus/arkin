@@ -1,9 +1,7 @@
 use std::fmt::Debug;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Result;
-use rayon::prelude::*;
-use rust_decimal::Decimal;
 
 use arkin_core::prelude::*;
 use arkin_persistance::prelude::*;
@@ -12,16 +10,18 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::ComputationGraph;
-use crate::{
-    config::InsightsServiceConfig,
-    state::{DataRequest, DataResponse, InsightsState},
-};
+use crate::{config::InsightsServiceConfig, state::InsightsState};
 
 pub trait FeatureModule: Debug + Send + Sync {
-    fn id(&self) -> &NodeId;
-    fn sources(&self) -> &[NodeId];
-    fn data(&self) -> &[DataRequest];
-    fn calculate(&self, data: DataResponse) -> Result<HashMap<FeatureId, Decimal>>;
+    fn inputs(&self) -> &[NodeId];
+    fn outputs(&self) -> &[NodeId];
+    // fn data(&self) -> &[DataRequest];
+    fn calculate(
+        &self,
+        instruments: &[Instrument],
+        timestamp: &OffsetDateTime,
+        state: Arc<InsightsState>,
+    ) -> Result<Vec<Insight>>;
 }
 
 pub struct InsightsService {
@@ -56,11 +56,7 @@ impl InsightsService {
             .for_each(|event| self.state.insert(event));
 
         // Generate insights
-        let insights = instruments
-            .par_iter()
-            .map(|instrument| self.pipeline.calculate(self.state.clone(), &to, instrument))
-            .flat_map(|f| f)
-            .collect::<Vec<_>>();
+        let insights = self.pipeline.calculate(self.state.clone(), instruments, to);
 
         for insight in &insights {
             info!("Generated insight: {}", insight);

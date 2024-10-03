@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
@@ -29,33 +30,48 @@ impl ComputationGraph {
         // Create features
         let features = FeatureFactory::from_config(&config.features);
 
-        // Add features as nodes
-        features.into_iter().for_each(|f| {
-            graph.add_node(f);
-        });
+        // Create a mapping from Node IDs to Node Indices
+        let mut id_to_index = HashMap::new();
 
-        // Add edges automatically
-        let mut edges_to_add = vec![];
-        for target_node in graph.node_indices() {
-            for source in graph[target_node].sources() {
-                if source == "base" || source == "self" {
-                    continue;
-                }
-                let source_node = graph
-                    .node_indices()
-                    .find(|i| graph[*i].id() == source)
-                    .expect("Failed to find node from config");
-                edges_to_add.push((source_node, target_node));
+        // Add features as nodes and populate the mapping
+        for feature in features {
+            let output_ids = feature.outputs().to_vec();
+            let node_index = graph.add_node(feature);
+            for id in output_ids {
+                id_to_index.insert(id.clone(), node_index);
             }
         }
+
+        // Add edges automatically
+        let mut edges_to_add = HashMap::new();
+        for target_node in graph.node_indices() {
+            for source_id in graph[target_node].inputs() {
+                if source_id == "trade_price"
+                    || source_id == "trade_side"
+                    || source_id == "trade_quantity"
+                    || source_id == "bid_price"
+                    || source_id == "bid_quantity"
+                    || source_id == "ask_price"
+                    || source_id == "ask_quantity"
+                    || source_id == "mid_price"
+                {
+                    continue;
+                }
+                let source_node = id_to_index.get(source_id).expect("Failed to find source node from config");
+                edges_to_add.insert(*source_node, target_node);
+            }
+        }
+
+        // Add edges to the graph
         for (source, target) in edges_to_add {
             graph.add_edge(source, target, ());
         }
 
-        // Save down the topological order for parallel processing
+        // Save the topological order for parallel processing
         let order = toposort(&graph, None).expect("Cycle detected in graph");
 
         info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
+
         ComputationGraph {
             graph: Arc::new(graph),
             order,
@@ -66,8 +82,8 @@ impl ComputationGraph {
     pub fn calculate(
         &self,
         state: Arc<InsightsState>,
+        instruments: &[Instrument],
         timestamp: &OffsetDateTime,
-        instrument: &Instrument,
     ) -> Vec<Insight> {
         // Step 1: Calculate in-degrees
         let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
@@ -92,7 +108,7 @@ impl ComputationGraph {
         pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
                 let state = state.clone();
-                let instrument = instrument.clone();
+                // let instrument = instruments.clone();
                 let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);
                 let queue_tx = queue_tx.clone();
@@ -102,21 +118,14 @@ impl ComputationGraph {
                     // Process the node
                     let feature = &graph[node];
 
-                    // Query the data
-                    let data = state.read_features(&instrument, timestamp, feature.data());
-
                     // Calculate the feature
-                    let res = feature.calculate(data);
+                    let res = feature.calculate(instruments, timestamp, state.clone());
                     match res {
                         Ok(data) => {
-                            debug!("Calculated: {:?}", data);
-
-                            // Save data to state and result set
-                            data.into_iter().for_each(|(id, value)| {
-                                debug!("Saving: {} => {}", id, value);
-                                let event = Insight::new(timestamp.to_owned(), instrument.to_owned(), id, value);
-                                state.insert(event.clone());
-                                pipeline_result.lock().push(event);
+                            // debug!("Calculated: {:?}", data);
+                            data.into_iter().for_each(|insight| {
+                                debug!("Saving: {}", insight);
+                                pipeline_result.lock().push(insight);
                             });
                         }
                         Err(e) => {

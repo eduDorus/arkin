@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
         .await?
         .expect("Instrument not found");
 
-    let start = datetime!(2024-09-29 03:30).assume_utc();
+    let start = datetime!(2024-09-30 00:00).assume_utc();
     let end = datetime!(2024-09-30 13:00).assume_utc();
     let frequency_secs = Duration::from_secs(60);
 

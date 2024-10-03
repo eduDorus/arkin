@@ -32,9 +32,9 @@ tracing = { workspace = true }
 tokio-rustls = { workspace = true }
 time = { workspace = true }
 anyhow = { workspace = true }
-tch = { workspace = true }
 
 # Test DL
+# tch = { workspace = true }
 # candle-core = { version = "0.7.2", features = [ "metal" ] }
 # burn = { version = "0.14.0", features = [ "dataset", "metal", "metrics", "train", "tui", "wgpu" ] }
 # linalg test

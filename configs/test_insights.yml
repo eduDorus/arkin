@@ -11,17 +11,32 @@ insights_service:
   pipeline:
     features:
       - count:
-          inputs:
-            [trade_side, trade_price, trade_quantity, bid_price, ask_price]
-          outputs:
-            [
-              trade_count_side,
-              trade_count_price,
-              trade_count_quantity,
-              trade_count_bid,
-              trade_count_ask,
-            ]
+          inputs: [trade_side]
+          outputs: [trade_count_m]
           window: 60
+      - count:
+          inputs: [bid_price, ask_price]
+          outputs: [ob_spread_avg_m]
+          #   type: avg
+          #   absolute: false
+          window: 60
+      - count:
+          inputs: [trade_count_m, ob_spread_avg_m]
+          outputs: [trade_volume]
+          window: 60
+      - count:
+          inputs: [trade_volume]
+          outputs: [trade_count_h, trade_volume_h]
+          window: 3600
+      - count:
+          inputs: [trade_count_h, trade_volume_h]
+          outputs: [comp_1, comp_2, comp_3]
+          window: 3600
+      - count:
+          inputs: [comp_1, comp_2]
+          outputs: [forecast]
+          window: 3600
+
       # - pct_change:
       #     id: returns
       #     input:
