@@ -56,6 +56,7 @@ impl From<Trade> for DBTrade {
     }
 }
 
+#[derive(Debug)]
 pub struct TradeRepo {
     pool: PgPool,
 }

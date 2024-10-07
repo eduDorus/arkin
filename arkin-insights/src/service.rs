@@ -6,7 +6,7 @@ use anyhow::Result;
 use arkin_core::prelude::*;
 use arkin_persistance::prelude::*;
 use time::OffsetDateTime;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::ComputationGraph;
@@ -39,27 +39,35 @@ impl InsightsService {
         }
     }
 
+    pub fn insert(&self, insight: Insight) {
+        self.state.insert(insight);
+    }
+
+    pub fn insert_batch(&self, insights: Vec<Insight>) {
+        insights.into_iter().for_each(|insight| self.state.insert(insight));
+    }
+
     pub async fn process(&self, instruments: &[Instrument], from: &OffsetDateTime, to: &OffsetDateTime) -> Result<()> {
         // Fetch data from persistance service
-        let instrument_ids = instruments.iter().map(|i| i.id).collect::<Vec<Uuid>>();
-        let trades = self.persistance_service.read_trades_range(&instrument_ids, from, to).await?;
-        let ticks = self.persistance_service.read_ticks_range(&instrument_ids, from, to).await?;
+        // let instrument_ids = instruments.iter().map(|i| i.id).collect::<Vec<Uuid>>();
+        // let trades = self.persistance_service.read_trades_range(&instrument_ids, from, to).await?;
+        // let ticks = self.persistance_service.read_ticks_range(&instrument_ids, from, to).await?;
 
-        // Transform data to insights and add to state
-        trades
-            .into_iter()
-            .flat_map(|trade| trade.to_insights())
-            .for_each(|event| self.state.insert(event));
-        ticks
-            .into_iter()
-            .flat_map(|tick| tick.to_insights())
-            .for_each(|event| self.state.insert(event));
+        // // Transform data to insights and add to state
+        // trades
+        //     .into_iter()
+        //     .flat_map(|trade| trade.to_insights())
+        //     .for_each(|event| self.state.insert(event));
+        // ticks
+        //     .into_iter()
+        //     .flat_map(|tick| tick.to_insights())
+        //     .for_each(|event| self.state.insert(event));
 
         // Generate insights
         let insights = self.pipeline.calculate(self.state.clone(), instruments, to);
 
         for insight in &insights {
-            info!("Generated insight: {}", insight);
+            debug!("Generated insight: {}", insight);
         }
 
         self.persistance_service.insert_insight_batch(insights).await?;

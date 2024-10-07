@@ -36,6 +36,8 @@ impl Clock {
         Some((next_timestamp, next_timestamp + self.frequency_secs))
     }
 
+    // From Iterator trait
+
     pub fn reset(&mut self) {
         self.current_timestamp = self.start;
     }
@@ -46,5 +48,13 @@ impl Clock {
 
     pub fn end(&self) -> OffsetDateTime {
         self.end
+    }
+}
+
+impl Iterator for Clock {
+    type Item = (OffsetDateTime, OffsetDateTime);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next()
     }
 }

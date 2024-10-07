@@ -133,6 +133,7 @@ impl From<Instrument> for DBInstrument {
     }
 }
 
+#[derive(Debug)]
 pub struct InstrumentRepo {
     pool: PgPool,
 }

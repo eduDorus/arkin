@@ -11,6 +11,7 @@ use crate::repos::InsightsRepo;
 
 use super::InstrumentService;
 
+#[derive(Debug)]
 pub struct InsightsService {
     insights_repo: Arc<InsightsRepo>,
     instrument_service: Arc<InstrumentService>,

@@ -3,13 +3,14 @@ use std::sync::Arc;
 use anyhow::Result;
 use arkin_core::prelude::*;
 use time::OffsetDateTime;
-use tracing::error;
+use tracing::{error, instrument};
 use uuid::Uuid;
 
 use crate::repos::TradeRepo;
 
 use super::instruments::InstrumentService;
 
+#[derive(Debug)]
 pub struct TradeService {
     trade_repo: Arc<TradeRepo>,
     instrument_service: Arc<InstrumentService>,

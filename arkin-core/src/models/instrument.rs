@@ -8,7 +8,7 @@ use crate::{prelude::INSTRUMENT_TIMESTAMP_FORMAT, Maturity, Price};
 
 use super::Venue;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Instrument {
     pub id: Uuid,
     pub venue: Venue,
@@ -194,7 +194,7 @@ impl Instrument {
     }
 }
 
-#[derive(Clone, Display, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash)]
 pub enum InstrumentType {
     Spot,
     Perpetual,
@@ -202,13 +202,13 @@ pub enum InstrumentType {
     Option,
 }
 
-#[derive(Clone, Display, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash)]
 pub enum OptionType {
     Call,
     Put,
 }
 
-#[derive(Clone, Display, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash)]
 pub enum InstrumentStatus {
     Trading,
     Halted,

@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::repos::VenueRepo;
 
+#[derive(Debug)]
 pub struct VenueService {
     venue_repo: Arc<VenueRepo>,
 }

@@ -1,15 +1,16 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use anyhow::Result;
 use arkin_core::prelude::*;
 use time::OffsetDateTime;
-use tracing::error;
+use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::repos::TickRepo;
 
 use super::instruments::InstrumentService;
 
+#[derive(Debug)]
 pub struct TickService {
     tick_repo: Arc<TickRepo>,
     instrument_service: Arc<InstrumentService>,
@@ -37,6 +38,7 @@ impl TickService {
         from: &OffsetDateTime,
         to: &OffsetDateTime,
     ) -> Result<Vec<Tick>> {
+        let timer = Instant::now();
         // Load ticks
         let db_ticks = self.tick_repo.read_range(instrument_ids, from, to).await?;
 
@@ -60,6 +62,7 @@ impl TickService {
                 error!("Could not fetch instrument: {}", tick.instrument_id);
             }
         }
+        info!("Read ticks in {:?}", timer.elapsed());
 
         Ok(ticks)
     }

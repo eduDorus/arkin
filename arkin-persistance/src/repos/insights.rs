@@ -29,6 +29,7 @@ impl From<Insight> for DBInsight {
     }
 }
 
+#[derive(Debug)]
 pub struct InsightsRepo {
     pool: PgPool,
 }

@@ -29,6 +29,7 @@ impl From<DBVenue> for Venue {
     }
 }
 
+#[derive(Debug)]
 pub struct VenueRepo {
     pool: PgPool,
 }

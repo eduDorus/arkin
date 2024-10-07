@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use anyhow::Result;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use time::OffsetDateTime;
-use tracing::debug;
+use tracing::{debug, instrument};
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -12,6 +12,7 @@ use crate::repos::{InsightsRepo, InstrumentRepo, TickRepo, TradeRepo, VenueRepo}
 use crate::services::{InsightsService, InstrumentService, TickService, VenueService};
 use crate::{config::DatabaseConfig, services::TradeService};
 
+#[derive(Debug)]
 pub struct PersistanceService {
     venue_service: Arc<VenueService>,
     instrument_service: Arc<InstrumentService>,
@@ -91,6 +92,7 @@ impl PersistanceService {
         self.tick_service.insert_batch(ticks).await
     }
 
+    #[instrument]
     pub async fn read_trades_range(
         &self,
         instrument_ids: &[Uuid],

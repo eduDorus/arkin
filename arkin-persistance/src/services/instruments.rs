@@ -9,6 +9,7 @@ use crate::repos::InstrumentRepo;
 
 use super::venues::VenueService;
 
+#[derive(Debug)]
 pub struct InstrumentCache {
     by_id: RwLock<HashMap<Uuid, Instrument>>,
     by_venue_symbol: RwLock<HashMap<String, Instrument>>,
@@ -36,6 +37,7 @@ impl InstrumentCache {
     }
 }
 
+#[derive(Debug)]
 pub struct InstrumentService {
     instrument_repo: Arc<InstrumentRepo>,
     instrument_cache: InstrumentCache,

@@ -32,6 +32,8 @@ tracing = { workspace = true }
 tokio-rustls = { workspace = true }
 time = { workspace = true }
 anyhow = { workspace = true }
+uuid = { workspace = true }
+rayon = { workspace = true }
 
 # Test DL
 # tch = { workspace = true }

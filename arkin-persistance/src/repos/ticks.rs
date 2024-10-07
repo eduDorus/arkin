@@ -33,6 +33,7 @@ impl From<Tick> for DBTick {
     }
 }
 
+#[derive(Debug)]
 pub struct TickRepo {
     pool: PgPool,
 }
