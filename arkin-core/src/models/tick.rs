@@ -45,10 +45,25 @@ impl Tick {
 
     pub fn to_insights(&self) -> Vec<Insight> {
         vec![
-            Insight::new(self.event_time, self.instrument.clone(), "bid_price".into(), self.bid_price),
-            Insight::new(self.event_time, self.instrument.clone(), "ask_price".into(), self.ask_price),
-            Insight::new(self.event_time, self.instrument.clone(), "mid_price".into(), self.mid_price()),
-            Insight::new(self.event_time, self.instrument.clone(), "spread".into(), self.spread()),
+            Insight::new(
+                self.event_time,
+                Some(self.instrument.clone()),
+                "bid_price".into(),
+                self.bid_price,
+            ),
+            Insight::new(
+                self.event_time,
+                Some(self.instrument.clone()),
+                "ask_price".into(),
+                self.ask_price,
+            ),
+            Insight::new(
+                self.event_time,
+                Some(self.instrument.clone()),
+                "mid_price".into(),
+                self.mid_price(),
+            ),
+            Insight::new(self.event_time, Some(self.instrument.clone()), "spread".into(), self.spread()),
         ]
     }
 
@@ -90,31 +105,6 @@ impl TryFrom<Event> for Tick {
 impl From<Tick> for Event {
     fn from(value: Tick) -> Self {
         Event::Tick(value)
-    }
-}
-
-impl From<Tick> for Vec<Insight> {
-    fn from(value: Tick) -> Self {
-        vec![
-            Insight::new(
-                value.event_time,
-                value.instrument.clone(),
-                "bid_price".into(),
-                value.bid_price(),
-            ),
-            Insight::new(
-                value.event_time,
-                value.instrument.clone(),
-                "ask_price".into(),
-                value.ask_price(),
-            ),
-            Insight::new(
-                value.event_time,
-                value.instrument.clone(),
-                "mid_price".into(),
-                value.mid_price(),
-            ),
-        ]
     }
 }
 

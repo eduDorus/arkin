@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use arkin_core::prelude::*;
 use time::OffsetDateTime;
-use tracing::{error, instrument};
+use tracing::error;
 use uuid::Uuid;
 
 use crate::repos::TradeRepo;

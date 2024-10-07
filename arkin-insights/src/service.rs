@@ -7,7 +7,6 @@ use arkin_core::prelude::*;
 use arkin_persistance::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, info};
-use uuid::Uuid;
 
 use crate::ComputationGraph;
 use crate::{config::InsightsServiceConfig, state::InsightsState};
@@ -44,10 +43,11 @@ impl InsightsService {
     }
 
     pub fn insert_batch(&self, insights: Vec<Insight>) {
-        insights.into_iter().for_each(|insight| self.state.insert(insight));
+        self.state.insert_batch(insights);
     }
 
     pub async fn process(&self, instruments: &[Instrument], from: &OffsetDateTime, to: &OffsetDateTime) -> Result<()> {
+        info!("Running insights pipeline from {} to {}", from, to);
         // Fetch data from persistance service
         // let instrument_ids = instruments.iter().map(|i| i.id).collect::<Vec<Uuid>>();
         // let trades = self.persistance_service.read_trades_range(&instrument_ids, from, to).await?;

@@ -20,6 +20,8 @@ pub struct PipelineConfig {
 pub enum FeatureConfig {
     #[serde(rename = "count")]
     Count(CountFeatureConfig),
+    #[serde(rename = "sum")]
+    Sum(SumFeatureConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -27,6 +29,12 @@ pub struct CountFeatureConfig {
     pub inputs: Vec<NodeId>,
     pub outputs: Vec<NodeId>,
     pub window: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SumFeatureConfig {
+    pub inputs: Vec<NodeId>,
+    pub outputs: Vec<NodeId>,
 }
 
 // #[derive(Debug, Serialize, Deserialize, Clone)]

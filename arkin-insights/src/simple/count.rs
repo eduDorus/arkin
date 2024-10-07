@@ -46,14 +46,19 @@ impl FeatureModule for CountFeature {
         // Query the data from the internal state
         let data: Vec<Insight> = self
             .inputs()
-            .par_iter()
-            .flat_map(|feature| {
-                instruments.par_iter().map(|instrument| {
-                    let entries = state.list_entries_window(instrument, feature, timestamp, &self.window);
-                    let count = Decimal::from(entries.len());
-                    Insight::new(timestamp.clone(), instrument.clone(), feature.clone(), count)
-                })
+            .into_iter()
+            .zip(self.outputs())
+            .map(|(input_id, output_id)| {
+                instruments
+                    .par_iter()
+                    .map(|instrument| {
+                        let entries = state.list_entries_window(Some(instrument), input_id, timestamp, &self.window);
+                        let count = Decimal::from(entries.len());
+                        Insight::new(timestamp.clone(), Some(instrument.clone()), output_id.clone(), count)
+                    })
+                    .collect::<Vec<_>>()
             })
+            .flatten()
             .collect();
 
         state.insert_batch(data.clone());

@@ -41,9 +41,19 @@ impl Trade {
 
     pub fn to_insights(&self) -> Vec<Insight> {
         vec![
-            Insight::new(self.event_time, self.instrument.clone(), "trade_price".into(), self.price),
-            Insight::new(self.event_time, self.instrument.clone(), "trade_quantity".into(), self.quantity),
-            Insight::new(self.event_time, self.instrument.clone(), "trade_side".into(), self.side.into()),
+            Insight::new(self.event_time, Some(self.instrument.clone()), "trade_price".into(), self.price),
+            Insight::new(
+                self.event_time,
+                Some(self.instrument.clone()),
+                "trade_quantity".into(),
+                self.quantity,
+            ),
+            Insight::new(
+                self.event_time,
+                Some(self.instrument.clone()),
+                "trade_side".into(),
+                self.side.into(),
+            ),
         ]
     }
 }

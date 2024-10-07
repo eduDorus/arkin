@@ -101,7 +101,7 @@ petgraph = { version = "0.6", features = [ "graphmap" ], default-features = fals
 # clarabel = { version = "0.9" }
 
 # Statistics & Math
-tch = { version = "0.17.0", features = [ "download-libtorch" ] }
+# tch = { version = "0.17.0", features = [ "download-libtorch" ] }
 
 # Testing
 rstest = { version = "0.23.0" }

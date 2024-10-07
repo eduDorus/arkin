@@ -20,7 +20,7 @@ rayon = { workspace = true }
 flume = { workspace = true }
 rust_decimal = { workspace = true }
 uuid = { workspace = true }
-tch = { workspace = true }
+# tch = { workspace = true }
 
 [dev-dependencies]
 # test-utils = { path = "../test-utils" }

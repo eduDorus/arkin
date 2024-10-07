@@ -1,10 +1,11 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     time::Duration,
 };
 
 use arkin_core::prelude::*;
-use parking_lot::Mutex;
+use dashmap::DashMap;
+use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
@@ -12,7 +13,7 @@ use time::OffsetDateTime;
 
 #[derive(Default)]
 pub struct InsightsState {
-    features: Mutex<HashMap<(Instrument, FeatureId), BTreeMap<CompositeIndex, Decimal>>>,
+    features: DashMap<(Option<Instrument>, FeatureId), BTreeMap<CompositeIndex, Decimal>>,
 }
 
 impl InsightsState {
@@ -20,8 +21,7 @@ impl InsightsState {
         let key = (event.instrument().clone(), event.id().clone());
         let mut composit_key = CompositeIndex::new(&event.event_time());
 
-        let mut lock = self.features.lock();
-        let entry = lock.entry(key).or_default();
+        let mut entry = self.features.entry(key).or_default();
         while entry.get(&composit_key).is_some() {
             composit_key.increment();
         }
@@ -29,17 +29,16 @@ impl InsightsState {
     }
 
     pub fn insert_batch(&self, events: Vec<Insight>) {
-        let mut lock = self.features.lock();
-        for event in events {
+        events.par_iter().for_each(|event| {
             let key = (event.instrument().clone(), event.id().clone());
             let mut composit_key = CompositeIndex::new(&event.event_time());
 
-            let entry = lock.entry(key).or_default();
+            let mut entry = self.features.entry(key).or_default();
             while entry.get(&composit_key).is_some() {
                 composit_key.increment();
             }
             entry.insert(composit_key, event.value().to_owned());
-        }
+        });
     }
 
     // pub fn read_features(
@@ -69,28 +68,28 @@ impl InsightsState {
     // }
 
     pub fn instruments(&self) -> HashSet<Instrument> {
-        self.features.lock().iter().map(|v| v.0 .0.clone()).collect::<HashSet<_>>()
+        self.features.iter().filter_map(|v| v.key().0.clone()).collect::<HashSet<_>>()
     }
 
     pub fn last_entry(
         &self,
-        instrument: &Instrument,
+        instrument: Option<&Instrument>,
         feature_id: &FeatureId,
         timestamp: &OffsetDateTime,
-    ) -> Vec<Decimal> {
+    ) -> Option<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
 
-        let lock = self.features.lock();
-        if let Some(tree) = lock.get(&(instrument.to_owned(), feature_id.to_owned())) {
-            tree.range(..=index).rev().take(1).map(|(_, v)| *v).collect()
-        } else {
-            Vec::new()
+        if let Some(tree) = self.features.get(&(instrument.cloned(), feature_id.to_owned())) {
+            if let Some((_, v)) = tree.range(..=index).rev().take(1).next() {
+                return Some(v.clone());
+            }
         }
+        None
     }
 
     pub fn list_entries_window(
         &self,
-        instrument: &Instrument,
+        instrument: Option<&Instrument>,
         feature_id: &FeatureId,
         timestamp: &OffsetDateTime,
         window: &Duration,
@@ -98,8 +97,7 @@ impl InsightsState {
         let index = CompositeIndex::new_max(timestamp);
         let end_index = CompositeIndex::new(&(*timestamp - *window));
 
-        let lock = self.features.lock();
-        if let Some(tree) = lock.get(&(instrument.to_owned(), feature_id.to_owned())) {
+        if let Some(tree) = self.features.get(&(instrument.cloned(), feature_id.to_owned())) {
             tree.range(end_index..=index).map(|(_, v)| *v).collect()
         } else {
             Vec::new()
@@ -108,15 +106,14 @@ impl InsightsState {
 
     pub fn list_entries_periods(
         &self,
-        instrument: &Instrument,
+        instrument: Option<&Instrument>,
         feature_id: &FeatureId,
         timestamp: &OffsetDateTime,
         periods: &usize,
     ) -> Vec<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
 
-        let lock = self.features.lock();
-        if let Some(tree) = lock.get(&(instrument.to_owned(), feature_id.to_owned())) {
+        if let Some(tree) = self.features.get(&(instrument.cloned(), feature_id.to_owned())) {
             let mut res = tree.range(..=index).rev().take(*periods).map(|(_, v)| *v).collect::<Vec<_>>();
             res.reverse();
             res

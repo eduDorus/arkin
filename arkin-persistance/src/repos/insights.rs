@@ -12,7 +12,7 @@ use crate::{BIND_LIMIT, MAX_CONCURRENT_QUERIES};
 
 #[derive(Debug, FromRow)]
 pub struct DBInsight {
-    pub instrument_id: Uuid,
+    pub instrument_id: Option<Uuid>,
     pub event_time: OffsetDateTime,
     pub feature_id: String,
     pub value: Decimal,
@@ -21,7 +21,7 @@ pub struct DBInsight {
 impl From<Insight> for DBInsight {
     fn from(insight: Insight) -> Self {
         Self {
-            instrument_id: insight.instrument.id,
+            instrument_id: insight.instrument.map(|i| i.id),
             event_time: insight.event_time,
             feature_id: insight.feature_id,
             value: insight.value,

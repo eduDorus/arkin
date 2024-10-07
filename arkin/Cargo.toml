@@ -34,6 +34,7 @@ time = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
 rayon = { workspace = true }
+futures-util = { workspace = true }
 
 # Test DL
 # tch = { workspace = true }

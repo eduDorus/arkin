@@ -3,8 +3,6 @@ use std::time::Duration;
 
 use anyhow::Result;
 use mimalloc::MiMalloc;
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
 use time::macros::datetime;
 use tokio_rustls::rustls::crypto::aws_lc_rs;
 use tokio_rustls::rustls::crypto::CryptoProvider;
@@ -13,7 +11,6 @@ use tracing::info;
 use arkin_core::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_persistance::prelude::*;
-use uuid::Uuid;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -38,8 +35,8 @@ async fn main() -> Result<()> {
         .expect("Instrument not found");
     let instrument_ids = vec![instruments.id];
 
-    let start = datetime!(2024-09-29 03:30).assume_utc();
-    let end = datetime!(2024-09-30 13:00).assume_utc();
+    let start = datetime!(2024-09-30 00:00).assume_utc();
+    let end = datetime!(2024-09-30 01:00).assume_utc();
     let frequency_secs = Duration::from_secs(60);
 
     let mut clock = Clock::new(&start, &end, &frequency_secs);

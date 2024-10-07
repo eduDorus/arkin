@@ -48,17 +48,25 @@ impl InsightsService {
 
         let mut result = Vec::with_capacity(insights.len());
         for insight in insights {
-            if let Ok(instrument) = self.instrument_service.read_by_id(&insight.instrument_id).await {
-                if let Some(instrument) = instrument {
-                    result.push(Insight::new(insight.event_time, instrument, insight.feature_id, insight.value));
+            if let Some(id) = insight.instrument_id {
+                if let Ok(instrument) = self.instrument_service.read_by_id(&id).await {
+                    if let Some(instrument) = instrument {
+                        result.push(Insight::new(
+                            insight.event_time,
+                            Some(instrument),
+                            insight.feature_id,
+                            insight.value,
+                        ));
+                    } else {
+                        error!("Instrument not found: {}", id);
+                    }
                 } else {
-                    error!("Instrument not found: {}", insight.instrument_id);
+                    error!("Could not fetch instrument: {}", id);
                 }
             } else {
-                error!("Could not fetch instrument: {}", insight.instrument_id);
+                result.push(Insight::new_general(insight.event_time, insight.feature_id, insight.value));
             }
         }
-
         Ok(result)
     }
 }

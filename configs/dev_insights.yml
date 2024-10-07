@@ -11,17 +11,12 @@ insights_service:
   pipeline:
     features:
       - count:
-          inputs:
-            [trade_side, trade_price, trade_quantity, bid_price, ask_price]
-          outputs:
-            [
-              trade_count_side,
-              trade_count_price,
-              trade_count_quantity,
-              trade_count_bid,
-              trade_count_ask,
-            ]
+          inputs: [trade_side]
+          outputs: [trade_count]
           window: 60
+      - sum:
+          inputs: [trade_count]
+          outputs: [trade_count_sum]
       # - pct_change:
       #     id: returns
       #     input:

@@ -181,7 +181,7 @@ SELECT add_dimension('trades', by_hash('instrument_id', 4));
 
 CREATE TABLE IF NOT EXISTS insights (
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    instrument_id uuid NOT NULL REFERENCES instruments(id),
+    instrument_id uuid REFERENCES instruments(id),
     feature_id VARCHAR NOT NULL,
     value NUMERIC NOT NULL,
     PRIMARY KEY (instrument_id, feature_id, event_time)
