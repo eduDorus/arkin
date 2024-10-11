@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap},
     time::Duration,
 };
 
@@ -8,8 +8,6 @@ use dashmap::DashMap;
 use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
-
-// use crate::config::{LatestInputConfig, PeriodInputConfig, WindowInputConfig};
 
 #[derive(Default)]
 pub struct InsightsState {
@@ -41,37 +39,7 @@ impl InsightsState {
         });
     }
 
-    // pub fn read_features(
-    //     &self,
-    //     instrument: &Instrument,
-    //     timestamp: &OffsetDateTime,
-    //     request: &[DataRequest],
-    // ) -> DataResponse {
-    //     DataResponse::new(
-    //         request
-    //             .iter()
-    //             .map(|r| {
-    //                 let data = match &r {
-    //                     DataRequest::Latest { feature_id } => self.last_entry(instrument, feature_id, timestamp),
-    //                     DataRequest::Window { feature_id, window } => {
-    //                         self.list_entries_window(instrument, feature_id, timestamp, window)
-    //                     }
-    //                     DataRequest::Period {
-    //                         feature_id,
-    //                         periods,
-    //                     } => self.list_entries_periods(instrument, feature_id, timestamp, periods),
-    //                 };
-    //                 (r.feature_id().clone(), data)
-    //             })
-    //             .collect(),
-    //     )
-    // }
-
-    pub fn instruments(&self) -> HashSet<Instrument> {
-        self.features.iter().filter_map(|v| v.key().0.clone()).collect::<HashSet<_>>()
-    }
-
-    pub fn last_entry(
+    pub fn get_last_by_instrument(
         &self,
         instrument: Option<&Instrument>,
         feature_id: &FeatureId,
@@ -87,7 +55,25 @@ impl InsightsState {
         None
     }
 
-    pub fn list_entries_window(
+    pub fn get_last_by_instruments(
+        &self,
+        instruments: &[Instrument],
+        feature_id: &FeatureId,
+        timestamp: &OffsetDateTime,
+    ) -> HashMap<Instrument, Decimal> {
+        instruments
+            .iter()
+            .cloned()
+            .map(|i| {
+                (
+                    i.clone(),
+                    self.get_last_by_instrument(Some(&i), feature_id, timestamp).unwrap_or_default(),
+                )
+            })
+            .collect()
+    }
+
+    pub fn get_window_by_instrument(
         &self,
         instrument: Option<&Instrument>,
         feature_id: &FeatureId,
@@ -104,7 +90,26 @@ impl InsightsState {
         }
     }
 
-    pub fn list_entries_periods(
+    pub fn get_window_by_instruments(
+        &self,
+        instruments: &[Instrument],
+        feature_id: &FeatureId,
+        timestamp: &OffsetDateTime,
+        window: &Duration,
+    ) -> HashMap<Instrument, Vec<Decimal>> {
+        instruments
+            .iter()
+            .cloned()
+            .map(|i| {
+                (
+                    i.clone(),
+                    self.get_window_by_instrument(Some(&i), feature_id, timestamp, window),
+                )
+            })
+            .collect()
+    }
+
+    pub fn get_periods_by_instrument(
         &self,
         instrument: Option<&Instrument>,
         feature_id: &FeatureId,
@@ -120,6 +125,25 @@ impl InsightsState {
         } else {
             Vec::new()
         }
+    }
+
+    pub fn get_periods_by_instruments(
+        &self,
+        instruments: &[Instrument],
+        feature_id: &FeatureId,
+        timestamp: &OffsetDateTime,
+        periods: &usize,
+    ) -> HashMap<Instrument, Vec<Decimal>> {
+        instruments
+            .iter()
+            .cloned()
+            .map(|i| {
+                (
+                    i.clone(),
+                    self.get_periods_by_instrument(Some(&i), feature_id, timestamp, periods),
+                )
+            })
+            .collect()
     }
 }
 

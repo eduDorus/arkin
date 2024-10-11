@@ -1,20 +1,25 @@
 use crate::{
     config::FeatureConfig,
-    service::FeatureModule,
-    simple::{CountFeature, SumFeature},
+    service::Computation,
+    simple::{OHLCFeature, StdDevFeature, TradeCountFeature},
+    ta::{EMAFeature, SMAFeature},
 };
 
 pub struct FeatureFactory {}
 
 impl FeatureFactory {
-    pub fn from_config(configs: &[FeatureConfig]) -> Vec<Box<dyn FeatureModule>> {
+    pub fn from_config(configs: &[FeatureConfig]) -> Vec<Box<dyn Computation>> {
         // Create nodes
         configs
             .iter()
             .map(|config| {
-                let feature: Box<dyn FeatureModule> = match config {
-                    FeatureConfig::Count(c) => Box::new(CountFeature::from_config(c)),
-                    FeatureConfig::Sum(c) => Box::new(SumFeature::from_config(c)),
+                let feature: Box<dyn Computation> = match config {
+                    FeatureConfig::OHLC(c) => Box::new(OHLCFeature::from_config(c)),
+                    FeatureConfig::TradeCount(c) => Box::new(TradeCountFeature::from_config(c)),
+                    FeatureConfig::StdDev(c) => Box::new(StdDevFeature::from_config(c)),
+                    FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
+                    FeatureConfig::EMA(c) => Box::new(EMAFeature::from_config(c)),
+                    // FeatureConfig::Sum(c) => Box::new(SumFeature::from_config(c)),
                     // FeatureConfig::Sum(c) => Box::new(SumFeature::from_config(c)),
                     // FeatureConfig::Mean(c) => Box::new(MeanFeature::from_config(c)),
                     // FeatureConfig::CumSum(c) => Box::new(CumSumFeature::from_config(c)),

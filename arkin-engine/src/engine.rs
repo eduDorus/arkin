@@ -7,12 +7,9 @@ use arkin_insights::InsightsManager;
 use arkin_market::MarketManager;
 use arkin_portfolio::PortfolioManager;
 use arkin_strategies::StrategyManager;
-use derive_builder::Builder;
 use time::OffsetDateTime;
 use tracing::info;
 
-#[derive(Builder)]
-#[builder(pattern = "owned")]
 pub struct Engine {
     market_manager: MarketManager,
     portfolio_manager: PortfolioManager,

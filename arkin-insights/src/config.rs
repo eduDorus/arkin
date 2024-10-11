@@ -1,4 +1,5 @@
 use arkin_core::prelude::*;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -18,16 +19,35 @@ pub struct PipelineConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FeatureConfig {
+    #[serde(rename = "ohlc")]
+    OHLC(OHLCConfig),
     #[serde(rename = "count")]
-    Count(CountFeatureConfig),
-    #[serde(rename = "sum")]
-    Sum(SumFeatureConfig),
+    TradeCount(TradeCountConfig),
+    #[serde(rename = "stddev")]
+    StdDev(StdDevConfig),
+    #[serde(rename = "sma")]
+    SMA(SMAConfig),
+    #[serde(rename = "ema")]
+    EMA(EMAConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CountFeatureConfig {
-    pub inputs: Vec<NodeId>,
-    pub outputs: Vec<NodeId>,
+pub struct OHLCConfig {
+    pub input: NodeId,
+    pub open_output: NodeId,
+    pub high_output: NodeId,
+    pub low_output: NodeId,
+    pub close_output: NodeId,
+    pub window: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TradeCountConfig {
+    pub input: NodeId,
+    pub buy_output: NodeId,
+    pub sell_output: NodeId,
+    pub total_output: NodeId,
+    pub ratio_output: NodeId,
     pub window: u64,
 }
 
@@ -35,6 +55,28 @@ pub struct CountFeatureConfig {
 pub struct SumFeatureConfig {
     pub inputs: Vec<NodeId>,
     pub outputs: Vec<NodeId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StdDevConfig {
+    pub input: NodeId,
+    pub output: NodeId,
+    pub window: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SMAConfig {
+    pub input: NodeId,
+    pub output: NodeId,
+    pub periods: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EMAConfig {
+    pub input: NodeId,
+    pub output: NodeId,
+    pub periods: usize,
+    pub smoothing: Decimal,
 }
 
 // #[derive(Debug, Serialize, Deserialize, Clone)]

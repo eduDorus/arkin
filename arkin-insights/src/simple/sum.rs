@@ -5,7 +5,7 @@ use arkin_core::prelude::*;
 use time::OffsetDateTime;
 use tracing::debug;
 
-use crate::{config::SumFeatureConfig, service::FeatureModule, state::InsightsState};
+use crate::{config::SumFeatureConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct SumFeature {
@@ -22,7 +22,7 @@ impl SumFeature {
     }
 }
 
-impl FeatureModule for SumFeature {
+impl Computation for SumFeature {
     fn inputs(&self) -> &[NodeId] {
         &self.inputs
     }
@@ -47,7 +47,7 @@ impl FeatureModule for SumFeature {
             .map(|(input_id, output_id)| {
                 let values = instruments
                     .iter()
-                    .filter_map(|instrument| state.last_entry(Some(instrument), input_id, timestamp))
+                    .filter_map(|instrument| state.get_last_by_instrument(Some(instrument), input_id, timestamp))
                     .collect::<Vec<_>>();
                 let sum = values.iter().sum();
                 Insight::new(timestamp.clone(), None, output_id.clone(), sum)

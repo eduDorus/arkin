@@ -1,5 +1,7 @@
-mod count;
-mod sum;
+mod ohlc;
+mod std_dev;
+mod trade_count;
 
-pub use count::CountFeature;
-pub use sum::SumFeature;
+pub use ohlc::OHLCFeature;
+pub use std_dev::StdDevFeature;
+pub use trade_count::TradeCountFeature;

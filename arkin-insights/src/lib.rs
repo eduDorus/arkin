@@ -1,26 +1,15 @@
-// mod base;
 mod config;
 mod factory;
 mod pipeline;
-mod simple;
-// mod risk;
 mod service;
+mod simple;
 mod state;
-// mod ta;
-
-// use base::*;
-use pipeline::*;
-// use ta::*;
+mod ta;
 
 pub use service::InsightsService;
 
 pub mod prelude {
     // pub use crate::base::*;
     pub use crate::config::*;
-    pub use crate::factory::*;
-    pub use crate::pipeline::*;
-    pub use crate::service::*;
-    // pub use crate::risk::*;
-    pub use crate::state::*;
-    // pub use crate::ta::*;
+    pub use crate::service::InsightsService;
 }
