@@ -124,7 +124,7 @@ impl ComputationGraph {
                         Ok(data) => {
                             // debug!("Calculated: {:?}", data);
                             data.into_iter().for_each(|insight| {
-                                debug!("Saving: {}", insight);
+                                info!("Pipeline got: {}", insight);
                                 pipeline_result.lock().push(insight);
                             });
                         }

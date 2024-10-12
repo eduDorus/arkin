@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::Result;
 use rust_decimal::prelude::*;
@@ -13,7 +13,7 @@ use crate::{config::StdDevConfig, service::Computation, state::InsightsState};
 pub struct StdDevFeature {
     input: NodeId,
     output: NodeId,
-    window: Duration,
+    periods: usize,
 }
 
 impl StdDevFeature {
@@ -21,7 +21,7 @@ impl StdDevFeature {
         StdDevFeature {
             input: config.input.to_owned(),
             output: config.output.to_owned(),
-            window: Duration::from_secs(config.window),
+            periods: config.periods,
         }
     }
 }
@@ -44,7 +44,7 @@ impl Computation for StdDevFeature {
         debug!("Calculating StdDev");
 
         // Get data from state
-        let data = state.get_window_by_instruments(instruments, &self.input, timestamp, &self.window);
+        let data = state.get_periods_by_instruments(instruments, &self.input, timestamp, &self.periods);
 
         // Calculate the mean (StdDev)
         let insights = data

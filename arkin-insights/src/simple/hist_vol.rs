@@ -19,7 +19,7 @@ impl HistVolFeature {
     pub fn from_config(config: &HistVolConfig) -> Self {
         // Calculate annualized multiplier (seconds)
         let multiplier =
-            config.trading_days * Decimal::from_f64(24.0 * 60.0 * 60.0).unwrap() / config.timeframe_in_secs;
+            config.trading_days_per_year * Decimal::from_f64(24.0 * 60.0 * 60.0).unwrap() / config.timeframe_in_secs;
         let annualized_multi = multiplier.sqrt().expect("Failed to calculate annualization multiplier");
         HistVolFeature {
             input: config.input.to_owned(),

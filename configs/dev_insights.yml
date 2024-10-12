@@ -10,108 +10,63 @@
 insights_service:
   pipeline:
     features:
-      - count:
-          inputs: [trade_side]
-          outputs: [trade_count]
+      - ohlcv:
+          input_price: trade_price
+          input_quantity: trade_quantity
+          output_open: open
+          output_high: high
+          output_low: low
+          output_close: close
+          output_volume: volume
+          output_notional_volume: notional_volume
           window: 60
-      - sum:
-          inputs: [trade_count]
-          outputs: [trade_count_sum]
-      # - pct_change:
-      #     id: returns
-      #     input:
-      #       from: base
-      #       feature: trade_price
-      #       window: 60
-      #     output: returns
-      # - cum_sum:
-      #     id: cumulative_returns
-      #     input:
-      #       from: returns
-      #       feature: returns
-      #       window: 3600
-      #     output: cumulative_returns
-      # - std_dev:
-      #     id: hist_vol
-      #     input:
-      #       from: returns
-      #       feature: returns
-      #       window: 3600
-      #     output: hist_vol
-      # # Volume
-      # - sum:
-      #     id: volume
-      #     input:
-      #       from: base
-      #       feature: trade_quantity
-      #       window: 60
-      #     output: volume
-      # - sma:
-      #     id: sma_5_volume
-      #     input:
-      #       from: volume
-      #       feature: volume
-      #       periods: 5
-      #     output: sma_5_volume
-      # - sma:
-      #     id: sma_5_volume
-      #     input: volume
-      #     periods: 5
-      # - spread:
-      #     input_front: sma_5_volume
-      #     input_back: sma_60_volume
-      #     absolute: false
-      #     output: spread_sma_volume
-      # - sma:
-      #     id: sma_60_volume
-      #     input:
-      #       from: volume
-      #       feature: volume
-      #       periods: 60
-      #     output: sma_60_volume
-      # - spread:
-      #     id: spread_sma_volume
-      #     input_front:
-      #       from: sma_5_volume
-      #       feature: sma_5_volume
-      #     input_back:
-      #       from: sma_60_volume
-      #       feature: sma_60_volume
-      #     output: spread_sma_volume
-      #     absolute: false
-      # # VWAP
-      # - vwap:
-      #     id: vwap
-      #     input_price:
-      #       from: base
-      #       feature: trade_price
-      #       window: 60
-      #     input_quantity:
-      #       from: base
-      #       feature: trade_quantity
-      #       window: 60
-      #     output: vwap
-      # - sma:
-      #     id: sma_5_vwap
-      #     input:
-      #       from: vwap
-      #       feature: vwap
-      #       periods: 5
-      #     output: sma_5_vwap
-      # - sma:
-      #     id: sma_60_vwap
-      #     input:
-      #       from: vwap
-      #       feature: vwap
-      #       periods: 60
-      #     output: sma_60_vwap
-      # - spread:
-      #     id: spread_sma_vwap
-      #     input_front:
-      #       from: sma_5_vwap
-      #       feature: sma_5_vwap
-      #     input_back:
-      #       from: sma_60_vwap
-      #       feature: sma_60_vwap
-      #     output: spread_sma_vwap
-      #     absolute: false
+      - vwap:
+          input_price: trade_price
+          input_quantity: trade_quantity
+          output: vwap
+          window: 60
+      - pct_change:
+          input: close
+          output: return
+          periods: 2
+      - trade_count:
+          trade_side_input: trade_side
+          buy_output: buy_count
+          sell_output: sell_count
+          total_output: total_count
+          ratio_output: buy_sell_ratio
+          window: 60
+      - std_dev:
+          input: return
+          output: return_stddev
+          periods: 60
+      - hist_vol:
+          input: return_stddev
+          output: annualized_hist_vol
+          trading_days_per_year: 365
+          timeframe_in_secs: 60
+      - sma:
+          input: close
+          output: sma_5
+          periods: 5
+      - sma:
+          input: close
+          output: sma_60
+          periods: 60
+      - ema:
+          input: close
+          output: ema_12
+          periods: 12
+          smoothing: 2
+      - ema:
+          input: close
+          output: ema_26
+          periods: 26
+          smoothing: 2
+      - macd:
+          fast_input: ema_12
+          slow_input: ema_26
+          signal_output: macd_signal
+          histogram_output: macd_histogram
+          signal_periods: 9
+          smoothing: 2

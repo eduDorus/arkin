@@ -19,13 +19,15 @@ pub struct PipelineConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FeatureConfig {
-    #[serde(rename = "ohlc")]
-    OHLC(OHLCConfig),
+    #[serde(rename = "ohlcv")]
+    OHLCV(OHLCVConfig),
+    #[serde(rename = "vwap")]
+    VWAP(VWAPConfig),
     #[serde(rename = "pct_change")]
     PctChange(PctChangeConfig),
     #[serde(rename = "trade_count")]
     TradeCount(TradeCountConfig),
-    #[serde(rename = "stddev")]
+    #[serde(rename = "std_dev")]
     StdDev(StdDevConfig),
     #[serde(rename = "hist_vol")]
     HistVol(HistVolConfig),
@@ -38,33 +40,29 @@ pub enum FeatureConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OHLCConfig {
-    pub input: NodeId,
-    pub open_output: NodeId,
-    pub high_output: NodeId,
-    pub low_output: NodeId,
-    pub close_output: NodeId,
+pub struct OHLCVConfig {
+    pub input_price: NodeId,
+    pub input_quantity: NodeId,
+    pub output_open: NodeId,
+    pub output_high: NodeId,
+    pub output_low: NodeId,
+    pub output_close: NodeId,
+    pub output_volume: NodeId,
+    pub output_notional_volume: NodeId,
     pub window: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PctChangeConfig {
-    pub input: NodeId,
+pub struct VWAPConfig {
+    pub input_price: NodeId,
+    pub input_quantity: NodeId,
     pub output: NodeId,
     pub window: u64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HistVolConfig {
-    pub input: NodeId,
-    pub output: NodeId,
-    pub trading_days: Decimal,
-    pub timeframe_in_secs: Decimal,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TradeCountConfig {
-    pub input: NodeId,
+    pub trade_side_input: NodeId,
     pub buy_output: NodeId,
     pub sell_output: NodeId,
     pub total_output: NodeId,
@@ -73,16 +71,31 @@ pub struct TradeCountConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SumFeatureConfig {
-    pub inputs: Vec<NodeId>,
-    pub outputs: Vec<NodeId>,
+pub struct PctChangeConfig {
+    pub input: NodeId,
+    pub output: NodeId,
+    pub periods: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StdDevConfig {
     pub input: NodeId,
     pub output: NodeId,
-    pub window: u64,
+    pub periods: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HistVolConfig {
+    pub input: NodeId,
+    pub output: NodeId,
+    pub trading_days_per_year: Decimal,
+    pub timeframe_in_secs: Decimal,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SumFeatureConfig {
+    pub inputs: Vec<NodeId>,
+    pub outputs: Vec<NodeId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

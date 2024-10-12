@@ -79,7 +79,7 @@ impl Computation for MACDFeature {
                 let signal_insight = Insight::new(
                     timestamp.clone(),
                     Some(instrument.clone()),
-                    self.histogram_output.clone(),
+                    self.signal_output.clone(),
                     signal_line,
                 );
 

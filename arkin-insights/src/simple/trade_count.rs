@@ -10,7 +10,7 @@ use crate::{config::TradeCountConfig, service::Computation, state::InsightsState
 
 #[derive(Debug)]
 pub struct TradeCountFeature {
-    input: NodeId,
+    trade_side_input: NodeId,
     buy_output: NodeId,
     sell_output: NodeId,
     total_output: NodeId,
@@ -21,7 +21,7 @@ pub struct TradeCountFeature {
 impl TradeCountFeature {
     pub fn from_config(config: &TradeCountConfig) -> Self {
         Self {
-            input: config.input.to_owned(),
+            trade_side_input: config.trade_side_input.to_owned(),
             buy_output: config.buy_output.to_owned(),
             sell_output: config.sell_output.to_owned(),
             total_output: config.total_output.to_owned(),
@@ -33,7 +33,7 @@ impl TradeCountFeature {
 
 impl Computation for TradeCountFeature {
     fn inputs(&self) -> Vec<NodeId> {
-        vec![self.input.clone()]
+        vec![self.trade_side_input.clone()]
     }
 
     fn outputs(&self) -> Vec<NodeId> {
@@ -54,7 +54,7 @@ impl Computation for TradeCountFeature {
         debug!("Calculating trade count feature");
 
         // Get data from state
-        let data = state.get_window_by_instruments(instruments, &self.input, timestamp, &self.window);
+        let data = state.get_window_by_instruments(instruments, &self.trade_side_input, timestamp, &self.window);
 
         // Calculate the trade count
         let insights = data

@@ -46,7 +46,7 @@ impl InsightsRepo {
             INSERT INTO insights (event_time, instrument_id, feature_id, value)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (event_time, instrument_id, feature_id)
-            DO UPDATE SET value = EXCLUDED.value 
+            DO UPDATE SET value = EXCLUDED.value
             "#,
             insight.event_time,
             insight.instrument_id,
@@ -80,8 +80,8 @@ impl InsightsRepo {
                 });
 
                 // Add the `ON CONFLICT` clause
-                query_builder
-                    .push("ON CONFLICT (event_time, instrument_id, feature_id) DO UPDATE SET value = EXCLUDED.value");
+                // query_builder.push("ON CONFLICT DO NOTHING");
+                // .push("ON CONFLICT (event_time, instrument_id, feature_id) DO UPDATE SET value = EXCLUDED.value");
 
                 query_builder
             })
@@ -99,6 +99,7 @@ impl InsightsRepo {
                 Ok(_) => { /* Success */ }
                 Err(e) => {
                     error!("Error executing query: {}", e);
+                    error!("Query: {:?}", e);
                     return Err(e.into());
                 }
             }

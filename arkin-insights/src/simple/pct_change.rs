@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::Result;
 use arkin_core::prelude::*;
@@ -11,7 +11,7 @@ use crate::{config::PctChangeConfig, service::Computation, state::InsightsState}
 pub struct PctChangeFeature {
     input: NodeId,
     output: NodeId,
-    window: Duration,
+    periods: usize,
 }
 
 impl PctChangeFeature {
@@ -19,7 +19,7 @@ impl PctChangeFeature {
         PctChangeFeature {
             input: config.input.to_owned(),
             output: config.output.to_owned(),
-            window: Duration::from_secs(config.window),
+            periods: config.periods,
         }
     }
 }
@@ -42,7 +42,7 @@ impl Computation for PctChangeFeature {
         debug!("Calculating percentage change");
 
         // Get data from state
-        let data = state.get_window_by_instruments(instruments, &self.input, timestamp, &self.window);
+        let data = state.get_periods_by_instruments(instruments, &self.input, timestamp, &self.periods);
 
         // Retrieve the values for the feature over the window period
         let insights = data

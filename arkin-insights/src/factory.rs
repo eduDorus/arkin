@@ -1,7 +1,7 @@
 use crate::{
     config::FeatureConfig,
     service::Computation,
-    simple::{HistVolFeature, OHLCFeature, PctChangeFeature, StdDevFeature, TradeCountFeature},
+    simple::{HistVolFeature, OHLCVFeature, PctChangeFeature, StdDevFeature, TradeCountFeature, VWAPFeature},
     ta::{EMAFeature, MACDFeature, SMAFeature},
 };
 
@@ -14,7 +14,8 @@ impl FeatureFactory {
             .iter()
             .map(|config| {
                 let feature: Box<dyn Computation> = match config {
-                    FeatureConfig::OHLC(c) => Box::new(OHLCFeature::from_config(c)),
+                    FeatureConfig::OHLCV(c) => Box::new(OHLCVFeature::from_config(c)),
+                    FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
                     FeatureConfig::PctChange(c) => Box::new(PctChangeFeature::from_config(c)),
                     FeatureConfig::HistVol(c) => Box::new(HistVolFeature::from_config(c)),
                     FeatureConfig::TradeCount(c) => Box::new(TradeCountFeature::from_config(c)),
