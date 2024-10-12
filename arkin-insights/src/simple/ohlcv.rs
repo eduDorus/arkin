@@ -61,16 +61,20 @@ impl Computation for OHLCVFeature {
         debug!("Calculating OHLCV");
 
         // Get data from state
-        let price_data = state.get_window_by_instruments(instruments, &self.trade_price_input, timestamp, &self.window);
-        let quantity_data =
-            state.get_window_by_instruments(instruments, &self.trade_quantity_input, timestamp, &self.window);
 
         // Calculate the mean (OHLC)
         let insights = instruments
             .iter()
             .filter_map(|instrument| {
-                let prices = price_data.get(instrument).cloned().unwrap_or(vec![]);
-                let quantities = quantity_data.get(instrument).cloned().unwrap_or(vec![]);
+                // Get data
+                let prices =
+                    state.get_window_by_instrument(Some(instrument), &self.trade_price_input, timestamp, &self.window);
+                let quantities = state.get_window_by_instrument(
+                    Some(instrument),
+                    &self.trade_quantity_input,
+                    timestamp,
+                    &self.window,
+                );
 
                 // Check if we have enough data
                 if prices.is_empty() || quantities.is_empty() || prices.len() != quantities.len() {

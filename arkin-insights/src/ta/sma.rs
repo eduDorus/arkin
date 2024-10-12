@@ -43,13 +43,13 @@ impl Computation for SMAFeature {
     ) -> Result<Vec<Insight>> {
         debug!("Calculating SMA");
 
-        // Get data from state
-        let data = state.get_periods_by_instruments(instruments, &self.input, timestamp, &self.periods);
-
         // Calculate the mean (SMA)
-        let insights = data
-            .into_iter()
-            .filter_map(|(instrument, values)| {
+        let insights = instruments
+            .iter()
+            .filter_map(|instrument| {
+                // Get data from state
+                let values = state.get_periods_by_instrument(Some(instrument), &self.input, timestamp, &self.periods);
+
                 // Check if we have enough data
                 if values.len() < self.periods {
                     warn!("Not enough data for SMA calculation");
@@ -61,7 +61,12 @@ impl Computation for SMAFeature {
                 let sum = values.iter().sum::<Decimal>();
                 let sma = sum / count;
 
-                Some(Insight::new(timestamp.clone(), Some(instrument), self.output.clone(), sma))
+                Some(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output.clone(),
+                    sma,
+                ))
             })
             .collect::<Vec<_>>();
 

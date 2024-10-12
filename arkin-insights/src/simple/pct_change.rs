@@ -42,26 +42,35 @@ impl Computation for PctChangeFeature {
         debug!("Calculating percentage change");
 
         // Get data from state
-        let data = state.get_periods_by_instruments(instruments, &self.input, timestamp, &self.periods);
 
         // Retrieve the values for the feature over the window period
-        let insights = data
-            .into_iter()
-            .filter_map(|(i, v)| {
+        let insights = instruments
+            .iter()
+            .filter_map(|instrument| {
+                //  Get data
+                let data = state.get_periods_by_instrument(Some(instrument), &self.input, timestamp, &self.periods);
+
                 // Check if we have enough data
-                if v.len() < 2 {
+                if data.len() < 2 {
                     return None;
                 }
 
                 // Calculate the percentage change
-                let first_value = v
+                let first_value = data
                     .first()
                     .expect("Could not get first value, unexpected empty vector, should have been caught earlier");
-                let last_value = v
+                let last_value = data
                     .last()
                     .expect("Could not get last value, unexpected empty vector, should have been caught earlier");
                 let percentage_change = (last_value - first_value) / first_value;
-                Some(Insight::new(timestamp.clone(), Some(i), self.output.clone(), percentage_change))
+
+                // Return insight
+                Some(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output.clone(),
+                    percentage_change,
+                ))
             })
             .collect::<Vec<_>>();
 

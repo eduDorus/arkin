@@ -46,14 +46,13 @@ impl Computation for EMAFeature {
     ) -> Result<Vec<Insight>> {
         debug!("Calculating EMA");
 
-        // Get data from state
-        let data = state.get_periods_by_instruments(instruments, &self.input, timestamp, &self.periods);
-        let last_emas = state.get_last_by_instruments(instruments, &self.output, timestamp);
-
         // Calculate the mean (EMA)
-        let insights = data
-            .into_iter()
-            .filter_map(|(instrument, values)| {
+        let insights = instruments
+            .iter()
+            .filter_map(|instrument| {
+                // Get data
+                let values = state.get_periods_by_instrument(Some(instrument), &self.input, timestamp, &self.periods);
+
                 // Check if we have enough data
                 if values.len() < self.periods {
                     warn!("Not enough data for EMA calculation");
@@ -61,9 +60,10 @@ impl Computation for EMAFeature {
                 }
 
                 // Check if the instrument has an EMA entry
-                match last_emas.get(&instrument) {
+                let last_ema = state.get_last_by_instrument(Some(instrument), &self.output, timestamp);
+                match last_ema {
                     // If key exists and has a last EMA value, proceed with the calculation
-                    Some(Some(last_ema)) => {
+                    Some(last_ema) => {
                         // Calculate SMA
                         let sum = values.iter().sum::<Decimal>();
                         let count = Decimal::from(values.len());
@@ -72,20 +72,25 @@ impl Computation for EMAFeature {
                         // Calculate EMA
                         let ema =
                             sma * self.smoothing_constant + last_ema * (Decimal::from(1) - self.smoothing_constant);
-                        Some(Insight::new(timestamp.clone(), Some(instrument), self.output.clone(), ema))
+                        Some(Insight::new(
+                            timestamp.clone(),
+                            Some(instrument.clone()),
+                            self.output.clone(),
+                            ema,
+                        ))
                     }
                     // If key exists but has no last EMA value, use SMA as the starting EMA
-                    Some(None) => {
-                        warn!("Instrument {:?} has no last EMA value, using SMA as fallback", instrument);
+                    None => {
+                        warn!("Instrument {} has no last EMA value, using SMA as fallback", instrument);
                         let sum = values.iter().sum::<Decimal>();
                         let count = Decimal::from(values.len());
                         let sma = sum / count;
-                        Some(Insight::new(timestamp.clone(), Some(instrument), self.output.clone(), sma))
-                    }
-                    // If key does not exist, skip this instrument
-                    None => {
-                        warn!("No EMA data found for instrument {:?}", instrument);
-                        None
+                        Some(Insight::new(
+                            timestamp.clone(),
+                            Some(instrument.clone()),
+                            self.output.clone(),
+                            sma,
+                        ))
                     }
                 }
             })

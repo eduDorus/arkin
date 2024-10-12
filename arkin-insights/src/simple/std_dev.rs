@@ -43,26 +43,31 @@ impl Computation for StdDevFeature {
     ) -> Result<Vec<Insight>> {
         debug!("Calculating StdDev");
 
-        // Get data from state
-        let data = state.get_periods_by_instruments(instruments, &self.input, timestamp, &self.periods);
-
         // Calculate the mean (StdDev)
-        let insights = data
-            .into_iter()
-            .filter_map(|(instrument, values)| {
+        let insights = instruments
+            .iter()
+            .filter_map(|instrument| {
+                // Get data from state
+                let data = state.get_periods_by_instrument(Some(instrument), &self.input, timestamp, &self.periods);
+
                 // Check if we have enough data
-                if values.is_empty() {
+                if data.is_empty() {
                     warn!("Not enough data for StdDev calculation");
                     return None;
                 }
 
                 // Calculate StdDev
-                let sum = values.iter().sum::<Decimal>();
-                let count = Decimal::from(values.len());
+                let sum = data.iter().sum::<Decimal>();
+                let count = Decimal::from(data.len());
                 let mean = sum / count;
-                let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<Decimal>() / count;
+                let variance = data.iter().map(|v| (v - mean).powi(2)).sum::<Decimal>() / count;
                 if let Some(std_dev) = variance.sqrt() {
-                    Some(Insight::new(timestamp.clone(), Some(instrument), self.output.clone(), std_dev))
+                    Some(Insight::new(
+                        timestamp.clone(),
+                        Some(instrument.clone()),
+                        self.output.clone(),
+                        std_dev,
+                    ))
                 } else {
                     warn!("Failed to calculate StdDev: mean: {}, variance: {}", mean, variance);
                     None

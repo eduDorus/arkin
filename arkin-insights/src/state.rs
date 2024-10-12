@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    time::Duration,
-};
+use std::{collections::BTreeMap, time::Duration};
 
 use arkin_core::prelude::*;
 use dashmap::DashMap;
@@ -55,19 +52,6 @@ impl InsightsState {
         None
     }
 
-    pub fn get_last_by_instruments(
-        &self,
-        instruments: &[Instrument],
-        feature_id: &FeatureId,
-        timestamp: &OffsetDateTime,
-    ) -> HashMap<Instrument, Option<Decimal>> {
-        instruments
-            .iter()
-            .cloned()
-            .map(|i| (i.clone(), self.get_last_by_instrument(Some(&i), feature_id, timestamp)))
-            .collect()
-    }
-
     pub fn get_window_by_instrument(
         &self,
         instrument: Option<&Instrument>,
@@ -83,25 +67,6 @@ impl InsightsState {
         } else {
             Vec::new()
         }
-    }
-
-    pub fn get_window_by_instruments(
-        &self,
-        instruments: &[Instrument],
-        feature_id: &FeatureId,
-        timestamp: &OffsetDateTime,
-        window: &Duration,
-    ) -> HashMap<Instrument, Vec<Decimal>> {
-        instruments
-            .iter()
-            .cloned()
-            .map(|i| {
-                (
-                    i.clone(),
-                    self.get_window_by_instrument(Some(&i), feature_id, timestamp, window),
-                )
-            })
-            .collect()
     }
 
     pub fn get_periods_by_instrument(
@@ -120,25 +85,6 @@ impl InsightsState {
         } else {
             Vec::new()
         }
-    }
-
-    pub fn get_periods_by_instruments(
-        &self,
-        instruments: &[Instrument],
-        feature_id: &FeatureId,
-        timestamp: &OffsetDateTime,
-        periods: &usize,
-    ) -> HashMap<Instrument, Vec<Decimal>> {
-        instruments
-            .iter()
-            .cloned()
-            .map(|i| {
-                (
-                    i.clone(),
-                    self.get_periods_by_instrument(Some(&i), feature_id, timestamp, periods),
-                )
-            })
-            .collect()
     }
 }
 

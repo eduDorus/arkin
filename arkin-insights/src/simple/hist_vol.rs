@@ -47,21 +47,30 @@ impl Computation for HistVolFeature {
         debug!("Calculating percentage change");
 
         // Get data from state
-        let data = state.get_last_by_instruments(instruments, &self.input, timestamp);
 
         // Retrieve the values for the feature over the window period
-        let insights = data
-            .into_iter()
-            .filter_map(|(i, v)| {
+        let insights = instruments
+            .iter()
+            .filter_map(|instrument| {
+                // Get data
+                let data = state.get_last_by_instrument(Some(instrument), &self.input, timestamp);
+
                 // Check if we have enough data
-                if v.is_none() {
+                if data.is_none() {
                     return None;
                 }
 
-                let v = v.expect("Could not get value, unexpected None, should have been caught earlier");
+                // Calculate the annualized volatility
+                let v = data.expect("Could not get value, unexpected None, should have been caught earlier");
                 let annualized_vol = v * self.annualized_multi;
 
-                Some(Insight::new(timestamp.clone(), Some(i), self.output.clone(), annualized_vol))
+                // Create the insight
+                Some(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output.clone(),
+                    annualized_vol,
+                ))
             })
             .collect::<Vec<_>>();
 

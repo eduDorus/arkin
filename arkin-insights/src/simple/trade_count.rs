@@ -4,7 +4,7 @@ use anyhow::Result;
 use arkin_core::prelude::*;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{config::TradeCountConfig, service::Computation, state::InsightsState};
 
@@ -54,29 +54,48 @@ impl Computation for TradeCountFeature {
         debug!("Calculating trade count feature");
 
         // Get data from state
-        let data = state.get_window_by_instruments(instruments, &self.trade_side_input, timestamp, &self.window);
 
         // Calculate the trade count
-        let insights = data
-            .into_iter()
-            .map(|(i, v)| {
-                let buy_count = v.iter().filter(|x| *x > &Decimal::ZERO).count().into();
-                let sell_count = v.iter().filter(|x| *x < &Decimal::ZERO).count().into();
+        let insights = instruments
+            .iter()
+            .filter_map(|instrument| {
+                let data =
+                    state.get_window_by_instrument(Some(instrument), &self.trade_side_input, timestamp, &self.window);
+
+                if data.is_empty() {
+                    warn!("Trade side data is empty, cannot calculate trade count");
+                    return None;
+                }
+
+                // Calculate counts
+                let buy_count = data.iter().filter(|x| *x > &Decimal::ZERO).count().into();
+                let sell_count = data.iter().filter(|x| *x < &Decimal::ZERO).count().into();
                 let total_count = buy_count + sell_count;
+
+                // Create insights
                 let buy_count_insight =
-                    Insight::new(timestamp.clone(), Some(i.clone()), self.buy_output.clone(), buy_count);
-                let sell_count_insight =
-                    Insight::new(timestamp.clone(), Some(i.clone()), self.sell_output.clone(), sell_count);
-                let total_count_insight =
-                    Insight::new(timestamp.clone(), Some(i.clone()), self.total_output.clone(), total_count);
+                    Insight::new(timestamp.clone(), Some(instrument.clone()), self.buy_output.clone(), buy_count);
+                let sell_count_insight = Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.sell_output.clone(),
+                    sell_count,
+                );
+                let total_count_insight = Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.total_output.clone(),
+                    total_count,
+                );
                 // Buy Sell Ratio Occilator (buy - sell) / (total)
                 let buy_sell_ratio = Insight::new(
                     timestamp.clone(),
-                    Some(i.clone()),
+                    Some(instrument.clone()),
                     self.ratio_output.clone(),
                     (buy_count - sell_count) / total_count,
                 );
-                vec![buy_count_insight, sell_count_insight, total_count_insight, buy_sell_ratio]
+
+                Some(vec![buy_count_insight, sell_count_insight, total_count_insight, buy_sell_ratio])
             })
             .flatten()
             .collect::<Vec<_>>();
