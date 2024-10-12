@@ -62,11 +62,11 @@ pub struct VWAPConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TradeCountConfig {
-    pub trade_side_input: NodeId,
-    pub buy_output: NodeId,
-    pub sell_output: NodeId,
-    pub total_output: NodeId,
-    pub ratio_output: NodeId,
+    pub input_side: NodeId,
+    pub output_buy: NodeId,
+    pub output_sell: NodeId,
+    pub output_total: NodeId,
+    pub output_ratio: NodeId,
     pub window: u64,
 }
 
@@ -93,12 +93,6 @@ pub struct HistVolConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SumFeatureConfig {
-    pub inputs: Vec<NodeId>,
-    pub outputs: Vec<NodeId>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SMAConfig {
     pub input: NodeId,
     pub output: NodeId,
@@ -115,109 +109,10 @@ pub struct EMAConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MACDConfig {
-    pub fast_input: NodeId,
-    pub slow_input: NodeId,
-    pub signal_output: NodeId,
-    pub histogram_output: NodeId,
+    pub input_fast: NodeId,
+    pub input_slow: NodeId,
+    pub output_signal: NodeId,
+    pub output_histogram: NodeId,
     pub signal_periods: usize,
     pub smoothing: Decimal,
 }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub enum FeatureConfig {
-//     #[serde(rename = "count")]
-//     Count(CountFeatureConfig),
-//     #[serde(rename = "sum")]
-//     Sum(SumFeatureConfig),
-//     #[serde(rename = "mean")]
-//     Mean(MeanFeatureConfig),
-//     #[serde(rename = "cum_sum")]
-//     CumSum(CumSumFeatureConfig),
-//     #[serde(rename = "pct_change")]
-//     PctChange(PctChangeFeatureConfig),
-//     #[serde(rename = "std_dev")]
-//     StdDev(StdDevFeatureConfig),
-//     #[serde(rename = "vwap")]
-//     VWAP(VWAPFeatureConfig),
-//     #[serde(rename = "sma")]
-//     SMA(SMAFeatureConfig),
-//     #[serde(rename = "spread")]
-//     Spread(SpreadFeatureConfig),
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct CountFeatureConfig {
-//     pub id: NodeId,
-//     pub input: WindowInputConfig,
-//     pub output: FeatureId,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct SumFeatureConfig {
-//     pub id: NodeId,
-//     pub input: WindowInputConfig,
-//     pub output: FeatureId,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct MeanFeatureConfig {
-//     pub id: NodeId,
-//     pub input: WindowInputConfig,
-//     pub output: FeatureId,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct CumSumFeatureConfig {
-//     pub id: NodeId,
-//     pub input: WindowInputConfig,
-//     pub output: FeatureId,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct PctChangeFeatureConfig {
-//     pub id: NodeId,
-//     pub input: WindowInputConfig,
-//     pub output: FeatureId,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct StdDevFeatureConfig {
-//     pub id: NodeId,
-//     pub input: WindowInputConfig,
-//     pub output: FeatureId,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct VWAPFeatureConfig {
-//     pub id: NodeId,
-//     pub input_price: WindowInputConfig,
-//     pub input_quantity: WindowInputConfig,
-//     pub output: FeatureId,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct SMAFeatureConfig {
-//     pub id: NodeId,
-//     pub input: PeriodInputConfig,
-//     pub output: FeatureId,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct SpreadFeatureConfig {
-//     pub id: NodeId,
-//     pub input_front: LatestInputConfig,
-//     pub input_back: LatestInputConfig,
-//     pub output: FeatureId,
-//     pub absolute: bool,
-// }
-
-// #[derive(Debug, Serialize, Deserialize, Clone)]
-// pub struct PositionConfig {
-//     pub id: NodeId,
-//     pub input_position_price: LatestInputConfig,
-//     pub input_position_quantity: LatestInputConfig,
-//     pub input_fill_price: WindowInputConfig,
-//     pub input_fill_quantity: WindowInputConfig,
-//     pub output_price: FeatureId,
-//     pub output_quantity: FeatureId,
-// }

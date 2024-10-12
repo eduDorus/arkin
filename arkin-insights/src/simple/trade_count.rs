@@ -10,22 +10,22 @@ use crate::{config::TradeCountConfig, service::Computation, state::InsightsState
 
 #[derive(Debug)]
 pub struct TradeCountFeature {
-    trade_side_input: NodeId,
-    buy_output: NodeId,
-    sell_output: NodeId,
-    total_output: NodeId,
-    ratio_output: NodeId,
+    input_side: NodeId,
+    output_buy: NodeId,
+    output_sell: NodeId,
+    output_total: NodeId,
+    output_ratio: NodeId,
     window: Duration,
 }
 
 impl TradeCountFeature {
     pub fn from_config(config: &TradeCountConfig) -> Self {
         Self {
-            trade_side_input: config.trade_side_input.to_owned(),
-            buy_output: config.buy_output.to_owned(),
-            sell_output: config.sell_output.to_owned(),
-            total_output: config.total_output.to_owned(),
-            ratio_output: config.ratio_output.to_owned(),
+            input_side: config.input_side.to_owned(),
+            output_buy: config.output_buy.to_owned(),
+            output_sell: config.output_sell.to_owned(),
+            output_total: config.output_total.to_owned(),
+            output_ratio: config.output_ratio.to_owned(),
             window: Duration::from_secs(config.window),
         }
     }
@@ -33,15 +33,15 @@ impl TradeCountFeature {
 
 impl Computation for TradeCountFeature {
     fn inputs(&self) -> Vec<NodeId> {
-        vec![self.trade_side_input.clone()]
+        vec![self.input_side.clone()]
     }
 
     fn outputs(&self) -> Vec<NodeId> {
         vec![
-            self.buy_output.clone(),
-            self.sell_output.clone(),
-            self.total_output.clone(),
-            self.ratio_output.clone(),
+            self.output_buy.clone(),
+            self.output_sell.clone(),
+            self.output_total.clone(),
+            self.output_ratio.clone(),
         ]
     }
 
@@ -59,8 +59,7 @@ impl Computation for TradeCountFeature {
         let insights = instruments
             .iter()
             .filter_map(|instrument| {
-                let data =
-                    state.get_window_by_instrument(Some(instrument), &self.trade_side_input, timestamp, &self.window);
+                let data = state.get_window_by_instrument(Some(instrument), &self.input_side, timestamp, &self.window);
 
                 if data.is_empty() {
                     warn!("Trade side data is empty, cannot calculate trade count");
@@ -74,24 +73,24 @@ impl Computation for TradeCountFeature {
 
                 // Create insights
                 let buy_count_insight =
-                    Insight::new(timestamp.clone(), Some(instrument.clone()), self.buy_output.clone(), buy_count);
+                    Insight::new(timestamp.clone(), Some(instrument.clone()), self.output_buy.clone(), buy_count);
                 let sell_count_insight = Insight::new(
                     timestamp.clone(),
                     Some(instrument.clone()),
-                    self.sell_output.clone(),
+                    self.output_sell.clone(),
                     sell_count,
                 );
                 let total_count_insight = Insight::new(
                     timestamp.clone(),
                     Some(instrument.clone()),
-                    self.total_output.clone(),
+                    self.output_total.clone(),
                     total_count,
                 );
                 // Buy Sell Ratio Occilator (buy - sell) / (total)
                 let buy_sell_ratio = Insight::new(
                     timestamp.clone(),
                     Some(instrument.clone()),
-                    self.ratio_output.clone(),
+                    self.output_ratio.clone(),
                     (buy_count - sell_count) / total_count,
                 );
 

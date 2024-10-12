@@ -30,11 +30,11 @@ insights_service:
           output: return
           periods: 2
       - trade_count:
-          trade_side_input: trade_side
-          buy_output: buy_count
-          sell_output: sell_count
-          total_output: total_count
-          ratio_output: buy_sell_ratio
+          input_side: trade_side
+          output_buy: buy_count
+          output_sell: sell_count
+          output_total: total_count
+          output_ratio: buy_sell_ratio
           window: 60
       - std_dev:
           input: return
@@ -64,9 +64,9 @@ insights_service:
           periods: 26
           smoothing: 2
       - macd:
-          fast_input: ema_12
-          slow_input: ema_26
-          signal_output: macd_signal
-          histogram_output: macd_histogram
+          input_fast: ema_12
+          input_slow: ema_26
+          output_signal: macd_signal
+          output_histogram: macd_histogram
           signal_periods: 9
           smoothing: 2

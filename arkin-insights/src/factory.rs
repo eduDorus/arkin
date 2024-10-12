@@ -23,15 +23,6 @@ impl FeatureFactory {
                     FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
                     FeatureConfig::EMA(c) => Box::new(EMAFeature::from_config(c)),
                     FeatureConfig::MACD(c) => Box::new(MACDFeature::from_config(c)),
-                    // FeatureConfig::Sum(c) => Box::new(SumFeature::from_config(c)),
-                    // FeatureConfig::Sum(c) => Box::new(SumFeature::from_config(c)),
-                    // FeatureConfig::Mean(c) => Box::new(MeanFeature::from_config(c)),
-                    // FeatureConfig::CumSum(c) => Box::new(CumSumFeature::from_config(c)),
-                    // FeatureConfig::PctChange(c) => Box::new(PctChangeFeature::from_config(c)),
-                    // FeatureConfig::StdDev(c) => Box::new(StdDevFeature::from_config(c)),
-                    // FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
-                    // FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
-                    // FeatureConfig::Spread(c) => Box::new(SpreadFeature::from_config(c)),
                 };
                 feature
             })

@@ -11,10 +11,10 @@ use crate::{config::MACDConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct MACDFeature {
-    fast_input: NodeId,
-    slow_input: NodeId,
-    signal_output: NodeId,
-    histogram_output: NodeId,
+    input_fast: NodeId,
+    input_slow: NodeId,
+    output_signal: NodeId,
+    output_histogram: NodeId,
     smoothing_constant: Decimal,
 }
 
@@ -23,10 +23,10 @@ impl MACDFeature {
         let smoothing_constant =
             Decimal::from(config.smoothing) / (Decimal::from(config.signal_periods) + Decimal::from(1));
         MACDFeature {
-            fast_input: config.fast_input.to_owned(),
-            slow_input: config.slow_input.to_owned(),
-            signal_output: config.signal_output.to_owned(),
-            histogram_output: config.histogram_output.to_owned(),
+            input_fast: config.input_fast.to_owned(),
+            input_slow: config.input_slow.to_owned(),
+            output_signal: config.output_signal.to_owned(),
+            output_histogram: config.output_histogram.to_owned(),
             smoothing_constant,
         }
     }
@@ -34,11 +34,11 @@ impl MACDFeature {
 
 impl Computation for MACDFeature {
     fn inputs(&self) -> Vec<NodeId> {
-        vec![self.fast_input.clone(), self.slow_input.clone()]
+        vec![self.input_fast.clone(), self.input_slow.clone()]
     }
 
     fn outputs(&self) -> Vec<NodeId> {
-        vec![self.histogram_output.clone(), self.signal_output.clone()]
+        vec![self.output_histogram.clone(), self.output_signal.clone()]
     }
 
     fn calculate(
@@ -54,8 +54,8 @@ impl Computation for MACDFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data from state
-                let fast_data = state.get_last_by_instrument(Some(instrument), &self.fast_input, timestamp);
-                let slow_data = state.get_last_by_instrument(Some(instrument), &self.slow_input, timestamp);
+                let fast_data = state.get_last_by_instrument(Some(instrument), &self.input_fast, timestamp);
+                let slow_data = state.get_last_by_instrument(Some(instrument), &self.input_slow, timestamp);
 
                 // Check if we have enough data
                 if fast_data.is_none() || slow_data.is_none() {
@@ -70,7 +70,7 @@ impl Computation for MACDFeature {
                 let macd_line = fast - slow;
 
                 // Calculate EMA of MACD line
-                let prev_signal = state.get_last_by_instrument(Some(instrument), &self.signal_output, timestamp);
+                let prev_signal = state.get_last_by_instrument(Some(instrument), &self.output_signal, timestamp);
                 let signal_line = match prev_signal {
                     Some(s) => (macd_line - s) * self.smoothing_constant + s,
                     None => macd_line,
@@ -79,7 +79,7 @@ impl Computation for MACDFeature {
                 let signal_insight = Insight::new(
                     timestamp.clone(),
                     Some(instrument.clone()),
-                    self.signal_output.clone(),
+                    self.output_signal.clone(),
                     signal_line,
                 );
 
@@ -87,7 +87,7 @@ impl Computation for MACDFeature {
                 let histogram_insight = Insight::new(
                     timestamp.clone(),
                     Some(instrument.clone()),
-                    self.histogram_output.clone(),
+                    self.output_histogram.clone(),
                     histogram,
                 );
                 Some(vec![signal_insight, histogram_insight])
