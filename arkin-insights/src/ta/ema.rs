@@ -14,17 +14,17 @@ pub struct EMAFeature {
     input: NodeId,
     output: NodeId,
     periods: usize,
-    multiplier: Decimal,
+    smoothing_constant: Decimal,
 }
 
 impl EMAFeature {
     pub fn from_config(config: &EMAConfig) -> Self {
-        let multiplier = Decimal::from(config.smoothing) / (Decimal::from(config.periods) + Decimal::from(1));
+        let smoothing_constant = Decimal::from(config.smoothing) / (Decimal::from(config.periods) + Decimal::from(1));
         EMAFeature {
             input: config.input.to_owned(),
             output: config.output.to_owned(),
             periods: config.periods,
-            multiplier,
+            smoothing_constant,
         }
     }
 }
@@ -70,7 +70,8 @@ impl Computation for EMAFeature {
                         let sma = sum / count;
 
                         // Calculate EMA
-                        let ema = sma * self.multiplier + last_ema * (Decimal::from(1) - self.multiplier);
+                        let ema =
+                            sma * self.smoothing_constant + last_ema * (Decimal::from(1) - self.smoothing_constant);
                         Some(Insight::new(timestamp.clone(), Some(instrument), self.output.clone(), ema))
                     }
                     // If key exists but has no last EMA value, use SMA as the starting EMA

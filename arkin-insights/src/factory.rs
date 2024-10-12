@@ -2,7 +2,7 @@ use crate::{
     config::FeatureConfig,
     service::Computation,
     simple::{HistVolFeature, OHLCFeature, PctChangeFeature, StdDevFeature, TradeCountFeature},
-    ta::{EMAFeature, SMAFeature},
+    ta::{EMAFeature, MACDFeature, SMAFeature},
 };
 
 pub struct FeatureFactory {}
@@ -21,6 +21,7 @@ impl FeatureFactory {
                     FeatureConfig::StdDev(c) => Box::new(StdDevFeature::from_config(c)),
                     FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
                     FeatureConfig::EMA(c) => Box::new(EMAFeature::from_config(c)),
+                    FeatureConfig::MACD(c) => Box::new(MACDFeature::from_config(c)),
                     // FeatureConfig::Sum(c) => Box::new(SumFeature::from_config(c)),
                     // FeatureConfig::Sum(c) => Box::new(SumFeature::from_config(c)),
                     // FeatureConfig::Mean(c) => Box::new(MeanFeature::from_config(c)),

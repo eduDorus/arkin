@@ -33,6 +33,8 @@ pub enum FeatureConfig {
     SMA(SMAConfig),
     #[serde(rename = "ema")]
     EMA(EMAConfig),
+    #[serde(rename = "macd")]
+    MACD(MACDConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -95,6 +97,16 @@ pub struct EMAConfig {
     pub input: NodeId,
     pub output: NodeId,
     pub periods: usize,
+    pub smoothing: Decimal,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MACDConfig {
+    pub fast_input: NodeId,
+    pub slow_input: NodeId,
+    pub signal_output: NodeId,
+    pub histogram_output: NodeId,
+    pub signal_periods: usize,
     pub smoothing: Decimal,
 }
 
