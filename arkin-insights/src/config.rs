@@ -21,10 +21,14 @@ pub struct PipelineConfig {
 pub enum FeatureConfig {
     #[serde(rename = "ohlc")]
     OHLC(OHLCConfig),
-    #[serde(rename = "count")]
+    #[serde(rename = "pct_change")]
+    PctChange(PctChangeConfig),
+    #[serde(rename = "trade_count")]
     TradeCount(TradeCountConfig),
     #[serde(rename = "stddev")]
     StdDev(StdDevConfig),
+    #[serde(rename = "hist_vol")]
+    HistVol(HistVolConfig),
     #[serde(rename = "sma")]
     SMA(SMAConfig),
     #[serde(rename = "ema")]
@@ -39,6 +43,21 @@ pub struct OHLCConfig {
     pub low_output: NodeId,
     pub close_output: NodeId,
     pub window: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PctChangeConfig {
+    pub input: NodeId,
+    pub output: NodeId,
+    pub window: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HistVolConfig {
+    pub input: NodeId,
+    pub output: NodeId,
+    pub trading_days: Decimal,
+    pub timeframe_in_secs: Decimal,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

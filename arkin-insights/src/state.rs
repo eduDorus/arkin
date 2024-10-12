@@ -60,16 +60,11 @@ impl InsightsState {
         instruments: &[Instrument],
         feature_id: &FeatureId,
         timestamp: &OffsetDateTime,
-    ) -> HashMap<Instrument, Decimal> {
+    ) -> HashMap<Instrument, Option<Decimal>> {
         instruments
             .iter()
             .cloned()
-            .map(|i| {
-                (
-                    i.clone(),
-                    self.get_last_by_instrument(Some(&i), feature_id, timestamp).unwrap_or_default(),
-                )
-            })
+            .map(|i| (i.clone(), self.get_last_by_instrument(Some(&i), feature_id, timestamp)))
             .collect()
     }
 

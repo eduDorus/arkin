@@ -60,16 +60,33 @@ impl Computation for EMAFeature {
                     return None;
                 }
 
-                // Calculate SMA
-                let sum = values.iter().sum::<Decimal>();
-                let count = Decimal::from(values.len());
-                let sma = sum / count;
+                // Check if the instrument has an EMA entry
+                match last_emas.get(&instrument) {
+                    // If key exists and has a last EMA value, proceed with the calculation
+                    Some(Some(last_ema)) => {
+                        // Calculate SMA
+                        let sum = values.iter().sum::<Decimal>();
+                        let count = Decimal::from(values.len());
+                        let sma = sum / count;
 
-                // Calculate the EMA (EMA = last value x multiplier + EMA (previous day) x (1-multiplier))
-                let last_ema = last_emas.get(&instrument).unwrap_or(&sma);
-                let ema = sma * self.multiplier + last_ema * (Decimal::from(1) - self.multiplier);
-
-                Some(Insight::new(timestamp.clone(), Some(instrument), self.output.clone(), ema))
+                        // Calculate EMA
+                        let ema = sma * self.multiplier + last_ema * (Decimal::from(1) - self.multiplier);
+                        Some(Insight::new(timestamp.clone(), Some(instrument), self.output.clone(), ema))
+                    }
+                    // If key exists but has no last EMA value, use SMA as the starting EMA
+                    Some(None) => {
+                        warn!("Instrument {:?} has no last EMA value, using SMA as fallback", instrument);
+                        let sum = values.iter().sum::<Decimal>();
+                        let count = Decimal::from(values.len());
+                        let sma = sum / count;
+                        Some(Insight::new(timestamp.clone(), Some(instrument), self.output.clone(), sma))
+                    }
+                    // If key does not exist, skip this instrument
+                    None => {
+                        warn!("No EMA data found for instrument {:?}", instrument);
+                        None
+                    }
+                }
             })
             .collect::<Vec<_>>();
 
