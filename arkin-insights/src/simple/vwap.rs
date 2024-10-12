@@ -47,10 +47,8 @@ impl Computation for VWAPFeature {
         let insights = instruments
             .iter()
             .filter_map(|instrument| {
-                let prices =
-                    state.get_window_by_instrument(Some(instrument), &self.input_price, timestamp, &self.window);
-                let quantities =
-                    state.get_window_by_instrument(Some(instrument), &self.input_quantity, timestamp, &self.window);
+                let prices = state.get_window(Some(instrument), &self.input_price, timestamp, &self.window);
+                let quantities = state.get_window(Some(instrument), &self.input_quantity, timestamp, &self.window);
 
                 if prices.is_empty() {
                     warn!("No price data found for instrument {}", instrument);

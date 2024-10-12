@@ -36,7 +36,7 @@ impl InsightsState {
         });
     }
 
-    pub fn get_last_by_instrument(
+    pub fn get_last(
         &self,
         instrument: Option<&Instrument>,
         feature_id: &FeatureId,
@@ -52,7 +52,7 @@ impl InsightsState {
         None
     }
 
-    pub fn get_window_by_instrument(
+    pub fn get_window(
         &self,
         instrument: Option<&Instrument>,
         feature_id: &FeatureId,
@@ -69,7 +69,7 @@ impl InsightsState {
         }
     }
 
-    pub fn get_periods_by_instrument(
+    pub fn get_periods(
         &self,
         instrument: Option<&Instrument>,
         feature_id: &FeatureId,

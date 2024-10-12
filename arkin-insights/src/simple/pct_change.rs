@@ -48,7 +48,7 @@ impl Computation for PctChangeFeature {
             .iter()
             .filter_map(|instrument| {
                 //  Get data
-                let data = state.get_periods_by_instrument(Some(instrument), &self.input, timestamp, &self.periods);
+                let data = state.get_periods(Some(instrument), &self.input, timestamp, &self.periods);
 
                 // Check if we have enough data
                 if data.len() < 2 {

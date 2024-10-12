@@ -54,8 +54,8 @@ impl Computation for MACDFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data from state
-                let fast_data = state.get_last_by_instrument(Some(instrument), &self.input_fast, timestamp);
-                let slow_data = state.get_last_by_instrument(Some(instrument), &self.input_slow, timestamp);
+                let fast_data = state.get_last(Some(instrument), &self.input_fast, timestamp);
+                let slow_data = state.get_last(Some(instrument), &self.input_slow, timestamp);
 
                 // Check if we have enough data
                 if fast_data.is_none() || slow_data.is_none() {
@@ -70,7 +70,7 @@ impl Computation for MACDFeature {
                 let macd_line = fast - slow;
 
                 // Calculate EMA of MACD line
-                let prev_signal = state.get_last_by_instrument(Some(instrument), &self.output_signal, timestamp);
+                let prev_signal = state.get_last(Some(instrument), &self.output_signal, timestamp);
                 let signal_line = match prev_signal {
                     Some(s) => (macd_line - s) * self.smoothing_constant + s,
                     None => macd_line,

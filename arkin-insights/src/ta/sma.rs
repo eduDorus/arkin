@@ -48,7 +48,7 @@ impl Computation for SMAFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data from state
-                let values = state.get_periods_by_instrument(Some(instrument), &self.input, timestamp, &self.periods);
+                let values = state.get_periods(Some(instrument), &self.input, timestamp, &self.periods);
 
                 // Check if we have enough data
                 if values.len() < self.periods {

@@ -67,14 +67,9 @@ impl Computation for OHLCVFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data
-                let prices =
-                    state.get_window_by_instrument(Some(instrument), &self.trade_price_input, timestamp, &self.window);
-                let quantities = state.get_window_by_instrument(
-                    Some(instrument),
-                    &self.trade_quantity_input,
-                    timestamp,
-                    &self.window,
-                );
+                let prices = state.get_window(Some(instrument), &self.trade_price_input, timestamp, &self.window);
+                let quantities =
+                    state.get_window(Some(instrument), &self.trade_quantity_input, timestamp, &self.window);
 
                 // Check if we have enough data
                 if prices.is_empty() || quantities.is_empty() || prices.len() != quantities.len() {

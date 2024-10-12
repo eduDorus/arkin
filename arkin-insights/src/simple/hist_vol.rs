@@ -53,7 +53,7 @@ impl Computation for HistVolFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data
-                let data = state.get_last_by_instrument(Some(instrument), &self.input, timestamp);
+                let data = state.get_last(Some(instrument), &self.input, timestamp);
 
                 // Check if we have enough data
                 if data.is_none() {

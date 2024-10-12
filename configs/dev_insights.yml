@@ -40,6 +40,10 @@ insights_service:
           input: return
           output: return_stddev
           periods: 60
+      - std_dev:
+          input: close
+          output: stddev_20
+          periods: 20
       - hist_vol:
           input: return_stddev
           output: annualized_hist_vol
@@ -47,8 +51,8 @@ insights_service:
           timeframe_in_secs: 60
       - sma:
           input: close
-          output: sma_5
-          periods: 5
+          output: sma_20
+          periods: 20
       - sma:
           input: close
           output: sma_60
@@ -70,3 +74,12 @@ insights_service:
           output_histogram: macd_histogram
           signal_periods: 9
           smoothing: 2
+      - bollinger_bands:
+          input_price: close
+          input_sma: sma_20
+          input_stddev: stddev_20
+          output_upper: bb_upper
+          output_lower: bb_lower
+          output_oscillator: bb_oscillator
+          output_width: bb_width
+          sigma: 2

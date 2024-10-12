@@ -37,6 +37,8 @@ pub enum FeatureConfig {
     EMA(EMAConfig),
     #[serde(rename = "macd")]
     MACD(MACDConfig),
+    #[serde(rename = "bollinger_bands")]
+    BollingerBands(BollingerBandsConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -115,4 +117,16 @@ pub struct MACDConfig {
     pub output_histogram: NodeId,
     pub signal_periods: usize,
     pub smoothing: Decimal,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BollingerBandsConfig {
+    pub input_price: NodeId,
+    pub input_sma: NodeId,
+    pub input_stddev: NodeId,
+    pub output_upper: NodeId,
+    pub output_lower: NodeId,
+    pub output_oscillator: NodeId,
+    pub output_width: NodeId,
+    pub sigma: Decimal,
 }

@@ -59,7 +59,7 @@ impl Computation for TradeCountFeature {
         let insights = instruments
             .iter()
             .filter_map(|instrument| {
-                let data = state.get_window_by_instrument(Some(instrument), &self.input_side, timestamp, &self.window);
+                let data = state.get_window(Some(instrument), &self.input_side, timestamp, &self.window);
 
                 if data.is_empty() {
                     warn!("Trade side data is empty, cannot calculate trade count");
