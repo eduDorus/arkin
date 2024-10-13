@@ -75,15 +75,25 @@ impl Computation for RSIFeature {
                 // Calculate the RSI
                 let rsi_gain = prev_avg_gain * Decimal::from(self.periods - 1) + last_gain;
                 let rsi_loss = prev_avg_loss * Decimal::from(self.periods - 1) + last_loss;
-                let ratio = rsi_gain / rsi_loss;
-                let rsi = Decimal::from(100) - (Decimal::from(100) / (Decimal::from(1) + ratio));
 
-                Some(Insight::new(
-                    timestamp.clone(),
-                    Some(instrument.clone()),
-                    self.output.clone(),
-                    rsi,
-                ))
+                // Zero loss edge case
+                if rsi_loss.is_zero() {
+                    return Some(Insight::new(
+                        timestamp.clone(),
+                        Some(instrument.clone()),
+                        self.output.clone(),
+                        Decimal::from(100),
+                    ));
+                } else {
+                    let ratio = rsi_gain / rsi_loss;
+                    let rsi = Decimal::from(100) - (Decimal::from(100) / (Decimal::from(1) + ratio));
+                    return Some(Insight::new(
+                        timestamp.clone(),
+                        Some(instrument.clone()),
+                        self.output.clone(),
+                        rsi,
+                    ));
+                }
             })
             .collect::<Vec<_>>();
 
