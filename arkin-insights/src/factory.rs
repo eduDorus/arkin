@@ -2,7 +2,7 @@ use crate::{
     config::FeatureConfig,
     service::Computation,
     simple::{HistVolFeature, OHLCVFeature, PctChangeFeature, StdDevFeature, TradeCountFeature, VWAPFeature},
-    ta::{BollingerBandsFeature, EMAFeature, MACDFeature, SMAFeature},
+    ta::{BollingerBandsFeature, EMAFeature, MACDFeature, RSIFeature, SMAFeature},
 };
 
 pub struct FeatureFactory {}
@@ -24,6 +24,7 @@ impl FeatureFactory {
                     FeatureConfig::EMA(c) => Box::new(EMAFeature::from_config(c)),
                     FeatureConfig::MACD(c) => Box::new(MACDFeature::from_config(c)),
                     FeatureConfig::BollingerBands(c) => Box::new(BollingerBandsFeature::from_config(c)),
+                    FeatureConfig::RSI(c) => Box::new(RSIFeature::from_config(c)),
                 };
                 feature
             })

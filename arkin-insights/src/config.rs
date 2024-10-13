@@ -39,6 +39,8 @@ pub enum FeatureConfig {
     MACD(MACDConfig),
     #[serde(rename = "bollinger_bands")]
     BollingerBands(BollingerBandsConfig),
+    #[serde(rename = "rsi")]
+    RSI(RSIConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -129,4 +131,11 @@ pub struct BollingerBandsConfig {
     pub output_oscillator: NodeId,
     pub output_width: NodeId,
     pub sigma: Decimal,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RSIConfig {
+    pub input_return: NodeId,
+    pub output: NodeId,
+    pub periods: usize,
 }

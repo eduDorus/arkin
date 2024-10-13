@@ -28,7 +28,7 @@ insights_service:
       - pct_change:
           input: close
           output: return
-          periods: 2
+          periods: 1
       - trade_count:
           input_side: trade_side
           output_buy: buy_count
@@ -83,3 +83,7 @@ insights_service:
           output_oscillator: bb_oscillator
           output_width: bb_width
           sigma: 2
+      - rsi:
+          input_return: return
+          output: rsi
+          periods: 14

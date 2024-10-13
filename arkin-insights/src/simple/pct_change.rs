@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use arkin_core::prelude::*;
 use time::OffsetDateTime;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{config::PctChangeConfig, service::Computation, state::InsightsState};
 
@@ -48,10 +48,11 @@ impl Computation for PctChangeFeature {
             .iter()
             .filter_map(|instrument| {
                 //  Get data
-                let data = state.get_periods(Some(instrument), &self.input, timestamp, &self.periods);
+                let data = state.get_periods(Some(instrument), &self.input, timestamp, &(self.periods + 1));
 
                 // Check if we have enough data
-                if data.len() < 2 {
+                if data.len() < self.periods + 1 {
+                    warn!("Not enough data to calculate percent change");
                     return None;
                 }
 
