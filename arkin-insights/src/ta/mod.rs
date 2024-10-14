@@ -5,7 +5,7 @@ mod rsi;
 mod sma;
 
 pub use bb::BollingerBandsFeature;
-pub use ema::EMAFeature;
+pub use ema::ExponentialMovingAverageFeature;
 pub use macd::MACDFeature;
-pub use rsi::RSIFeature;
-pub use sma::SMAFeature;
+pub use rsi::RelativeStrengthIndexFeature;
+pub use sma::SimpleMovingAverageFeature;

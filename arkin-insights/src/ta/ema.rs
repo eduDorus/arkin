@@ -10,17 +10,17 @@ use arkin_core::prelude::*;
 use crate::{config::EMAConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
-pub struct EMAFeature {
+pub struct ExponentialMovingAverageFeature {
     input: NodeId,
     output: NodeId,
     periods: usize,
     smoothing_constant: Decimal,
 }
 
-impl EMAFeature {
+impl ExponentialMovingAverageFeature {
     pub fn from_config(config: &EMAConfig) -> Self {
         let smoothing_constant = Decimal::from(config.smoothing) / (Decimal::from(config.periods) + Decimal::from(1));
-        EMAFeature {
+        ExponentialMovingAverageFeature {
             input: config.input.to_owned(),
             output: config.output.to_owned(),
             periods: config.periods,
@@ -29,7 +29,7 @@ impl EMAFeature {
     }
 }
 
-impl Computation for EMAFeature {
+impl Computation for ExponentialMovingAverageFeature {
     fn inputs(&self) -> Vec<NodeId> {
         vec![self.input.clone()]
     }

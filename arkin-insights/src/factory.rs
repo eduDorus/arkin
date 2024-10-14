@@ -2,7 +2,10 @@ use crate::{
     config::FeatureConfig,
     service::Computation,
     simple::{HistVolFeature, OHLCVFeature, PctChangeFeature, StdDevFeature, TradeCountFeature, VWAPFeature},
-    ta::{BollingerBandsFeature, EMAFeature, MACDFeature, RSIFeature, SMAFeature},
+    ta::{
+        BollingerBandsFeature, ExponentialMovingAverageFeature, MACDFeature, RelativeStrengthIndexFeature,
+        SimpleMovingAverageFeature,
+    },
 };
 
 pub struct FeatureFactory {}
@@ -20,11 +23,11 @@ impl FeatureFactory {
                     FeatureConfig::HistVol(c) => Box::new(HistVolFeature::from_config(c)),
                     FeatureConfig::TradeCount(c) => Box::new(TradeCountFeature::from_config(c)),
                     FeatureConfig::StdDev(c) => Box::new(StdDevFeature::from_config(c)),
-                    FeatureConfig::SMA(c) => Box::new(SMAFeature::from_config(c)),
-                    FeatureConfig::EMA(c) => Box::new(EMAFeature::from_config(c)),
+                    FeatureConfig::SMA(c) => Box::new(SimpleMovingAverageFeature::from_config(c)),
+                    FeatureConfig::EMA(c) => Box::new(ExponentialMovingAverageFeature::from_config(c)),
                     FeatureConfig::MACD(c) => Box::new(MACDFeature::from_config(c)),
-                    FeatureConfig::BollingerBands(c) => Box::new(BollingerBandsFeature::from_config(c)),
-                    FeatureConfig::RSI(c) => Box::new(RSIFeature::from_config(c)),
+                    FeatureConfig::BB(c) => Box::new(BollingerBandsFeature::from_config(c)),
+                    FeatureConfig::RSI(c) => Box::new(RelativeStrengthIndexFeature::from_config(c)),
                 };
                 feature
             })

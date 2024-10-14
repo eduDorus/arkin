@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use arkin_core::prelude::*;
+use rust_decimal::prelude::*;
 use time::OffsetDateTime;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
+
+use arkin_core::prelude::*;
 
 use crate::{config::PctChangeConfig, service::Computation, state::InsightsState};
 
@@ -48,6 +50,7 @@ impl Computation for PctChangeFeature {
             .iter()
             .filter_map(|instrument| {
                 //  Get data
+                info!("Getting data for timestamp: {:?}", timestamp);
                 let data = state.get_periods(Some(instrument), &self.input, timestamp, &(self.periods + 1));
 
                 // Check if we have enough data
@@ -55,6 +58,7 @@ impl Computation for PctChangeFeature {
                     warn!("Not enough data to calculate percent change");
                     return None;
                 }
+                info!("Data: {:?}", data);
 
                 // Calculate the percentage change
                 let first_value = data
@@ -63,7 +67,10 @@ impl Computation for PctChangeFeature {
                 let last_value = data
                     .last()
                     .expect("Could not get last value, unexpected empty vector, should have been caught earlier");
-                let percentage_change = (last_value - first_value) / first_value;
+                let difference = last_value - first_value;
+                let avg = (first_value + last_value) / Decimal::from(2);
+                let percentage_change = difference / avg;
+                let percentage_change = percentage_change * Decimal::from(100);
 
                 // Return insight
                 Some(Insight::new(

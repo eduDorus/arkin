@@ -10,15 +10,15 @@ use arkin_core::prelude::*;
 use crate::{config::SMAConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
-pub struct SMAFeature {
+pub struct SimpleMovingAverageFeature {
     input: NodeId,
     output: NodeId,
     periods: usize,
 }
 
-impl SMAFeature {
+impl SimpleMovingAverageFeature {
     pub fn from_config(config: &SMAConfig) -> Self {
-        SMAFeature {
+        SimpleMovingAverageFeature {
             input: config.input.to_owned(),
             output: config.output.to_owned(),
             periods: config.periods,
@@ -26,7 +26,7 @@ impl SMAFeature {
     }
 }
 
-impl Computation for SMAFeature {
+impl Computation for SimpleMovingAverageFeature {
     fn inputs(&self) -> Vec<NodeId> {
         vec![self.input.clone()]
     }

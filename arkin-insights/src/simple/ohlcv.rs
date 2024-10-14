@@ -11,28 +11,46 @@ use crate::{config::OHLCVConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct OHLCVFeature {
-    trade_price_input: NodeId,
-    trade_quantity_input: NodeId,
-    open_output: NodeId,
-    high_output: NodeId,
-    low_output: NodeId,
-    close_output: NodeId,
-    volume_output: NodeId,
-    notional_volume_output: NodeId,
+    input_price: NodeId,
+    input_quantity: NodeId,
+    output_open: NodeId,
+    output_high: NodeId,
+    output_low: NodeId,
+    output_close: NodeId,
+    output_typical_price: NodeId,
+    output_vwap: NodeId,
+    output_volume: NodeId,
+    output_buy_volume: NodeId,
+    output_sell_volume: NodeId,
+    output_notional_volume: NodeId,
+    output_buy_notional_volume: NodeId,
+    output_sell_notional_volume: NodeId,
+    output_trade_count: NodeId,
+    output_buy_trade_count: NodeId,
+    output_sell_trade_count: NodeId,
     window: Duration,
 }
 
 impl OHLCVFeature {
     pub fn from_config(config: &OHLCVConfig) -> Self {
         OHLCVFeature {
-            trade_price_input: config.input_price.to_owned(),
-            trade_quantity_input: config.input_quantity.to_owned(),
-            open_output: config.output_open.to_owned(),
-            high_output: config.output_high.to_owned(),
-            low_output: config.output_low.to_owned(),
-            close_output: config.output_close.to_owned(),
-            volume_output: config.output_volume.to_owned(),
-            notional_volume_output: config.output_notional_volume.to_owned(),
+            input_price: config.input_price.to_owned(),
+            input_quantity: config.input_quantity.to_owned(),
+            output_open: config.output_open.to_owned(),
+            output_high: config.output_high.to_owned(),
+            output_low: config.output_low.to_owned(),
+            output_close: config.output_close.to_owned(),
+            output_typical_price: config.output_typical_price.to_owned(),
+            output_vwap: config.output_vwap.to_owned(),
+            output_volume: config.output_volume.to_owned(),
+            output_buy_volume: config.output_buy_volume.to_owned(),
+            output_sell_volume: config.output_sell_volume.to_owned(),
+            output_notional_volume: config.output_notional_volume.to_owned(),
+            output_buy_notional_volume: config.output_buy_notional_volume.to_owned(),
+            output_sell_notional_volume: config.output_sell_notional_volume.to_owned(),
+            output_trade_count: config.output_trade_count.to_owned(),
+            output_buy_trade_count: config.output_buy_trade_count.to_owned(),
+            output_sell_trade_count: config.output_sell_trade_count.to_owned(),
             window: Duration::from_secs(config.window),
         }
     }
@@ -40,15 +58,26 @@ impl OHLCVFeature {
 
 impl Computation for OHLCVFeature {
     fn inputs(&self) -> Vec<NodeId> {
-        vec![self.trade_price_input.clone(), self.trade_quantity_input.clone()]
+        vec![self.input_price.clone(), self.input_quantity.clone()]
     }
 
     fn outputs(&self) -> Vec<NodeId> {
         vec![
-            self.open_output.clone(),
-            self.high_output.clone(),
-            self.low_output.clone(),
-            self.close_output.clone(),
+            self.output_open.clone(),
+            self.output_high.clone(),
+            self.output_low.clone(),
+            self.output_close.clone(),
+            self.output_typical_price.clone(),
+            self.output_vwap.clone(),
+            self.output_volume.clone(),
+            self.output_buy_volume.clone(),
+            self.output_sell_volume.clone(),
+            self.output_notional_volume.clone(),
+            self.output_buy_notional_volume.clone(),
+            self.output_sell_notional_volume.clone(),
+            self.output_trade_count.clone(),
+            self.output_buy_trade_count.clone(),
+            self.output_sell_trade_count.clone(),
         ]
     }
 
@@ -67,9 +96,8 @@ impl Computation for OHLCVFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data
-                let prices = state.get_window(Some(instrument), &self.trade_price_input, timestamp, &self.window);
-                let quantities =
-                    state.get_window(Some(instrument), &self.trade_quantity_input, timestamp, &self.window);
+                let prices = state.get_window(Some(instrument), &self.input_price, timestamp, &self.window);
+                let quantities = state.get_window(Some(instrument), &self.input_quantity, timestamp, &self.window);
 
                 // Check if we have enough data
                 if prices.is_empty() || quantities.is_empty() || prices.len() != quantities.len() {
@@ -78,60 +106,154 @@ impl Computation for OHLCVFeature {
                 }
 
                 // Calculate OHLC
-                let open = prices.first().expect("Should have at least one value");
-                let high = prices.iter().max().expect("Should have at least one value");
-                let low = prices.iter().min().expect("Should have at least one value");
-                let close = prices.last().expect("Should have at least one value");
-                let volume = quantities.iter().sum::<Decimal>();
-                let notional_volume = prices
-                    .iter()
-                    .zip(quantities.iter())
-                    .map(|(price, quantity)| price * quantity)
-                    .sum::<Decimal>();
+                let open = prices.first().expect("Should have at least one value").clone();
+                let high = prices.iter().max().expect("Should have at least one value").clone();
+                let low = prices.iter().min().expect("Should have at least one value").clone();
+                let close = prices.last().expect("Should have at least one value").clone();
+                let typical_price = (high + low + close) / Decimal::from(3);
+
+                // Calculate volume
+                let (volume, buy_volume, sell_volume) = quantities.iter().fold(
+                    (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO),
+                    |(volume, buy_volume, sell_volume), quantity| {
+                        if quantity > &Decimal::ZERO {
+                            (volume + quantity, buy_volume + quantity, sell_volume)
+                        } else {
+                            (volume + quantity.abs(), buy_volume, sell_volume + quantity.abs())
+                        }
+                    },
+                );
+
+                // Calculate notional volume
+                let (notional_volume, buy_notional_volume, sell_notional_volume) =
+                    prices.iter().zip(quantities.iter()).fold(
+                        (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO),
+                        |(notional_volume, notional_buy_volume, notional_sell_volume), (price, quantity)| {
+                            if quantity > &Decimal::ZERO {
+                                (
+                                    notional_volume + price * quantity,
+                                    notional_buy_volume + price * quantity,
+                                    notional_sell_volume,
+                                )
+                            } else {
+                                (
+                                    notional_volume + price * quantity.abs(),
+                                    notional_buy_volume,
+                                    notional_sell_volume + price * quantity.abs(),
+                                )
+                            }
+                        },
+                    );
+
+                // Calculate VWAP
+                let vwap = notional_volume / volume;
+
+                // Calculate trade count
+                let (trade_count, buy_trade_count, sell_trade_count) = quantities.iter().fold(
+                    (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO),
+                    |(trade_count, buy_trade_count, sell_trade_count), quantity| {
+                        if quantity > &Decimal::ZERO {
+                            (trade_count + Decimal::ONE, buy_trade_count + Decimal::ONE, sell_trade_count)
+                        } else {
+                            (trade_count + Decimal::ONE, buy_trade_count, sell_trade_count + Decimal::ONE)
+                        }
+                    },
+                );
 
                 // Create insights
-                let open_insight = Insight::new(
-                    timestamp.clone(),
-                    Some(instrument.clone()),
-                    self.open_output.clone(),
-                    open.clone(),
-                );
-                let high_insight = Insight::new(
-                    timestamp.clone(),
-                    Some(instrument.clone()),
-                    self.high_output.clone(),
-                    high.clone(),
-                );
-                let low_insight = Insight::new(
-                    timestamp.clone(),
-                    Some(instrument.clone()),
-                    self.low_output.clone(),
-                    low.clone(),
-                );
-                let close_insight = Insight::new(
-                    timestamp.clone(),
-                    Some(instrument.clone()),
-                    self.close_output.clone(),
-                    close.clone(),
-                );
-                let volume_insight =
-                    Insight::new(timestamp.clone(), Some(instrument.clone()), self.volume_output.clone(), volume);
+                let mut insights = Vec::with_capacity(self.outputs().len());
 
-                let notional_volume_insight = Insight::new(
+                insights.push(Insight::new(
                     timestamp.clone(),
                     Some(instrument.clone()),
-                    self.notional_volume_output.clone(),
+                    self.output_open.clone(),
+                    open,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_high.clone(),
+                    high,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_low.clone(),
+                    low,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_close.clone(),
+                    close,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_typical_price.clone(),
+                    typical_price,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_vwap.clone(),
+                    vwap,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_volume.clone(),
+                    volume,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_buy_volume.clone(),
+                    buy_volume,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_sell_volume.clone(),
+                    sell_volume,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_notional_volume.clone(),
                     notional_volume,
-                );
-
-                Some(vec![
-                    open_insight,
-                    high_insight,
-                    low_insight,
-                    close_insight,
-                    volume_insight,
-                    notional_volume_insight,
-                ])
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_buy_notional_volume.clone(),
+                    buy_notional_volume,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_sell_notional_volume.clone(),
+                    sell_notional_volume,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_trade_count.clone(),
+                    trade_count,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_buy_trade_count.clone(),
+                    buy_trade_count,
+                ));
+                insights.push(Insight::new(
+                    timestamp.clone(),
+                    Some(instrument.clone()),
+                    self.output_sell_trade_count.clone(),
+                    sell_trade_count,
+                ));
+                Some(insights)
             })
             .flatten()
             .collect::<Vec<_>>();

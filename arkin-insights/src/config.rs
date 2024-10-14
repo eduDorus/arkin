@@ -37,10 +37,10 @@ pub enum FeatureConfig {
     EMA(EMAConfig),
     #[serde(rename = "macd")]
     MACD(MACDConfig),
-    #[serde(rename = "bollinger_bands")]
-    BollingerBands(BollingerBandsConfig),
+    #[serde(rename = "bb")]
+    BB(BollingerBandsConfig),
     #[serde(rename = "rsi")]
-    RSI(RSIConfig),
+    RSI(RelativeStrengthIndexConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -51,8 +51,17 @@ pub struct OHLCVConfig {
     pub output_high: NodeId,
     pub output_low: NodeId,
     pub output_close: NodeId,
+    pub output_typical_price: NodeId,
+    pub output_vwap: NodeId,
     pub output_volume: NodeId,
+    pub output_buy_volume: NodeId,
+    pub output_sell_volume: NodeId,
     pub output_notional_volume: NodeId,
+    pub output_buy_notional_volume: NodeId,
+    pub output_sell_notional_volume: NodeId,
+    pub output_trade_count: NodeId,
+    pub output_buy_trade_count: NodeId,
+    pub output_sell_trade_count: NodeId,
     pub window: u64,
 }
 
@@ -134,8 +143,16 @@ pub struct BollingerBandsConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RSIConfig {
+pub struct RelativeStrengthIndexConfig {
     pub input_return: NodeId,
+    pub output: NodeId,
+    pub periods: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MoneyFlowIndexConfig {
+    pub input_price: NodeId,
+    pub input_quantity: NodeId,
     pub output: NodeId,
     pub periods: usize,
 }

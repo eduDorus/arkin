@@ -42,8 +42,12 @@ impl ComputationGraph {
             }
         }
 
+        for (id, index) in &id_to_index {
+            info!("Node ID: {:?}, Node Index: {:?}", id, index);
+        }
+
         // Add edges automatically
-        let mut edges_to_add = HashMap::new();
+        let mut edges_to_add = Vec::new();
         for target_node in graph.node_indices() {
             for source_id in graph[target_node].inputs() {
                 if source_id == "trade_price"
@@ -58,8 +62,11 @@ impl ComputationGraph {
                     continue;
                 }
                 let source_node = id_to_index.get(&source_id).expect("Failed to find source node from config");
-                edges_to_add.insert(*source_node, target_node);
+                edges_to_add.push((*source_node, target_node));
             }
+        }
+        for (source, target) in &edges_to_add {
+            info!("Edge: {:?} -> {:?}", source, target);
         }
 
         // Add edges to the graph

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
 use crate::{
@@ -46,13 +47,7 @@ impl Trade {
                 self.event_time,
                 Some(self.instrument.clone()),
                 "trade_quantity".into(),
-                self.quantity,
-            ),
-            Insight::new(
-                self.event_time,
-                Some(self.instrument.clone()),
-                "trade_side".into(),
-                self.side.into(),
+                self.quantity * Decimal::from(self.side),
             ),
         ]
     }

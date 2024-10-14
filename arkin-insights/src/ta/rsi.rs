@@ -3,22 +3,22 @@ use std::sync::Arc;
 use anyhow::Result;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
 
-use crate::{config::RSIConfig, service::Computation, state::InsightsState};
+use crate::{config::RelativeStrengthIndexConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
-pub struct RSIFeature {
+pub struct RelativeStrengthIndexFeature {
     input_return: NodeId,
     output: NodeId,
     periods: usize,
 }
 
-impl RSIFeature {
-    pub fn from_config(config: &RSIConfig) -> Self {
-        RSIFeature {
+impl RelativeStrengthIndexFeature {
+    pub fn from_config(config: &RelativeStrengthIndexConfig) -> Self {
+        RelativeStrengthIndexFeature {
             input_return: config.input_return.to_owned(),
             output: config.output.to_owned(),
             periods: config.periods,
@@ -26,7 +26,7 @@ impl RSIFeature {
     }
 }
 
-impl Computation for RSIFeature {
+impl Computation for RelativeStrengthIndexFeature {
     fn inputs(&self) -> Vec<NodeId> {
         vec![self.input_return.clone()]
     }
@@ -70,7 +70,6 @@ impl Computation for RSIFeature {
                 let last_loss = losses.pop().unwrap_or(Decimal::ZERO);
                 let prev_avg_gain = gains.iter().sum::<Decimal>() / Decimal::from(self.periods);
                 let prev_avg_loss = losses.iter().sum::<Decimal>() / Decimal::from(self.periods);
-                info!("Prev Avg Gain: {} Avg Loss: {}", prev_avg_gain, prev_avg_loss);
 
                 // Calculate the RSI
                 let rsi_gain = prev_avg_gain * Decimal::from(self.periods - 1) + last_gain;

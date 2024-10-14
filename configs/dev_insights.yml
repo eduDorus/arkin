@@ -17,25 +17,22 @@ insights_service:
           output_high: high
           output_low: low
           output_close: close
+          output_typical_price: typical_price
+          output_vwap: vwap_price
           output_volume: volume
+          output_buy_volume: buy_volume
+          output_sell_volume: sell_volume
           output_notional_volume: notional_volume
-          window: 60
-      - vwap:
-          input_price: trade_price
-          input_quantity: trade_quantity
-          output: vwap
+          output_buy_notional_volume: buy_notional_volume
+          output_sell_notional_volume: sell_notional_volume
+          output_trade_count: trade_count
+          output_buy_trade_count: buy_trade_count
+          output_sell_trade_count: sell_trade_count
           window: 60
       - pct_change:
           input: close
           output: return
           periods: 1
-      - trade_count:
-          input_side: trade_side
-          output_buy: buy_count
-          output_sell: sell_count
-          output_total: total_count
-          output_ratio: buy_sell_ratio
-          window: 60
       - std_dev:
           input: return
           output: return_stddev
@@ -74,7 +71,7 @@ insights_service:
           output_histogram: macd_histogram
           signal_periods: 9
           smoothing: 2
-      - bollinger_bands:
+      - bb:
           input_price: close
           input_sma: sma_20
           input_stddev: stddev_20

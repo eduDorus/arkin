@@ -68,7 +68,7 @@ impl Computation for VWAPFeature {
                 let (total_price_volume, total_volume) = prices.iter().zip(quantities.iter()).fold(
                     (Decimal::ZERO, Decimal::ZERO),
                     |(acc_price_volume, acc_quantity), (price, quantity)| {
-                        (acc_price_volume + (price * quantity), acc_quantity + quantity)
+                        (acc_price_volume + (price * quantity.abs()), acc_quantity + quantity.abs())
                     },
                 );
 
