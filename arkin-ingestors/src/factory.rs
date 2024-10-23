@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arkin_persistance::PersistanceService;
 
-use crate::{config::IngestorModuleConfig, service::Ingestor};
+use crate::{config::IngestorModuleConfig, service::Ingestor, TardisIngestor};
 
 use super::binance::BinanceIngestor;
 
@@ -12,15 +12,19 @@ impl IngestorFactory {
     pub fn from_config(
         configs: &[IngestorModuleConfig],
         persistance_service: Arc<PersistanceService>,
-    ) -> Vec<Box<dyn Ingestor>> {
+    ) -> Vec<Arc<Box<dyn Ingestor>>> {
         configs
             .iter()
             .map(|config| {
                 let ingestor: Box<dyn Ingestor> = match config {
-                    IngestorModuleConfig::Binance(c) => Box::new(BinanceIngestor::new(c, persistance_service.clone())),
-                    IngestorModuleConfig::Tardis(_) => unimplemented!(),
+                    IngestorModuleConfig::Binance(c) => {
+                        Box::new(BinanceIngestor::from_config(c, persistance_service.clone()))
+                    }
+                    IngestorModuleConfig::Tardis(c) => {
+                        Box::new(TardisIngestor::from_config(c, persistance_service.clone()))
+                    }
                 };
-                ingestor
+                Arc::new(ingestor)
             })
             .collect()
     }

@@ -1,0 +1,33 @@
+ingestor_service:
+  ingestors:
+    - tardis:
+        http_url: https://api.tardis.dev/v1/data-feeds
+        api_secret: TD.DCMMZ1tjYHSgDZb4.XLraXTAaKGBHX1h.P3QBqskIDGEEHSY.bgAmXDtpCKxPSOF.JAvZUDBMFG1WyGw.2r9H
+        max_concurrent_requests: 1
+        venue: binance-usdm
+        channel: agg-trades
+        instruments:
+          - btcusdt
+          # - ethusdt
+          # - solusdt
+        start: "2024-10-22 00:00"
+        end: "2024-10-22 00:01"
+    - tardis:
+        http_url: https://api.tardis.dev/v1/data-feeds
+        api_secret: TD.DCMMZ1tjYHSgDZb4.XLraXTAaKGBHX1h.P3QBqskIDGEEHSY.bgAmXDtpCKxPSOF.JAvZUDBMFG1WyGw.2r9H
+        max_concurrent_requests: 1
+        venue: binance-usdm
+        channel: ticks
+        instruments:
+          - btcusdt
+          # - ethusdt
+          # - solusdt
+        start: "2024-10-22 00:00"
+        end: "2024-10-22 00:01"
+        # - binance:
+        #     ws_url: wss://fstream.binance.com/ws
+        #     ws_channels:
+        #       - btcusdt@aggTrade
+        #       - btcusdt@bookTicker
+        #     connections_per_manager: 2
+        #     duplicate_lookback: 1000

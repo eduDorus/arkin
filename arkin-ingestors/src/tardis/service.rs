@@ -1,26 +1,25 @@
-use anyhow::bail;
-use anyhow::Error;
-use anyhow::Result;
-use bytes::Bytes;
-use futures_util::stream;
-use futures_util::Future;
-use futures_util::Stream;
-use futures_util::StreamExt;
-use serde::de::DeserializeOwned;
-use std::fmt::Debug;
-use std::fmt::{self, Display};
+use std::fmt;
+use std::future::Future;
 use std::str::FromStr;
-use time::macros::format_description;
-use time::OffsetDateTime;
-use tokio::io::AsyncBufReadExt;
-use tokio::io::BufReader;
-use tracing::debug;
-use tracing::error;
+use std::sync::Arc;
 
+use anyhow::{bail, Error, Result};
 use arkin_core::prelude::*;
+use arkin_persistance::prelude::*;
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures_util::{stream, Stream, StreamExt};
+use serde::de::DeserializeOwned;
+use time::macros::format_description;
+use time::{OffsetDateTime, PrimitiveDateTime};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::pin;
+use tracing::{debug, error, info};
 
 use crate::config::TardisIngestorConfig;
+use crate::service::Ingestor;
 
+use super::binance_swap::BinanceSwapsEvent;
 use super::http::TardisHttpClient;
 
 #[derive(Debug, Clone)]
@@ -35,7 +34,7 @@ pub enum TardisExchange {
     OkxOptions,
 }
 
-impl Display for TardisExchange {
+impl fmt::Display for TardisExchange {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -109,6 +108,12 @@ impl TardisExchange {
     }
 }
 
+impl Default for TardisExchange {
+    fn default() -> Self {
+        TardisExchange::BinanceUSDM // Set default to VariantA
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum TardisChannel {
     Book,
@@ -120,6 +125,12 @@ pub enum TardisChannel {
     Snapshot,
     OpenInterest,
     FundingRate,
+}
+
+impl Default for TardisChannel {
+    fn default() -> Self {
+        TardisChannel::AggTrade // Set default to VariantA
+    }
 }
 
 impl fmt::Display for TardisChannel {
@@ -161,61 +172,6 @@ impl FromStr for TardisChannel {
     }
 }
 
-pub struct TardisService {
-    pub client: TardisHttpClient,
-    pub max_concurrent_requests: usize,
-}
-
-impl TardisService {
-    pub fn builder() -> TardisServiceBuilder {
-        TardisServiceBuilder::default()
-    }
-}
-
-#[derive(Default)]
-pub struct TardisServiceBuilder {
-    pub api_secret: Option<String>,
-    pub base_url: String,
-    pub max_concurrent_requests: usize,
-}
-
-#[allow(clippy::assigning_clones)]
-impl TardisServiceBuilder {
-    pub fn config(mut self, config: &TardisIngestorConfig) -> Self {
-        self.api_secret = config.api_secret.to_owned();
-        self.base_url = config.base_url.to_owned();
-        self.max_concurrent_requests = config.max_concurrent_requests;
-        self
-    }
-
-    pub fn api_secret(mut self, api_secret: Option<String>) -> Self {
-        self.api_secret = api_secret;
-        self
-    }
-
-    pub fn base_url(mut self, base_url: String) -> Self {
-        self.base_url = base_url;
-        self
-    }
-
-    pub fn max_concurrent_requests(mut self, max_concurrent_requests: usize) -> Self {
-        self.max_concurrent_requests = max_concurrent_requests;
-        self
-    }
-
-    pub fn build(self) -> TardisService {
-        let client = TardisHttpClient::builder()
-            .base_url(self.base_url.to_owned())
-            .api_secret(self.api_secret.to_owned())
-            .build();
-
-        TardisService {
-            client,
-            max_concurrent_requests: self.max_concurrent_requests,
-        }
-    }
-}
-
 pub struct TardisRequest {
     pub exchange: TardisExchange,
     pub channel: TardisChannel,
@@ -242,7 +198,41 @@ impl TardisRequest {
     }
 }
 
-impl TardisService {
+pub struct TardisIngestor {
+    pub persistance_service: Arc<PersistanceService>,
+    pub client: TardisHttpClient,
+    pub max_concurrent_requests: usize,
+    pub venue: TardisExchange,
+    pub channel: TardisChannel,
+    pub instruments: Vec<String>,
+    pub start: OffsetDateTime,
+    pub end: OffsetDateTime,
+}
+
+impl TardisIngestor {
+    pub fn from_config(config: &TardisIngestorConfig, persistance_service: Arc<PersistanceService>) -> Self {
+        let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
+        let start = PrimitiveDateTime::parse(&config.start, &format)
+            .expect("Failed to parse start date")
+            .assume_utc();
+        let end = PrimitiveDateTime::parse(&config.end, &format)
+            .expect("Failed to parse end date")
+            .assume_utc();
+        Self {
+            persistance_service,
+            client: TardisHttpClient::builder()
+                .api_secret(config.api_secret.clone())
+                .base_url(config.http_url.clone())
+                .build(),
+            max_concurrent_requests: config.max_concurrent_requests,
+            venue: TardisExchange::from_str(&config.venue).expect("Invalid venue for tardis"),
+            channel: TardisChannel::from_str(&config.channel).expect("Invalid channel for tardis"),
+            instruments: config.instruments.to_owned(),
+            start,
+            end,
+        }
+    }
+
     pub fn download_stream(
         &self,
         req: TardisRequest,
@@ -344,4 +334,85 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
     let ts = ts.assume_utc();
 
     Ok((ts, json.to_string()))
+}
+
+#[async_trait]
+impl Ingestor for TardisIngestor {
+    async fn start(&self) {
+        info!("Starting tardis ingestor...");
+
+        let req = TardisRequest::new(&self.venue, &self.channel, &self.instruments, &self.start, &self.end);
+
+        let stream = self.stream(req);
+        pin!(stream);
+        // process_stream_concurrently(stream, manager.clone(), 10).await;
+
+        // batch insert 5000 events
+        // let mut events = Vec::with_capacity(10000);
+        while let Some((_ts, json)) = stream.next().await {
+            match serde_json::from_str::<BinanceSwapsEvent>(&json) {
+                Ok(e) => {
+                    info!("{}", e);
+                    if let Ok(res) = self.persistance_service.read_instrument_by_venue_symbol(e.venue_symbol()).await {
+                        if let Some(instrument) = res {
+                            debug!("Instrument found: {}", instrument.symbol);
+                            match e {
+                                BinanceSwapsEvent::AggTradeStream(stream) => {
+                                    let trade = stream.data;
+                                    // "m": true: The buyer is the market maker.
+                                    // • The trade was initiated by a sell order from the taker.
+                                    // • The taker is selling, and the maker (buyer) is buying.
+                                    // "m": false: The seller is the market maker.
+                                    // • The trade was initiated by a buy order from the taker.
+                                    // • The taker is buying, and the maker (seller) is selling.
+                                    let side = if trade.maker {
+                                        MarketSide::Sell
+                                    } else {
+                                        MarketSide::Buy
+                                    };
+                                    let trade = Trade::new(
+                                        trade.event_time,
+                                        instrument,
+                                        trade.agg_trade_id,
+                                        side,
+                                        trade.price,
+                                        trade.quantity,
+                                    );
+                                    if let Err(e) = self.persistance_service.insert_trade(trade).await {
+                                        error!("Failed to insert trade: {}", e);
+                                    }
+                                }
+                                BinanceSwapsEvent::TickStream(stream) => {
+                                    let tick = stream.data;
+                                    let tick = Tick::new(
+                                        tick.event_time,
+                                        instrument,
+                                        tick.update_id,
+                                        tick.bid_price,
+                                        tick.bid_quantity,
+                                        tick.ask_price,
+                                        tick.ask_quantity,
+                                    );
+                                    if let Err(e) = self.persistance_service.insert_tick(tick).await {
+                                        error!("Failed to insert tick: {}", e);
+                                    }
+                                }
+                            }
+                        } else {
+                            error!("Instrument not found for symbol: {}", e.venue_symbol());
+                            continue;
+                        }
+                    } else {
+                        error!("Failed to read instrument by venue symbol: {}", e.venue_symbol());
+                        continue;
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to parse Binance event: {}", e);
+                    error!("Data: {}", json);
+                    continue;
+                }
+            };
+        }
+    }
 }

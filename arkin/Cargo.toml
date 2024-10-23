@@ -1,24 +1,23 @@
 [package]
-name = "arkin"
-version.workspace = true
-authors.workspace = true
-edition.workspace = true
-license.workspace = true
+name="arkin"
+version.workspace=true
+authors.workspace=true
+edition.workspace=true
+license.workspace=true
 
 [[bin]]
-name = "ingestors"
-path = "src/bin/ingestors.rs"
+name="ingestors"
+path="src/bin/ingestors.rs"
 
 [[bin]]
-name = "insights"
-path = "src/bin/insights.rs"
-
+name="insights"
+path="src/bin/insights.rs"
 
 [dependencies]
-arkin-core = { path = "../arkin-core" }
-arkin-persistance = { path = "../arkin-persistance" }
-arkin-ingestors = { path = "../arkin-ingestors" }
-arkin-insights = { path = "../arkin-insights" }
+arkin-core={ path="../arkin-core" }
+arkin-persistance={ path="../arkin-persistance" }
+arkin-ingestors={ path="../arkin-ingestors" }
+arkin-insights={ path="../arkin-insights" }
 #arkin-engine = { path = "../arkin-engine" }
 #arkin-execution = { path = "../arkin-execution" }
 #arkin-strategies = { path = "../arkin-strategies" }
@@ -26,15 +25,15 @@ arkin-insights = { path = "../arkin-insights" }
 #arkin-portfolio = { path = "../arkin-portfolio" }
 #arkin-market = { path = "../arkin-market" }
 
-tokio = { workspace = true }
-mimalloc = { workspace = true }
-tracing = { workspace = true }
-tokio-rustls = { workspace = true }
-time = { workspace = true }
-anyhow = { workspace = true }
-uuid = { workspace = true }
-rayon = { workspace = true }
-futures-util = { workspace = true }
+tokio={ workspace=true }
+mimalloc={ workspace=true }
+tracing={ workspace=true }
+tokio-rustls={ workspace=true }
+time={ workspace=true }
+anyhow={ workspace=true }
+uuid={ workspace=true }
+rayon={ workspace=true }
+futures-util={ workspace=true }
 
 # Test DL
 # tch = { workspace = true }

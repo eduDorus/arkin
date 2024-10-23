@@ -1,34 +1,50 @@
+#![allow(unused)]
+use std::fmt;
+
 use arkin_core::prelude::*;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use time::OffsetDateTime;
 
-use super::parser::BinanceParser;
-
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum BinanceSwapsEvent {
-    TradeStream(BinanceSwapsTrade),
-    Trade(BinanceSwapsTradeData),
+    // TradeStream(BinanceSwapsTrade),
+    // Trade(BinanceSwapsTradeData),
     AggTradeStream(BinanceSwapsAggTrade),
-    AggTrade(BinanceSwapsAggTradeData),
-    BookStream(BinanceSwapsBook),
-    Book(BinanceSwapsBookData),
+    // AggTrade(BinanceSwapsAggTradeData),
+    // BookStream(BinanceSwapsBook),
+    // Book(BinanceSwapsBookData),
     TickStream(BinanceSwapsTick),
-    Tick(BinanceSwapsTickData),
+    // Tick(BinanceSwapsTickData),
 }
 
-impl From<BinanceSwapsEvent> for Event {
-    fn from(event: BinanceSwapsEvent) -> Self {
-        match event {
-            BinanceSwapsEvent::TradeStream(data) => Event::from(data.data),
-            BinanceSwapsEvent::Trade(data) => Event::from(data),
-            BinanceSwapsEvent::AggTradeStream(data) => Event::from(data.data),
-            BinanceSwapsEvent::AggTrade(data) => Event::from(data),
-            BinanceSwapsEvent::BookStream(data) => Event::from(data.data),
-            BinanceSwapsEvent::Book(data) => Event::from(data),
-            BinanceSwapsEvent::TickStream(data) => Event::from(data.data),
-            BinanceSwapsEvent::Tick(data) => Event::from(data),
+impl BinanceSwapsEvent {
+    pub fn venue_symbol(&self) -> &str {
+        match self {
+            BinanceSwapsEvent::AggTradeStream(data) => &data.data.instrument,
+            BinanceSwapsEvent::TickStream(data) => &data.data.instrument,
+            // BinanceSwapsEvent::TradeStream(data) => data.data.instrument.clone(),
+            // BinanceSwapsEvent::Trade(data) => data.instrument.clone(),
+            // BinanceSwapsEvent::AggTradeStream(data) => data.data.instrument.clone(),
+            // BinanceSwapsEvent::BookStream(data) => data.data.instrument.clone(),
+            // BinanceSwapsEvent::Book(data) => data.instrument.clone(),
+            // BinanceSwapsEvent::TickStream(data) => data.data.instrument.clone(),
+        }
+    }
+}
+
+impl fmt::Display for BinanceSwapsEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinanceSwapsEvent::AggTradeStream(data) => write!(f, "{}", data.data),
+            BinanceSwapsEvent::TickStream(data) => write!(f, "{}", data.data),
+            // BinanceSwapsEvent::TradeStream(data) => write!(f, "{:?}", data),
+            // BinanceSwapsEvent::Trade(data) => write!(f, "{:?}", data),
+            // BinanceSwapsEvent::AggTradeStream(data) => write!(f, "{:?}", data),
+            // BinanceSwapsEvent::BookStream(data) => write!(f, "{:?}", data),
+            // BinanceSwapsEvent::Book(data) => write!(f, "{:?}", data),
+            // BinanceSwapsEvent::TickStream(data) => write!(f, "{:?}", data),
         }
     }
 }
@@ -87,20 +103,6 @@ pub struct BinanceSwapsTradeData {
     pub maker: bool, // The true = sell, false = buy
 }
 
-impl From<BinanceSwapsTradeData> for Event {
-    fn from(data: BinanceSwapsTradeData) -> Self {
-        let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::Trade(Trade {
-            received_time: OffsetDateTime::now_utc(),
-            event_time: data.event_time,
-            instrument,
-            trade_id: data.trade_id,
-            price: data.price.into(), // TODO: Fix this
-            quantity: data.quantity.into(),
-        })
-    }
-}
-
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
 pub struct BinanceSwapsAggTrade {
@@ -132,17 +134,20 @@ pub struct BinanceSwapsAggTradeData {
     pub maker: bool, // The true = sell, false = buy
 }
 
-impl From<BinanceSwapsAggTradeData> for Event {
-    fn from(data: BinanceSwapsAggTradeData) -> Self {
-        let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::Trade(Trade::new(
-            OffsetDateTime::now_utc(),
-            data.event_time,
-            instrument,
-            data.agg_trade_id,
-            data.price.into(), // TODO: Fix this
-            data.quantity.into(),
-        ))
+impl fmt::Display for BinanceSwapsAggTradeData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AggTrade {} {} id: {} price: {}, quantity: {}, maker: {}",
+            self.event_time
+                .format(TIMESTAMP_FORMAT)
+                .expect("Failed to format event time for binance agg trade"),
+            self.instrument,
+            self.agg_trade_id,
+            self.price,
+            self.quantity,
+            self.maker,
+        )
     }
 }
 
@@ -179,24 +184,6 @@ pub struct BinanceSwapsBookData {
 pub struct BinanceSwapsBookUpdate {
     pub price: Decimal,
     pub quantity: Decimal,
-}
-
-impl From<BinanceSwapsBookData> for Event {
-    fn from(data: BinanceSwapsBookData) -> Self {
-        let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::Book(Book::new(
-            data.event_time,
-            instrument,
-            data.bids
-                .iter()
-                .map(|b| BookUpdateSide::new(b.price.into(), b.quantity.into()))
-                .collect(),
-            data.asks
-                .iter()
-                .map(|a| BookUpdateSide::new(a.price.into(), a.quantity.into()))
-                .collect(),
-        ))
-    }
 }
 
 // {
@@ -240,18 +227,21 @@ pub struct BinanceSwapsTickData {
     pub ask_quantity: Decimal,
 }
 
-impl From<BinanceSwapsTickData> for Event {
-    fn from(data: BinanceSwapsTickData) -> Self {
-        let instrument = BinanceParser::parse_instrument(&data.instrument);
-        Event::Tick(Tick {
-            event_time: data.event_time,
-            instrument,
-            tick_id: data.update_id,
-            bid_price: data.bid_price.into(), // TODO: Fix this
-            bid_quantity: data.bid_quantity.into(),
-            ask_price: data.ask_price.into(), // TODO: Fix this
-            ask_quantity: data.ask_quantity.into(),
-        })
+impl fmt::Display for BinanceSwapsTickData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Tick {} {} id: {} bid: {} {} ask: {} {}",
+            self.event_time
+                .format(TIMESTAMP_FORMAT)
+                .expect("Failed to format event time for binance tick"),
+            self.instrument,
+            self.update_id,
+            self.bid_price,
+            self.bid_quantity,
+            self.ask_price,
+            self.ask_quantity,
+        )
     }
 }
 

@@ -7,12 +7,12 @@ use arkin_persistance::prelude::*;
 use crate::{config::IngestorServiceConfig, IngestorFactory};
 
 #[async_trait]
-pub trait Ingestor {
+pub trait Ingestor: Send + Sync {
     async fn start(&self);
 }
 
 pub struct IngestorService {
-    ingestors: Vec<Box<dyn Ingestor>>,
+    ingestors: Vec<Arc<Box<dyn Ingestor>>>,
 }
 
 impl IngestorService {
@@ -23,9 +23,19 @@ impl IngestorService {
     }
 
     pub async fn start(&self) {
-        // Probably want to spawn these tasks
+        let mut tasks = vec![];
+
         for ingestor in &self.ingestors {
-            ingestor.start().await;
+            let ingestor_clone = Arc::clone(ingestor); // Clone the Arc for sharing
+            let task = tokio::spawn(async move {
+                ingestor_clone.start().await;
+            });
+            tasks.push(task);
+        }
+
+        // Optionally, wait for all tasks to complete
+        for task in tasks {
+            let _ = task.await; // Handle errors as needed
         }
     }
 }

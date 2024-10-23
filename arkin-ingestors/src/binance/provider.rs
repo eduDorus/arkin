@@ -26,7 +26,7 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    pub fn new(config: &BinanceIngestorConfig, persistance_service: Arc<PersistanceService>) -> Self {
+    pub fn from_config(config: &BinanceIngestorConfig, persistance_service: Arc<PersistanceService>) -> Self {
         Self {
             persistance_service,
             url: config.ws_url.parse().expect("Failed to parse ws binance URL"),

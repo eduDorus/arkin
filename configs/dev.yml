@@ -8,28 +8,6 @@ database:
   max_connections: 200
   idle_timeout: 300
 
-ingestor_service:
-  ingestors:
-    - binance:
-        ws_url: wss://fstream.binance.com/ws
-        ws_channels:
-          - btcusdt@aggTrade
-          - btcusdt@bookTicker
-        connections_per_manager: 2
-        duplicate_lookback: 1000
-  # - tardis:
-  #     base_url: https://api.tardis.dev/v1/data-feeds
-  #     max_concurrent_requests: 1
-  #     subscriptions:
-  #       - exchange: binance_swap
-  #         start: 2024-06-01 00:00:00
-  #         channels:
-  #           - agg_trade
-  #           - ticker
-  #           - book
-  #         symbols:
-  #           - btcusdt
-
 portfolio_manager:
   initial_capital: 100000
   leverage: 1

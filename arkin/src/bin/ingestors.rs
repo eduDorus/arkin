@@ -15,7 +15,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     init_tracing();
-    info!("Starting Arkin 🚀");
+    info!("Starting Arkin Ingestors 🚀");
 
     // Install the default CryptoProvider
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");

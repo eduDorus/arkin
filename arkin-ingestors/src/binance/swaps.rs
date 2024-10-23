@@ -49,21 +49,6 @@ impl fmt::Display for BinanceSwapEvent {
     }
 }
 
-// impl From<BinanceSwapsEvent> for Event {
-//     fn from(event: BinanceSwapsEvent) -> Self {
-//         match event {
-//             BinanceSwapsEvent::TradeStream(data) => Event::from(data.data),
-//             BinanceSwapsEvent::Trade(data) => Event::from(data),
-//             BinanceSwapsEvent::AggTradeStream(data) => Event::from(data.data),
-//             BinanceSwapsEvent::AggTrade(data) => Event::from(data),
-//             BinanceSwapsEvent::BookStream(data) => Event::from(data.data),
-//             BinanceSwapsEvent::Book(data) => Event::from(data),
-//             BinanceSwapsEvent::TickStream(data) => Event::from(data.data),
-//             BinanceSwapsEvent::Tick(data) => Event::from(data),
-//         }
-//     }
-// }
-
 // https://api.tardis.dev/v1/exchanges
 // {
 //     "id": "binance-futures",
@@ -117,20 +102,6 @@ pub struct BinanceSwapsTradeData {
     #[serde(rename = "m")]
     pub maker: bool, // The true = sell, false = buy
 }
-
-// impl From<BinanceSwapsTradeData> for Event {
-//     fn from(data: BinanceSwapsTradeData) -> Self {
-//         let instrument = BinanceParser::parse_instrument(&data.instrument);
-//         Event::Trade(Trade {
-//             received_time: OffsetDateTime::now_utc(),
-//             event_time: data.event_time,
-//             instrument,
-//             trade_id: data.trade_id,
-//             price: data.price.into(), // TODO: Fix this
-//             quantity: data.quantity.into(),
-//         })
-//     }
-// }
 
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
@@ -186,20 +157,6 @@ impl fmt::Display for BinanceSwapsAggTradeData {
     }
 }
 
-// impl From<BinanceSwapsAggTradeData> for Event {
-//     fn from(data: BinanceSwapsAggTradeData) -> Self {
-//         let instrument = BinanceParser::parse_instrument(&data.instrument);
-//         Event::Trade(Trade::new(
-//             OffsetDateTime::now_utc(),
-//             data.event_time,
-//             instrument,
-//             data.agg_trade_id,
-//             data.price.into(), // TODO: Fix this
-//             data.quantity.into(),
-//         ))
-//     }
-// }
-
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
 pub struct BinanceSwapsBook {
@@ -234,24 +191,6 @@ pub struct BinanceSwapsBookUpdate {
     pub price: Decimal,
     pub quantity: Decimal,
 }
-
-// impl From<BinanceSwapsBookData> for Event {
-//     fn from(data: BinanceSwapsBookData) -> Self {
-//         let instrument = BinanceParser::parse_instrument(&data.instrument);
-//         Event::Book(Book::new(
-//             data.event_time,
-//             instrument,
-//             data.bids
-//                 .iter()
-//                 .map(|b| BookUpdateSide::new(b.price.into(), b.quantity.into()))
-//                 .collect(),
-//             data.asks
-//                 .iter()
-//                 .map(|a| BookUpdateSide::new(a.price.into(), a.quantity.into()))
-//                 .collect(),
-//         ))
-//     }
-// }
 
 // {
 //     "e":"bookTicker",         // event type
@@ -311,21 +250,6 @@ impl fmt::Display for BinanceSwapsTickData {
         )
     }
 }
-
-// impl From<BinanceSwapsTickData> for Event {
-//     fn from(data: BinanceSwapsTickData) -> Self {
-//         let instrument = BinanceParser::parse_instrument(&data.instrument);
-//         Event::Tick(Tick {
-//             event_time: data.event_time,
-//             instrument,
-//             tick_id: data.update_id,
-//             bid_price: data.bid_price.into(), // TODO: Fix this
-//             bid_quantity: data.bid_quantity.into(),
-//             ask_price: data.ask_price.into(), // TODO: Fix this
-//             ask_quantity: data.ask_quantity.into(),
-//         })
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

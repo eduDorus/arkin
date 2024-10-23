@@ -30,7 +30,12 @@ pub struct BinanceIngestorConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TardisIngestorConfig {
+    pub http_url: String,
     pub api_secret: Option<String>,
-    pub base_url: String,
     pub max_concurrent_requests: usize,
+    pub venue: String,
+    pub channel: String,
+    pub instruments: Vec<String>,
+    pub start: String,
+    pub end: String,
 }
