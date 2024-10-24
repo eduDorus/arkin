@@ -45,7 +45,7 @@ impl EventState {
             .collect()
     }
 
-    pub fn last_entry<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Option<T>
+    pub fn last_entry<T>(&self, instrument: &Instrument, timestamp: OffsetDateTime) -> Option<T>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
@@ -57,7 +57,7 @@ impl EventState {
             .and_then(|event| event.try_into().ok())
     }
 
-    pub fn list_entries_since_start<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Vec<T>
+    pub fn list_entries_since_start<T>(&self, instrument: &Instrument, timestamp: OffsetDateTime) -> Vec<T>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
@@ -75,12 +75,7 @@ impl EventState {
             .unwrap_or_default()
     }
 
-    pub fn list_entries_window<T>(
-        &self,
-        instrument: &Instrument,
-        timestamp: &OffsetDateTime,
-        window: &Duration,
-    ) -> Vec<T>
+    pub fn list_entries_window<T>(&self, instrument: &Instrument, timestamp: OffsetDateTime, window: Duration) -> Vec<T>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {

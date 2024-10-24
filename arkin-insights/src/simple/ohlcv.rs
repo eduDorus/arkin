@@ -11,23 +11,23 @@ use crate::{config::OHLCVConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct OHLCVFeature {
-    input_price: NodeId,
-    input_quantity: NodeId,
-    output_open: NodeId,
-    output_high: NodeId,
-    output_low: NodeId,
-    output_close: NodeId,
-    output_typical_price: NodeId,
-    output_vwap: NodeId,
-    output_volume: NodeId,
-    output_buy_volume: NodeId,
-    output_sell_volume: NodeId,
-    output_notional_volume: NodeId,
-    output_buy_notional_volume: NodeId,
-    output_sell_notional_volume: NodeId,
-    output_trade_count: NodeId,
-    output_buy_trade_count: NodeId,
-    output_sell_trade_count: NodeId,
+    input_price: FeatureId,
+    input_quantity: FeatureId,
+    output_open: FeatureId,
+    output_high: FeatureId,
+    output_low: FeatureId,
+    output_close: FeatureId,
+    output_typical_price: FeatureId,
+    output_vwap: FeatureId,
+    output_volume: FeatureId,
+    output_buy_volume: FeatureId,
+    output_sell_volume: FeatureId,
+    output_notional_volume: FeatureId,
+    output_buy_notional_volume: FeatureId,
+    output_sell_notional_volume: FeatureId,
+    output_trade_count: FeatureId,
+    output_buy_trade_count: FeatureId,
+    output_sell_trade_count: FeatureId,
     window: Duration,
 }
 
@@ -57,11 +57,11 @@ impl OHLCVFeature {
 }
 
 impl Computation for OHLCVFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input_price.clone(), self.input_quantity.clone()]
     }
 
-    fn outputs(&self) -> Vec<NodeId> {
+    fn outputs(&self) -> Vec<FeatureId> {
         vec![
             self.output_open.clone(),
             self.output_high.clone(),
@@ -83,8 +83,8 @@ impl Computation for OHLCVFeature {
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        event_time: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating OHLCV");
@@ -96,8 +96,9 @@ impl Computation for OHLCVFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data
-                let prices = state.get_window(Some(instrument), &self.input_price, timestamp, &self.window);
-                let quantities = state.get_window(Some(instrument), &self.input_quantity, timestamp, &self.window);
+                let prices = state.window(Some(instrument.clone()), self.input_price.clone(), event_time, self.window);
+                let quantities =
+                    state.window(Some(instrument.clone()), self.input_quantity.clone(), event_time, self.window);
 
                 // Check if we have enough data
                 if prices.is_empty() || quantities.is_empty() || prices.len() != quantities.len() {
@@ -106,10 +107,10 @@ impl Computation for OHLCVFeature {
                 }
 
                 // Calculate OHLC
-                let open = prices.first().expect("Should have at least one value").clone();
-                let high = prices.iter().max().expect("Should have at least one value").clone();
-                let low = prices.iter().min().expect("Should have at least one value").clone();
-                let close = prices.last().expect("Should have at least one value").clone();
+                let open = prices.first().expect("Should have at least one value").to_owned();
+                let high = prices.iter().max().expect("Should have at least one value").to_owned();
+                let low = prices.iter().min().expect("Should have at least one value").to_owned();
+                let close = prices.last().expect("Should have at least one value").to_owned();
                 let typical_price = (high + low + close) / Decimal::from(3);
 
                 // Calculate volume
@@ -164,91 +165,86 @@ impl Computation for OHLCVFeature {
                 let mut insights = Vec::with_capacity(self.outputs().len());
 
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_open.clone(),
                     open,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_high.clone(),
                     high,
                 ));
+                insights.push(Insight::new(event_time, Some(instrument.clone()), self.output_low.clone(), low));
                 insights.push(Insight::new(
-                    timestamp.clone(),
-                    Some(instrument.clone()),
-                    self.output_low.clone(),
-                    low,
-                ));
-                insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_close.clone(),
                     close,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_typical_price.clone(),
                     typical_price,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_vwap.clone(),
                     vwap,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_volume.clone(),
                     volume,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_buy_volume.clone(),
                     buy_volume,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_sell_volume.clone(),
                     sell_volume,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_notional_volume.clone(),
                     notional_volume,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_buy_notional_volume.clone(),
                     buy_notional_volume,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_sell_notional_volume.clone(),
                     sell_notional_volume,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_trade_count.clone(),
                     trade_count,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_buy_trade_count.clone(),
                     buy_trade_count,
                 ));
                 insights.push(Insight::new(
-                    timestamp.clone(),
+                    event_time,
                     Some(instrument.clone()),
                     self.output_sell_trade_count.clone(),
                     sell_trade_count,

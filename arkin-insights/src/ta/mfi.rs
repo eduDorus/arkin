@@ -11,8 +11,8 @@ use crate::{config::RelativeStrengthIndexConfig, service::Computation, state::In
 
 #[derive(Debug)]
 pub struct RSIFeature {
-    input_return: NodeId,
-    output: NodeId,
+    input_return: FeatureId,
+    output: FeatureId,
     periods: usize,
 }
 
@@ -27,18 +27,18 @@ impl RSIFeature {
 }
 
 impl Computation for RSIFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input_return.clone()]
     }
 
-    fn outputs(&self) -> Vec<NodeId> {
+    fn outputs(&self) -> Vec<FeatureId> {
         vec![self.output.clone()]
     }
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating RSI");
@@ -78,7 +78,7 @@ impl Computation for RSIFeature {
                 // Zero loss edge case
                 if rsi_loss.is_zero() {
                     return Some(Insight::new(
-                        timestamp.clone(),
+                        timestamp,
                         Some(instrument.clone()),
                         self.output.clone(),
                         Decimal::from(100),
@@ -87,7 +87,7 @@ impl Computation for RSIFeature {
                     let ratio = rsi_gain / rsi_loss;
                     let rsi = Decimal::from(100) - (Decimal::from(100) / (Decimal::from(1) + ratio));
                     return Some(Insight::new(
-                        timestamp.clone(),
+                        timestamp,
                         Some(instrument.clone()),
                         self.output.clone(),
                         rsi,

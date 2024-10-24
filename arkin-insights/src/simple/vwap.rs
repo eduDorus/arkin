@@ -10,8 +10,8 @@ use crate::{config::VWAPConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct VWAPFeature {
-    input_price: NodeId,
-    input_quantity: NodeId,
+    input_price: FeatureId,
+    input_quantity: FeatureId,
     output: FeatureId,
     window: Duration,
 }
@@ -28,7 +28,7 @@ impl VWAPFeature {
 }
 
 impl Computation for VWAPFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input_price.clone(), self.input_quantity.clone()]
     }
 
@@ -38,17 +38,19 @@ impl Computation for VWAPFeature {
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating VWAP feature");
 
         let insights = instruments
             .iter()
+            .cloned()
             .filter_map(|instrument| {
-                let prices = state.get_window(Some(instrument), &self.input_price, timestamp, &self.window);
-                let quantities = state.get_window(Some(instrument), &self.input_quantity, timestamp, &self.window);
+                let prices = state.window(Some(instrument.clone()), self.input_price.clone(), timestamp, self.window);
+                let quantities =
+                    state.window(Some(instrument.clone()), self.input_quantity.clone(), timestamp, self.window);
 
                 if prices.is_empty() {
                     warn!("No price data found for instrument {}", instrument);
@@ -78,12 +80,7 @@ impl Computation for VWAPFeature {
                     total_price_volume / total_volume
                 };
 
-                Some(Insight::new(
-                    timestamp.clone(),
-                    Some(instrument.clone()),
-                    self.output.clone(),
-                    vwap,
-                ))
+                Some(Insight::new(timestamp, Some(instrument), self.output.clone(), vwap))
             })
             .collect::<Vec<_>>();
 

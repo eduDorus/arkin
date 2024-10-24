@@ -11,8 +11,8 @@ use crate::{config::PctChangeConfig, service::Computation, state::InsightsState}
 
 #[derive(Debug)]
 pub struct PctChangeFeature {
-    input: NodeId,
-    output: NodeId,
+    input: FeatureId,
+    output: FeatureId,
     periods: usize,
 }
 
@@ -27,18 +27,18 @@ impl PctChangeFeature {
 }
 
 impl Computation for PctChangeFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
 
-    fn outputs(&self) -> Vec<NodeId> {
+    fn outputs(&self) -> Vec<FeatureId> {
         vec![self.output.clone()]
     }
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating percentage change");
@@ -51,7 +51,7 @@ impl Computation for PctChangeFeature {
             .filter_map(|instrument| {
                 //  Get data
                 info!("Getting data for timestamp: {:?}", timestamp);
-                let data = state.get_periods(Some(instrument), &self.input, timestamp, &(self.periods + 1));
+                let data = state.periods(Some(instrument.clone()), self.input.clone(), timestamp, self.periods + 1);
 
                 // Check if we have enough data
                 if data.len() < self.periods + 1 {
@@ -74,7 +74,7 @@ impl Computation for PctChangeFeature {
 
                 // Return insight
                 Some(Insight::new(
-                    timestamp.clone(),
+                    timestamp,
                     Some(instrument.clone()),
                     self.output.clone(),
                     percentage_change,

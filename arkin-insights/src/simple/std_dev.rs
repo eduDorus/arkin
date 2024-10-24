@@ -11,8 +11,8 @@ use crate::{config::StdDevConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct StdDevFeature {
-    input: NodeId,
-    output: NodeId,
+    input: FeatureId,
+    output: FeatureId,
     periods: usize,
 }
 
@@ -27,18 +27,18 @@ impl StdDevFeature {
 }
 
 impl Computation for StdDevFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
 
-    fn outputs(&self) -> Vec<NodeId> {
+    fn outputs(&self) -> Vec<FeatureId> {
         vec![self.output.clone()]
     }
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating StdDev");
@@ -46,9 +46,10 @@ impl Computation for StdDevFeature {
         // Calculate the mean (StdDev)
         let insights = instruments
             .iter()
+            .cloned()
             .filter_map(|instrument| {
                 // Get data from state
-                let data = state.get_periods(Some(instrument), &self.input, timestamp, &self.periods);
+                let data = state.periods(Some(instrument.clone()), self.input.clone(), timestamp, self.periods);
 
                 // Check if we have enough data
                 if data.is_empty() {
@@ -62,12 +63,7 @@ impl Computation for StdDevFeature {
                 let mean = sum / count;
                 let variance = data.iter().map(|v| (v - mean).powi(2)).sum::<Decimal>() / count;
                 if let Some(std_dev) = variance.sqrt() {
-                    Some(Insight::new(
-                        timestamp.clone(),
-                        Some(instrument.clone()),
-                        self.output.clone(),
-                        std_dev,
-                    ))
+                    Some(Insight::new(timestamp, Some(instrument.clone()), self.output.clone(), std_dev))
                 } else {
                     warn!("Failed to calculate StdDev: mean: {}, variance: {}", mean, variance);
                     None

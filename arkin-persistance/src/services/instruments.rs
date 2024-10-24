@@ -1,9 +1,11 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Error, Result};
-use arkin_core::prelude::*;
-use parking_lot::RwLock;
+use dashmap::DashMap;
+use tracing::{debug, error};
 use uuid::Uuid;
+
+use arkin_core::prelude::*;
 
 use crate::repos::InstrumentRepo;
 
@@ -11,41 +13,43 @@ use super::venues::VenueService;
 
 #[derive(Debug)]
 pub struct InstrumentCache {
-    by_id: RwLock<HashMap<Uuid, Instrument>>,
-    by_venue_symbol: RwLock<HashMap<String, Instrument>>,
+    by_id: DashMap<Uuid, Arc<Instrument>>,
+    by_venue_symbol: DashMap<String, Arc<Instrument>>,
 }
 
 impl InstrumentCache {
     pub fn new() -> Self {
         Self {
-            by_id: RwLock::new(HashMap::new()),
-            by_venue_symbol: RwLock::new(HashMap::new()),
+            by_id: DashMap::new(),
+            by_venue_symbol: DashMap::new(),
         }
     }
 
-    pub fn insert(&self, instrument: Instrument) {
-        self.by_id.write().insert(instrument.id, instrument.clone());
-        self.by_venue_symbol.write().insert(instrument.venue_symbol.clone(), instrument);
+    pub fn insert(&self, instrument: Instrument) -> Arc<Instrument> {
+        let instrument = Arc::new(instrument);
+        self.by_id.insert(instrument.id, instrument.clone());
+        self.by_venue_symbol.insert(instrument.venue_symbol.clone(), instrument.clone());
+        instrument
     }
 
-    pub fn get_by_id(&self, id: &Uuid) -> Option<Instrument> {
-        self.by_id.read().get(id).cloned()
+    pub fn get_by_id(&self, id: Uuid) -> Option<Arc<Instrument>> {
+        self.by_id.get(&id).map(|entry| entry.value().clone())
     }
 
-    pub fn get_by_venue_symbol(&self, venue_symbol: &str) -> Option<Instrument> {
-        self.by_venue_symbol.read().get(venue_symbol).cloned()
+    pub fn get_by_venue_symbol(&self, venue_symbol: &str) -> Option<Arc<Instrument>> {
+        self.by_venue_symbol.get(venue_symbol).map(|entry| entry.value().clone())
     }
 }
 
 #[derive(Debug)]
 pub struct InstrumentService {
-    instrument_repo: Arc<InstrumentRepo>,
+    instrument_repo: InstrumentRepo,
     instrument_cache: InstrumentCache,
-    venue_service: Arc<VenueService>,
+    venue_service: VenueService,
 }
 
 impl InstrumentService {
-    pub fn new(instrument_repo: Arc<InstrumentRepo>, venue_service: Arc<VenueService>) -> Self {
+    pub fn new(instrument_repo: InstrumentRepo, venue_service: VenueService) -> Self {
         Self {
             instrument_repo,
             instrument_cache: InstrumentCache::new(),
@@ -54,94 +58,107 @@ impl InstrumentService {
     }
 
     pub async fn insert(&self, instrument: Instrument) -> Result<()> {
-        self.instrument_repo.create(instrument).await
+        let instrument_repo = &self.instrument_repo;
+        instrument_repo.create(instrument).await
     }
 
-    pub async fn read_by_id(&self, id: &Uuid) -> Result<Option<Instrument>> {
+    pub async fn read_by_id(&self, id: Uuid) -> Result<Arc<Instrument>> {
+        let instrument_cache = &self.instrument_cache;
+        let instrument_repo = &self.instrument_repo;
+        let venue_service = &self.venue_service;
+
         // Check cache
-        if let Some(instrument) = self.instrument_cache.get_by_id(id) {
-            return Ok(Some(instrument));
-        }
+        let instrument = match instrument_cache.get_by_id(id) {
+            Some(instrument) => instrument,
+            None => {
+                debug!("Instrument not found in cache");
+                if let Some(db_instrument) = instrument_repo.read_by_id(id).await? {
+                    let venue = venue_service
+                        .read_by_id(db_instrument.venue_id)
+                        .await?
+                        .ok_or_else(|| Error::msg("Venue not found"))?;
 
-        // Read from db
-        if let Some(db_instrument) = self.instrument_repo.read_by_id(id).await? {
-            let venue = self
-                .venue_service
-                .read_by_id(&db_instrument.venue_id)
-                .await?
-                .ok_or_else(|| Error::msg("Venue not found"))?;
+                    let instrument = Instrument {
+                        id: db_instrument.id,
+                        symbol: db_instrument.symbol,
+                        venue_symbol: db_instrument.venue_symbol,
+                        venue,
+                        instrument_type: db_instrument.instrument_type.into(),
+                        base_asset: db_instrument.base_asset,
+                        quote_asset: db_instrument.quote_asset,
+                        maturity: db_instrument.maturity,
+                        strike: db_instrument.strike,
+                        option_type: db_instrument.option_type.map(|v| v.into()),
+                        contract_size: db_instrument.contract_size,
+                        price_precision: db_instrument.price_precision as u32,
+                        quantity_precision: db_instrument.quantity_precision as u32,
+                        base_precision: db_instrument.base_precision as u32,
+                        quote_precision: db_instrument.quote_precision as u32,
+                        tick_size: db_instrument.tick_size,
+                        lot_size: db_instrument.lot_size,
+                        status: db_instrument.status.into(),
+                    };
 
-            let instrument = Instrument {
-                id: db_instrument.id,
-                symbol: db_instrument.symbol,
-                venue_symbol: db_instrument.venue_symbol,
-                venue,
-                instrument_type: db_instrument.instrument_type.into(),
-                base_asset: db_instrument.base_asset,
-                quote_asset: db_instrument.quote_asset,
-                maturity: db_instrument.maturity,
-                strike: db_instrument.strike,
-                option_type: db_instrument.option_type.map(|v| v.into()),
-                contract_size: db_instrument.contract_size,
-                price_precision: db_instrument.price_precision as u32,
-                quantity_precision: db_instrument.quantity_precision as u32,
-                base_precision: db_instrument.base_precision as u32,
-                quote_precision: db_instrument.quote_precision as u32,
-                tick_size: db_instrument.tick_size,
-                lot_size: db_instrument.lot_size,
-                status: db_instrument.status.into(),
-            };
-
-            // Update cache
-            self.instrument_cache.insert(instrument.clone());
-
-            Ok(Some(instrument))
-        } else {
-            Ok(None)
-        }
+                    // Update cache
+                    let instrument = instrument_cache.insert(instrument);
+                    instrument
+                } else {
+                    let msg = format!("Instrument with id {:?} not found in the database", id);
+                    error!("{}", msg);
+                    Err(Error::msg(msg))?
+                }
+            }
+        };
+        Ok(instrument)
     }
 
-    pub async fn read_by_venue_symbol(&self, venue_symbol: &str) -> Result<Option<Instrument>> {
-        // Read from cache
-        if let Some(instrument) = self.instrument_cache.get_by_venue_symbol(venue_symbol) {
-            return Ok(Some(instrument));
-        }
+    pub async fn read_by_venue_symbol(&self, venue_symbol: String) -> Result<Arc<Instrument>> {
+        let instrument_cache = &self.instrument_cache;
+        let instrument_repo = &self.instrument_repo;
+        let venue_service = &self.venue_service;
 
-        // Read from db
-        if let Some(db_instrument) = self.instrument_repo.read_by_venue_symbol(venue_symbol).await? {
-            let venue = self
-                .venue_service
-                .read_by_id(&db_instrument.venue_id)
-                .await?
-                .ok_or_else(|| Error::msg("Venue not found"))?;
+        // Check cache
+        let instrument = match instrument_cache.get_by_venue_symbol(&venue_symbol) {
+            Some(instrument) => instrument,
+            None => {
+                debug!("Instrument not found in cache");
+                if let Some(db_instrument) = instrument_repo.read_by_venue_symbol(&venue_symbol).await? {
+                    let venue = venue_service
+                        .read_by_id(db_instrument.venue_id)
+                        .await?
+                        .ok_or_else(|| Error::msg("Venue not found"))?;
 
-            let instrument = Instrument {
-                id: db_instrument.id,
-                symbol: db_instrument.symbol,
-                venue_symbol: db_instrument.venue_symbol,
-                venue,
-                instrument_type: db_instrument.instrument_type.into(),
-                base_asset: db_instrument.base_asset,
-                quote_asset: db_instrument.quote_asset,
-                maturity: db_instrument.maturity,
-                strike: db_instrument.strike,
-                option_type: db_instrument.option_type.map(|v| v.into()),
-                contract_size: db_instrument.contract_size,
-                price_precision: db_instrument.price_precision as u32,
-                quantity_precision: db_instrument.quantity_precision as u32,
-                base_precision: db_instrument.base_precision as u32,
-                quote_precision: db_instrument.quote_precision as u32,
-                tick_size: db_instrument.tick_size,
-                lot_size: db_instrument.lot_size,
-                status: db_instrument.status.into(),
-            };
+                    let instrument = Instrument {
+                        id: db_instrument.id,
+                        symbol: db_instrument.symbol,
+                        venue_symbol: db_instrument.venue_symbol,
+                        venue,
+                        instrument_type: db_instrument.instrument_type.into(),
+                        base_asset: db_instrument.base_asset,
+                        quote_asset: db_instrument.quote_asset,
+                        maturity: db_instrument.maturity,
+                        strike: db_instrument.strike,
+                        option_type: db_instrument.option_type.map(|v| v.into()),
+                        contract_size: db_instrument.contract_size,
+                        price_precision: db_instrument.price_precision as u32,
+                        quantity_precision: db_instrument.quantity_precision as u32,
+                        base_precision: db_instrument.base_precision as u32,
+                        quote_precision: db_instrument.quote_precision as u32,
+                        tick_size: db_instrument.tick_size,
+                        lot_size: db_instrument.lot_size,
+                        status: db_instrument.status.into(),
+                    };
 
-            // Update cache
-            self.instrument_cache.insert(instrument.clone());
-
-            Ok(Some(instrument))
-        } else {
-            Ok(None)
-        }
+                    // Update cache
+                    let instrument = instrument_cache.insert(instrument);
+                    instrument
+                } else {
+                    let msg = format!("Instrument with venue symbol {:?} not found in the database", venue_symbol);
+                    error!("{}", msg);
+                    Err(Error::msg(msg))?
+                }
+            }
+        };
+        Ok(instrument)
     }
 }

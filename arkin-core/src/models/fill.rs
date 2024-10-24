@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use strum::Display;
 use time::OffsetDateTime;
@@ -22,7 +22,7 @@ pub enum FillSide {
 pub struct Fill {
     pub id: Uuid,
     pub account: Account,
-    pub instrument: Instrument,
+    pub instrument: Arc<Instrument>,
     pub strategy: Strategy,
     pub execution_order: ExecutionOrder,
     pub venue_order: VenueOrder,
@@ -35,7 +35,7 @@ pub struct Fill {
 impl Fill {
     pub fn new(
         account: Account,
-        instrument: Instrument,
+        instrument: Arc<Instrument>,
         strategy: Strategy,
         execution_order: ExecutionOrder,
         venue_order: VenueOrder,

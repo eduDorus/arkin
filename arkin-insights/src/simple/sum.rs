@@ -9,8 +9,8 @@ use crate::{config::SumFeatureConfig, service::Computation, state::InsightsState
 
 #[derive(Debug)]
 pub struct SumFeature {
-    inputs: Vec<NodeId>,
-    outputs: Vec<NodeId>,
+    inputs: Vec<FeatureId>,
+    outputs: Vec<FeatureId>,
 }
 
 impl SumFeature {
@@ -23,18 +23,18 @@ impl SumFeature {
 }
 
 impl Computation for SumFeature {
-    fn inputs(&self) -> &[NodeId] {
+    fn inputs(&self) -> &[FeatureId] {
         &self.inputs
     }
 
-    fn outputs(&self) -> &[NodeId] {
+    fn outputs(&self) -> &[FeatureId] {
         &self.outputs
     }
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating Sum with id: {}", self.inputs[0]);
@@ -50,7 +50,7 @@ impl Computation for SumFeature {
                     .filter_map(|instrument| state.get_last_by_instrument(Some(instrument), input_id, timestamp))
                     .collect::<Vec<_>>();
                 let sum = values.iter().sum();
-                Insight::new(timestamp.clone(), None, output_id.clone(), sum)
+                Insight::new(timestamp, None, output_id.clone(), sum)
             })
             .collect::<Vec<_>>();
 

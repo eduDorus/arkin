@@ -13,8 +13,8 @@ use crate::{
 
 #[derive(Debug)]
 pub struct SpreadFeature {
-    id: NodeId,
-    sources: Vec<NodeId>,
+    id: FeatureId,
+    sources: Vec<FeatureId>,
     inputs: Vec<DataRequest>,
     output: FeatureId,
     absolute: bool,
@@ -33,11 +33,11 @@ impl SpreadFeature {
 }
 
 impl FeatureModule for SpreadFeature {
-    fn id(&self) -> &NodeId {
+    fn id(&self) -> &FeatureId {
         &self.id
     }
 
-    fn sources(&self) -> &[NodeId] {
+    fn sources(&self) -> &[FeatureId] {
         &self.sources
     }
 

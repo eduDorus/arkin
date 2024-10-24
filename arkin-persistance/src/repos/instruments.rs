@@ -179,7 +179,7 @@ impl InstrumentRepo {
         Ok(())
     }
 
-    pub async fn read_by_id(&self, id: &Uuid) -> Result<Option<DBInstrument>> {
+    pub async fn read_by_id(&self, id: Uuid) -> Result<Option<DBInstrument>> {
         let instrument = sqlx::query_as!(
             DBInstrument,
             r#"

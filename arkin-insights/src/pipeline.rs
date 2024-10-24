@@ -50,15 +50,8 @@ impl ComputationGraph {
         let mut edges_to_add = Vec::new();
         for target_node in graph.node_indices() {
             for source_id in graph[target_node].inputs() {
-                if source_id == "trade_price"
-                    || source_id == "trade_side"
-                    || source_id == "trade_quantity"
-                    || source_id == "bid_price"
-                    || source_id == "bid_quantity"
-                    || source_id == "ask_price"
-                    || source_id == "ask_quantity"
-                    || source_id == "mid_price"
-                {
+                // We don't need to have a dependency on raw inputs
+                if RAW_FEATURE_IDS.contains(&source_id) {
                     continue;
                 }
                 let source_node = id_to_index.get(&source_id).expect("Failed to find source node from config");
@@ -89,8 +82,8 @@ impl ComputationGraph {
     pub fn calculate(
         &self,
         state: Arc<InsightsState>,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
     ) -> Vec<Insight> {
         // Step 1: Calculate in-degrees
         let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));

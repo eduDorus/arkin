@@ -13,8 +13,8 @@ use crate::{
 
 #[derive(Debug)]
 pub struct CumSumFeature {
-    id: NodeId,
-    sources: Vec<NodeId>,
+    id: FeatureId,
+    sources: Vec<FeatureId>,
     inputs: Vec<DataRequest>,
     output: FeatureId,
 }
@@ -31,11 +31,11 @@ impl CumSumFeature {
 }
 
 impl FeatureModule for CumSumFeature {
-    fn id(&self) -> &NodeId {
+    fn id(&self) -> &FeatureId {
         &self.id
     }
 
-    fn sources(&self) -> &[NodeId] {
+    fn sources(&self) -> &[FeatureId] {
         &self.sources
     }
 

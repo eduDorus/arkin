@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -13,14 +13,14 @@ use super::{Instrument, Strategy};
 #[derive(Clone)]
 pub struct Signal {
     pub id: Uuid,
-    pub instrument: Instrument,
+    pub instrument: Arc<Instrument>,
     pub strategy: Strategy,
     pub weight: Weight,
     pub created_at: OffsetDateTime,
 }
 
 impl Signal {
-    pub fn new(instrument: Instrument, strategy: Strategy, weight: Weight, created_at: OffsetDateTime) -> Self {
+    pub fn new(instrument: Arc<Instrument>, strategy: Strategy, weight: Weight, created_at: OffsetDateTime) -> Self {
         Signal {
             id: Uuid::new_v4(),
             instrument,

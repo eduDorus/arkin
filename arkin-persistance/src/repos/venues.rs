@@ -1,6 +1,7 @@
-use arkin_core::prelude::Venue;
 use sqlx::{prelude::*, Error, PgPool};
 use uuid::Uuid;
+
+use arkin_core::prelude::*;
 
 #[derive(FromRow)]
 pub struct DBVenue {
@@ -55,7 +56,7 @@ impl VenueRepo {
         Ok(())
     }
 
-    pub async fn read_by_id(&self, id: &Uuid) -> Result<Option<DBVenue>, Error> {
+    pub async fn read_by_id(&self, id: Uuid) -> Result<Option<DBVenue>, Error> {
         let venue = sqlx::query_as!(
             DBVenue,
             r#"

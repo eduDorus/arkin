@@ -1,5 +1,5 @@
-use std::fmt;
 use std::time::Duration;
+use std::{fmt, sync::Arc};
 
 use strum::Display;
 use time::OffsetDateTime;
@@ -36,7 +36,7 @@ pub enum ExecutionOrderStatus {
 pub struct ExecutionOrder {
     pub id: Uuid,
     pub account: Account,
-    pub instrument: Instrument,
+    pub instrument: Arc<Instrument>,
     pub strategy: Strategy,
     pub signal: Signal,
     pub side: MarketSide,
@@ -54,7 +54,7 @@ pub struct ExecutionOrder {
 impl ExecutionOrder {
     pub fn new(
         account: Account,
-        instrument: Instrument,
+        instrument: Arc<Instrument>,
         strategy: Strategy,
         signal: Signal,
         side: MarketSide,

@@ -67,7 +67,7 @@ impl AllocationModule for SimpleAllocation {
         let position_diff = expected_positions
             .into_iter()
             .map(|(key, expected_quantity)| {
-                let current_quantity = current_positions.get(&key).unwrap_or(&Decimal::zero()).to_owned();
+                let current_quantity = current_positions.get(&key).unwrap_or(Decimal::zero()).to_owned();
                 info!("Expected Amount: {} Current Amount: {}", expected_quantity, current_quantity);
                 let diff = (expected_quantity - current_quantity).round_dp(4);
                 (key, diff)

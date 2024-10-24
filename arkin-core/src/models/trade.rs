@@ -1,9 +1,10 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
 use crate::{
+    constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
     events::{EventType, EventTypeOf},
     models::Insight,
     Event, Price, Quantity,
@@ -11,10 +12,10 @@ use crate::{
 
 use super::{Instrument, MarketSide};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Trade {
     pub event_time: OffsetDateTime,
-    pub instrument: Instrument,
+    pub instrument: Arc<Instrument>,
     pub trade_id: u64,
     pub side: MarketSide,
     pub price: Price,
@@ -24,7 +25,7 @@ pub struct Trade {
 impl Trade {
     pub fn new(
         event_time: OffsetDateTime,
-        instrument: Instrument,
+        instrument: Arc<Instrument>,
         trade_id: u64,
         side: MarketSide,
         price: Price,
@@ -40,13 +41,18 @@ impl Trade {
         }
     }
 
-    pub fn to_insights(&self) -> Vec<Insight> {
+    pub fn to_insights(self) -> Vec<Insight> {
         vec![
-            Insight::new(self.event_time, Some(self.instrument.clone()), "trade_price".into(), self.price),
             Insight::new(
                 self.event_time,
                 Some(self.instrument.clone()),
-                "trade_quantity".into(),
+                TRADE_PRICE_FEATURE_ID.clone(),
+                self.price,
+            ),
+            Insight::new(
+                self.event_time,
+                Some(self.instrument),
+                TRADE_QUANTITY_FEATURE_ID.clone(),
                 self.quantity * Decimal::from(self.side),
             ),
         ]

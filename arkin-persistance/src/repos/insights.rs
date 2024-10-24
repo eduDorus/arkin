@@ -21,9 +21,12 @@ pub struct DBInsight {
 impl From<Insight> for DBInsight {
     fn from(insight: Insight) -> Self {
         Self {
-            instrument_id: insight.instrument.map(|i| i.id),
+            instrument_id: match insight.instrument {
+                Some(i) => Some(i.id),
+                None => None,
+            },
             event_time: insight.event_time,
-            feature_id: insight.feature_id,
+            feature_id: insight.feature_id.as_ref().clone(),
             value: insight.value,
         }
     }
@@ -108,28 +111,29 @@ impl InsightsRepo {
         Ok(())
     }
 
-    pub async fn read_range_by_instrument_id_and_feature_id(
-        &self,
-        instrument_id: &Uuid,
-        feature_id: &str,
-        start: &OffsetDateTime,
-        end: &OffsetDateTime,
-    ) -> Result<Vec<DBInsight>> {
-        let insights = sqlx::query_as!(
-            DBInsight,
-            r#"
-            SELECT * FROM insights
-            WHERE instrument_id = $1 AND feature_id = $2 AND event_time >= $3 AND event_time < $4
-            ORDER BY event_time ASC
-            "#,
-            instrument_id,
-            feature_id,
-            start,
-            end,
-        )
-        .fetch_all(&self.pool)
-        .await?;
+    // I DON'T THINK WE WILL EVER READ INSIGHTS INTO OUR SYSTEM
+    // pub async fn read_range_by_instrument_id_and_feature_id(
+    //     &self,
+    //     instrument_id: Uuid,
+    //     feature_id: &str,
+    //     start: OffsetDateTime,
+    //     end: OffsetDateTime,
+    // ) -> Result<Vec<DBInsight>> {
+    //     let insights = sqlx::query_as!(
+    //         DBInsight,
+    //         r#"
+    //         SELECT * FROM insights
+    //         WHERE instrument_id = $1 AND feature_id = $2 AND event_time >= $3 AND event_time < $4
+    //         ORDER BY event_time ASC
+    //         "#,
+    //         instrument_id,
+    //         feature_id,
+    //         start,
+    //         end,
+    //     )
+    //     .fetch_all(&self.pool)
+    //     .await?;
 
-        Ok(insights)
-    }
+    //     Ok(insights)
+    // }
 }

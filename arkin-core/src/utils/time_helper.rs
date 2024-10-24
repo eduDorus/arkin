@@ -1,7 +1,7 @@
 use anyhow::Result;
 use time::{Duration, OffsetDateTime, Time};
 
-pub fn datetime_range_minute(start: &OffsetDateTime, end: &OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
+pub fn datetime_range_minute(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -14,7 +14,7 @@ pub fn datetime_range_minute(start: &OffsetDateTime, end: &OffsetDateTime) -> Re
     let adjusted_start = start.replace_time(Time::from_hms(start.hour(), start.minute(), 0)?);
 
     let mut current = adjusted_start;
-    while current < *end {
+    while current < end {
         datetimes.push(current);
         current += Duration::minutes(1);
     }
@@ -22,7 +22,7 @@ pub fn datetime_range_minute(start: &OffsetDateTime, end: &OffsetDateTime) -> Re
     Ok(datetimes)
 }
 
-pub fn datetime_range_hourly(start: &OffsetDateTime, end: &OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
+pub fn datetime_range_hourly(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -33,7 +33,7 @@ pub fn datetime_range_hourly(start: &OffsetDateTime, end: &OffsetDateTime) -> Re
     let adjusted_start = start.replace_time(Time::from_hms(start.hour(), 0, 0)?);
 
     let mut current = adjusted_start;
-    while current < *end {
+    while current < end {
         datetimes.push(current);
         current += Duration::hours(1);
     }
@@ -41,7 +41,7 @@ pub fn datetime_range_hourly(start: &OffsetDateTime, end: &OffsetDateTime) -> Re
     Ok(datetimes)
 }
 
-pub fn datetime_range_daily(start: &OffsetDateTime, end: &OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
+pub fn datetime_range_daily(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -52,7 +52,7 @@ pub fn datetime_range_daily(start: &OffsetDateTime, end: &OffsetDateTime) -> Res
     let adjusted_start = start.replace_time(Time::MIDNIGHT);
 
     let mut current = adjusted_start;
-    while current < *end {
+    while current < end {
         datetimes.push(current);
         current += Duration::days(1);
     }
@@ -60,7 +60,7 @@ pub fn datetime_range_daily(start: &OffsetDateTime, end: &OffsetDateTime) -> Res
     Ok(datetimes)
 }
 
-pub fn datetime_range_weekly(start: &OffsetDateTime, end: &OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
+pub fn datetime_range_weekly(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -72,7 +72,7 @@ pub fn datetime_range_weekly(start: &OffsetDateTime, end: &OffsetDateTime) -> Re
     let adjusted_start = start.replace_time(Time::MIDNIGHT) - Duration::days(days_to_subtract);
 
     let mut current = adjusted_start;
-    while current < *end {
+    while current < end {
         datetimes.push(current);
         current += Duration::weeks(1);
     }
@@ -97,7 +97,7 @@ mod tests {
         let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
         let end = datetime!(2023 - 06 - 09 12:26:03).assume_utc();
 
-        let dates = datetime_range_minute(&start, &end).unwrap();
+        let dates = datetime_range_minute(start, end).unwrap();
 
         assert_eq!(dates.len(), 4);
         assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:23:00).assume_utc());
@@ -111,7 +111,7 @@ mod tests {
         let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
         let end = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
 
-        let dates = datetime_range_minute(&start, &end).unwrap();
+        let dates = datetime_range_minute(start, end).unwrap();
 
         assert_eq!(dates.len(), 1);
         assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:23:00).assume_utc());
@@ -122,7 +122,7 @@ mod tests {
         let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
         let end = datetime!(2023 - 06 - 09 15:43:13).assume_utc();
 
-        let dates = datetime_range_hourly(&start, &end).unwrap();
+        let dates = datetime_range_hourly(start, end).unwrap();
 
         assert_eq!(dates.len(), 4);
         assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:00:00).assume_utc());
@@ -136,7 +136,7 @@ mod tests {
         let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
         let end = datetime!(2023 - 06 - 11 22:23:03).assume_utc();
 
-        let dates = datetime_range_daily(&start, &end).unwrap();
+        let dates = datetime_range_daily(start, end).unwrap();
 
         assert_eq!(dates.len(), 3);
         assert_eq!(dates[0], datetime!(2023 - 06 - 09 00:00:00).assume_utc());
@@ -149,7 +149,7 @@ mod tests {
         let start = datetime!(2023 - 01 - 01 12:23:03).assume_utc();
         let end = datetime!(2023 - 02 - 15 22:23:03).assume_utc();
 
-        let dates = datetime_range_weekly(&start, &end).unwrap();
+        let dates = datetime_range_weekly(start, end).unwrap();
 
         assert_eq!(dates.len(), 8);
         println!("{:?}", dates);

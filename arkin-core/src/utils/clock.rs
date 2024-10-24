@@ -11,7 +11,7 @@ pub struct Clock {
 }
 
 impl Clock {
-    pub fn new(start: &OffsetDateTime, end: &OffsetDateTime, frequency_secs: &Duration) -> Self {
+    pub fn new(start: OffsetDateTime, end: OffsetDateTime, frequency_secs: Duration) -> Self {
         info!(
             "Creating new clock with start: {}, end: {}, frequency_secs: {}",
             start,

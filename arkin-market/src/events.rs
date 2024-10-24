@@ -44,8 +44,8 @@ impl MarketState {
     pub fn list_entries_window<T>(
         &self,
         instrument: &Instrument,
-        timestamp: &OffsetDateTime,
-        window: &Duration,
+        timestamp: OffsetDateTime,
+        window: Duration,
     ) -> Vec<T>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
@@ -66,7 +66,7 @@ impl MarketState {
     }
 
     #[allow(dead_code)]
-    pub fn last_entry<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Option<T>
+    pub fn last_entry<T>(&self, instrument: &Instrument, timestamp: OffsetDateTime) -> Option<T>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {
@@ -79,7 +79,7 @@ impl MarketState {
     }
 
     #[allow(dead_code)]
-    pub fn list_entries_since_start<T>(&self, instrument: &Instrument, timestamp: &OffsetDateTime) -> Vec<T>
+    pub fn list_entries_since_start<T>(&self, instrument: &Instrument, timestamp: OffsetDateTime) -> Vec<T>
     where
         T: TryFrom<Event, Error = ()> + EventTypeOf,
     {

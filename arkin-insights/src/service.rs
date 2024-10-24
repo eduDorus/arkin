@@ -12,12 +12,12 @@ use crate::pipeline::ComputationGraph;
 use crate::{config::InsightsServiceConfig, state::InsightsState};
 
 pub trait Computation: Debug + Send + Sync {
-    fn inputs(&self) -> Vec<NodeId>;
-    fn outputs(&self) -> Vec<NodeId>;
+    fn inputs(&self) -> Vec<FeatureId>;
+    fn outputs(&self) -> Vec<FeatureId>;
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>>;
 }
@@ -45,7 +45,12 @@ impl InsightsService {
         self.state.insert_batch(insights);
     }
 
-    pub async fn process(&self, instruments: &[Instrument], from: &OffsetDateTime, to: &OffsetDateTime) -> Result<()> {
+    pub async fn process(
+        &self,
+        instruments: &[Arc<Instrument>],
+        from: OffsetDateTime,
+        to: OffsetDateTime,
+    ) -> Result<()> {
         info!("Running insights pipeline from {} to {}", from, to);
 
         // Generate insights

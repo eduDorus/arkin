@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Result;
 use async_trait::async_trait;
 use async_tungstenite::tungstenite::Message;
 use serde::Serialize;
@@ -41,7 +42,7 @@ impl BinanceIngestor {
 
 #[async_trait]
 impl Ingestor for BinanceIngestor {
-    async fn start(&self) {
+    async fn start(&self) -> Result<()> {
         info!("Starting binance ingestor...");
 
         // Check for API key and secret
@@ -66,57 +67,51 @@ impl Ingestor for BinanceIngestor {
                     match serde_json::from_str::<BinanceSwapEvent>(&data) {
                         Ok(e) => {
                             info!("{}", e);
-                            if let Ok(res) =
+                            if let Ok(instrument) =
                                 self.persistance_service.read_instrument_by_venue_symbol(e.venue_symbol()).await
                             {
-                                if let Some(instrument) = res {
-                                    debug!("Instrument found: {}", instrument.symbol);
-                                    match e {
-                                        BinanceSwapEvent::AggTrade(trade) => {
-                                            // "m": true: The buyer is the market maker.
-                                            // • The trade was initiated by a sell order from the taker.
-                                            // • The taker is selling, and the maker (buyer) is buying.
-                                            // "m": false: The seller is the market maker.
-                                            // • The trade was initiated by a buy order from the taker.
-                                            // • The taker is buying, and the maker (seller) is selling.
-                                            let side = if trade.maker {
-                                                MarketSide::Sell
-                                            } else {
-                                                MarketSide::Buy
-                                            };
-                                            let trade = Trade::new(
-                                                trade.event_time,
-                                                instrument,
-                                                trade.agg_trade_id,
-                                                side,
-                                                trade.price,
-                                                trade.quantity,
-                                            );
-                                            if let Err(e) = self.persistance_service.insert_trade(trade).await {
-                                                error!("Failed to insert trade: {}", e);
-                                            }
-                                        }
-                                        BinanceSwapEvent::Tick(tick) => {
-                                            let tick = Tick::new(
-                                                tick.event_time,
-                                                instrument,
-                                                tick.update_id,
-                                                tick.bid_price,
-                                                tick.bid_quantity,
-                                                tick.ask_price,
-                                                tick.ask_quantity,
-                                            );
-                                            if let Err(e) = self.persistance_service.insert_tick(tick).await {
-                                                error!("Failed to insert tick: {}", e);
-                                            }
+                                debug!("Instrument found: {}", instrument.symbol);
+                                match e {
+                                    BinanceSwapEvent::AggTrade(trade) => {
+                                        // "m": true: The buyer is the market maker.
+                                        // • The trade was initiated by a sell order from the taker.
+                                        // • The taker is selling, and the maker (buyer) is buying.
+                                        // "m": false: The seller is the market maker.
+                                        // • The trade was initiated by a buy order from the taker.
+                                        // • The taker is buying, and the maker (seller) is selling.
+                                        let side = if trade.maker {
+                                            MarketSide::Sell
+                                        } else {
+                                            MarketSide::Buy
+                                        };
+                                        let trade = Trade::new(
+                                            trade.event_time,
+                                            instrument,
+                                            trade.agg_trade_id,
+                                            side,
+                                            trade.price,
+                                            trade.quantity,
+                                        );
+                                        if let Err(e) = self.persistance_service.insert_trade(trade).await {
+                                            error!("Failed to insert trade: {}", e);
                                         }
                                     }
-                                } else {
-                                    error!("Instrument not found for symbol: {}", e.venue_symbol());
-                                    continue;
+                                    BinanceSwapEvent::Tick(tick) => {
+                                        let tick = Tick::new(
+                                            tick.event_time,
+                                            instrument,
+                                            tick.update_id,
+                                            tick.bid_price,
+                                            tick.bid_quantity,
+                                            tick.ask_price,
+                                            tick.ask_quantity,
+                                        );
+                                        if let Err(e) = self.persistance_service.insert_tick(tick).await {
+                                            error!("Failed to insert tick: {}", e);
+                                        }
+                                    }
                                 }
                             } else {
-                                error!("Failed to read instrument by venue symbol: {}", e.venue_symbol());
                                 continue;
                             }
                         }
@@ -133,6 +128,7 @@ impl Ingestor for BinanceIngestor {
                 }
             }
         }
+        Ok(())
     }
 }
 

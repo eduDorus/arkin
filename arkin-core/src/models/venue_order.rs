@@ -1,5 +1,5 @@
-use std::fmt;
 use std::time::Duration;
+use std::{fmt, sync::Arc};
 
 use strum::Display;
 use time::OffsetDateTime;
@@ -44,7 +44,7 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     pub id: Uuid,
     pub account: Account,
-    pub instrument: Instrument,
+    pub instrument: Arc<Instrument>,
     pub strategy: Strategy,
     pub execution_order: ExecutionOrder,
     pub venue_order_id: u64,
@@ -64,7 +64,7 @@ pub struct VenueOrder {
 impl VenueOrder {
     pub fn new_market(
         account: Account,
-        instrument: Instrument,
+        instrument: Arc<Instrument>,
         strategy: Strategy,
         execution_order: ExecutionOrder,
         side: MarketSide,
@@ -94,7 +94,7 @@ impl VenueOrder {
 
     pub fn new_limit(
         account: Account,
-        instrument: Instrument,
+        instrument: Arc<Instrument>,
         strategy: Strategy,
         execution_order: ExecutionOrder,
         side: MarketSide,

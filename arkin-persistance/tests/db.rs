@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use rstest::*;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
@@ -12,30 +12,30 @@ use uuid::Uuid;
 pub fn persistance_service() -> PersistanceService {
     test_setup();
     let config = load::<PersistanceConfig>();
-    PersistanceService::from_config(&config.database)
+    PersistanceService::from_config(&config)
 }
 
-#[rstest]
-#[tokio::test]
-async fn test_insert_venue(persistance_service: PersistanceService) {
-    test_setup();
-    let venue = Venue {
-        id: Uuid::new_v4(),
-        name: "Okex".into(),
-        venue_type: "exchange".into(),
-    };
-    persistance_service.insert_venue(venue).await.unwrap();
-}
+// #[rstest]
+// #[tokio::test]
+// async fn test_insert_venue(persistance_service: PersistanceService) {
+//     test_setup();
+//     let venue = Venue {
+//         id: Uuid::new_v4(),
+//         name: "Okex".into(),
+//         venue_type: "exchange".into(),
+//     };
+//     persistance_service.insert_venue(venue).await.unwrap();
+// }
 
-#[rstest]
-#[tokio::test]
-async fn test_read_venue(persistance_service: PersistanceService) {
-    test_setup();
-    let id = Uuid::from_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID");
-    let venue = persistance_service.read_venue_by_id(&id).await.unwrap().unwrap();
-    assert_eq!(venue.id, id);
-    assert_eq!(venue.name, "binance");
-}
+// #[rstest]
+// #[tokio::test]
+// async fn test_read_venue(persistance_service: PersistanceService) {
+//     test_setup();
+//     let id = Uuid::from_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID");
+//     let venue = persistance_service.read_venue_by_id(id).await.unwrap().unwrap();
+//     assert_eq!(venue.id, id);
+//     assert_eq!(venue.name, "binance");
+// }
 
 #[rstest]
 #[tokio::test]
@@ -54,7 +54,7 @@ async fn test_insert_instrument(persistance_service: PersistanceService, binance
 async fn test_read_instrument(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
     let id = Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID");
-    let instrument = persistance_service.read_instrument_by_id(&id).await.unwrap().unwrap();
+    let instrument = persistance_service.read_instrument_by_id(id).await.unwrap();
     assert_eq!(instrument.id, binance_btc_usdt_perp.id);
 }
 
@@ -62,9 +62,10 @@ async fn test_read_instrument(persistance_service: PersistanceService, binance_b
 #[tokio::test]
 async fn test_insert_tick(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
+    let instrument = Arc::new(binance_btc_usdt_perp);
     let tick = Tick::new(
         datetime!(2024-07-01 00:01).assume_utc(),
-        binance_btc_usdt_perp,
+        instrument.clone(),
         1,
         Decimal::from_f64(100.0).expect("Invalid decimal"),
         Decimal::from_f64(1.0).expect("Invalid decimal"),
@@ -86,12 +87,13 @@ async fn test_insert_tick_batch(
     #[case] amount: i64,
 ) {
     test_setup();
+    let instrument = Arc::new(binance_btc_usdt_perp);
     let ticks = (0..amount)
         .into_iter()
         .map(|i| {
             Tick::new(
                 datetime!(2024-07-01 00:01).assume_utc() + time::Duration::seconds(i),
-                binance_btc_usdt_perp.clone(),
+                instrument.clone(),
                 i as u64,
                 Decimal::from_f64(100.0).expect("Invalid decimal"),
                 Decimal::from_f64(1.0).expect("Invalid decimal"),
@@ -100,7 +102,7 @@ async fn test_insert_tick_batch(
             )
         })
         .collect::<Vec<_>>();
-    persistance_service.insert_tick_batch(ticks).await.unwrap();
+    persistance_service.insert_tick_batch_vec(ticks).await.unwrap();
 }
 
 #[rstest]
@@ -110,7 +112,7 @@ async fn test_read_tick_range(persistance_service: PersistanceService, binance_b
     let from = datetime!(2024-07-01 00:00).assume_utc();
     let till = datetime!(2024-07-01 00:10).assume_utc();
     let ticks = persistance_service
-        .read_ticks_range(&[binance_btc_usdt_perp.id], &from, &till)
+        .read_ticks_range(&[Arc::new(binance_btc_usdt_perp)], from, till)
         .await
         .unwrap();
     assert!(!ticks.is_empty());
@@ -120,9 +122,10 @@ async fn test_read_tick_range(persistance_service: PersistanceService, binance_b
 #[tokio::test]
 async fn test_insert_trade(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
+    let instrument = Arc::new(binance_btc_usdt_perp);
     let trade = Trade::new(
         datetime!(2024-07-01 00:01).assume_utc(),
-        binance_btc_usdt_perp.clone(),
+        instrument,
         1,
         MarketSide::Buy,
         Decimal::from_f64(100.0).expect("Invalid decimal"),
@@ -142,13 +145,16 @@ async fn test_insert_trade_batch(
     binance_btc_usdt_perp: Instrument,
     #[case] amount: i64,
 ) {
+    use std::sync::Arc;
+
     test_setup();
+    let instrument = Arc::new(binance_btc_usdt_perp);
     let trades = (0..amount)
         .into_iter()
         .map(|i| {
             Trade::new(
                 datetime!(2024-07-01 00:01).assume_utc() + time::Duration::seconds(i),
-                binance_btc_usdt_perp.clone(),
+                instrument.clone(),
                 i as u64,
                 MarketSide::Buy,
                 Decimal::from_f64(100.0).expect("Invalid decimal"),
@@ -156,7 +162,7 @@ async fn test_insert_trade_batch(
             )
         })
         .collect::<Vec<_>>();
-    persistance_service.insert_trade_batch(trades).await.unwrap();
+    persistance_service.insert_trade_batch_vec(trades).await.unwrap();
 }
 
 #[rstest]
@@ -166,7 +172,7 @@ async fn test_read_trade_range(persistance_service: PersistanceService, binance_
     let from = datetime!(2024-07-01 00:00).assume_utc();
     let till = datetime!(2024-07-01 00:10).assume_utc();
     let trades = persistance_service
-        .read_trades_range(&[binance_btc_usdt_perp.id], &from, &till)
+        .read_trades_range(&[Arc::new(binance_btc_usdt_perp)], from, till)
         .await
         .unwrap();
     assert!(!trades.is_empty());

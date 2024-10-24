@@ -11,8 +11,8 @@ use crate::{config::SMAConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct SimpleMovingAverageFeature {
-    input: NodeId,
-    output: NodeId,
+    input: FeatureId,
+    output: FeatureId,
     periods: usize,
 }
 
@@ -27,18 +27,18 @@ impl SimpleMovingAverageFeature {
 }
 
 impl Computation for SimpleMovingAverageFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
 
-    fn outputs(&self) -> Vec<NodeId> {
+    fn outputs(&self) -> Vec<FeatureId> {
         vec![self.output.clone()]
     }
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating SMA");
@@ -46,9 +46,10 @@ impl Computation for SimpleMovingAverageFeature {
         // Calculate the mean (SMA)
         let insights = instruments
             .iter()
+            .cloned()
             .filter_map(|instrument| {
                 // Get data from state
-                let values = state.get_periods(Some(instrument), &self.input, timestamp, &self.periods);
+                let values = state.periods(Some(instrument.clone()), self.input.clone(), timestamp, self.periods);
 
                 // Check if we have enough data
                 if values.len() < self.periods {
@@ -61,12 +62,7 @@ impl Computation for SimpleMovingAverageFeature {
                 let sum = values.iter().sum::<Decimal>();
                 let sma = sum / count;
 
-                Some(Insight::new(
-                    timestamp.clone(),
-                    Some(instrument.clone()),
-                    self.output.clone(),
-                    sma,
-                ))
+                Some(Insight::new(timestamp, Some(instrument), self.output.clone(), sma))
             })
             .collect::<Vec<_>>();
 

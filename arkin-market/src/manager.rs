@@ -26,7 +26,7 @@ impl MarketManager {
         events.into_iter().for_each(|e| self.insert(e))
     }
 
-    pub fn snapshot(&self, timestamp: &OffsetDateTime, window: Duration) -> MarketSnapshot {
+    pub fn snapshot(&self, timestamp: OffsetDateTime, window: Duration) -> MarketSnapshot {
         let ticks = self
             .state
             .list_instruments::<Tick>()

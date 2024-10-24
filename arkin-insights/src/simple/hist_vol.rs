@@ -10,8 +10,8 @@ use crate::{config::HistVolConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct HistVolFeature {
-    input: NodeId,
-    output: NodeId,
+    input: FeatureId,
+    output: FeatureId,
     annualized_multi: Decimal,
 }
 
@@ -30,18 +30,18 @@ impl HistVolFeature {
 }
 
 impl Computation for HistVolFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
 
-    fn outputs(&self) -> Vec<NodeId> {
+    fn outputs(&self) -> Vec<FeatureId> {
         vec![self.output.clone()]
     }
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating percentage change");
@@ -53,7 +53,7 @@ impl Computation for HistVolFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data
-                let data = state.get_last(Some(instrument), &self.input, timestamp);
+                let data = state.last(Some(instrument.clone()), self.input.clone(), timestamp);
 
                 // Check if we have enough data
                 if data.is_none() {
@@ -66,7 +66,7 @@ impl Computation for HistVolFeature {
 
                 // Create the insight
                 Some(Insight::new(
-                    timestamp.clone(),
+                    timestamp,
                     Some(instrument.clone()),
                     self.output.clone(),
                     annualized_vol,

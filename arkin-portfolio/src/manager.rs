@@ -174,7 +174,7 @@ impl PortfolioManager {
         })
     }
 
-    pub fn snapshot(&self, timestamp: &OffsetDateTime) -> PortfolioSnapshot {
+    pub fn snapshot(&self, timestamp: OffsetDateTime) -> PortfolioSnapshot {
         let positions = self.positions.iter().map(|v| v.clone()).collect();
         PortfolioSnapshot::new(timestamp.to_owned(), self.capital, positions)
     }

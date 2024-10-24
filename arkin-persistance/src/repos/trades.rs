@@ -1,12 +1,10 @@
 use anyhow::Result;
 use arkin_core::prelude::*;
-use futures_util::{stream, StreamExt};
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
-use tracing::error;
 use uuid::Uuid;
 
-use crate::{BIND_LIMIT, MAX_CONCURRENT_QUERIES};
+use crate::BIND_LIMIT;
 
 #[derive(Debug, Clone, sqlx::Type)]
 #[sqlx(type_name = "market_side", rename_all = "snake_case")]
@@ -88,71 +86,54 @@ impl TradeRepo {
     }
 
     pub async fn insert_batch(&self, trades: Vec<Trade>) -> Result<()> {
-        let trades = trades.into_iter().map(DBTrade::from).collect::<Vec<_>>();
+        let db_trades = trades.into_iter().map(DBTrade::from).collect::<Vec<_>>();
 
-        let queries = trades
-            .chunks(BIND_LIMIT / 5)
-            .map(|batch| {
-                // Create a query builder
-                let mut query_builder = sqlx::QueryBuilder::new(
-                    "INSERT INTO trades (event_time, instrument_id, trade_id, side, price, quantity) ",
-                );
+        for batch in db_trades.chunks(BIND_LIMIT / 7) {
+            // Create a query builder
+            let mut query_builder = sqlx::QueryBuilder::new(
+                "INSERT INTO trades (event_time, instrument_id, trade_id, side, price, quantity) ",
+            );
 
-                // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
-                query_builder.push_values(batch, |mut b, trade| {
-                    // If you wanted to bind these by-reference instead of by-value,
-                    // you'd need an iterator that yields references that live as long as `query_builder`,
-                    // e.g. collect it to a `Vec` first.
-                    b.push_bind(trade.event_time)
-                        .push_bind(trade.instrument_id)
-                        .push_bind(trade.trade_id)
-                        .push_bind(trade.side.clone())
-                        .push_bind(trade.price)
-                        .push_bind(trade.quantity);
-                });
+            // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
+            query_builder.push_values(batch, |mut b, trade| {
+                // If you wanted to bind these by-reference instead of by-value,
+                // you'd need an iterator that yields references that live as long as `query_builder`,
+                // e.g. collect it to a `Vec` first.
+                b.push_bind(trade.event_time)
+                    .push_bind(trade.instrument_id)
+                    .push_bind(trade.trade_id)
+                    .push_bind(trade.side.clone())
+                    .push_bind(trade.price)
+                    .push_bind(trade.quantity);
+            });
 
-                query_builder
-            })
-            .collect::<Vec<_>>();
+            // Use ON CONFLICT for the composite primary key
+            query_builder.push(" ON CONFLICT (instrument_id, trade_id, event_time) DO NOTHING");
 
-        let query_stream = stream::iter(queries.into_iter().map(|mut query| {
-            let db_pool = self.pool.clone();
-            async move { query.build().execute(&db_pool).await }
-        }));
-
-        let results = query_stream.buffered(MAX_CONCURRENT_QUERIES).collect::<Vec<_>>().await;
-
-        for result in results {
-            match result {
-                Ok(_) => { /* Success */ }
-                Err(e) => {
-                    error!("Error executing query: {}", e);
-                    return Err(e.into());
-                }
-            }
+            let query = query_builder.build();
+            query.execute(&self.pool).await?;
         }
-
         Ok(())
     }
 
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],
-        from: &OffsetDateTime,
-        to: &OffsetDateTime,
+        from: OffsetDateTime,
+        to: OffsetDateTime,
     ) -> Result<Vec<DBTrade>> {
         let trades = sqlx::query_as!(
             DBTrade,
             r#"
-            SELECT 
-                event_time, 
-                instrument_id, 
-                trade_id, 
-                side as "side:DBMarketSide", 
-                price, 
+            SELECT
+                event_time,
+                instrument_id,
+                trade_id,
+                side as "side:DBMarketSide",
+                price,
                 quantity
             FROM trades
-            WHERE instrument_id = ANY($1) AND event_time >= $2 AND event_time < $3 
+            WHERE instrument_id = ANY($1) AND event_time >= $2 AND event_time < $3
             ORDER BY event_time ASC
             "#,
             instrument_ids,

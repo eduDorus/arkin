@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use time::OffsetDateTime;
 
@@ -13,7 +13,7 @@ use super::Instrument;
 pub struct Book {
     pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
-    pub instrument: Instrument,
+    pub instrument: Arc<Instrument>,
     pub bids: Vec<BookUpdateSide>,
     pub asks: Vec<BookUpdateSide>,
 }
@@ -21,7 +21,7 @@ pub struct Book {
 impl Book {
     pub fn new(
         event_time: OffsetDateTime,
-        instrument: Instrument,
+        instrument: Arc<Instrument>,
         bids: Vec<BookUpdateSide>,
         asks: Vec<BookUpdateSide>,
     ) -> Self {

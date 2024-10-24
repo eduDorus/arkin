@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use strum::{Display, EnumDiscriminants, EnumString};
 use time::OffsetDateTime;
 
@@ -32,7 +34,7 @@ impl Event {
         self.into()
     }
 
-    pub fn instrument(&self) -> Instrument {
+    pub fn instrument(&self) -> Arc<Instrument> {
         match self {
             Event::Tick(tick) => tick.instrument.clone(),
             Event::Trade(trade) => trade.instrument.clone(),

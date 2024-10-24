@@ -20,10 +20,10 @@ pub enum BinanceSwapsEvent {
 }
 
 impl BinanceSwapsEvent {
-    pub fn venue_symbol(&self) -> &str {
+    pub fn venue_symbol(&self) -> String {
         match self {
-            BinanceSwapsEvent::AggTradeStream(data) => &data.data.instrument,
-            BinanceSwapsEvent::TickStream(data) => &data.data.instrument,
+            BinanceSwapsEvent::AggTradeStream(data) => data.data.instrument.clone(),
+            BinanceSwapsEvent::TickStream(data) => data.data.instrument.clone(),
             // BinanceSwapsEvent::TradeStream(data) => data.data.instrument.clone(),
             // BinanceSwapsEvent::Trade(data) => data.instrument.clone(),
             // BinanceSwapsEvent::AggTradeStream(data) => data.data.instrument.clone(),

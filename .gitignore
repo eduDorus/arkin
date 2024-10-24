@@ -1,11 +1,11 @@
 .DS_Store
-/target
+target
 
 # Environment Configs and Secrets
-/configs/*_config.yaml
-/configs/*_secrets.yaml
+configs/dev*.yaml
+configs/*_secrets.yaml
 
 # Evironment file
 .env
 
-/data
+data

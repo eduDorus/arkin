@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use time::{format_description::FormatItem, macros::format_description};
 
@@ -10,7 +10,22 @@ pub const TIMESTAMP_FORMAT: &[FormatItem] =
     format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond]");
 
 // Features
-pub static TRADE_PRICE_ID: LazyLock<FeatureId> = LazyLock::new(|| FeatureId::from("trade_price"));
-pub static TRADE_QUANTITY_ID: LazyLock<FeatureId> = LazyLock::new(|| FeatureId::from("trade_quantity"));
-pub static FILL_PRICE_ID: LazyLock<FeatureId> = LazyLock::new(|| FeatureId::from("fill_price"));
-pub static FILL_QUANTITY_ID: LazyLock<FeatureId> = LazyLock::new(|| FeatureId::from("fill_quantity"));
+pub static TRADE_PRICE_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("trade_price".to_string()));
+pub static TRADE_QUANTITY_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("trade_quantity".to_string()));
+pub static TICK_BID_PRICE_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("tick_bid_price".to_string()));
+pub static TICK_BID_QUANTITY_FEATURE_ID: LazyLock<FeatureId> =
+    LazyLock::new(|| Arc::new("tick_bid_quantity".to_string()));
+pub static TICK_ASK_PRICE_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("tick_ask_price".to_string()));
+pub static TICK_ASK_QUANTITY_FEATURE_ID: LazyLock<FeatureId> =
+    LazyLock::new(|| Arc::new("tick_ask_quantity".to_string()));
+
+pub static RAW_FEATURE_IDS: LazyLock<Vec<FeatureId>> = LazyLock::new(|| {
+    vec![
+        TRADE_PRICE_FEATURE_ID.clone(),
+        TRADE_QUANTITY_FEATURE_ID.clone(),
+        TICK_BID_PRICE_FEATURE_ID.clone(),
+        TICK_BID_QUANTITY_FEATURE_ID.clone(),
+        TICK_ASK_PRICE_FEATURE_ID.clone(),
+        TICK_ASK_QUANTITY_FEATURE_ID.clone(),
+    ]
+});

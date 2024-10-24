@@ -11,8 +11,8 @@ use crate::{config::EMAConfig, service::Computation, state::InsightsState};
 
 #[derive(Debug)]
 pub struct ExponentialMovingAverageFeature {
-    input: NodeId,
-    output: NodeId,
+    input: FeatureId,
+    output: FeatureId,
     periods: usize,
     smoothing_constant: Decimal,
 }
@@ -30,18 +30,18 @@ impl ExponentialMovingAverageFeature {
 }
 
 impl Computation for ExponentialMovingAverageFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
 
-    fn outputs(&self) -> Vec<NodeId> {
+    fn outputs(&self) -> Vec<FeatureId> {
         vec![self.output.clone()]
     }
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating EMA");
@@ -49,9 +49,10 @@ impl Computation for ExponentialMovingAverageFeature {
         // Calculate the mean (EMA)
         let insights = instruments
             .iter()
+            .cloned()
             .filter_map(|instrument| {
                 // Get data
-                let values = state.get_periods(Some(instrument), &self.input, timestamp, &self.periods);
+                let values = state.periods(Some(instrument.clone()), self.input.clone(), timestamp, self.periods);
 
                 // Check if we have enough data
                 if values.len() < self.periods {
@@ -60,7 +61,7 @@ impl Computation for ExponentialMovingAverageFeature {
                 }
 
                 // Check if the instrument has an EMA entry
-                let last_ema = state.get_last(Some(instrument), &self.output, timestamp);
+                let last_ema = state.last(Some(instrument.clone()), self.output.clone(), timestamp);
                 match last_ema {
                     // If key exists and has a last EMA value, proceed with the calculation
                     Some(last_ema) => {
@@ -72,12 +73,7 @@ impl Computation for ExponentialMovingAverageFeature {
                         // Calculate EMA
                         let ema =
                             sma * self.smoothing_constant + last_ema * (Decimal::from(1) - self.smoothing_constant);
-                        Some(Insight::new(
-                            timestamp.clone(),
-                            Some(instrument.clone()),
-                            self.output.clone(),
-                            ema,
-                        ))
+                        Some(Insight::new(timestamp, Some(instrument.clone()), self.output.clone(), ema))
                     }
                     // If key exists but has no last EMA value, use SMA as the starting EMA
                     None => {
@@ -85,12 +81,7 @@ impl Computation for ExponentialMovingAverageFeature {
                         let sum = values.iter().sum::<Decimal>();
                         let count = Decimal::from(values.len());
                         let sma = sum / count;
-                        Some(Insight::new(
-                            timestamp.clone(),
-                            Some(instrument.clone()),
-                            self.output.clone(),
-                            sma,
-                        ))
+                        Some(Insight::new(timestamp, Some(instrument), self.output.clone(), sma))
                     }
                 }
             })

@@ -41,8 +41,8 @@ impl StrategyModule for CrossoverStrategy {
                     .get_instrument_insight(i, &self.source[1])
                     .expect("Missing volume spread");
 
-                let weight = if volume_spread.value() > &Decimal::ZERO {
-                    match price_spread.value().cmp(&Decimal::ZERO) {
+                let weight = if volume_spread.value() > Decimal::ZERO {
+                    match price_spread.value().cmp(Decimal::ZERO) {
                         std::cmp::Ordering::Greater => Weight::from(-1),
                         std::cmp::Ordering::Less => Weight::from(1),
                         std::cmp::Ordering::Equal => Weight::from(0),

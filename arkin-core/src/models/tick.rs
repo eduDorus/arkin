@@ -1,20 +1,24 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use time::OffsetDateTime;
 
 use crate::{
+    constants::{
+        TICK_ASK_PRICE_FEATURE_ID, TICK_ASK_QUANTITY_FEATURE_ID, TICK_BID_PRICE_FEATURE_ID,
+        TICK_BID_QUANTITY_FEATURE_ID,
+    },
     events::{EventType, EventTypeOf},
     Event, Price, Quantity,
 };
 
 use super::{Insight, Instrument};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Tick {
     pub event_time: OffsetDateTime,
-    pub instrument: Instrument,
+    pub instrument: Arc<Instrument>,
     pub tick_id: u64,
     pub bid_price: Price,
     pub bid_quantity: Quantity,
@@ -25,7 +29,7 @@ pub struct Tick {
 impl Tick {
     pub fn new(
         event_time: OffsetDateTime,
-        instrument: Instrument,
+        instrument: Arc<Instrument>,
         tick_id: u64,
         bid_price: Price,
         bid_quantity: Quantity,
@@ -43,27 +47,32 @@ impl Tick {
         }
     }
 
-    pub fn to_insights(&self) -> Vec<Insight> {
+    pub fn to_insights(self) -> Vec<Insight> {
         vec![
             Insight::new(
                 self.event_time,
                 Some(self.instrument.clone()),
-                "bid_price".into(),
+                TICK_BID_PRICE_FEATURE_ID.clone(),
                 self.bid_price,
             ),
             Insight::new(
                 self.event_time,
                 Some(self.instrument.clone()),
-                "ask_price".into(),
-                self.ask_price,
+                TICK_BID_QUANTITY_FEATURE_ID.clone(),
+                self.bid_quantity,
             ),
             Insight::new(
                 self.event_time,
                 Some(self.instrument.clone()),
-                "mid_price".into(),
-                self.mid_price(),
+                TICK_ASK_PRICE_FEATURE_ID.clone(),
+                self.ask_price,
             ),
-            Insight::new(self.event_time, Some(self.instrument.clone()), "spread".into(), self.spread()),
+            Insight::new(
+                self.event_time,
+                Some(self.instrument),
+                TICK_ASK_QUANTITY_FEATURE_ID.clone(),
+                self.ask_quantity,
+            ),
         ]
     }
 

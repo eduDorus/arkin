@@ -11,16 +11,16 @@ pub struct CompositeIndex {
 }
 
 impl CompositeIndex {
-    pub fn new(timestamp: &OffsetDateTime) -> Self {
+    pub fn new(timestamp: OffsetDateTime) -> Self {
         CompositeIndex {
-            timestamp: timestamp.to_owned(),
+            timestamp: timestamp,
             index: 0,
         }
     }
 
-    pub fn new_max(timestamp: &OffsetDateTime) -> Self {
+    pub fn new_max(timestamp: OffsetDateTime) -> Self {
         CompositeIndex {
-            timestamp: timestamp.to_owned(),
+            timestamp: timestamp,
             index: u64::MAX,
         }
     }

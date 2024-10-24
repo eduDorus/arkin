@@ -11,13 +11,13 @@ use crate::{config::BollingerBandsConfig, service::Computation, state::InsightsS
 
 #[derive(Debug)]
 pub struct BollingerBandsFeature {
-    input_price: NodeId,
-    input_sma: NodeId,
-    input_stddev: NodeId,
-    output_upper: NodeId,
-    output_lower: NodeId,
-    output_oscillator: NodeId,
-    output_width: NodeId,
+    input_price: FeatureId,
+    input_sma: FeatureId,
+    input_stddev: FeatureId,
+    output_upper: FeatureId,
+    output_lower: FeatureId,
+    output_oscillator: FeatureId,
+    output_width: FeatureId,
     sigma: Decimal,
 }
 
@@ -37,11 +37,11 @@ impl BollingerBandsFeature {
 }
 
 impl Computation for BollingerBandsFeature {
-    fn inputs(&self) -> Vec<NodeId> {
+    fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input_price.clone(), self.input_sma.clone(), self.input_stddev.clone()]
     }
 
-    fn outputs(&self) -> Vec<NodeId> {
+    fn outputs(&self) -> Vec<FeatureId> {
         vec![
             self.output_upper.clone(),
             self.output_lower.clone(),
@@ -52,8 +52,8 @@ impl Computation for BollingerBandsFeature {
 
     fn calculate(
         &self,
-        instruments: &[Instrument],
-        timestamp: &OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        timestamp: OffsetDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating BollingerBands");
@@ -61,11 +61,12 @@ impl Computation for BollingerBandsFeature {
         // Calculate the mean (BollingerBands)
         let insights = instruments
             .iter()
+            .cloned()
             .filter_map(|instrument| {
                 // Get data
-                let price = state.get_last(Some(instrument), &self.input_price, timestamp);
-                let sma = state.get_last(Some(instrument), &self.input_sma, timestamp);
-                let std_dev = state.get_last(Some(instrument), &self.input_stddev, timestamp);
+                let price = state.last(Some(instrument.clone()), self.input_price.clone(), timestamp);
+                let sma = state.last(Some(instrument.clone()), self.input_sma.clone(), timestamp);
+                let std_dev = state.last(Some(instrument.clone()), self.input_stddev.clone(), timestamp);
 
                 // Check if we have enough data
                 match (price, sma, std_dev) {
@@ -77,15 +78,15 @@ impl Computation for BollingerBandsFeature {
                         let width = (upper - lower) / ma;
 
                         Some(vec![
-                            Insight::new(timestamp.clone(), Some(instrument.clone()), self.output_upper.clone(), upper),
-                            Insight::new(timestamp.clone(), Some(instrument.clone()), self.output_lower.clone(), lower),
+                            Insight::new(timestamp, Some(instrument.clone()), self.output_upper.clone(), upper),
+                            Insight::new(timestamp, Some(instrument.clone()), self.output_lower.clone(), lower),
                             Insight::new(
-                                timestamp.clone(),
+                                timestamp,
                                 Some(instrument.clone()),
                                 self.output_oscillator.clone(),
                                 oscillator,
                             ),
-                            Insight::new(timestamp.clone(), Some(instrument.clone()), self.output_width.clone(), width),
+                            Insight::new(timestamp, Some(instrument), self.output_width.clone(), width),
                         ])
                     }
                     _ => {

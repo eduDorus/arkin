@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use rust_decimal::Decimal;
 use strum::Display;
@@ -13,7 +13,7 @@ use super::{Account, Instrument, MarketSide, Strategy};
 pub struct Position {
     pub id: Uuid,
     pub account: Account,
-    pub instrument: Instrument,
+    pub instrument: Arc<Instrument>,
     pub strategy: Strategy,
     pub side: PositionSide,
     pub avg_open_price: Price,
@@ -42,7 +42,7 @@ impl Position {
     pub fn new(
         account: Account,
         strategy: Strategy,
-        instrument: Instrument,
+        instrument: Arc<Instrument>,
         side: MarketSide,
         price: Price,
         quantity: Quantity,

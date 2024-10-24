@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arkin_persistance::PersistanceService;
+use arkin_persistance::prelude::*;
 
 use crate::{config::IngestorModuleConfig, service::Ingestor, TardisIngestor};
 
@@ -12,11 +12,11 @@ impl IngestorFactory {
     pub fn from_config(
         configs: &[IngestorModuleConfig],
         persistance_service: Arc<PersistanceService>,
-    ) -> Vec<Arc<Box<dyn Ingestor>>> {
+    ) -> Vec<Box<dyn Ingestor + Send + Sync>> {
         configs
             .iter()
             .map(|config| {
-                let ingestor: Box<dyn Ingestor> = match config {
+                let ingestor: Box<dyn Ingestor + Send + Sync> = match config {
                     IngestorModuleConfig::Binance(c) => {
                         Box::new(BinanceIngestor::from_config(c, persistance_service.clone()))
                     }
@@ -24,7 +24,7 @@ impl IngestorFactory {
                         Box::new(TardisIngestor::from_config(c, persistance_service.clone()))
                     }
                 };
-                Arc::new(ingestor)
+                ingestor
             })
             .collect()
     }

@@ -1,12 +1,11 @@
 use anyhow::Result;
 use arkin_core::{prelude::Tick, Price, Quantity};
-use futures_util::{stream, StreamExt};
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
-use tracing::error;
+use tracing::info;
 use uuid::Uuid;
 
-use crate::{BIND_LIMIT, MAX_CONCURRENT_QUERIES};
+use crate::BIND_LIMIT;
 
 #[derive(Debug, FromRow)]
 pub struct DBTick {
@@ -66,65 +65,48 @@ impl TickRepo {
     }
 
     pub async fn insert_batch(&self, ticks: Vec<Tick>) -> Result<()> {
-        let ticks = ticks.into_iter().map(DBTick::from).collect::<Vec<_>>();
+        // Convert Tick to DBTick and prepare for insertion
+        let db_ticks = ticks.into_iter().map(DBTick::from).collect::<Vec<_>>();
 
-        let queries = ticks
-            .chunks(BIND_LIMIT / 7)
-            .map(|batch| {
-                // Create a query builder
-                let mut query_builder = sqlx::QueryBuilder::new(
+        // Build batched insert queries
+        for batch in db_ticks.chunks(BIND_LIMIT / 7) {
+            // Create a query builder
+            let mut query_builder = sqlx::QueryBuilder::new(
                     "INSERT INTO ticks (event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity) ",
                 );
 
-                // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
-                query_builder.push_values(batch, |mut b, trade| {
-                    // If you wanted to bind these by-reference instead of by-value,
-                    // you'd need an iterator that yields references that live as long as `query_builder`,
-                    // e.g. collect it to a `Vec` first.
-                    b.push_bind(trade.event_time)
-                        .push_bind(trade.instrument_id)
-                        .push_bind(trade.tick_id)
-                        .push_bind(trade.bid_price)
-                        .push_bind(trade.bid_quantity)
-                        .push_bind(trade.ask_price)
-                        .push_bind(trade.ask_quantity);
-                });
+            // Push the values into the query builder
+            query_builder.push_values(batch, |mut b, tick| {
+                b.push_bind(tick.event_time)
+                    .push_bind(tick.instrument_id)
+                    .push_bind(tick.tick_id)
+                    .push_bind(tick.bid_price)
+                    .push_bind(tick.bid_quantity)
+                    .push_bind(tick.ask_price)
+                    .push_bind(tick.ask_quantity);
+            });
 
-                query_builder
-            })
-            .collect::<Vec<_>>();
+            // Use ON CONFLICT for the composite primary key
+            query_builder.push("ON CONFLICT (instrument_id, tick_id, event_time) DO NOTHING");
+            let query = query_builder.build();
 
-        let query_stream = stream::iter(queries.into_iter().map(|mut query| {
-            let db_pool = self.pool.clone();
-            async move { query.build().execute(&db_pool).await }
-        }));
-
-        let results = query_stream.buffered(MAX_CONCURRENT_QUERIES).collect::<Vec<_>>().await;
-
-        for result in results {
-            match result {
-                Ok(_) => { /* Success */ }
-                Err(e) => {
-                    error!("Error executing query: {}", e);
-                    return Err(e.into());
-                }
-            }
+            query.execute(&self.pool).await?;
         }
-
+        info!("Saved ticks");
         Ok(())
     }
 
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],
-        start: &OffsetDateTime,
-        end: &OffsetDateTime,
+        start: OffsetDateTime,
+        end: OffsetDateTime,
     ) -> Result<Vec<DBTick>> {
         let ticks = sqlx::query_as!(
             DBTick,
             r#"
             SELECT * FROM ticks
-            WHERE instrument_id = ANY($3) AND event_time >= $1 AND event_time < $2 
+            WHERE instrument_id = ANY($3) AND event_time >= $1 AND event_time < $2
             ORDER BY event_time ASC
             "#,
             start,

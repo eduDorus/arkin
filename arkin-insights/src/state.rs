@@ -1,50 +1,51 @@
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-use arkin_core::prelude::*;
 use dashmap::DashMap;
 use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
+use arkin_core::prelude::*;
+
 #[derive(Default)]
 pub struct InsightsState {
-    features: DashMap<(Option<Instrument>, FeatureId), BTreeMap<CompositeIndex, Decimal>>,
+    features: DashMap<(Option<Arc<Instrument>>, FeatureId), BTreeMap<CompositeIndex, Decimal>>,
 }
 
 impl InsightsState {
     pub fn insert(&self, event: Insight) {
-        let key = (event.instrument().clone(), event.id().clone());
-        let mut composit_key = CompositeIndex::new(&event.event_time());
+        let key = (event.instrument, event.feature_id);
+        let mut composit_key = CompositeIndex::new(event.event_time);
 
         let mut entry = self.features.entry(key).or_default();
         while entry.get(&composit_key).is_some() {
             composit_key.increment();
         }
-        entry.insert(composit_key, event.value().to_owned());
+        entry.insert(composit_key, event.value);
     }
 
     pub fn insert_batch(&self, events: Vec<Insight>) {
-        events.par_iter().for_each(|event| {
-            let key = (event.instrument().clone(), event.id().clone());
-            let mut composit_key = CompositeIndex::new(&event.event_time());
+        events.into_par_iter().for_each(|event| {
+            let key = (event.instrument, event.feature_id);
+            let mut composit_key = CompositeIndex::new(event.event_time);
 
             let mut entry = self.features.entry(key).or_default();
             while entry.get(&composit_key).is_some() {
                 composit_key.increment();
             }
-            entry.insert(composit_key, event.value().to_owned());
+            entry.insert(composit_key, event.value);
         });
     }
 
-    pub fn get_last(
+    pub fn last(
         &self,
-        instrument: Option<&Instrument>,
-        feature_id: &FeatureId,
-        timestamp: &OffsetDateTime,
+        instrument: Option<Arc<Instrument>>,
+        feature_id: FeatureId,
+        timestamp: OffsetDateTime,
     ) -> Option<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
 
-        if let Some(tree) = self.features.get(&(instrument.cloned(), feature_id.to_owned())) {
+        if let Some(tree) = self.features.get(&(instrument, feature_id)) {
             if let Some((_, v)) = tree.range(..=index).rev().take(1).next() {
                 return Some(v.clone());
             }
@@ -52,34 +53,34 @@ impl InsightsState {
         None
     }
 
-    pub fn get_window(
+    pub fn window(
         &self,
-        instrument: Option<&Instrument>,
-        feature_id: &FeatureId,
-        timestamp: &OffsetDateTime,
-        window: &Duration,
+        instrument: Option<Arc<Instrument>>,
+        feature_id: FeatureId,
+        timestamp: OffsetDateTime,
+        window: Duration,
     ) -> Vec<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
-        let end_index = CompositeIndex::new(&(*timestamp - *window));
+        let end_index = CompositeIndex::new(timestamp - window);
 
-        if let Some(tree) = self.features.get(&(instrument.cloned(), feature_id.to_owned())) {
+        if let Some(tree) = self.features.get(&(instrument, feature_id)) {
             tree.range(end_index..=index).map(|(_, v)| *v).collect()
         } else {
             Vec::new()
         }
     }
 
-    pub fn get_periods(
+    pub fn periods(
         &self,
-        instrument: Option<&Instrument>,
-        feature_id: &FeatureId,
-        timestamp: &OffsetDateTime,
-        periods: &usize,
+        instrument: Option<Arc<Instrument>>,
+        feature_id: FeatureId,
+        timestamp: OffsetDateTime,
+        periods: usize,
     ) -> Vec<Decimal> {
         let index = CompositeIndex::new_max(timestamp);
 
-        if let Some(tree) = self.features.get(&(instrument.cloned(), feature_id.to_owned())) {
-            let mut res = tree.range(..=index).rev().take(*periods).map(|(_, v)| *v).collect::<Vec<_>>();
+        if let Some(tree) = self.features.get(&(instrument, feature_id)) {
+            let mut res = tree.range(..=index).rev().take(periods).map(|(_, v)| *v).collect::<Vec<_>>();
             res.reverse();
             res
         } else {

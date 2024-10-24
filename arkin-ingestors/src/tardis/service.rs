@@ -182,11 +182,11 @@ pub struct TardisRequest {
 
 impl TardisRequest {
     pub fn new(
-        exchange: &TardisExchange,
-        channel: &TardisChannel,
-        instruments: &Vec<String>,
-        start: &OffsetDateTime,
-        end: &OffsetDateTime,
+        exchange: TardisExchange,
+        channel: TardisChannel,
+        instruments: Vec<String>,
+        start: OffsetDateTime,
+        end: OffsetDateTime,
     ) -> Self {
         TardisRequest {
             exchange: exchange.to_owned(),
@@ -237,7 +237,7 @@ impl TardisIngestor {
         &self,
         req: TardisRequest,
     ) -> impl Stream<Item = impl Future<Output = Result<Vec<(OffsetDateTime, String)>>> + '_> + '_ {
-        let dates = datetime_range_minute(&req.start, &req.end).expect("Invalid date range");
+        let dates = datetime_range_minute(req.start, req.end).expect("Invalid date range");
         stream::iter(dates.into_iter().map(move |datetime| {
             let client = self.client.clone();
             let exchange_str = req.exchange.to_string();
@@ -338,81 +338,82 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 
 #[async_trait]
 impl Ingestor for TardisIngestor {
-    async fn start(&self) {
+    async fn start(&self) -> Result<()> {
         info!("Starting tardis ingestor...");
+        let persistance_service = Arc::clone(&self.persistance_service);
 
-        let req = TardisRequest::new(&self.venue, &self.channel, &self.instruments, &self.start, &self.end);
+        let req = TardisRequest::new(
+            self.venue.clone(),
+            self.channel.clone(),
+            self.instruments.clone(),
+            self.start,
+            self.end,
+        );
 
         let stream = self.stream(req);
         pin!(stream);
-        // process_stream_concurrently(stream, manager.clone(), 10).await;
 
-        // batch insert 5000 events
-        // let mut events = Vec::with_capacity(10000);
+        // No need to clone persistance_service for each iteration
         while let Some((_ts, json)) = stream.next().await {
-            match serde_json::from_str::<BinanceSwapsEvent>(&json) {
-                Ok(e) => {
-                    info!("{}", e);
-                    if let Ok(res) = self.persistance_service.read_instrument_by_venue_symbol(e.venue_symbol()).await {
-                        if let Some(instrument) = res {
-                            debug!("Instrument found: {}", instrument.symbol);
-                            match e {
-                                BinanceSwapsEvent::AggTradeStream(stream) => {
-                                    let trade = stream.data;
-                                    // "m": true: The buyer is the market maker.
-                                    // • The trade was initiated by a sell order from the taker.
-                                    // • The taker is selling, and the maker (buyer) is buying.
-                                    // "m": false: The seller is the market maker.
-                                    // • The trade was initiated by a buy order from the taker.
-                                    // • The taker is buying, and the maker (seller) is selling.
-                                    let side = if trade.maker {
-                                        MarketSide::Sell
-                                    } else {
-                                        MarketSide::Buy
-                                    };
-                                    let trade = Trade::new(
-                                        trade.event_time,
-                                        instrument,
-                                        trade.agg_trade_id,
-                                        side,
-                                        trade.price,
-                                        trade.quantity,
-                                    );
-                                    if let Err(e) = self.persistance_service.insert_trade(trade).await {
-                                        error!("Failed to insert trade: {}", e);
-                                    }
-                                }
-                                BinanceSwapsEvent::TickStream(stream) => {
-                                    let tick = stream.data;
-                                    let tick = Tick::new(
-                                        tick.event_time,
-                                        instrument,
-                                        tick.update_id,
-                                        tick.bid_price,
-                                        tick.bid_quantity,
-                                        tick.ask_price,
-                                        tick.ask_quantity,
-                                    );
-                                    if let Err(e) = self.persistance_service.insert_tick(tick).await {
-                                        error!("Failed to insert tick: {}", e);
-                                    }
-                                }
-                            }
-                        } else {
-                            error!("Instrument not found for symbol: {}", e.venue_symbol());
-                            continue;
-                        }
-                    } else {
-                        error!("Failed to read instrument by venue symbol: {}", e.venue_symbol());
-                        continue;
-                    }
-                }
+            let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
+                Ok(e) => Some(e),
                 Err(e) => {
                     error!("Failed to parse Binance event: {}", e);
                     error!("Data: {}", json);
-                    continue;
+                    None
                 }
             };
+
+            let event = match event {
+                Some(e) => {
+                    debug!("{}", e);
+                    e
+                }
+                None => continue,
+            };
+
+            let instrument = persistance_service
+                .read_instrument_by_venue_symbol(event.venue_symbol())
+                .await?;
+
+            match event {
+                BinanceSwapsEvent::AggTradeStream(stream) => {
+                    let trade = stream.data;
+                    let side = if trade.maker {
+                        MarketSide::Sell
+                    } else {
+                        MarketSide::Buy
+                    };
+                    let trade = Trade::new(
+                        trade.event_time,
+                        instrument,
+                        trade.agg_trade_id,
+                        side,
+                        trade.price,
+                        trade.quantity,
+                    );
+
+                    if let Err(e) = persistance_service.insert_trade_batch(trade).await {
+                        error!("Failed to insert trade: {}", e);
+                    }
+                }
+                BinanceSwapsEvent::TickStream(stream) => {
+                    let tick = stream.data;
+                    let tick = Tick::new(
+                        tick.event_time,
+                        instrument,
+                        tick.update_id,
+                        tick.bid_price,
+                        tick.bid_quantity,
+                        tick.ask_price,
+                        tick.ask_quantity,
+                    );
+                    if let Err(e) = persistance_service.insert_tick_batch(tick).await {
+                        error!("Failed to insert tick: {}", e);
+                    }
+                }
+            }
         }
+        Ok(())
     }
 }

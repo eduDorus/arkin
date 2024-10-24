@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use strum::Display;
 
-#[derive(Display, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum MarketSide {
     Buy,
     Sell,

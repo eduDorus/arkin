@@ -24,26 +24,25 @@ async fn main() -> Result<()> {
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
 
     let config = load::<PersistanceConfig>();
-    let persistance_service = Arc::new(PersistanceService::from_config(&config.database));
+    let persistance_service = Arc::new(PersistanceService::from_config(&config));
 
     let config = load::<InsightsConfig>();
     let insights_service = InsightsService::from_config(&config.insights_service, persistance_service.clone());
 
-    let instruments = persistance_service
-        .read_instrument_by_venue_symbol("BTCUSDT")
-        .await?
-        .expect("Instrument not found");
-    let instrument_ids = vec![instruments.id];
+    let instrument = persistance_service
+        .read_instrument_by_venue_symbol("BTCUSDT".to_string())
+        .await?;
+    let instruments = vec![instrument];
 
     let start = datetime!(2024-09-29 10:00).assume_utc();
     let end = datetime!(2024-09-29 18:00).assume_utc();
     let frequency_secs = Duration::from_secs(60);
 
-    let mut clock = Clock::new(&start, &end, &frequency_secs);
+    let mut clock = Clock::new(start, end, frequency_secs);
 
     // Warm up pipeline state
-    let trades = persistance_service.read_trades_range(&instrument_ids, &start, &end).await?;
-    let ticks = persistance_service.read_ticks_range(&instrument_ids, &start, &end).await?;
+    let trades = persistance_service.read_trades_range(&instruments, start, end).await?;
+    let ticks = persistance_service.read_ticks_range(&instruments, start, end).await?;
     info!("Loaded {} trades and {} ticks", trades.len(), ticks.len());
 
     // Transform data to insights and add to state
@@ -63,7 +62,7 @@ async fn main() -> Result<()> {
     info!("Done inserting insights into state");
 
     while let Some((from, to)) = clock.next() {
-        insights_service.process(&[instruments.clone()], &from, &to).await?;
+        insights_service.process(&instruments, from, to).await?;
     }
     Ok(())
 }

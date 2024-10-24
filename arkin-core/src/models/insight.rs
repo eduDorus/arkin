@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
@@ -10,7 +10,7 @@ use super::Instrument;
 #[derive(Clone)]
 pub struct Insight {
     pub event_time: OffsetDateTime,
-    pub instrument: Option<Instrument>,
+    pub instrument: Option<Arc<Instrument>>,
     pub feature_id: FeatureId,
     pub value: Decimal,
 }
@@ -18,7 +18,7 @@ pub struct Insight {
 impl Insight {
     pub fn new(
         event_time: OffsetDateTime,
-        instrument: Option<Instrument>,
+        instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
         value: Decimal,
     ) -> Self {
@@ -38,22 +38,6 @@ impl Insight {
             value,
         }
     }
-
-    pub fn id(&self) -> &FeatureId {
-        &self.feature_id
-    }
-
-    pub fn instrument(&self) -> &Option<Instrument> {
-        &self.instrument
-    }
-
-    pub fn event_time(&self) -> &OffsetDateTime {
-        &self.event_time
-    }
-
-    pub fn value(&self) -> &Decimal {
-        &self.value
-    }
 }
 
 impl fmt::Display for Insight {
@@ -63,7 +47,7 @@ impl fmt::Display for Insight {
             f,
             "{} {:?} {} {}",
             event_time,
-            self.instrument.clone().map(|i| i.symbol),
+            self.instrument.as_ref().map(|i| i.symbol.clone()),
             self.feature_id,
             self.value
         )
