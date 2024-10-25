@@ -64,5 +64,7 @@ async fn main() -> Result<()> {
     while let Some((from, to)) = clock.next() {
         insights_service.process(&instruments, from, to).await?;
     }
+
+    persistance_service.flush().await?;
     Ok(())
 }

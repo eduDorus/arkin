@@ -60,7 +60,7 @@ impl InsightsService {
             debug!("Generated insight: {}", insight);
         }
 
-        self.persistance_service.insert_insight_batch(insights).await?;
+        self.persistance_service.insert_insight_batch_vec(insights).await?;
         Ok(())
     }
 }

@@ -56,7 +56,7 @@ impl PersistanceService {
             instrument_service.clone(),
             config.batch_size,
         ));
-        let insights_service = Arc::new(InsightsService::new(insights_repo.clone()));
+        let insights_service = Arc::new(InsightsService::new(insights_repo.clone(), config.batch_size));
 
         Self {
             // venue_service,
@@ -70,6 +70,7 @@ impl PersistanceService {
     pub async fn flush(&self) -> Result<()> {
         self.tick_service.flush().await?;
         self.trade_service.flush().await?;
+        self.insights_service.flush().await?;
         Ok(())
     }
 
@@ -143,7 +144,11 @@ impl PersistanceService {
         self.insights_service.insert(insight).await
     }
 
-    pub async fn insert_insight_batch(&self, insights: Vec<Insight>) -> Result<()> {
-        self.insights_service.insert_batch(insights).await
+    pub async fn insert_insight_batch(&self, insight: Insight) -> Result<()> {
+        self.insights_service.insert_batch(insight).await
+    }
+
+    pub async fn insert_insight_batch_vec(&self, insights: Vec<Insight>) -> Result<()> {
+        self.insights_service.insert_batch_vec(insights).await
     }
 }

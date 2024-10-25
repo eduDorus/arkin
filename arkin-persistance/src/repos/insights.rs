@@ -1,14 +1,13 @@
 use anyhow::Result;
-use futures_util::{stream, StreamExt};
 use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
-use tracing::error;
+use tracing::info;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::{BIND_LIMIT, MAX_CONCURRENT_QUERIES};
+use crate::BIND_LIMIT;
 
 #[derive(Debug, FromRow)]
 pub struct DBInsight {
@@ -62,52 +61,32 @@ impl InsightsRepo {
     }
 
     pub async fn insert_batch(&self, insights: Vec<Insight>) -> Result<()> {
-        let insights = insights.into_iter().map(DBInsight::from).collect::<Vec<_>>();
+        let db_insights = insights.into_iter().map(DBInsight::from).collect::<Vec<_>>();
 
-        let queries = insights
-            .chunks(BIND_LIMIT / 4)
-            .map(|batch| {
-                // Create a query builder
-                let mut query_builder =
-                    sqlx::QueryBuilder::new("INSERT INTO insights (event_time, instrument_id, feature_id, value) ");
+        // Build batched insert queries
+        for batch in db_insights.chunks(BIND_LIMIT / 4) {
+            // Create a query builder
+            let mut query_builder =
+                sqlx::QueryBuilder::new("INSERT INTO insights (event_time, instrument_id, feature_id, value) ");
 
-                // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
-                query_builder.push_values(batch, |mut b, insight| {
-                    // If you wanted to bind these by-reference instead of by-value,
-                    // you'd need an iterator that yields references that live as long as `query_builder`,
-                    // e.g. collect it to a `Vec` first.
-                    b.push_bind(insight.event_time)
-                        .push_bind(insight.instrument_id)
-                        .push_bind(insight.feature_id.clone())
-                        .push_bind(insight.value);
-                });
+            // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
+            query_builder.push_values(batch, |mut b, insight| {
+                // If you wanted to bind these by-reference instead of by-value,
+                // you'd need an iterator that yields references that live as long as `query_builder`,
+                // e.g. collect it to a `Vec` first.
+                b.push_bind(insight.event_time)
+                    .push_bind(insight.instrument_id)
+                    .push_bind(insight.feature_id.clone())
+                    .push_bind(insight.value);
+            });
 
-                // Add the `ON CONFLICT` clause
-                // query_builder.push("ON CONFLICT DO NOTHING");
-                // .push("ON CONFLICT (event_time, instrument_id, feature_id) DO UPDATE SET value = EXCLUDED.value");
+            query_builder
+                .push("ON CONFLICT (event_time, instrument_id, feature_id) DO UPDATE SET value = EXCLUDED.value");
+            let query = query_builder.build();
 
-                query_builder
-            })
-            .collect::<Vec<_>>();
-
-        let query_stream = stream::iter(queries.into_iter().map(|mut query| {
-            let db_pool = self.pool.clone();
-            async move { query.build().execute(&db_pool).await }
-        }));
-
-        let results = query_stream.buffered(MAX_CONCURRENT_QUERIES).collect::<Vec<_>>().await;
-
-        for result in results {
-            match result {
-                Ok(_) => { /* Success */ }
-                Err(e) => {
-                    error!("Error executing query: {}", e);
-                    error!("Query: {:?}", e);
-                    return Err(e.into());
-                }
-            }
+            query.execute(&self.pool).await?;
         }
-
+        info!("Saved {} inserts", db_insights.len());
         Ok(())
     }
 

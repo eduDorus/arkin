@@ -7,7 +7,7 @@ use crate::{constants::TIMESTAMP_FORMAT, FeatureId};
 
 use super::Instrument;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Insight {
     pub event_time: OffsetDateTime,
     pub instrument: Option<Arc<Instrument>>,
