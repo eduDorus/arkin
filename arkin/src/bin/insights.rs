@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
         .await?;
     let instruments = vec![instrument];
 
-    let start = datetime!(2024-10-15 00:00).assume_utc();
+    let start = datetime!(2024-10-10 00:00).assume_utc();
     let end = datetime!(2024-10-24 00:00).assume_utc();
     let frequency_secs = Duration::from_secs(60);
 

@@ -33,9 +33,10 @@ license="Proprietary"
 [workspace.dependencies]
 # Utiliy
 uuid={ version="1.11", features=["v4", "rng", "fast-rng", "serde", "borsh"] }
-rand="0.8.5"
+rand="0.8"
 strum={ version="0.26", features=["derive"] }
 url={ version="2.5" }
+itertools="0.13"
 
 # Multi-threading
 parking_lot={ version="0.12", features=["hardware-lock-elision"], default-features=false }
@@ -103,9 +104,9 @@ petgraph={ version="0.6", features=["graphmap"], default-features=false }
 # tch = { version = "0.17.0", features = [ "download-libtorch" ] }
 
 # Testing
-rstest={ version="0.23.0" }
+rstest={ version="0.23" }
 async-std={ version="1.13", features=["attributes"] }
-ctor="0.2.8"
+ctor="0.2"
 
 [profile.release]
 lto="thin"

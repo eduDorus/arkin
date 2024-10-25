@@ -3,9 +3,9 @@ mod factory;
 mod pipeline;
 mod service;
 mod simple;
-mod smoothing;
 mod state;
 mod ta;
+mod ta_lib;
 
 pub use service::InsightsService;
 

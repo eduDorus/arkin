@@ -21,8 +21,7 @@ flume={ workspace=true }
 rust_decimal={ workspace=true }
 rust_decimal_macros={ workspace=true }
 uuid={ workspace=true }
-# tch = { workspace = true }
+itertools={ workspace=true }
 
 [dev-dependencies]
-# test-utils = { path = "../test-utils" }
 rstest={ workspace=true }
