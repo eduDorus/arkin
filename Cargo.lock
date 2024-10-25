@@ -138,6 +138,7 @@ dependencies = [
  "rayon",
  "rstest",
  "rust_decimal",
+ "rust_decimal_macros",
  "serde",
  "time",
  "tracing",

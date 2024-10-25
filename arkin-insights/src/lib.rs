@@ -3,6 +3,7 @@ mod factory;
 mod pipeline;
 mod service;
 mod simple;
+mod smoothing;
 mod state;
 mod ta;
 

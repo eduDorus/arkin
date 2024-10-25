@@ -1,27 +1,28 @@
 [package]
-name = "arkin-insights"
-authors.workspace = true
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+name="arkin-insights"
+authors.workspace=true
+version.workspace=true
+edition.workspace=true
+license.workspace=true
 
 [dependencies]
-arkin-core = { path = "../arkin-core" }
-arkin-persistance = { path = "../arkin-persistance" }
+arkin-core={ path="../arkin-core" }
+arkin-persistance={ path="../arkin-persistance" }
 
-dashmap = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
-time = { workspace = true }
-petgraph = { workspace = true }
-serde = { workspace = true }
-parking_lot = { workspace = true }
-rayon = { workspace = true }
-flume = { workspace = true }
-rust_decimal = { workspace = true }
-uuid = { workspace = true }
+dashmap={ workspace=true }
+anyhow={ workspace=true }
+tracing={ workspace=true }
+time={ workspace=true }
+petgraph={ workspace=true }
+serde={ workspace=true }
+parking_lot={ workspace=true }
+rayon={ workspace=true }
+flume={ workspace=true }
+rust_decimal={ workspace=true }
+rust_decimal_macros={ workspace=true }
+uuid={ workspace=true }
 # tch = { workspace = true }
 
 [dev-dependencies]
 # test-utils = { path = "../test-utils" }
-rstest = { workspace = true }
+rstest={ workspace=true }
