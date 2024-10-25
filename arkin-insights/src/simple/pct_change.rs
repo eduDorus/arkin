@@ -58,7 +58,6 @@ impl Computation for PctChangeFeature {
                     warn!("Not enough data to calculate percent change");
                     return None;
                 }
-                info!("Data: {:?}", data);
 
                 // Calculate the percentage change
                 let first_value = data

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bytes::Bytes;
 
 use anyhow::Result;
@@ -8,7 +10,7 @@ use reqwest::{
 };
 use serde::Serialize;
 use time::OffsetDateTime;
-use tracing::debug;
+use tracing::{debug, error, info};
 
 #[derive(Debug, Clone)]
 pub struct TardisHttpClient {
@@ -36,9 +38,17 @@ impl TardisHttpClient {
             debug!("URL: {:?}", req.url().to_string());
             debug!("Request: {:?}", req);
             let res = self.client.execute(req).await?;
-            debug!("Response: {:?}", res);
-            let data = res.bytes().await?;
-            Ok(data)
+            info!("Response: {:?}", res);
+            match res.error_for_status() {
+                Ok(res) => {
+                    let data = res.bytes().await?;
+                    return Ok(data);
+                }
+                Err(e) => {
+                    error!("Failed to fetch data: {}", e);
+                    return Err(backoff::Error::transient(e));
+                }
+            }
         })
         .await?;
         Ok(res)
@@ -74,7 +84,12 @@ impl TardisHttpClientBuilder {
 pub fn get_client(api_secret: &Option<String>) -> Result<Client> {
     // Set api bearer token if provided
     let headers = create_headers(api_secret)?;
-    let client = Client::builder().default_headers(headers).build()?;
+    let client = Client::builder()
+        .default_headers(headers)
+        .read_timeout(Duration::from_secs(120))
+        .timeout(Duration::from_secs(180))
+        .connect_timeout(Duration::from_secs(10))
+        .build()?;
     Ok(client)
 }
 

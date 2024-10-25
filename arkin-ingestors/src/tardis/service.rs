@@ -218,6 +218,11 @@ impl TardisIngestor {
         let end = PrimitiveDateTime::parse(&config.end, &format)
             .expect("Failed to parse end date")
             .assume_utc();
+
+        let start_fmt = start.format(TIMESTAMP_FORMAT).unwrap();
+        let end_fmt = end.format(TIMESTAMP_FORMAT).unwrap();
+
+        info!("Starting: {} Ending: {}", start_fmt, end_fmt);
         Self {
             persistance_service,
             client: TardisHttpClient::builder()
@@ -329,7 +334,7 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 
     let format = format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond]Z");
     let Ok(ts) = time::PrimitiveDateTime::parse(timestamp, format) else {
-        bail!("Invalid timestamp: {}", &timestamp);
+        bail!("Invalid timestamp: {} in line: {}", &timestamp, line);
     };
     let ts = ts.assume_utc();
 

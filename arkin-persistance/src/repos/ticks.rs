@@ -92,7 +92,7 @@ impl TickRepo {
 
             query.execute(&self.pool).await?;
         }
-        info!("Saved ticks");
+        info!("Saved {} ticks", db_ticks.len());
         Ok(())
     }
 

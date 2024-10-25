@@ -2,6 +2,7 @@ use anyhow::Result;
 use arkin_core::prelude::*;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::BIND_LIMIT;
@@ -113,6 +114,7 @@ impl TradeRepo {
             let query = query_builder.build();
             query.execute(&self.pool).await?;
         }
+        info!("Saved {} trades", db_trades.len());
         Ok(())
     }
 
