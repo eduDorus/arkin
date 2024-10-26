@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
 
@@ -50,7 +50,6 @@ impl Computation for PctChangeFeature {
             .iter()
             .filter_map(|instrument| {
                 //  Get data
-                info!("Getting data for timestamp: {:?}", timestamp);
                 let data = state.periods(Some(instrument.clone()), self.input.clone(), timestamp, self.periods + 1);
 
                 // Check if we have enough data

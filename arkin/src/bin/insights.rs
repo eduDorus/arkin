@@ -6,6 +6,7 @@ use mimalloc::MiMalloc;
 use time::macros::datetime;
 use tokio_rustls::rustls::crypto::aws_lc_rs;
 use tokio_rustls::rustls::crypto::CryptoProvider;
+use tracing::error;
 use tracing::info;
 
 use arkin_core::prelude::*;
@@ -29,10 +30,17 @@ async fn main() -> Result<()> {
     let config = load::<InsightsConfig>();
     let insights_service = InsightsService::from_config(&config.insights_service, persistance_service.clone());
 
-    let instrument = persistance_service
-        .read_instrument_by_venue_symbol("BTCUSDT".to_string())
-        .await?;
-    let instruments = vec![instrument];
+    let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
+    let mut instruments = Vec::new();
+    for s in venue_symbols {
+        let res = persistance_service.read_instrument_by_venue_symbol(s.to_string()).await;
+        match res {
+            Ok(instrument) => instruments.push(instrument),
+            Err(e) => {
+                error!("Failed to read instrument: {}", e);
+            }
+        }
+    }
 
     let start = datetime!(2024-10-10 00:00).assume_utc();
     let end = datetime!(2024-10-24 00:00).assume_utc();
