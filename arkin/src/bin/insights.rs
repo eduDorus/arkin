@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
     }
 
     let start = datetime!(2024-10-10 00:00).assume_utc();
-    let end = datetime!(2024-10-24 00:00).assume_utc();
+    let end = datetime!(2024-11-05 00:00).assume_utc();
     let frequency_secs = Duration::from_secs(60);
 
     let mut clock = Clock::new(start, end, frequency_secs);

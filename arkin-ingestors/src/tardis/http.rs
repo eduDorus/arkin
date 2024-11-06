@@ -5,7 +5,7 @@ use bytes::Bytes;
 use anyhow::Result;
 use backoff::ExponentialBackoff;
 use reqwest::{
-    header::{HeaderMap, HeaderValue},
+    header::{HeaderMap, HeaderValue, CONTENT_TYPE, USER_AGENT},
     Client,
 };
 use serde::Serialize;
@@ -15,6 +15,7 @@ use tracing::{debug, error, info};
 #[derive(Debug, Clone)]
 pub struct TardisHttpClient {
     pub base_url: String,
+    pub api_secret: Option<String>,
     pub client: Client,
 }
 
@@ -34,11 +35,15 @@ impl TardisHttpClient {
         let url = format!("{}/{}", self.base_url, exchange);
         let query = QueryParams::new(channel, symbols, date, offset);
         let res = backoff::future::retry(ExponentialBackoff::default(), || async {
-            let req = self.client.get(&url).query(&query.to_query()).build()?;
+            let headers = create_headers(&self.api_secret).expect("Failed to create headers");
+            let req = self.client.get(&url).query(&query.to_query()).headers(headers).build()?;
             debug!("URL: {:?}", req.url().to_string());
             debug!("Request: {:?}", req);
+            debug!("Request header: {:?}", req.headers());
             let res = self.client.execute(req).await?;
             info!("Response: {:?}", res);
+            debug!("Response header: {:?}", res.headers());
+            debug!("Response version: {:?}", res.version());
             match res.error_for_status() {
                 Ok(res) => {
                     let data = res.bytes().await?;
@@ -73,29 +78,39 @@ impl TardisHttpClientBuilder {
     }
 
     pub fn build(self) -> TardisHttpClient {
-        let client = get_client(&self.api_secret).expect("Failed to create tardis http client");
+        let client = get_client().expect("Failed to create tardis http client");
         TardisHttpClient {
             base_url: self.base_url,
+            api_secret: self.api_secret,
             client,
         }
     }
 }
 
-pub fn get_client(api_secret: &Option<String>) -> Result<Client> {
+pub fn get_client() -> Result<Client> {
     // Set api bearer token if provided
-    let headers = create_headers(api_secret)?;
     let client = Client::builder()
-        .default_headers(headers)
         .read_timeout(Duration::from_secs(120))
         .timeout(Duration::from_secs(180))
         .connect_timeout(Duration::from_secs(10))
+        .gzip(true)
+        .zstd(true)
+        .brotli(true)
+        .deflate(true)
         .build()?;
     Ok(client)
 }
 
 fn create_headers(api_secret: &Option<String>) -> anyhow::Result<HeaderMap> {
     let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", HeaderValue::from_str("application/json")?);
+
+    // Set content type to json
+    headers.insert(CONTENT_TYPE, HeaderValue::from_str("application/json")?);
+
+    // Set user agent
+    headers.insert(USER_AGENT, HeaderValue::from_str("nginx/1.18.0")?);
+
+    // Set the Authorization header if api_secret is provided
     if let Some(api_key) = api_secret {
         let mut bearer = "Bearer ".to_owned();
         bearer.push_str(api_key);

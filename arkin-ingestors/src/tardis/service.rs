@@ -251,7 +251,7 @@ impl TardisIngestor {
             let offset = datetime.time().hour() as i64 * 60 + datetime.time().minute() as i64;
 
             async move {
-                debug!("Downloading: {} Offset: {}", datetime, offset);
+                info!("Tardis downloading {} from {}", channel_str, datetime);
                 let buffer: Bytes = client.request(exchange_str, channel_str, instruments, datetime, offset).await?;
 
                 // Write response to buffer
