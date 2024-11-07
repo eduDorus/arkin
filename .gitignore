@@ -4,7 +4,7 @@ target
 # Environment Configs and Secrets
 # configs/dev*.yaml
 # configs/*_secrets.yaml
-configs/dev*
+configs
 
 # Evironment file
 .env
