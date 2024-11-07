@@ -2,7 +2,7 @@ use anyhow::Result;
 use arkin_core::prelude::*;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
-use tracing::info;
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::BIND_LIMIT;
@@ -114,7 +114,7 @@ impl TradeRepo {
             let query = query_builder.build();
             query.execute(&self.pool).await?;
         }
-        info!("Saved {} trades", db_trades.len());
+        debug!("Saved {} trades", db_trades.len());
         Ok(())
     }
 
@@ -147,4 +147,38 @@ impl TradeRepo {
 
         Ok(trades)
     }
+
+    // pub async fn stream_trades(
+    //     &self,
+    //     instrument_ids: &[Uuid],
+    //     from: OffsetDateTime,
+    //     to: OffsetDateTime,
+    // ) -> Result<Pin<Box<dyn Stream<Item = Result<DBTrade>> + Send>>, Error> + 'static {
+    //     // Create the SQLx query
+    //     let stream = sqlx::query_as!(
+    //         DBTrade,
+    //         r#"
+    //         SELECT
+    //             event_time,
+    //             instrument_id,
+    //             trade_id,
+    //             side as "side:DBMarketSide",
+    //             price,
+    //             quantity
+    //         FROM trades
+    //         WHERE instrument_id = ANY($1) AND event_time >= $2 AND event_time < $3
+    //         ORDER BY event_time ASC
+    //         "#,
+    //         instrument_ids,
+    //         from,
+    //         to,
+    //     )
+    //     .fetch(&self.pool);
+
+    //     // Map sqlx::Error to your custom Error type
+    //     let mapped_stream = stream.map(|result| result.map_err(|e| e.into()));
+
+    //     // Box the stream to handle dynamic dispatch and pinning
+    //     Ok(mapped_stream.boxed())
+    // }
 }

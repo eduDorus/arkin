@@ -2,7 +2,7 @@ use anyhow::Result;
 use arkin_core::{prelude::Tick, Price, Quantity};
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
-use tracing::info;
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::BIND_LIMIT;
@@ -92,7 +92,7 @@ impl TickRepo {
 
             query.execute(&self.pool).await?;
         }
-        info!("Saved {} ticks", db_ticks.len());
+        debug!("Saved {} ticks", db_ticks.len());
         Ok(())
     }
 

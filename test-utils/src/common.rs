@@ -4,7 +4,7 @@ use arkin_engine::{Engine, EngineBuilder};
 use arkin_execution::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_market::prelude::*;
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 use arkin_portfolio::prelude::*;
 use arkin_strategies::prelude::*;
 
@@ -20,7 +20,7 @@ fn setup_env() {
 
 #[fixture]
 pub fn database() -> DBManager {
-    let config = load::<PersistanceConfig>();
+    let config = load::<PersistenceConfig>();
     DBManager::from_config(&config.database)
 }
 
@@ -76,7 +76,7 @@ pub fn event_time() -> OffsetDateTime {
 
 #[fixture]
 pub fn database() -> DBManager {
-    let config = load::<PersistanceConfig>();
+    let config = load::<PersistenceConfig>();
     DBManager::from_config(&config.database)
 }
 

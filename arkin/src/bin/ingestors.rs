@@ -8,7 +8,7 @@ use tracing::info;
 
 use arkin_core::prelude::*;
 use arkin_ingestors::prelude::*;
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -21,14 +21,14 @@ async fn main() {
     // Install the default CryptoProvider
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
 
-    let config = load::<PersistanceConfig>();
-    let persistance_service = Arc::new(PersistanceService::from_config(&config));
+    let config = load::<PersistenceConfig>();
+    let persistence_service = Arc::new(PersistenceService::from_config(&config));
 
     let config = load::<IngestorConfig>();
-    let ingestor_service = IngestorService::from_config(&config.ingestor_service, persistance_service.clone());
+    let ingestor_service = IngestorService::from_config(&config.ingestor_service, persistence_service.clone());
     ingestor_service.start().await;
 
-    if let Err(e) = persistance_service.flush().await {
-        error!("Failed to flush persistance service: {}", e);
+    if let Err(e) = persistence_service.flush().await {
+        error!("Failed to flush persistence service: {}", e);
     }
 }

@@ -5,45 +5,45 @@ use rust_decimal::{prelude::FromPrimitive, Decimal};
 use time::macros::datetime;
 
 use arkin_core::prelude::*;
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 use uuid::Uuid;
 
 #[fixture]
-pub fn persistance_service() -> PersistanceService {
+pub fn persistence_service() -> PersistenceService {
     test_setup();
-    let config = load::<PersistanceConfig>();
-    PersistanceService::from_config(&config)
+    let config = load::<PersistenceConfig>();
+    PersistenceService::from_config(&config)
 }
 
 // #[rstest]
 // #[tokio::test]
-// async fn test_insert_venue(persistance_service: PersistanceService) {
+// async fn test_insert_venue(persistence_service: PersistenceService) {
 //     test_setup();
 //     let venue = Venue {
 //         id: Uuid::new_v4(),
 //         name: "Okex".into(),
 //         venue_type: "exchange".into(),
 //     };
-//     persistance_service.insert_venue(venue).await.unwrap();
+//     persistence_service.insert_venue(venue).await.unwrap();
 // }
 
 // #[rstest]
 // #[tokio::test]
-// async fn test_read_venue(persistance_service: PersistanceService) {
+// async fn test_read_venue(persistence_service: PersistenceService) {
 //     test_setup();
 //     let id = Uuid::from_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID");
-//     let venue = persistance_service.read_venue_by_id(id).await.unwrap().unwrap();
+//     let venue = persistence_service.read_venue_by_id(id).await.unwrap().unwrap();
 //     assert_eq!(venue.id, id);
 //     assert_eq!(venue.name, "binance");
 // }
 
 #[rstest]
 #[tokio::test]
-async fn test_insert_instrument(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
+async fn test_insert_instrument(persistence_service: PersistenceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
     let mut binance_btc_usdt_perp = binance_btc_usdt_perp.clone();
     binance_btc_usdt_perp.id = Uuid::new_v4();
-    persistance_service
+    persistence_service
         .insert_instrument(binance_btc_usdt_perp)
         .await
         .expect("Failed to insert instrument");
@@ -51,16 +51,16 @@ async fn test_insert_instrument(persistance_service: PersistanceService, binance
 
 #[rstest]
 #[tokio::test]
-async fn test_read_instrument(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
+async fn test_read_instrument(persistence_service: PersistenceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
     let id = Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID");
-    let instrument = persistance_service.read_instrument_by_id(id).await.unwrap();
+    let instrument = persistence_service.read_instrument_by_id(id).await.unwrap();
     assert_eq!(instrument.id, binance_btc_usdt_perp.id);
 }
 
 #[rstest]
 #[tokio::test]
-async fn test_insert_tick(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
+async fn test_insert_tick(persistence_service: PersistenceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
     let instrument = Arc::new(binance_btc_usdt_perp);
     let tick = Tick::new(
@@ -72,7 +72,7 @@ async fn test_insert_tick(persistance_service: PersistanceService, binance_btc_u
         Decimal::from_f64(101.0).expect("Invalid decimal"),
         Decimal::from_f64(1.0).expect("Invalid decimal"),
     );
-    persistance_service.insert_tick(tick).await.unwrap();
+    persistence_service.insert_tick(tick).await.unwrap();
 }
 
 #[rstest]
@@ -82,7 +82,7 @@ async fn test_insert_tick(persistance_service: PersistanceService, binance_btc_u
 #[case::batch_100000(100000)]
 #[tokio::test]
 async fn test_insert_tick_batch(
-    persistance_service: PersistanceService,
+    persistence_service: PersistenceService,
     binance_btc_usdt_perp: Instrument,
     #[case] amount: i64,
 ) {
@@ -102,16 +102,16 @@ async fn test_insert_tick_batch(
             )
         })
         .collect::<Vec<_>>();
-    persistance_service.insert_tick_batch_vec(ticks).await.unwrap();
+    persistence_service.insert_tick_batch_vec(ticks).await.unwrap();
 }
 
 #[rstest]
 #[tokio::test]
-async fn test_read_tick_range(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
+async fn test_read_tick_range(persistence_service: PersistenceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
     let from = datetime!(2024-07-01 00:00).assume_utc();
     let till = datetime!(2024-07-01 00:10).assume_utc();
-    let ticks = persistance_service
+    let ticks = persistence_service
         .read_ticks_range(&[Arc::new(binance_btc_usdt_perp)], from, till)
         .await
         .unwrap();
@@ -120,7 +120,7 @@ async fn test_read_tick_range(persistance_service: PersistanceService, binance_b
 
 #[rstest]
 #[tokio::test]
-async fn test_insert_trade(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
+async fn test_insert_trade(persistence_service: PersistenceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
     let instrument = Arc::new(binance_btc_usdt_perp);
     let trade = Trade::new(
@@ -131,7 +131,7 @@ async fn test_insert_trade(persistance_service: PersistanceService, binance_btc_
         Decimal::from_f64(100.0).expect("Invalid decimal"),
         Decimal::from_f64(4.3).expect("Invalid decimal"),
     );
-    persistance_service.insert_trade(trade).await.unwrap();
+    persistence_service.insert_trade(trade).await.unwrap();
 }
 
 #[rstest]
@@ -141,7 +141,7 @@ async fn test_insert_trade(persistance_service: PersistanceService, binance_btc_
 #[case::batch_100000(100000)]
 #[tokio::test]
 async fn test_insert_trade_batch(
-    persistance_service: PersistanceService,
+    persistence_service: PersistenceService,
     binance_btc_usdt_perp: Instrument,
     #[case] amount: i64,
 ) {
@@ -162,16 +162,16 @@ async fn test_insert_trade_batch(
             )
         })
         .collect::<Vec<_>>();
-    persistance_service.insert_trade_batch_vec(trades).await.unwrap();
+    persistence_service.insert_trade_batch_vec(trades).await.unwrap();
 }
 
 #[rstest]
 #[tokio::test]
-async fn test_read_trade_range(persistance_service: PersistanceService, binance_btc_usdt_perp: Instrument) {
+async fn test_read_trade_range(persistence_service: PersistenceService, binance_btc_usdt_perp: Instrument) {
     test_setup();
     let from = datetime!(2024-07-01 00:00).assume_utc();
     let till = datetime!(2024-07-01 00:10).assume_utc();
-    let trades = persistance_service
+    let trades = persistence_service
         .read_trades_range(&[Arc::new(binance_btc_usdt_perp)], from, till)
         .await
         .unwrap();

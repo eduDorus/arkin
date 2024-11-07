@@ -15,7 +15,7 @@ path="src/bin/insights.rs"
 
 [dependencies]
 arkin-core={ path="../arkin-core" }
-arkin-persistance={ path="../arkin-persistance" }
+arkin-persistence={ path="../arkin-persistence" }
 arkin-ingestors={ path="../arkin-ingestors" }
 arkin-insights={ path="../arkin-insights" }
 #arkin-engine = { path = "../arkin-engine" }
@@ -34,6 +34,7 @@ anyhow={ workspace=true }
 uuid={ workspace=true }
 rayon={ workspace=true }
 futures-util={ workspace=true }
+
 
 
 # Test DL

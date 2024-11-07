@@ -8,7 +8,7 @@ use arkin_allocation::prelude::*;
 use arkin_execution::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_market::prelude::*;
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 use arkin_portfolio::prelude::*;
 use arkin_strategies::prelude::*;
 use test_utils::prelude::*;

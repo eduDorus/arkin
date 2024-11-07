@@ -1,5 +1,5 @@
 [package]
-name="arkin-persistance"
+name="arkin-persistence"
 authors.workspace=true
 version.workspace=true
 edition.workspace=true

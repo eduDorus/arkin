@@ -56,8 +56,8 @@ async fn main() -> Result<()> {
     init_tracing();
     info!("Starting Arkin Utils 🚀");
 
-    // let config = load::<PersistanceConfig>();
-    // let persistance_service = Arc::new(PersistanceService::from_config(&config.database));
+    // let config = load::<PersistenceConfig>();
+    // let persistence_service = Arc::new(PersistenceService::from_config(&config.database));
 
     let args = Cli::parse();
 

@@ -2,7 +2,7 @@
 members=[
   "arkin",
   "arkin-core",
-  "arkin-persistance",
+  "arkin-persistence",
   "arkin-ingestors",
   "arkin-insights",
   # "arkin-allocation",
@@ -47,6 +47,7 @@ tokio={ version="1.41", features=["full"] }
 flume="0.11"
 futures-util={ version="0.3" }
 async-trait="0.1"
+async-stream="0.3"
 # trait-variant = "0.1.2"
 
 # HTTP & Websockets
@@ -96,6 +97,9 @@ mimalloc={ version="0.1", default-features=false }
 
 # Graph Library
 petgraph={ version="0.6", features=["graphmap"], default-features=false }
+
+# TA
+yata="0.7.0"
 
 # Optimization
 # clarabel = { version = "0.9" }

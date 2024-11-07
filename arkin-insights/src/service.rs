@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 
 use arkin_core::prelude::*;
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, info};
 
@@ -24,15 +24,15 @@ pub trait Computation: Debug + Send + Sync {
 
 pub struct InsightsService {
     state: Arc<InsightsState>,
-    persistance_service: Arc<PersistanceService>,
+    persistence_service: Arc<PersistenceService>,
     pipeline: ComputationGraph,
 }
 
 impl InsightsService {
-    pub fn from_config(config: &InsightsServiceConfig, persistance_service: Arc<PersistanceService>) -> Self {
+    pub fn from_config(config: &InsightsServiceConfig, persistence_service: Arc<PersistenceService>) -> Self {
         Self {
             state: Arc::new(InsightsState::default()),
-            persistance_service,
+            persistence_service,
             pipeline: ComputationGraph::from_config(&config.pipeline),
         }
     }
@@ -60,7 +60,7 @@ impl InsightsService {
             debug!("Generated insight: {}", insight);
         }
 
-        self.persistance_service.insert_insight_batch_vec(insights).await?;
+        self.persistence_service.insert_insight_batch_vec(insights).await?;
         Ok(())
     }
 }

@@ -2,6 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use futures_util::stream;
+use futures_util::StreamExt;
 use mimalloc::MiMalloc;
 use time::macros::datetime;
 use tokio_rustls::rustls::crypto::aws_lc_rs;
@@ -11,7 +13,7 @@ use tracing::info;
 
 use arkin_core::prelude::*;
 use arkin_insights::prelude::*;
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -24,55 +26,92 @@ async fn main() -> Result<()> {
     // Install the default CryptoProvider
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
 
-    let config = load::<PersistanceConfig>();
-    let persistance_service = Arc::new(PersistanceService::from_config(&config));
+    let config = load::<PersistenceConfig>();
+    let persistence_service = Arc::new(PersistenceService::from_config(&config));
 
     let config = load::<InsightsConfig>();
-    let insights_service = InsightsService::from_config(&config.insights_service, persistance_service.clone());
+    let insights_service = Arc::new(InsightsService::from_config(
+        &config.insights_service,
+        persistence_service.clone(),
+    ));
 
+    // Fetch instruments concurrently
     let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
-    let mut instruments = Vec::new();
-    for s in venue_symbols {
-        let res = persistance_service.read_instrument_by_venue_symbol(s.to_string()).await;
-        match res {
-            Ok(instrument) => instruments.push(instrument),
-            Err(e) => {
-                error!("Failed to read instrument: {}", e);
+    let fetches = venue_symbols.iter().map(|&s| {
+        let service = Arc::clone(&persistence_service);
+        async move {
+            match service.read_instrument_by_venue_symbol(s.to_string()).await {
+                Ok(instr) => Some(instr),
+                Err(e) => {
+                    error!("Failed to read instrument {}: {}", s, e);
+                    None
+                }
             }
         }
-    }
+    });
 
-    let start = datetime!(2024-10-10 00:00).assume_utc();
+    let results = stream::iter(fetches).buffer_unordered(5).collect::<Vec<_>>().await;
+    let instruments: Vec<_> = results.into_iter().filter_map(|x| x).collect();
+
+    if instruments.is_empty() {
+        error!("No instruments loaded. Exiting.");
+        return Ok(());
+    }
+    info!("Loaded {} instruments.", instruments.len());
+
+    let start = datetime!(2024-10-01 00:00).assume_utc();
     let end = datetime!(2024-11-05 00:00).assume_utc();
     let frequency_secs = Duration::from_secs(60);
 
-    let mut clock = Clock::new(start, end, frequency_secs);
+    let clock = Clock::new(start, end, frequency_secs);
 
-    // Warm up pipeline state
-    let trades = persistance_service.read_trades_range(&instruments, start, end).await?;
-    // let ticks = persistance_service.read_ticks_range(&instruments, start, end).await?;
-    info!("Loaded {} trades", trades.len());
+    stream::iter(clock)
+        .map(|(from, to)| {
+            let persistence_service = Arc::clone(&persistence_service);
+            let insights_service = Arc::clone(&insights_service);
+            let instruments = instruments.clone(); // Consider using Arc if large
+            async move {
+                match persistence_service.read_trades_range(&instruments, from, to).await {
+                    Ok(trades) => {
+                        let trade_insights: Vec<_> = trades.into_iter().flat_map(|trade| trade.to_insights()).collect();
+                        insights_service.insert_batch(trade_insights);
+                        if let Err(e) = insights_service.process(&instruments, from, to).await {
+                            error!("Failed to process insights: {}", e);
+                        }
+                    }
+                    Err(e) => error!("Failed to read trades range from {} to {}: {}", from, to, e),
+                }
+            }
+        })
+        .buffered(10) // Adjust based on system capabilities
+        .for_each(|_| async {})
+        .await;
 
-    // Transform data to insights and add to state
-    info!("Inserting trades and ticks into insights service");
-    info!("Processing insights");
-    let trade_insights = trades
-        .into_iter()
-        .map(|trade| trade.to_insights())
-        .flatten()
-        .collect::<Vec<_>>();
-    // let tick_insights = ticks.into_iter().map(|tick| tick.to_insights()).flatten().collect::<Vec<_>>();
-    info!("Done transforming data to insights");
+    // // Warm up pipeline state
+    // let trades = persistence_service.read_trades_range(&instruments, start, end).await?;
+    // // let ticks = persistence_service.read_ticks_range(&instruments, start, end).await?;
+    // info!("Loaded {} trades", trades.len());
 
-    info!("Inserting insights into state");
-    insights_service.insert_batch(trade_insights);
-    // insights_service.insert_batch(tick_insights);
-    info!("Done inserting insights into state");
+    // // Transform data to insights and add to state
+    // info!("Inserting trades and ticks into insights service");
+    // info!("Processing insights");
+    // let trade_insights = trades
+    //     .into_iter()
+    //     .map(|trade| trade.to_insights())
+    //     .flatten()
+    //     .collect::<Vec<_>>();
+    // // let tick_insights = ticks.into_iter().map(|tick| tick.to_insights()).flatten().collect::<Vec<_>>();
+    // info!("Done transforming data to insights");
 
-    while let Some((from, to)) = clock.next() {
-        insights_service.process(&instruments, from, to).await?;
-    }
+    // info!("Inserting insights into state");
+    // insights_service.insert_batch(trade_insights);
+    // // insights_service.insert_batch(tick_insights);
+    // info!("Done inserting insights into state");
 
-    persistance_service.flush().await?;
+    // while let Some((from, to)) = clock.next() {
+    //     insights_service.process(&instruments, from, to).await?;
+    // }
+
+    persistence_service.flush().await?;
     Ok(())
 }

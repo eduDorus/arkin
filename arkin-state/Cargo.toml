@@ -1,10 +1,10 @@
 [package]
-name = "arkin-state"
-authors.workspace = true
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+name="arkin-state"
+authors.workspace=true
+version.workspace=true
+edition.workspace=true
+license.workspace=true
 
 [dependencies]
-arkin-core = { path = "../arkin-core" }
-arkin-persistance = { path = "../arkin-persistance" }
+arkin-core={ path="../arkin-core" }
+arkin-persistence={ path="../arkin-persistence" }

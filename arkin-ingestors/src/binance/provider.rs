@@ -8,7 +8,7 @@ use tracing::{debug, error, info, warn};
 use url::Url;
 
 use arkin_core::prelude::*;
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 
 use crate::binance::swaps::BinanceSwapEvent;
 use crate::config::BinanceIngestorConfig;
@@ -17,7 +17,7 @@ use crate::ws::WebSocketManager;
 
 #[derive(Clone)]
 pub struct BinanceIngestor {
-    persistance_service: Arc<PersistanceService>,
+    persistence_service: Arc<PersistenceService>,
     url: Url,
     channels: Vec<String>,
     api_key: Option<String>,
@@ -27,9 +27,9 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    pub fn from_config(config: &BinanceIngestorConfig, persistance_service: Arc<PersistanceService>) -> Self {
+    pub fn from_config(config: &BinanceIngestorConfig, persistence_service: Arc<PersistenceService>) -> Self {
         Self {
-            persistance_service,
+            persistence_service,
             url: config.ws_url.parse().expect("Failed to parse ws binance URL"),
             channels: config.ws_channels.to_owned(),
             api_key: config.api_key.to_owned(),
@@ -68,7 +68,7 @@ impl Ingestor for BinanceIngestor {
                         Ok(e) => {
                             info!("{}", e);
                             if let Ok(instrument) =
-                                self.persistance_service.read_instrument_by_venue_symbol(e.venue_symbol()).await
+                                self.persistence_service.read_instrument_by_venue_symbol(e.venue_symbol()).await
                             {
                                 debug!("Instrument found: {}", instrument.symbol);
                                 match e {
@@ -92,7 +92,7 @@ impl Ingestor for BinanceIngestor {
                                             trade.price,
                                             trade.quantity,
                                         );
-                                        if let Err(e) = self.persistance_service.insert_trade(trade).await {
+                                        if let Err(e) = self.persistence_service.insert_trade(trade).await {
                                             error!("Failed to insert trade: {}", e);
                                         }
                                     }
@@ -106,7 +106,7 @@ impl Ingestor for BinanceIngestor {
                                             tick.ask_price,
                                             tick.ask_quantity,
                                         );
-                                        if let Err(e) = self.persistance_service.insert_tick(tick).await {
+                                        if let Err(e) = self.persistence_service.insert_tick(tick).await {
                                             error!("Failed to insert tick: {}", e);
                                         }
                                     }

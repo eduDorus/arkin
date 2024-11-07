@@ -7,7 +7,7 @@ license.workspace=true
 
 [dependencies]
 arkin-core={ path="../arkin-core" }
-arkin-persistance={ path="../arkin-persistance" }
+arkin-persistence={ path="../arkin-persistence" }
 
 dashmap={ workspace=true }
 anyhow={ workspace=true }
@@ -22,6 +22,7 @@ rust_decimal={ workspace=true }
 rust_decimal_macros={ workspace=true }
 uuid={ workspace=true }
 itertools={ workspace=true }
+yata={ workspace=true }
 
 [dev-dependencies]
 rstest={ workspace=true }

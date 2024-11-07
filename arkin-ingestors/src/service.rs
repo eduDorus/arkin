@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 use tracing::error;
 
 use crate::{config::IngestorServiceConfig, IngestorFactory};
@@ -15,19 +15,19 @@ pub trait Ingestor: Send + Sync {
 
 pub struct IngestorService {
     config: IngestorServiceConfig,
-    persistance_service: Arc<PersistanceService>,
+    persistence_service: Arc<PersistenceService>,
 }
 
 impl IngestorService {
-    pub fn from_config(config: &IngestorServiceConfig, persistance_service: Arc<PersistanceService>) -> Self {
+    pub fn from_config(config: &IngestorServiceConfig, persistence_service: Arc<PersistenceService>) -> Self {
         Self {
             config: config.clone(),
-            persistance_service,
+            persistence_service,
         }
     }
 
     pub async fn start(&self) {
-        let ingestors = IngestorFactory::from_config(&self.config.ingestors, Arc::clone(&self.persistance_service));
+        let ingestors = IngestorFactory::from_config(&self.config.ingestors, Arc::clone(&self.persistence_service));
 
         let mut tasks = Vec::with_capacity(ingestors.len());
         for ingestor in ingestors {

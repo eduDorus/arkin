@@ -2,7 +2,7 @@ use anyhow::Result;
 use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
-use tracing::info;
+use tracing::debug;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -86,7 +86,7 @@ impl InsightsRepo {
 
             query.execute(&self.pool).await?;
         }
-        info!("Saved {} inserts", db_insights.len());
+        debug!("Saved {} inserts", db_insights.len());
         Ok(())
     }
 

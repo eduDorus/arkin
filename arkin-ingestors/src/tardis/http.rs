@@ -10,7 +10,7 @@ use reqwest::{
 };
 use serde::Serialize;
 use time::OffsetDateTime;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 #[derive(Debug, Clone)]
 pub struct TardisHttpClient {
@@ -41,7 +41,7 @@ impl TardisHttpClient {
             debug!("Request: {:?}", req);
             debug!("Request header: {:?}", req.headers());
             let res = self.client.execute(req).await?;
-            info!("Response: {:?}", res);
+            debug!("Response: {:?}", res);
             debug!("Response header: {:?}", res.headers());
             debug!("Response version: {:?}", res.version());
             match res.error_for_status() {

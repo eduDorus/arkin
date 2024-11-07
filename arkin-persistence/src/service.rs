@@ -10,10 +10,10 @@ use arkin_core::prelude::*;
 use crate::repos::{InsightsRepo, InstrumentRepo, TickRepo, TradeRepo, VenueRepo};
 use crate::services::TradeService;
 use crate::services::{InsightsService, InstrumentService, TickService, VenueService};
-use crate::PersistanceConfig;
+use crate::PersistenceConfig;
 
 #[derive(Debug)]
-pub struct PersistanceService {
+pub struct PersistenceService {
     // venue_service: Arc<VenueService>,
     instrument_service: Arc<InstrumentService>,
     pub tick_service: Arc<TickService>,
@@ -21,8 +21,8 @@ pub struct PersistanceService {
     insights_service: Arc<InsightsService>,
 }
 
-impl PersistanceService {
-    pub fn from_config(config: &PersistanceConfig) -> Self {
+impl PersistenceService {
+    pub fn from_config(config: &PersistenceConfig) -> Self {
         let db_config = config.database.clone();
         let conn_options = PgConnectOptions::new()
             .host(&db_config.host)

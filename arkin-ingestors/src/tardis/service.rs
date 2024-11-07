@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{bail, Error, Result};
 use arkin_core::prelude::*;
-use arkin_persistance::prelude::*;
+use arkin_persistence::prelude::*;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures_util::{stream, Stream, StreamExt};
@@ -199,7 +199,7 @@ impl TardisRequest {
 }
 
 pub struct TardisIngestor {
-    pub persistance_service: Arc<PersistanceService>,
+    pub persistence_service: Arc<PersistenceService>,
     pub client: TardisHttpClient,
     pub max_concurrent_requests: usize,
     pub venue: TardisExchange,
@@ -210,7 +210,7 @@ pub struct TardisIngestor {
 }
 
 impl TardisIngestor {
-    pub fn from_config(config: &TardisIngestorConfig, persistance_service: Arc<PersistanceService>) -> Self {
+    pub fn from_config(config: &TardisIngestorConfig, persistence_service: Arc<PersistenceService>) -> Self {
         let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
         let start = PrimitiveDateTime::parse(&config.start, &format)
             .expect("Failed to parse start date")
@@ -224,7 +224,7 @@ impl TardisIngestor {
 
         info!("Starting: {} Ending: {}", start_fmt, end_fmt);
         Self {
-            persistance_service,
+            persistence_service,
             client: TardisHttpClient::builder()
                 .api_secret(config.api_secret.clone())
                 .base_url(config.http_url.clone())
@@ -345,7 +345,7 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 impl Ingestor for TardisIngestor {
     async fn start(&self) -> Result<()> {
         info!("Starting tardis ingestor...");
-        let persistance_service = Arc::clone(&self.persistance_service);
+        let persistence_service = Arc::clone(&self.persistence_service);
 
         let req = TardisRequest::new(
             self.venue.clone(),
@@ -358,7 +358,7 @@ impl Ingestor for TardisIngestor {
         let stream = self.stream(req);
         pin!(stream);
 
-        // No need to clone persistance_service for each iteration
+        // No need to clone persistence_service for each iteration
         while let Some((_ts, json)) = stream.next().await {
             let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
                 Ok(e) => Some(e),
@@ -377,7 +377,7 @@ impl Ingestor for TardisIngestor {
                 None => continue,
             };
 
-            let instrument = persistance_service
+            let instrument = persistence_service
                 .read_instrument_by_venue_symbol(event.venue_symbol())
                 .await?;
 
@@ -398,7 +398,7 @@ impl Ingestor for TardisIngestor {
                         trade.quantity,
                     );
 
-                    if let Err(e) = persistance_service.insert_trade_batch(trade).await {
+                    if let Err(e) = persistence_service.insert_trade_batch(trade).await {
                         error!("Failed to insert trade: {}", e);
                     }
                 }
@@ -413,7 +413,7 @@ impl Ingestor for TardisIngestor {
                         tick.ask_price,
                         tick.ask_quantity,
                     );
-                    if let Err(e) = persistance_service.insert_tick_batch(tick).await {
+                    if let Err(e) = persistence_service.insert_tick_batch(tick).await {
                         error!("Failed to insert tick: {}", e);
                     }
                 }

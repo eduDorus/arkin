@@ -9,7 +9,7 @@ pub fn load<T: DeserializeOwned>() -> T {
 
     let config = Config::builder()
         .add_source(File::with_name(&format!("{}/{}", config_dir, run_mode)).required(false))
-        .add_source(File::with_name(&format!("{}/{}_persistance", config_dir, run_mode)).required(false))
+        .add_source(File::with_name(&format!("{}/{}_persistence", config_dir, run_mode)).required(false))
         .add_source(File::with_name(&format!("{}/{}_ingestors", config_dir, run_mode)).required(false))
         .add_source(File::with_name(&format!("{}/{}_insights", config_dir, run_mode)).required(false))
         .add_source(File::with_name(&format!("{}/{}_secrets", config_dir, run_mode)).required(false))
