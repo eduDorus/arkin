@@ -2,8 +2,6 @@
 target
 
 # Environment Configs and Secrets
-# configs/dev*.yaml
-# configs/*_secrets.yaml
 configs
 
 # Evironment file
