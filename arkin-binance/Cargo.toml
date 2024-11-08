@@ -1,0 +1,29 @@
+[package]
+name = "arkin-binance"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tokio-rustls = { workspace = true }
+async-tungstenite = { workspace = true }
+tracing = { workspace = true }
+time = { workspace = true }
+uuid = { workspace = true }
+rayon = { workspace = true }
+futures-util = { workspace = true }
+reqwest = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+signature = { workspace = true }
+base64 = { workspace = true }
+ed25519-dalek = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+rust_decimal = { workspace = true }
+strum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
