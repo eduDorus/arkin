@@ -63,54 +63,32 @@ async fn main() -> Result<()> {
     let end = datetime!(2024-11-05 00:00).assume_utc();
     let frequency_secs = Duration::from_secs(60);
 
-    let clock = Clock::new(start, end, frequency_secs);
+    let mut clock = Clock::new(start, end, frequency_secs);
 
-    stream::iter(clock)
-        .map(|(from, to)| {
-            let persistence_service = Arc::clone(&persistence_service);
-            let insights_service = Arc::clone(&insights_service);
-            let instruments = instruments.clone(); // Consider using Arc if large
-            async move {
-                match persistence_service.read_trades_range(&instruments, from, to).await {
-                    Ok(trades) => {
-                        let trade_insights: Vec<_> = trades.into_iter().flat_map(|trade| trade.to_insights()).collect();
-                        insights_service.insert_batch(trade_insights);
-                        if let Err(e) = insights_service.process(&instruments, from, to).await {
-                            error!("Failed to process insights: {}", e);
-                        }
-                    }
-                    Err(e) => error!("Failed to read trades range from {} to {}: {}", from, to, e),
-                }
-            }
-        })
-        .buffered(10) // Adjust based on system capabilities
-        .for_each(|_| async {})
-        .await;
+    // Warm up pipeline state
+    let trades = persistence_service.read_trades_range(&instruments, start, end).await?;
+    // let ticks = persistence_service.read_ticks_range(&instruments, start, end).await?;
+    info!("Loaded {} trades", trades.len());
 
-    // // Warm up pipeline state
-    // let trades = persistence_service.read_trades_range(&instruments, start, end).await?;
-    // // let ticks = persistence_service.read_ticks_range(&instruments, start, end).await?;
-    // info!("Loaded {} trades", trades.len());
+    // Transform data to insights and add to state
+    info!("Inserting trades and ticks into insights service");
+    info!("Processing insights");
+    let trade_insights = trades
+        .into_iter()
+        .map(|trade| trade.to_insights())
+        .flatten()
+        .collect::<Vec<_>>();
+    // let tick_insights = ticks.into_iter().map(|tick| tick.to_insights()).flatten().collect::<Vec<_>>();
+    info!("Done transforming data to insights");
 
-    // // Transform data to insights and add to state
-    // info!("Inserting trades and ticks into insights service");
-    // info!("Processing insights");
-    // let trade_insights = trades
-    //     .into_iter()
-    //     .map(|trade| trade.to_insights())
-    //     .flatten()
-    //     .collect::<Vec<_>>();
-    // // let tick_insights = ticks.into_iter().map(|tick| tick.to_insights()).flatten().collect::<Vec<_>>();
-    // info!("Done transforming data to insights");
+    info!("Inserting insights into state");
+    insights_service.insert_batch(trade_insights);
+    // insights_service.insert_batch(tick_insights);
+    info!("Done inserting insights into state");
 
-    // info!("Inserting insights into state");
-    // insights_service.insert_batch(trade_insights);
-    // // insights_service.insert_batch(tick_insights);
-    // info!("Done inserting insights into state");
-
-    // while let Some((from, to)) = clock.next() {
-    //     insights_service.process(&instruments, from, to).await?;
-    // }
+    while let Some((from, to)) = clock.next() {
+        insights_service.process(&instruments, from, to).await?;
+    }
 
     persistence_service.flush().await?;
     Ok(())

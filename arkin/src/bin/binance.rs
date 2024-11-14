@@ -52,39 +52,40 @@ async fn main() -> Result<()> {
     // Disconnect
     conn.close().await.expect("Failed to disconnect");
 
+    let api_key = "ppCYOYKlKLRVwGCzmcbXNf2Qn34aeDEN36A4I0Fwdj8WmpvfkxO9cmNIx5PwhmOd";
+    let api_secret = "cs4wa0w860lgkViblUzua4ThRXpfD22ruG8d0GytU7fIrJCvz8jvCAzKpaKPwTl0";
+    let url = "https://fapi.binance.com";
+    let credentials = Credentials::from_hmac(api_key, api_secret);
+    let client = BinanceHttpClient::with_url(url).credentials(credentials);
+
+    // Send order
+    let req: Request = NewOrder::new("SOLUSDT", Side::Buy, "LIMIT")
+        .time_in_force(TimeInForce::Gtc)
+        .quantity(Decimal::new(1, 0))
+        .price(Decimal::new(2150000, 4))
+        .into();
+    let res = client.send(req).await;
+    match res {
+        Ok(res) => {
+            info!("Response: {:?}", res);
+        }
+        Err(e) => {
+            error!("Error: {:?}", e);
+        }
+    }
+    // sleep for 30 seconds
+    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+
+    // Cancel order
+    let req: Request = CancelOpenOrders::new("SOLUSDT").into();
+    let res = client.send(req).await;
+    match res {
+        Ok(res) => {
+            info!("Response: {:?}", res);
+        }
+        Err(e) => {
+            error!("Error: {:?}", e);
+        }
+    }
     Ok(())
-
-    // let url = "https://fapi.binance.com";
-    // let credentials = Credentials::from_hmac(api_key, api_secret);
-    // let client = BinanceHttpClient::with_url(url).credentials(credentials);
-
-    // // Send order
-    // let req: Request = NewOrder::new("SOLUSDT", Side::Buy, "LIMIT")
-    //     .time_in_force(TimeInForce::Gtc)
-    //     .quantity(Decimal::new(1, 0))
-    //     .price(Decimal::new(1650000, 4))
-    //     .into();
-    // let res = client.send(req).await;
-    // match res {
-    //     Ok(res) => {
-    //         info!("Response: {:?}", res);
-    //     }
-    //     Err(e) => {
-    //         error!("Error: {:?}", e);
-    //     }
-    // }
-    // // sleep for 30 seconds
-    // tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-
-    // // Cancel order
-    // let req: Request = CancelOpenOrders::new("SOLUSDT").into();
-    // let res = client.send(req).await;
-    // match res {
-    //     Ok(res) => {
-    //         info!("Response: {:?}", res);
-    //     }
-    //     Err(e) => {
-    //         error!("Error: {:?}", e);
-    //     }
-    // }
 }

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use futures_util::{stream, Stream};
 use time::OffsetDateTime;
 use tracing::info;
 
@@ -36,7 +37,13 @@ impl Clock {
         Some((next_timestamp, next_timestamp + self.frequency_secs))
     }
 
-    // From Iterator trait
+    pub fn to_stream(&mut self) -> impl Stream<Item = (OffsetDateTime, OffsetDateTime)> + Send + '_ {
+        let mut intervals = Vec::new();
+        while let Some((start, end)) = self.next() {
+            intervals.push((start, end));
+        }
+        stream::iter(intervals)
+    }
 
     pub fn reset(&mut self) {
         self.current_timestamp = self.start;
