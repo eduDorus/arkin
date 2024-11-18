@@ -5,7 +5,7 @@ use tracing::error;
 
 use arkin_persistence::prelude::*;
 
-use crate::{config::IngestorServiceConfig, IngestorFactory};
+use crate::IngestorFactory;
 
 pub struct IngestorService {
     config: IngestorServiceConfig,

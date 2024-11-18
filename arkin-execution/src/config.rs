@@ -3,17 +3,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExecutionConfig {
-    pub execution_manager: ExecutionManagerConfig,
+    pub order_manager: OrderManagerType,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ExecutionManagerConfig {
-    pub default_endpoint: String,
-    pub endpoints: Vec<ExecutionEndpointConfig>,
+pub enum OrderManagerType {
+    #[serde(rename = "single_executor")]
+    SingleExecutor(SingleExecutorOrderManagerConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum ExecutionEndpointConfig {
+pub struct SingleExecutorOrderManagerConfig {
+    pub executor: ExecutorTypeConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ExecutorTypeConfig {
     #[serde(rename = "simulation")]
     Simulation(SimulationConfig),
     #[serde(rename = "binance")]

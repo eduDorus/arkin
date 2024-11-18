@@ -16,7 +16,7 @@ use arkin_strategies::prelude::*;
 use crate::{TradingEngine, TradingEngineError};
 
 #[derive(Builder, Debug)]
-pub struct DefaultEngine {
+pub struct SingleStrategyEngine {
     #[builder(default)]
     persistor_task_tracker: TaskTracker,
     #[builder(default)]
@@ -42,10 +42,10 @@ pub struct DefaultEngine {
     insights: Arc<dyn Insights>,
 
     #[builder(default)]
-    strategies_task_tracker: TaskTracker,
+    strategy_task_tracker: TaskTracker,
     #[builder(default)]
-    strategies_shutdown: CancellationToken,
-    strategies: Vec<Arc<dyn Algorithm>>,
+    strategy_shutdown: CancellationToken,
+    strategy: Arc<dyn Algorithm>,
 
     #[builder(default)]
     allocation_task_tracker: TaskTracker,
@@ -61,7 +61,7 @@ pub struct DefaultEngine {
 }
 
 #[async_trait]
-impl TradingEngine for DefaultEngine {
+impl TradingEngine for SingleStrategyEngine {
     #[instrument(skip(self))]
     async fn start(&self) -> Result<(), TradingEngineError> {
         // Start the persistor
@@ -87,11 +87,9 @@ impl TradingEngine for DefaultEngine {
             .await?;
 
         // Start the strategies
-        for strategy in &self.strategies {
-            strategy
-                .start(self.strategies_task_tracker.clone(), self.strategies_shutdown.clone())
-                .await?;
-        }
+        self.strategy
+            .start(self.strategy_task_tracker.clone(), self.strategy_shutdown.clone())
+            .await?;
 
         // Start the allocation optimizer
         self.allocation_optim
@@ -122,12 +120,10 @@ impl TradingEngine for DefaultEngine {
         self.insights.cleanup().await?;
 
         info!("Stopping strategies...");
-        self.strategies_shutdown.cancel();
-        self.strategies_task_tracker.close();
-        self.strategies_task_tracker.wait().await;
-        for strategy in &self.strategies {
-            strategy.cleanup().await?;
-        }
+        self.strategy_shutdown.cancel();
+        self.strategy_task_tracker.close();
+        self.strategy_task_tracker.wait().await;
+        self.strategy.cleanup().await?;
 
         info!("Stopping allocation optimizer...");
         self.allocation_shutdown.cancel();

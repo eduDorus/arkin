@@ -2,23 +2,18 @@ use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AllocationConfig {
-    pub allocation_manager: AllocationManagerConfig,
+pub struct AllocationOptimConfig {
+    pub allocation_optim: AllocationTypeConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AllocationManagerConfig {
-    pub module: AllocationModuleConfig,
+pub enum AllocationTypeConfig {
+    #[serde(rename = "limited")]
+    Limited(LimitedConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum AllocationModuleConfig {
-    #[serde(rename = "simple")]
-    Simple(SimpleConfig),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SimpleConfig {
+pub struct LimitedConfig {
     pub max_allocation: Decimal,
     pub max_allocation_per_signal: Decimal,
 }

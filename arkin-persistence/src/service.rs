@@ -21,7 +21,7 @@ use crate::{PersistenceConfig, PersistenceError};
 pub struct PersistenceService {
     // venue_service: Arc<VenueService>,
     instrument_service: Arc<InstrumentService>,
-    pub tick_service: Arc<TickService>,
+    tick_service: Arc<TickService>,
     trade_service: Arc<TradeService>,
     insights_service: Arc<InsightsService>,
 }

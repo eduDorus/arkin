@@ -12,7 +12,7 @@ use tracing::info;
 use crate::{Portfolio, PortfolioError};
 
 #[derive(Debug, Clone, Builder)]
-pub struct DefaultPortfolio {
+pub struct SingleStrategyPortfolio {
     capital: Notional,
     #[builder(default = "Decimal::ONE")]
     leverage: Decimal,
@@ -21,7 +21,7 @@ pub struct DefaultPortfolio {
 }
 
 #[async_trait]
-impl Portfolio for DefaultPortfolio {
+impl Portfolio for SingleStrategyPortfolio {
     async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), PortfolioError> {
         Ok(())
     }

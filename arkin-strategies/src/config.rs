@@ -4,20 +4,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StrategyConfig {
-    pub strategy_manager: StrategyManagerConfig,
+    pub strategies: Vec<StrategyAlgorithmConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StrategyManagerConfig {
-    pub strategies: Vec<StrategyModuleConfig>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum StrategyModuleConfig {
+pub enum StrategyAlgorithmConfig {
     #[serde(rename = "crossover")]
     Crossover(CrossoverConfig),
-    // #[serde(rename = "spreader")]
-    // Spreader(SpreaderConfig),
+    #[serde(rename = "spreader")]
+    Spreader(SpreaderConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

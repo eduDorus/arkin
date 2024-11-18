@@ -14,10 +14,10 @@ impl VenueService {
         Self { venue_repo }
     }
 
-    pub async fn insert(&self, venue: Venue) -> Result<()> {
-        self.venue_repo.create(venue.into()).await?;
-        Ok(())
-    }
+    // pub async fn insert(&self, venue: Venue) -> Result<()> {
+    //     self.venue_repo.create(venue.into()).await?;
+    //     Ok(())
+    // }
 
     pub async fn read_by_id(&self, id: Uuid) -> Result<Option<Venue>> {
         let venue_repo = &self.venue_repo;

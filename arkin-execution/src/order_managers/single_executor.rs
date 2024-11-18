@@ -10,12 +10,12 @@ use arkin_core::prelude::*;
 use crate::{Executor, OrderManager, OrderManagerError};
 
 #[derive(Debug, Builder)]
-pub struct DefaultOrderManager {
+pub struct SingleExecutorOrderManager {
     executor: Arc<dyn Executor>,
 }
 
 #[async_trait]
-impl OrderManager for DefaultOrderManager {
+impl OrderManager for SingleExecutorOrderManager {
     #[instrument(skip(self))]
     async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
         info!("Starting order manager...");

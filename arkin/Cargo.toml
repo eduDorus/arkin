@@ -6,10 +6,6 @@ edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "ingestors"
-path = "src/bin/ingestors.rs"
-
-[[bin]]
 name = "insights"
 path = "src/bin/insights.rs"
 

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use arkin_portfolio::DefaultPortfolioBuilder;
+use arkin_portfolio::{PortfolioConfig, PortfolioFactory};
 use mimalloc::MiMalloc;
-use rust_decimal::prelude::*;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 
@@ -27,34 +26,14 @@ async fn main() {
     let config = load::<PersistenceConfig>();
     let persistence_service = Arc::new(PersistenceService::from_config(&config));
 
-    let portfolio = Arc::new(
-        DefaultPortfolioBuilder::default()
-            .capital(Decimal::from_f64(10000.0).expect("Failed to build Decimal"))
-            .leverage(Decimal::from_f64(1.0).expect("Failed to build Decimal"))
-            .build()
-            .expect("Failed to build DefaultPortfolio"),
-    );
+    let config = load::<PortfolioConfig>();
+    let portfolio = PortfolioFactory::from_config(&config);
 
-    let executor = Arc::new(
-        SimulationExecutorBuilder::default()
-            .build()
-            .expect("Failed to build SimulationExecutor"),
-    );
+    let config = load::<ExecutionConfig>();
+    let order_manager = ExecutionFactory::from_config(&config);
 
-    let order_manager = Arc::new(
-        DefaultOrderManagerBuilder::default()
-            .executor(executor)
-            .build()
-            .expect("Failed to build OrderManager"),
-    );
-
-    let allocation = Arc::new(
-        LimitedAllocationOptimBuilder::default()
-            .max_allocation(Decimal::from_f64(0.8).expect("Failed to build Decimal"))
-            .max_allocation_per_signal(Decimal::from_f64(0.1).expect("Failed to build Decimal"))
-            .build()
-            .expect("Failed to build LimitedAllocationOptim"),
-    );
+    let config = load::<AllocationOptimConfig>();
+    let allocation = AllocationFactory::from_config(&config);
 
     let config = load::<InsightsConfig>();
     let insights = Arc::new(InsightsService::from_config(
@@ -62,32 +41,18 @@ async fn main() {
         persistence_service.clone(),
     ));
 
-    let crossover_strategy = Arc::new(
-        CrossoverStrategyBuilder::default()
-            .id(Arc::new("crossover".to_string()))
-            .price_source(Arc::new("close".to_string()))
-            .volume_source(Arc::new("volume".to_string()))
-            .build()
-            .expect("Failed to build CrossoverStrategy"),
-    );
+    let config = load::<StrategyConfig>();
+    let strategy = StrategyFactory::from_config(&config).pop().expect("No strategy found");
 
-    let binance_ingestor = Arc::new(
-        BinanceIngestorBuilder::default()
-            .persistence_service(persistence_service.clone())
-            .url("wss://fstream.binance.com/ws".parse().unwrap())
-            .channels(vec!["btcusdt@aggTrade".to_string()])
-            .connections_per_manager(2)
-            .duplicate_lookback(10000)
-            .build()
-            .expect("Failed to build BinanceIngestor"),
-    );
+    let config = load::<IngestorsConfig>();
+    let ingestors = IngestorFactory::from_config(&config, persistence_service.clone());
 
-    let engine = DefaultEngineBuilder::default()
+    let engine = SingleStrategyEngineBuilder::default()
         .persistor(persistence_service)
         .portfolio(portfolio)
-        .ingestors(vec![binance_ingestor])
+        .ingestors(ingestors)
         .insights(insights)
-        .strategies(vec![crossover_strategy])
+        .strategy(strategy)
         .allocation_optim(allocation)
         .order_manager(order_manager)
         .build()

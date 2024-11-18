@@ -1,4 +1,4 @@
-mod default;
+mod single_strategy;
 
-pub use default::DefaultPortfolio;
-pub use default::DefaultPortfolioBuilder;
+pub use single_strategy::SingleStrategyPortfolio;
+pub use single_strategy::SingleStrategyPortfolioBuilder;

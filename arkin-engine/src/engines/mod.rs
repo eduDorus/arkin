@@ -1,4 +1,4 @@
-mod default;
+mod single_strategy;
 
-pub use default::DefaultEngine;
-pub use default::DefaultEngineBuilder;
+pub use single_strategy::SingleStrategyEngine;
+pub use single_strategy::SingleStrategyEngineBuilder;

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use crate::{AllocationModuleConfig, AllocationOptim, LimitedAllocationOptimBuilder};
+use crate::{AllocationOptim, AllocationOptimConfig, AllocationTypeConfig, LimitedAllocationOptimBuilder};
 
 pub struct AllocationFactory {}
 
 impl AllocationFactory {
-    pub fn from_config(config: &AllocationModuleConfig) -> Arc<dyn AllocationOptim> {
-        let allocation: Arc<dyn AllocationOptim> = match config {
-            AllocationModuleConfig::Simple(c) => Arc::new(
+    pub fn from_config(config: &AllocationOptimConfig) -> Arc<dyn AllocationOptim> {
+        let allocation: Arc<dyn AllocationOptim> = match &config.allocation_optim {
+            AllocationTypeConfig::Limited(c) => Arc::new(
                 LimitedAllocationOptimBuilder::default()
                     .max_allocation(c.max_allocation)
                     .max_allocation_per_signal(c.max_allocation_per_signal)

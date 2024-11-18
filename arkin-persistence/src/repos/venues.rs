@@ -40,21 +40,21 @@ impl VenueRepo {
         Self { pool }
     }
 
-    pub async fn create(&self, venue: Venue) -> Result<(), Error> {
-        let venue = DBVenue::from(venue);
-        sqlx::query!(
-            r#"
-            INSERT INTO venues (id, name, venue_type)
-            VALUES ($1, $2, $3)
-            "#,
-            venue.id,
-            venue.name,
-            venue.venue_type,
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
+    // pub async fn create(&self, venue: Venue) -> Result<(), Error> {
+    //     let venue = DBVenue::from(venue);
+    //     sqlx::query!(
+    //         r#"
+    //         INSERT INTO venues (id, name, venue_type)
+    //         VALUES ($1, $2, $3)
+    //         "#,
+    //         venue.id,
+    //         venue.name,
+    //         venue.venue_type,
+    //     )
+    //     .execute(&self.pool)
+    //     .await?;
+    //     Ok(())
+    // }
 
     pub async fn read_by_id(&self, id: Uuid) -> Result<Option<DBVenue>, Error> {
         let venue = sqlx::query_as!(
