@@ -1,26 +1,28 @@
 [package]
-name="arkin-persistence"
-authors.workspace=true
-version.workspace=true
-edition.workspace=true
-license.workspace=true
+name = "arkin-persistence"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
-arkin-core={ path="../arkin-core" }
+arkin-core = { path = "../arkin-core" }
 
-tokio={ workspace=true }
-time={ workspace=true }
-serde={ workspace=true }
-tracing={ workspace=true }
-anyhow={ workspace=true }
-rust_decimal={ workspace=true }
-futures-util={ workspace=true }
-async-trait={ workspace=true }
-uuid={ workspace=true }
-sqlx={ workspace=true }
-rayon={ workspace=true }
-parking_lot={ workspace=true }
-dashmap={ workspace=true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+time = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+rust_decimal = { workspace = true }
+futures-util = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+sqlx = { workspace = true }
+rayon = { workspace = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-rstest={ workspace=true }
+rstest = { workspace = true }

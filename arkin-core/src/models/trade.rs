@@ -1,4 +1,4 @@
-use std::{fmt, sync::Arc};
+use std::{cmp::Ordering, fmt, sync::Arc};
 
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
@@ -86,5 +86,27 @@ impl From<Trade> for Event {
 impl fmt::Display for Trade {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {} {} {}", self.instrument, self.event_time, self.price, self.quantity)
+    }
+}
+
+impl PartialEq for Trade {
+    fn eq(&self, other: &Self) -> bool {
+        self.event_time == other.event_time
+            && self.trade_id == other.trade_id
+            && Arc::ptr_eq(&self.instrument, &other.instrument)
+    }
+}
+
+impl Eq for Trade {}
+
+impl PartialOrd for Trade {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Trade {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.event_time, self.trade_id).cmp(&(other.event_time, other.trade_id))
     }
 }

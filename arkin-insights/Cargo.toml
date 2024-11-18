@@ -1,28 +1,31 @@
 [package]
-name="arkin-insights"
-authors.workspace=true
-version.workspace=true
-edition.workspace=true
-license.workspace=true
+name = "arkin-insights"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
-arkin-core={ path="../arkin-core" }
-arkin-persistence={ path="../arkin-persistence" }
+arkin-core = { path = "../arkin-core" }
+arkin-persistence = { path = "../arkin-persistence" }
 
-dashmap={ workspace=true }
-anyhow={ workspace=true }
-tracing={ workspace=true }
-time={ workspace=true }
-petgraph={ workspace=true }
-serde={ workspace=true }
-parking_lot={ workspace=true }
-rayon={ workspace=true }
-flume={ workspace=true }
-rust_decimal={ workspace=true }
-rust_decimal_macros={ workspace=true }
-uuid={ workspace=true }
-itertools={ workspace=true }
-yata={ workspace=true }
+tokio-util = { workspace = true }
+dashmap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+time = { workspace = true }
+petgraph = { workspace = true }
+serde = { workspace = true }
+parking_lot = { workspace = true }
+rayon = { workspace = true }
+flume = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+uuid = { workspace = true }
+itertools = { workspace = true }
+yata = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
-rstest={ workspace=true }
+rstest = { workspace = true }

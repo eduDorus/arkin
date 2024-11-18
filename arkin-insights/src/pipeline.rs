@@ -18,6 +18,7 @@ use crate::factory::FeatureFactory;
 use crate::service::Computation;
 use crate::state::InsightsState;
 
+#[derive(Debug)]
 pub struct ComputationGraph {
     graph: Arc<DiGraph<Box<dyn Computation>, ()>>,
     order: Vec<NodeIndex>,

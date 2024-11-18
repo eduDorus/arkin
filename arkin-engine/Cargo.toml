@@ -1,20 +1,26 @@
 [package]
-name="arkin-engine"
-authors.workspace=true
-version.workspace=true
-edition.workspace=true
-license.workspace=true
+name = "arkin-engine"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
-arkin-core={ path="../arkin-core" }
-arkin-execution={ path="../arkin-execution" }
-arkin-persistence={ path="../arkin-persistence" }
-arkin-insights={ path="../arkin-insights" }
-arkin-strategies={ path="../arkin-strategies" }
-arkin-allocation={ path="../arkin-allocation" }
-arkin-portfolio={ path="../arkin-portfolio" }
-arkin-market={ path="../arkin-market" }
+arkin-core = { path = "../arkin-core" }
+arkin-ingestors = { path = "../arkin-ingestors" }
+arkin-persistence = { path = "../arkin-persistence" }
+arkin-portfolio = { path = "../arkin-portfolio" }
+arkin-insights = { path = "../arkin-insights" }
+arkin-strategies = { path = "../arkin-strategies" }
+arkin-allocation = { path = "../arkin-allocation" }
+arkin-execution = { path = "../arkin-execution" }
 
-tokio={ workspace=true }
-tracing={ workspace=true }
-time={ workspace=true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+time = { workspace = true }
+
+derive_builder = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }

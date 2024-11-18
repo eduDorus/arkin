@@ -10,7 +10,7 @@ use crate::{
 
 use super::{Instrument, Strategy};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Signal {
     pub id: Uuid,
     pub instrument: Arc<Instrument>,

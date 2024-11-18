@@ -4,7 +4,7 @@ use time::OffsetDateTime;
 
 use crate::constants::TIMESTAMP_FORMAT;
 
-#[derive(Clone, Copy, PartialOrd, Ord, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, Eq, PartialEq, Hash)]
 pub struct CompositeIndex {
     timestamp: OffsetDateTime,
     index: u64,

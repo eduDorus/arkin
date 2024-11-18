@@ -1,4 +1,4 @@
-use std::{fmt, sync::Arc};
+use std::{cmp::Ordering, fmt, sync::Arc};
 
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -124,5 +124,27 @@ impl fmt::Display for Tick {
             "{} {} bid: {} {} ask: {} {}",
             self.instrument, self.event_time, self.bid_price, self.bid_quantity, self.ask_price, self.ask_quantity
         )
+    }
+}
+
+impl PartialEq for Tick {
+    fn eq(&self, other: &Self) -> bool {
+        self.event_time == other.event_time
+            && self.tick_id == other.tick_id
+            && Arc::ptr_eq(&self.instrument, &other.instrument)
+    }
+}
+
+impl Eq for Tick {}
+
+impl PartialOrd for Tick {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Tick {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.event_time, self.tick_id).cmp(&(other.event_time, other.tick_id))
     }
 }

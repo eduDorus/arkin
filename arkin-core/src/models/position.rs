@@ -9,7 +9,7 @@ use crate::{types::Commission, Notional, Price, Quantity};
 
 use super::{Account, Instrument, MarketSide, Strategy};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Position {
     pub id: Uuid,
     pub account: Account,

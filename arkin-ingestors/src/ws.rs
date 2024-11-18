@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
 use arkin_core::prelude::*;
 use async_tungstenite::{
     stream::Stream,
@@ -19,6 +18,8 @@ use tokio::{
 use tokio_rustls::client::TlsStream;
 use tracing::{debug, error, info};
 use url::Url;
+
+use crate::IngestorError;
 
 use super::binance::Subscription;
 
@@ -49,7 +50,7 @@ impl WebSocketManager {
         }
     }
 
-    pub async fn run(&mut self, manager_tx: Sender<String>, subscription: Subscription) -> Result<()> {
+    pub async fn run(&mut self, manager_tx: Sender<String>, subscription: Subscription) -> Result<(), IngestorError> {
         // Use select for new data in receiver or spawn new connection on permit
         info!("Starting WebSocket manager...");
         let (sender, receiver) = flume::unbounded::<Message>();
@@ -57,7 +58,13 @@ impl WebSocketManager {
         loop {
             select! {
                 msg = receiver.recv_async() => {
-                    let msg = msg?;
+                    let msg = match msg {
+                        Ok(msg) => msg,
+                        Err(e) => {
+                            error!("Failed to receive message: {:?}", e);
+                            continue;
+                        }
+                    };
                     // let bin_data = msg.into_data();
                     let data = msg.to_string();
                     if self.deduplicator.check(&data) {
@@ -85,7 +92,7 @@ impl WebSocketManager {
         permit: OwnedSemaphorePermit,
         sender: Sender<Message>,
         subscription: Subscription,
-    ) -> Result<()> {
+    ) -> Result<(), IngestorError> {
         let mut handle = Handler::new(&self.url, sender, subscription).await?;
         tokio::spawn(async move {
             if let Err(err) = handle.run().await {
@@ -115,7 +122,7 @@ pub struct Handler {
 }
 
 impl Handler {
-    pub async fn new(url: &Url, sender: Sender<Message>, subscription: Subscription) -> Result<Self> {
+    pub async fn new(url: &Url, sender: Sender<Message>, subscription: Subscription) -> Result<Self, IngestorError> {
         let (mut stream, _) = connect_async(url.to_string()).await?;
         // Send ping
         let ping = Message::Ping(vec![]);
@@ -141,7 +148,7 @@ impl Handler {
     ///
     /// When the shutdown signal is received, the connection is processed until
     /// it reaches a safe state, at which point it is terminated.
-    async fn run(&mut self) -> Result<()> {
+    async fn run(&mut self) -> Result<(), IngestorError> {
         let mut sub = self.subscription.clone();
         sub.update_id(self.id);
         self.stream.send(sub.into()).await?;
@@ -153,7 +160,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn handle_message(&mut self, msg: Message) -> Result<()> {
+    async fn handle_message(&mut self, msg: Message) -> Result<(), IngestorError> {
         match msg {
             Message::Text(text) => {
                 debug!("Hanlder received text: {:?}", text);

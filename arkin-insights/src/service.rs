@@ -5,10 +5,15 @@ use anyhow::Result;
 
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
+use async_trait::async_trait;
 use time::OffsetDateTime;
-use tracing::{debug, info};
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
+use tracing::{debug, info, instrument};
 
+use crate::errors::InsightsError;
 use crate::pipeline::ComputationGraph;
+use crate::traits::Insights;
 use crate::{config::InsightsServiceConfig, state::InsightsState};
 
 pub trait Computation: Debug + Send + Sync {
@@ -22,6 +27,7 @@ pub trait Computation: Debug + Send + Sync {
     ) -> Result<Vec<Insight>>;
 }
 
+#[derive(Debug)]
 pub struct InsightsService {
     state: Arc<InsightsState>,
     persistence_service: Arc<PersistenceService>,
@@ -36,21 +42,43 @@ impl InsightsService {
             pipeline: ComputationGraph::from_config(&config.pipeline),
         }
     }
+}
 
-    pub fn insert(&self, insight: Insight) {
+#[async_trait]
+impl Insights for InsightsService {
+    #[instrument(skip(self))]
+    async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), InsightsError> {
+        info!("Starting insights service...");
+        info!("Insights service started");
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn cleanup(&self) -> Result<(), InsightsError> {
+        info!("Cleaning up insights service...");
+        info!("Insights service cleaned up");
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn insert(&self, insight: Insight) -> Result<(), InsightsError> {
         self.state.insert(insight);
+        Ok(())
     }
 
-    pub fn insert_batch(&self, insights: Vec<Insight>) {
+    #[instrument(skip(self))]
+    async fn insert_batch(&self, insights: Vec<Insight>) -> Result<(), InsightsError> {
         self.state.insert_batch(insights);
+        Ok(())
     }
 
-    pub async fn process(
+    #[instrument(skip(self))]
+    async fn process(
         &self,
         instruments: &[Arc<Instrument>],
         from: OffsetDateTime,
         to: OffsetDateTime,
-    ) -> Result<()> {
+    ) -> Result<(), InsightsError> {
         info!("Running insights pipeline from {} to {}", from, to);
 
         // Generate insights

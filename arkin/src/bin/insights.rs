@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
     info!("Done transforming data to insights");
 
     info!("Inserting insights into state");
-    insights_service.insert_batch(trade_insights);
+    let _ = insights_service.insert_batch(trade_insights).await;
     // insights_service.insert_batch(tick_insights);
     info!("Done inserting insights into state");
 

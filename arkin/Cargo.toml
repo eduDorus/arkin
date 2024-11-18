@@ -20,16 +20,17 @@ path = "src/bin/binance.rs"
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 arkin-persistence = { path = "../arkin-persistence" }
+arkin-portfolio = { path = "../arkin-portfolio" }
 arkin-ingestors = { path = "../arkin-ingestors" }
 arkin-insights = { path = "../arkin-insights" }
+arkin-strategies = { path = "../arkin-strategies" }
+arkin-allocation = { path = "../arkin-allocation" }
+arkin-execution = { path = "../arkin-execution" }
+arkin-engine = { path = "../arkin-engine" }
 arkin-binance = { path = "../arkin-binance" }
-#arkin-engine = { path = "../arkin-engine" }
-#arkin-execution = { path = "../arkin-execution" }
-#arkin-strategies = { path = "../arkin-strategies" }
-#arkin-allocation = { path = "../arkin-allocation" }
-#arkin-portfolio = { path = "../arkin-portfolio" }
 #arkin-market = { path = "../arkin-market" }
 
+futures-util = { workspace = true }
 tokio = { workspace = true }
 mimalloc = { workspace = true }
 tracing = { workspace = true }
@@ -38,8 +39,16 @@ time = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
 rayon = { workspace = true }
-futures-util = { workspace = true }
 rust_decimal = { workspace = true }
+async-trait = { workspace = true }
+flume = { workspace = true }
+strum = { workspace = true }
+rand = { workspace = true }
+async-tungstenite = { workspace = true }
+tokio-util = { workspace = true }
+dashmap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 
 # Test DL

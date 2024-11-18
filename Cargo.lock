@@ -81,20 +81,53 @@ name = "arkin"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arkin-allocation",
  "arkin-binance",
  "arkin-core",
+ "arkin-engine",
+ "arkin-execution",
  "arkin-ingestors",
  "arkin-insights",
  "arkin-persistence",
+ "arkin-portfolio",
+ "arkin-strategies",
+ "async-trait",
+ "async-tungstenite",
+ "dashmap",
+ "flume",
  "futures-util",
  "mimalloc",
+ "rand",
  "rayon",
  "rust_decimal",
+ "serde",
+ "serde_json",
+ "strum",
  "time",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "arkin-allocation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-core",
+ "async-trait",
+ "derive_builder",
+ "rayon",
+ "rstest",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "thiserror 2.0.3",
+ "time",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]
@@ -129,6 +162,7 @@ name = "arkin-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "config",
  "futures-util",
  "rstest",
@@ -138,10 +172,53 @@ dependencies = [
  "serde_json",
  "sqlx",
  "strum",
+ "thiserror 2.0.3",
  "time",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "arkin-engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-allocation",
+ "arkin-core",
+ "arkin-execution",
+ "arkin-ingestors",
+ "arkin-insights",
+ "arkin-persistence",
+ "arkin-portfolio",
+ "arkin-strategies",
+ "async-trait",
+ "derive_builder",
+ "thiserror 2.0.3",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "arkin-execution"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "derive_builder",
+ "flume",
+ "rayon",
+ "rust_decimal",
+ "serde",
+ "strum",
+ "thiserror 2.0.3",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
  "uuid",
 ]
 
@@ -156,15 +233,18 @@ dependencies = [
  "async-tungstenite",
  "backoff",
  "bytes",
+ "derive_builder",
  "flume",
  "futures-util",
  "reqwest",
  "rust_decimal",
  "serde",
  "serde_json",
+ "thiserror 2.0.3",
  "time",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tracing",
  "url",
 ]
@@ -176,6 +256,7 @@ dependencies = [
  "anyhow",
  "arkin-core",
  "arkin-persistence",
+ "async-trait",
  "dashmap",
  "flume",
  "itertools 0.13.0",
@@ -186,7 +267,9 @@ dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
+ "thiserror 2.0.3",
  "time",
+ "tokio-util",
  "tracing",
  "uuid",
  "yata",
@@ -207,10 +290,49 @@ dependencies = [
  "rust_decimal",
  "serde",
  "sqlx",
+ "thiserror 2.0.3",
  "time",
  "tokio",
+ "tokio-util",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "arkin-portfolio"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "dashmap",
+ "derive_builder",
+ "rstest",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "thiserror 2.0.3",
+ "time",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "arkin-strategies"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-core",
+ "async-trait",
+ "derive_builder",
+ "rayon",
+ "rstest",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "thiserror 2.0.3",
+ "time",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]
@@ -292,9 +414,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdd82dba44d209fddb11c190e0a94b78651f95299598e472215667417a03ff1d"
+checksum = "fe7c2840b66236045acd2607d5866e274380afd87ef99d6226e961e2cb47df45"
 dependencies = [
  "aws-lc-sys",
  "mirai-annotations",
@@ -304,9 +426,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.22.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df7a4168111d7eb622a31b214057b8509c0a7e1794f44c546d742330dc793972"
+checksum = "ad3a619a9de81e1d7de1f1186dcba4506ed661a0e483d84410fdef0ee87b2f96"
 dependencies = [
  "bindgen",
  "cc",
@@ -503,9 +625,9 @@ checksum = "9ac0150caa2ae65ca5bd83f25c7de183dea78d4d366469f148435e2acfbad0da"
 
 [[package]]
 name = "cc"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aeb932158bd710538c73702db6945cb68a8fb08c519e6e12706b94263b36db8"
+checksum = "fd9de9f2205d5ef3fd67e685b0df337994ddd4495e2a28d185500d0e1edfea47"
 dependencies = [
  "jobserver",
  "libc",
@@ -727,6 +849,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.20.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f63b86c8a8826a49b8c21f08a2d07338eec8d900540f8630dc76284be802989"
+dependencies = [
+ "darling_core",
+ "darling_macro",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.20.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95133861a8032aaea082871032f5815eb9e98cef03fa916ab4500513994df9e5"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.20.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d336a2a514f6ccccaa3e09b02d41d35330c07ddf03a62165fcec10bb561c7806"
+dependencies = [
+ "darling_core",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
 name = "dashmap"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -766,6 +923,37 @@ checksum = "b42b6fa04a440b495c8b04d0e71b707c585f83cb9cb28cf8cd0d976c315e31b4"
 dependencies = [
  "powerfmt",
  "serde",
+]
+
+[[package]]
+name = "derive_builder"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "507dfb09ea8b7fa618fcf76e953f4f5e192547945816d5358edffe39f6f94947"
+dependencies = [
+ "derive_builder_macro",
+]
+
+[[package]]
+name = "derive_builder_core"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d5bcf7b024d6835cfb3d473887cd966994907effbe9227e8c8219824d06c4e8"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "derive_builder_macro"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab63b0e2bf4d5928aff72e83a7dace85d7bba5fe12dcc3c5a572d78caffd3f3c"
+dependencies = [
+ "derive_builder_core",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -927,9 +1115,9 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
-version = "1.0.34"
+version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1b589b4dc103969ad3cf85c950899926ec64300a1a46d76c03a6072957036f0"
+checksum = "c936bfdafb507ebbf50b8074c54fa31c5be9a1e7e5f467dd659697041407d07c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -1494,6 +1682,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ident_case"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
 name = "idna"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1631,9 +1825,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.162"
+version = "0.2.164"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d287de67fe55fd7e1581fe933d965a5a9477b38e949cfa9f8574ef01506398"
+checksum = "433bfe06b8c75da9b2e3fbea6e5329ff87748f0b144ef75306e674c3f6f7c13f"
 
 [[package]]
 name = "libloading"
@@ -2561,9 +2755,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.16"
+version = "0.23.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eee87ff5d9b36712a58574e12e9f0ea80f915a5b0ac518d322b24a465617925e"
+checksum = "7f1a745511c54ba6d4465e8d5dfbd81b45791756de28d4981af70d6dca128f1e"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -2657,9 +2851,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d726bfaff4b320266d395898905d0eba0345aae23b54aee3a737e260fd46db03"
+checksum = "c7fceb2473b9166b2294ef05efcb65a3db80803f0b03ef86a5fc88a2b85ee377"
 dependencies = [
  "itoa",
  "memchr",
@@ -3033,6 +3227,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "strsim"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
 name = "strum"
 version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3310,6 +3510,8 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
+ "hashbrown 0.14.5",
  "pin-project-lite",
  "tokio",
 ]

@@ -8,14 +8,18 @@ license.workspace = true
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 
+tokio-util = { workspace = true }
+derive_builder = { workspace = true }
 rayon = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
-clarabel = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
-test-utils = { path = "../test-utils" }
+# test-utils = { path = "../test-utils" }
 rstest = { workspace = true }

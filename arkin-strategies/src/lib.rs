@@ -1,15 +1,19 @@
 mod config;
-mod crossover;
+mod errors;
 mod factory;
-mod manager;
+mod strategies;
+mod traits;
 
 pub use config::*;
-pub use crossover::CrossoverStrategy;
-pub use manager::StrategyManager;
-pub use manager::StrategyModule;
+pub use errors::*;
+pub use factory::StrategyFactory;
+pub use strategies::*;
+pub use traits::*;
 
 pub mod prelude {
     pub use crate::config::*;
-    pub use crate::crossover::CrossoverStrategy;
-    pub use crate::manager::*;
+    pub use crate::errors::*;
+    pub use crate::strategies::*;
+    pub use crate::traits::*;
+    pub use crate::StrategyFactory;
 }

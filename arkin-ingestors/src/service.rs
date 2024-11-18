@@ -1,17 +1,11 @@
 use std::sync::Arc;
 
-use anyhow::Result;
-use async_trait::async_trait;
-
-use arkin_persistence::prelude::*;
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;
 
-use crate::{config::IngestorServiceConfig, IngestorFactory};
+use arkin_persistence::prelude::*;
 
-#[async_trait]
-pub trait Ingestor: Send + Sync {
-    async fn start(&self) -> Result<()>;
-}
+use crate::{config::IngestorServiceConfig, IngestorFactory};
 
 pub struct IngestorService {
     config: IngestorServiceConfig,
@@ -27,12 +21,16 @@ impl IngestorService {
     }
 
     pub async fn start(&self) {
+        let task_tracker = TaskTracker::new();
+        let shutdown = CancellationToken::new();
         let ingestors = IngestorFactory::from_config(&self.config.ingestors, Arc::clone(&self.persistence_service));
 
         let mut tasks = Vec::with_capacity(ingestors.len());
         for ingestor in ingestors {
             // Move the ingestor into the async block
-            let task = tokio::spawn(async move { ingestor.start().await });
+            let task_tracker = task_tracker.clone();
+            let shutdown = shutdown.clone();
+            let task = tokio::spawn(async move { ingestor.start(task_tracker, shutdown).await });
             tasks.push(task);
         }
 

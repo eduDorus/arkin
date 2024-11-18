@@ -3,14 +3,14 @@ members = [
   "arkin",
   "arkin-core",
   "arkin-persistence",
+  "arkin-portfolio",
   "arkin-ingestors",
-  "arkin-insights", "arkin-binance",
-  # "arkin-allocation",
-  # "arkin-engine",
-  # "arkin-execution",
-  #"arkin-market",
-  # "arkin-portfolio",
-  # "arkin-strategies",
+  "arkin-insights",
+  "arkin-strategies",
+  "arkin-allocation",
+  "arkin-execution",
+  "arkin-engine",
+  "arkin-binance",
   # "test-integration",
   # "test-utils",
 ]
@@ -42,6 +42,7 @@ sha2 = { version = "0.10", default-features = false, features = [ "oid" ] }
 signature = "2.2"
 base64 = "0.22"
 ed25519-dalek = { version = "2.1", features = [ "serde", "zeroize", "rand_core", "digest", "pkcs8", "pem" ] }
+derive_builder = "0.20"
 
 # Multi-threading
 parking_lot = { version = "0.12", features = [ "hardware-lock-elision" ], default-features = false }
@@ -50,9 +51,10 @@ rayon = "1.10"
 # Async
 tokio = { version = "1.41", features = [ "full" ] }
 flume = "0.11"
-futures-util = { version = "0.3" }
+futures-util = { version = "0.3", features = [ "io" ] }
 async-trait = "0.1"
 async-stream = "0.3"
+tokio-util = { version = "0.7", features = [ "rt" ] }
 # trait-variant = "0.1.2"
 
 # HTTP & Websockets
@@ -77,7 +79,7 @@ serde_json = { version = "1.0", features = [  ] }
 sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-rustls", "postgres", "time", "rust_decimal", "uuid", "derive" ] }
 
 # Time
-time = { version = "0.3", features = [ "macros", "serde", "parsing", "formatting" ], default-features = false }
+time = { version = "0.3", features = [ "macros", "serde-human-readable" ] }
 
 # Logging & Tracing
 tracing = { version = "0.1", features = [  ] }
@@ -104,7 +106,7 @@ mimalloc = { version = "0.1", default-features = false }
 petgraph = { version = "0.6", features = [ "graphmap" ], default-features = false }
 
 # TA
-yata = "0.7.0"
+yata = "0.7"
 
 # Optimization
 # clarabel = { version = "0.9" }

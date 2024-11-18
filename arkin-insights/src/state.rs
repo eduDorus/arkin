@@ -7,7 +7,7 @@ use time::OffsetDateTime;
 
 use arkin_core::prelude::*;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct InsightsState {
     features: DashMap<(Option<Arc<Instrument>>, FeatureId), BTreeMap<CompositeIndex, Decimal>>,
 }

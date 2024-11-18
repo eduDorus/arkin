@@ -1,17 +1,18 @@
-mod binance;
 mod config;
-mod factory;
-mod manager;
-mod simulation;
+mod errors;
+mod executors;
+mod order_managers;
+mod traits;
 
 pub use config::*;
-pub use manager::ExecutionEndpoint;
-pub use manager::ExecutionManager;
-pub use manager::Executor;
+pub use errors::*;
+pub use executors::*;
+pub use order_managers::*;
+pub use traits::*;
 
 pub mod prelude {
     pub use crate::config::*;
-    pub use crate::ExecutionEndpoint;
-    pub use crate::ExecutionManager;
-    pub use crate::Executor;
+    pub use crate::executors::*;
+    pub use crate::order_managers::*;
+    pub use crate::traits::*;
 }

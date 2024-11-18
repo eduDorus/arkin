@@ -15,13 +15,13 @@ use crate::{
 
 use super::{Account, ExecutionOrder, Instrument, MarketSide, Strategy};
 
-#[derive(Display, Clone)]
+#[derive(Debug, Display, Clone)]
 pub enum VenueOrderType {
     Market,
     Limit,
 }
 
-#[derive(Display, Clone)]
+#[derive(Debug, Display, Clone)]
 pub enum VenueOrderTimeInForce {
     Gtc,
     Ioc,
@@ -29,7 +29,7 @@ pub enum VenueOrderTimeInForce {
     Gtd(OffsetDateTime),
 }
 
-#[derive(Display, Clone, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, PartialEq, Eq)]
 pub enum VenueOrderStatus {
     New,
     Open,
@@ -40,7 +40,7 @@ pub enum VenueOrderStatus {
     Expired,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct VenueOrder {
     pub id: Uuid,
     pub account: Account,

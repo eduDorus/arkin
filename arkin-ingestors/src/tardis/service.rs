@@ -14,10 +14,13 @@ use time::macros::format_description;
 use time::{OffsetDateTime, PrimitiveDateTime};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::pin;
-use tracing::{debug, error, info};
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
+use tracing::{debug, error, info, instrument};
 
 use crate::config::TardisIngestorConfig;
-use crate::service::Ingestor;
+use crate::traits::Ingestor;
+use crate::IngestorError;
 
 use super::binance_swap::BinanceSwapsEvent;
 use super::http::TardisHttpClient;
@@ -198,6 +201,7 @@ impl TardisRequest {
     }
 }
 
+#[derive(Debug)]
 pub struct TardisIngestor {
     pub persistence_service: Arc<PersistenceService>,
     pub client: TardisHttpClient,
@@ -343,7 +347,8 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 
 #[async_trait]
 impl Ingestor for TardisIngestor {
-    async fn start(&self) -> Result<()> {
+    #[instrument(skip(self))]
+    async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting tardis ingestor...");
         let persistence_service = Arc::clone(&self.persistence_service);
 
@@ -419,6 +424,12 @@ impl Ingestor for TardisIngestor {
                 }
             }
         }
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn cleanup(&self) -> Result<(), IngestorError> {
+        info!("Cleaning up tardis ingestor...");
         Ok(())
     }
 }

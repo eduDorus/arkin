@@ -19,6 +19,8 @@ tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 sqlx = { workspace = true }
 futures-util = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
 
 rstest = { workspace = true }
 

@@ -15,16 +15,17 @@ use crate::{
 
 use super::{Account, Instrument, MarketSide, Signal, Strategy};
 
-#[derive(Display, Clone)]
-pub enum ExecutionOrderType {
+pub type OrderId = Uuid;
+
+#[derive(Debug, Display, Clone)]
+pub enum ExecutionOrderStrategy {
     Maker,
     Taker,
     VWAP,
 }
 
-#[derive(Display, Clone, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, PartialEq, Eq)]
 pub enum ExecutionOrderStatus {
-    New,
     Open,
     PartiallyFilled,
     Filled,
@@ -32,15 +33,15 @@ pub enum ExecutionOrderStatus {
     Rejected,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ExecutionOrder {
-    pub id: Uuid,
+    pub id: OrderId,
     pub account: Account,
     pub instrument: Arc<Instrument>,
     pub strategy: Strategy,
     pub signal: Signal,
     pub side: MarketSide,
-    pub execution_type: ExecutionOrderType,
+    pub execution_type: ExecutionOrderStrategy,
     pub current_price: Price,
     pub avg_fill_price: Price,
     pub quantity: Quantity,
@@ -58,7 +59,7 @@ impl ExecutionOrder {
         strategy: Strategy,
         signal: Signal,
         side: MarketSide,
-        execution_type: ExecutionOrderType,
+        execution_type: ExecutionOrderStrategy,
         current_price: Price,
         quantity: Quantity,
         created_at: OffsetDateTime,
@@ -76,7 +77,7 @@ impl ExecutionOrder {
             quantity,
             filled_quantity: Quantity::ZERO,
             total_commission: Notional::ZERO,
-            status: ExecutionOrderStatus::New,
+            status: ExecutionOrderStatus::Open,
             created_at,
             updated_at: created_at,
         }
@@ -109,16 +110,19 @@ impl ExecutionOrder {
     }
 
     fn is_valid_transition(&self, new_status: &ExecutionOrderStatus) -> bool {
-        matches!(
-            (&self.status, new_status),
-            (ExecutionOrderStatus::New, ExecutionOrderStatus::Open)
-                | (ExecutionOrderStatus::New, ExecutionOrderStatus::Cancelled)
-                | (ExecutionOrderStatus::New, ExecutionOrderStatus::Rejected)
-                | (ExecutionOrderStatus::Open, ExecutionOrderStatus::Cancelled)
-                | (ExecutionOrderStatus::Open, ExecutionOrderStatus::PartiallyFilled)
-                | (ExecutionOrderStatus::PartiallyFilled, ExecutionOrderStatus::Cancelled)
-                | (ExecutionOrderStatus::PartiallyFilled, ExecutionOrderStatus::Filled)
-        )
+        matches!((&self.status, new_status), |(
+            ExecutionOrderStatus::Open,
+            ExecutionOrderStatus::Cancelled,
+        )| (
+            ExecutionOrderStatus::Open,
+            ExecutionOrderStatus::PartiallyFilled
+        ) | (
+            ExecutionOrderStatus::PartiallyFilled,
+            ExecutionOrderStatus::Cancelled
+        ) | (
+            ExecutionOrderStatus::PartiallyFilled,
+            ExecutionOrderStatus::Filled
+        ))
     }
 
     pub fn remaining_quantity(&self) -> Quantity {

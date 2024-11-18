@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
-pub type StrategyId = String;
+pub type StrategyId = Arc<String>;
 pub type FeatureId = Arc<String>;
 
 // Common types
