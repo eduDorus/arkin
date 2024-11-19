@@ -3,7 +3,6 @@ use std::{fmt, sync::Arc};
 use derive_builder::Builder;
 use rust_decimal::Decimal;
 use strum::Display;
-use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{types::Commission, Notional, Price, Quantity};
@@ -31,7 +30,7 @@ pub enum PositionStatus {
     Closed,
 }
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, PartialEq, Eq, Builder)]
 #[builder(setter(into))]
 pub struct Position {
     #[builder(default = Uuid::new_v4())]
@@ -39,6 +38,7 @@ pub struct Position {
     pub instrument: Arc<Instrument>,
     pub side: PositionSide,
     pub avg_open_price: Price,
+    #[builder(default = None)]
     pub avg_close_price: Option<Price>,
     pub quantity: Quantity,
     #[builder(default = Decimal::ZERO)]
@@ -47,10 +47,6 @@ pub struct Position {
     pub commission: Commission,
     #[builder(default = PositionStatus::Open)]
     pub status: PositionStatus,
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub created_at: OffsetDateTime,
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub updated_at: OffsetDateTime,
 }
 
 impl Position {
@@ -97,7 +93,6 @@ impl From<Fill> for Position {
             .avg_open_price(fill.price)
             .quantity(fill.quantity)
             .commission(fill.commission)
-            .created_at(fill.created_at)
             .build()
             .expect("Failed to build position from fill")
     }
@@ -107,7 +102,7 @@ impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} avg open: {} avg close: {} quantity: {} pnl: {} commission: {}",
+            "Position: {} {} avg open: {} avg close: {} quantity: {} pnl: {} commission: {}",
             self.instrument,
             self.side,
             self.avg_open_price,

@@ -9,7 +9,7 @@ pub struct ExecutionConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum OrderManagerType {
     #[serde(rename = "single_executor")]
-    SingleExecutor(SingleExecutorOrderManagerConfig),
+    SimpleExecutor(SingleExecutorOrderManagerConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

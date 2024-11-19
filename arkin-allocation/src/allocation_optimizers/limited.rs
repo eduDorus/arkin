@@ -1,24 +1,34 @@
+#![allow(dead_code)]
+use std::sync::Arc;
+
 use async_trait::async_trait;
+use dashmap::DashMap;
 use derive_builder::Builder;
 use rust_decimal::prelude::*;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument};
 
 use arkin_core::prelude::*;
+use arkin_execution::prelude::*;
+use arkin_portfolio::prelude::*;
 
 use crate::{AllocationOptim, AllocationOptimError};
 
 #[derive(Debug, Builder)]
-#[builder(setter(into))]
-#[allow(unused)]
 pub struct LimitedAllocationOptim {
+    order_manager: Arc<dyn OrderManager>,
+    portfolio: Arc<dyn Portfolio>,
+    #[builder(default = "DashMap::new()")]
+    signals: DashMap<(StrategyId, Arc<Instrument>), Signal>,
+    #[builder(default = "Decimal::from_f32(0.8).unwrap()")]
     max_allocation: Decimal,
+    #[builder(default = "Decimal::from_f32(0.2).unwrap()")]
     max_allocation_per_signal: Decimal,
 }
 
 #[async_trait]
 impl AllocationOptim for LimitedAllocationOptim {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn start(
         &self,
         _task_tracker: TaskTracker,
@@ -29,24 +39,34 @@ impl AllocationOptim for LimitedAllocationOptim {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), AllocationOptimError> {
         info!("Cleaning up LimitedAllocation...");
         info!("LimitedAllocation cleaned up");
         Ok(())
     }
 
-    #[instrument(skip(self))]
-    async fn new_signal(&self, _signal: Signal) -> Result<(), AllocationOptimError> {
+    #[instrument(skip_all)]
+    async fn list_signals(&self) -> Result<Vec<Signal>, AllocationOptimError> {
+        Ok(self.signals.iter().map(|entry| entry.value().clone()).collect())
+    }
+
+    #[instrument(skip_all)]
+    async fn new_signal(&self, signal: Signal) -> Result<(), AllocationOptimError> {
+        let key = (signal.strateg_id.clone(), signal.instrument.clone());
+        self.signals.insert(key, signal);
         Ok(())
     }
 
-    #[instrument(skip(self))]
-    async fn new_signals(&self, _signals: Vec<Signal>) -> Result<(), AllocationOptimError> {
+    #[instrument(skip_all)]
+    async fn new_signals(&self, signals: Vec<Signal>) -> Result<(), AllocationOptimError> {
+        for signal in signals {
+            self.new_signal(signal).await?;
+        }
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn optimize(&self) -> Result<Vec<ExecutionOrder>, AllocationOptimError> {
         Ok(vec![])
         // let signals = strategy_snapshot.signals();

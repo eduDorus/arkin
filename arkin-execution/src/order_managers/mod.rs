@@ -1,4 +1,4 @@
-mod single_executor;
+mod simple;
 
-pub use single_executor::SingleExecutorOrderManager;
-pub use single_executor::SingleExecutorOrderManagerBuilder;
+pub use simple::SimpleOrderManager;
+pub use simple::SimpleOrderManagerBuilder;

@@ -4,7 +4,6 @@ use arkin_core::prelude::*;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
-use rust_decimal::prelude::*;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument, warn};
 
@@ -12,84 +11,92 @@ use crate::{Portfolio, PortfolioError};
 
 #[derive(Debug, Clone, Builder)]
 pub struct SingleStrategyPortfolio {
-    capital: Notional,
-    #[builder(default = "Decimal::ONE")]
-    leverage: Decimal,
     #[builder(default = "DashMap::new()")]
     positions: DashMap<Arc<Instrument>, Position>,
     #[builder(default = "DashMap::new()")]
-    balances: DashMap<String, Holding>,
+    holdings: DashMap<String, Holding>,
 }
 
 impl SingleStrategyPortfolio {
+    #[instrument(skip_all)]
     fn update_balance(&self, holding: Holding) {
-        if let Some(mut balance) = self.balances.get_mut(&holding.asset) {
+        if let Some(mut balance) = self.holdings.get_mut(&holding.asset) {
             balance.quantity = holding.quantity;
         } else {
-            self.balances.insert(holding.asset.clone(), holding);
+            self.holdings.insert(holding.asset.clone(), holding);
         }
     }
+
+    #[instrument(skip_all)]
     fn update_position(&self, fill: Fill) {
-        if let Some(mut position) = self.positions.get_mut(&fill.instrument) {
-            let (decreasing, increasing) = match (position.side, fill.side) {
-                (PositionSide::Long, MarketSide::Sell) | (PositionSide::Short, MarketSide::Buy) => (true, false),
-                _ => (false, true),
-            };
-
-            if increasing {
-                self.increase_position(&mut position, fill);
-            } else if decreasing {
-                let remaining = self.decrease_position(&mut position, fill.clone());
-                // Close position
-                if position.quantity.is_zero() {
-                    self.positions.remove(&position.instrument);
+        let position_side = self.positions.get(&fill.instrument).map(|p| p.side);
+        if let Some(position_side) = position_side {
+            info!("Position side: {:?}", position_side);
+            match (position_side, fill.side) {
+                (PositionSide::Long, MarketSide::Buy) | (PositionSide::Short, MarketSide::Sell) => {
+                    info!("Increasing position: {}", fill);
+                    self.increase_position(fill);
                 }
-
-                // If there is some remaining quantity, create a new position
-                if let Some(remaining_quantity) = remaining {
-                    let mut remaining_fill = fill;
-                    remaining_fill.quantity = remaining_quantity;
-                    self.create_new_position(remaining_fill);
+                _ => {
+                    info!("Decreasing position: {}", fill);
+                    self.decrease_position(fill);
                 }
             }
         } else {
+            info!("No position found for instrument: {}", fill.instrument);
             self.create_new_position(fill);
         }
     }
 
-    fn increase_position(&self, position: &mut Position, fill: Fill) {
-        let new_total_quantity = position.quantity + fill.quantity;
-        position.avg_open_price =
-            (position.avg_open_price * position.quantity + fill.price * fill.quantity) / new_total_quantity;
-        position.quantity = new_total_quantity;
-        position.commission += fill.commission;
-        position.updated_at = fill.created_at;
-
-        info!("Increased position: {}", position);
+    #[instrument(skip_all)]
+    fn increase_position(&self, fill: Fill) {
+        self.positions.alter(&fill.instrument, |_, mut p| {
+            let new_total_quantity = p.quantity + fill.quantity;
+            p.avg_open_price = (p.avg_open_price * p.quantity + fill.price * fill.quantity) / new_total_quantity;
+            p.quantity = new_total_quantity;
+            p.commission += fill.commission;
+            info!("Increased position: {}", p);
+            p
+        });
     }
 
-    fn decrease_position(&self, position: &mut Position, fill: Fill) -> Option<Quantity> {
-        let close_quantity = position.quantity.min(fill.quantity);
-        let pnl = self.calculate_pnl(position, fill.price, close_quantity);
+    #[instrument(skip_all)]
+    fn decrease_position(&self, fill: Fill) {
+        let initial_quantity = self.positions.get(&fill.instrument).map(|p| p.quantity).unwrap_or_default();
 
-        position.realized_pnl += pnl;
-        position.quantity -= close_quantity;
-        position.avg_close_price = Some(fill.price);
-        position.commission += fill.commission;
-        position.updated_at = fill.created_at;
+        // Update the position
+        self.positions.alter(&fill.instrument, |_, mut p| {
+            let close_quantity = fill.quantity.min(p.quantity);
+            p.quantity -= close_quantity;
+            p.avg_close_price = Some(fill.price);
+            p.realized_pnl += match p.side {
+                PositionSide::Long => Price::from(fill.price - p.avg_open_price) * close_quantity,
+                PositionSide::Short => Price::from(p.avg_open_price - fill.price) * close_quantity,
+            };
+            p.commission += fill.commission;
 
-        if position.quantity.is_zero() {
-            position.status = PositionStatus::Closed;
-        }
-        info!("Reduced position: {}", position);
+            match p.quantity.is_zero() {
+                true => {
+                    info!("Closed position: {}", p);
+                    p.status = PositionStatus::Closed;
+                }
+                false => {
+                    info!("Reduced position: {}", p);
+                }
+            }
+            p
+        });
 
-        if close_quantity < fill.quantity {
-            Some(fill.quantity - close_quantity)
-        } else {
-            None
+        // If we have remaining quantity, create a new position
+        if initial_quantity < fill.quantity {
+            let remaining_quantity = fill.quantity - initial_quantity;
+            let mut remaining_fill = fill.clone();
+            remaining_fill.quantity = remaining_quantity;
+            self.create_new_position(fill);
         }
     }
 
+    #[instrument(skip_all)]
     fn create_new_position(&self, fill: Fill) {
         let position = Position::from(fill);
 
@@ -97,13 +104,7 @@ impl SingleStrategyPortfolio {
         self.positions.insert(position.instrument.clone(), position);
     }
 
-    fn calculate_pnl(&self, position: &Position, close_price: Price, close_quantity: Quantity) -> Notional {
-        match position.side {
-            PositionSide::Long => Price::from(close_price - position.avg_open_price) * close_quantity,
-            PositionSide::Short => Price::from(position.avg_open_price - close_price) * close_quantity,
-        }
-    }
-
+    #[instrument(skip_all)]
     fn reconcilliate_position(&self, position: Position) {
         // Check if our position matches the incoming position
         if let Some(mut p) = self.positions.get_mut(&position.instrument) {
@@ -144,7 +145,7 @@ impl SingleStrategyPortfolio {
             }
         } else {
             // Create a new position
-            warn!("Position not found, creating new position: {}", position);
+            info!("Position not found, creating new position: {}", position);
             self.positions.insert(position.instrument.clone(), position);
         }
     }
@@ -152,67 +153,67 @@ impl SingleStrategyPortfolio {
 
 #[async_trait]
 impl Portfolio for SingleStrategyPortfolio {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), PortfolioError> {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), PortfolioError> {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn position_update(&self, position: Position) -> Result<(), PortfolioError> {
         self.reconcilliate_position(position);
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError> {
         self.update_position(fill);
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError> {
         self.update_balance(holding);
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn balances(&self) -> Vec<Holding> {
-        self.balances.iter().map(|v| v.clone()).collect()
+        self.holdings.iter().map(|v| v.clone()).collect()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn positions(&self) -> Vec<Position> {
         self.positions.iter().map(|v| v.clone()).collect()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn capital(&self) -> Notional {
-        self.capital + self.total_pnl().await - self.total_commission().await
+        unimplemented!("capital")
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn buying_power(&self) -> Notional {
-        self.capital * self.leverage - self.total_exposure().await
+        unimplemented!("buying_power")
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn total_exposure(&self) -> Notional {
         self.positions.iter().fold(Notional::default(), |acc, e| {
             acc + e.avg_open_price * e.quantity + e.realized_pnl
         })
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn total_pnl(&self) -> Notional {
         Notional::ZERO
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn total_commission(&self) -> Notional {
         Notional::ZERO
     }

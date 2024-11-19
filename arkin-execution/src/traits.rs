@@ -12,6 +12,8 @@ pub trait OrderManager: std::fmt::Debug + Send + Sync {
     async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), OrderManagerError>;
     async fn cleanup(&self) -> Result<(), OrderManagerError>;
 
+    async fn list_orders(&self) -> Result<Vec<ExecutionOrder>, OrderManagerError>;
+
     async fn place_order(&self, order: ExecutionOrder) -> Result<(), OrderManagerError>;
     async fn cancel_order(&self, id: ExecutionOrderId) -> Result<(), OrderManagerError>;
     async fn cancel_all_orders(&self) -> Result<(), OrderManagerError>;

@@ -53,11 +53,11 @@ impl Event {
             Event::Tick(tick) => tick.event_time,
             Event::Trade(trade) => trade.event_time,
             Event::Book(book) => book.event_time,
-            Event::Signal(signal) => signal.created_at,
+            Event::Signal(signal) => signal.event_time,
             Event::ExecutionOrder(_order) => OffsetDateTime::now_utc(),
             Event::VenueOrder(_order) => OffsetDateTime::now_utc(),
-            Event::Fill(fill) => fill.created_at,
-            Event::Position(position) => position.created_at,
+            Event::Fill(_fill) => OffsetDateTime::now_utc(),
+            Event::Position(_position) => OffsetDateTime::now_utc(),
             _ => panic!("Event does not have a timestamp"),
         }
     }

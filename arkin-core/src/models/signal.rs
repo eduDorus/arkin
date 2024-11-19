@@ -1,34 +1,23 @@
 use std::{fmt, sync::Arc};
 
+use derive_builder::Builder;
 use time::OffsetDateTime;
-use uuid::Uuid;
 
 use crate::{
+    constants,
     events::{EventType, EventTypeOf},
-    Event, Weight,
+    Event, StrategyId, Weight,
 };
 
-use super::{Instrument, Strategy};
+use super::Instrument;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct Signal {
-    pub id: Uuid,
+    pub event_time: OffsetDateTime,
     pub instrument: Arc<Instrument>,
-    pub strategy: Strategy,
+    pub strateg_id: StrategyId,
     pub weight: Weight,
-    pub created_at: OffsetDateTime,
-}
-
-impl Signal {
-    pub fn new(instrument: Arc<Instrument>, strategy: Strategy, weight: Weight, created_at: OffsetDateTime) -> Self {
-        Signal {
-            id: Uuid::new_v4(),
-            instrument,
-            strategy,
-            weight,
-            created_at,
-        }
-    }
 }
 
 impl EventTypeOf for Signal {
@@ -59,8 +48,13 @@ impl fmt::Display for Signal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {}",
-            self.created_at, self.strategy.name, self.instrument.symbol, self.weight
+            "Signal: ts={} inst={} strategy={} weight={}",
+            self.event_time
+                .format(constants::TIMESTAMP_FORMAT)
+                .expect("Failed to format timestamp"),
+            self.instrument.symbol,
+            self.strateg_id,
+            self.weight
         )
     }
 }

@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 
+tokio = { workspace = true }
 tokio-util = { workspace = true }
 serde = { workspace = true }
 rust_decimal = { workspace = true }
@@ -18,6 +19,7 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 derive_builder = { workspace = true }
+uuid = { workspace = true }
 
 mockall = { workspace = true }
 test-case = { workspace = true }

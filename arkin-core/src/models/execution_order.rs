@@ -16,7 +16,7 @@ use super::{Fill, Instrument, MarketSide};
 
 pub type ExecutionOrderId = Uuid;
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Display, Clone, PartialEq, Eq)]
 pub enum ExecutionOrderStrategy {
     Market,
     Limit(Price),
@@ -33,7 +33,7 @@ pub enum ExecutionOrderStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, PartialEq, Eq, Builder)]
 #[builder(setter(into))]
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]

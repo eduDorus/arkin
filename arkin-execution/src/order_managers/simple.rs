@@ -12,7 +12,7 @@ use arkin_core::prelude::*;
 use crate::{Executor, OrderManager, OrderManagerError};
 
 #[derive(Debug, Builder)]
-pub struct SingleExecutorOrderManager {
+pub struct SimpleOrderManager {
     executor: Arc<dyn Executor>,
     portfolio: Arc<dyn Portfolio>,
     #[builder(default = DashMap::new())]
@@ -22,8 +22,8 @@ pub struct SingleExecutorOrderManager {
 }
 
 #[async_trait]
-impl OrderManager for SingleExecutorOrderManager {
-    #[instrument(skip(self))]
+impl OrderManager for SimpleOrderManager {
+    #[instrument(skip_all)]
     async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
         info!("Starting order manager...");
         self.executor.start(task_tracker.clone(), shutdown.clone()).await?;
@@ -31,7 +31,7 @@ impl OrderManager for SingleExecutorOrderManager {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), OrderManagerError> {
         info!("Cleaning up order manager...");
         self.executor.cleanup().await?;
@@ -39,13 +39,18 @@ impl OrderManager for SingleExecutorOrderManager {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
+    async fn list_orders(&self) -> Result<Vec<ExecutionOrder>, OrderManagerError> {
+        Ok(self.execution_orders.iter().map(|x| x.value().clone()).collect())
+    }
+
+    #[instrument(skip_all)]
     async fn place_order(&self, order: ExecutionOrder) -> Result<(), OrderManagerError> {
         self.execution_orders.insert(order.id, order.clone());
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cancel_order(&self, id: ExecutionOrderId) -> Result<(), OrderManagerError> {
         let venue_order_ids = self
             .venue_orders
@@ -65,13 +70,13 @@ impl OrderManager for SingleExecutorOrderManager {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cancel_all_orders(&self) -> Result<(), OrderManagerError> {
         self.executor.cancel_all_orders().await?;
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn order_update(&self, fill: Fill) -> Result<(), OrderManagerError> {
         if let Some(mut order) = self.venue_orders.get_mut(&fill.venue_order_id) {
             order.add_fill(fill);
@@ -81,7 +86,7 @@ impl OrderManager for SingleExecutorOrderManager {
         }
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn order_status_update(&self, id: VenueOrderId, status: VenueOrderStatus) -> Result<(), OrderManagerError> {
         if let Some(mut order) = self.venue_orders.get_mut(&id) {
             order.update_status(status);
@@ -91,55 +96,15 @@ impl OrderManager for SingleExecutorOrderManager {
         }
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn position_update(&self, position: Position) -> Result<(), OrderManagerError> {
         self.portfolio.position_update(position).await?;
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn balance_update(&self, holding: Holding) -> Result<(), OrderManagerError> {
         self.portfolio.balance_update(holding).await?;
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::MockExecutor;
-    use arkin_core::test_utils::*;
-    use arkin_portfolio::MockPortfolio;
-    use rust_decimal::prelude::*;
-    use test_log::test;
-
-    #[test(tokio::test)]
-    async fn test_place_order() {
-        // Create mock Executor and Portfolio
-        let mock_executor = MockExecutor::new();
-        let mock_portfolio = MockPortfolio::new();
-
-        // Build the SingleExecutorOrderManager with mocks
-        let order_manager = SingleExecutorOrderManagerBuilder::default()
-            .executor(Arc::new(mock_executor))
-            .portfolio(Arc::new(mock_portfolio))
-            .build()
-            .unwrap();
-
-        // Create a test ExecutionOrder
-        let instrument = binance_btc_usdt_perp();
-        let execution_order = ExecutionOrderBuilder::default()
-            .instrument(instrument)
-            .execution_type(ExecutionOrderStrategy::Market)
-            .side(MarketSide::Buy)
-            .quantity(Quantity::from_f64(1.0).unwrap())
-            .build()
-            .unwrap();
-
-        // Call place_order
-        order_manager.place_order(execution_order.clone()).await.unwrap();
-
-        // Assert that the order is in the execution_orders map
-        assert!(order_manager.execution_orders.contains_key(&execution_order.id));
     }
 }

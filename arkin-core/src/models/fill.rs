@@ -2,11 +2,9 @@ use std::{fmt, sync::Arc};
 
 use derive_builder::Builder;
 use strum::Display;
-use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    constants::TIMESTAMP_FORMAT,
     events::{Event, EventType, EventTypeOf},
     types::{Commission, Price, Quantity},
 };
@@ -30,8 +28,6 @@ pub struct Fill {
     pub price: Price,
     pub quantity: Quantity,
     pub commission: Commission,
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub created_at: OffsetDateTime,
 }
 
 impl EventTypeOf for Fill {
@@ -56,12 +52,8 @@ impl fmt::Display for Fill {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} instrument: {} side: {} price: {} quantity: {}",
-            self.created_at.format(TIMESTAMP_FORMAT).unwrap(),
-            self.instrument,
-            self.side,
-            self.price,
-            self.quantity,
+            "instrument: {} side: {} price: {} quantity: {}",
+            self.instrument, self.side, self.price, self.quantity,
         )
     }
 }

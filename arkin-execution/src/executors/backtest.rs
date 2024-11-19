@@ -12,15 +12,15 @@ use arkin_core::prelude::*;
 use crate::{Executor, ExecutorError, OrderManager};
 
 #[derive(Debug, Builder)]
-pub struct SimulationExecutor {
+pub struct BacktestExecutor {
     order_manager: Arc<dyn OrderManager>,
     #[builder(default)]
     orders: DashMap<VenueOrderId, VenueOrder>,
 }
 
 #[async_trait]
-impl Executor for SimulationExecutor {
-    #[instrument(skip(self))]
+impl Executor for BacktestExecutor {
+    #[instrument(skip_all)]
     async fn start(&self, tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), ExecutorError> {
         info!("Starting simulation executor...");
         let order_manager = self.order_manager.clone();
@@ -70,21 +70,21 @@ impl Executor for SimulationExecutor {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), ExecutorError> {
         info!("Cleaning up simulation executor...");
         info!("Simulation executor cleaned up");
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn place_order(&self, order: VenueOrder) -> Result<(), ExecutorError> {
         info!("Placing order: {:?}", order);
         self.orders.insert(order.id, order);
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn place_orders(&self, orders: Vec<VenueOrder>) -> Result<(), ExecutorError> {
         info!("Placing orders: {:?}", orders);
         for order in orders {
@@ -93,17 +93,17 @@ impl Executor for SimulationExecutor {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn modify_order(&self, _order: VenueOrder) -> Result<(), ExecutorError> {
         unimplemented!("SimulationExecutor::modify_order")
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn modify_orders(&self, _orders: Vec<VenueOrder>) -> Result<(), ExecutorError> {
         unimplemented!("SimulationExecutor::modify_orders")
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cancel_order(&self, id: VenueOrderId) -> Result<(), ExecutorError> {
         info!("Cancelling order: {:?}", id);
         if let Some(mut order) = self.orders.get_mut(&id) {
@@ -114,7 +114,7 @@ impl Executor for SimulationExecutor {
         }
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cancel_orders(&self, ids: Vec<VenueOrderId>) -> Result<(), ExecutorError> {
         info!("Cancelling orders: {:?}", ids);
         for id in ids {
@@ -127,55 +127,12 @@ impl Executor for SimulationExecutor {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cancel_all_orders(&self) -> Result<(), ExecutorError> {
         info!("Cancelling all orders");
         for mut order in self.orders.iter_mut() {
             order.cancel();
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::MockOrderManager;
-    use arkin_core::test_utils::*;
-    use test_log::test;
-
-    #[test(tokio::test)]
-    async fn test_place_order() {
-        // Create a mock OrderManager
-        let mock_order_manager = MockOrderManager::new();
-
-        // Build the SimulationExecutor with the mock OrderManager
-        let executor = SimulationExecutorBuilder::default()
-            .order_manager(Arc::new(mock_order_manager))
-            .build()
-            .unwrap();
-
-        info!("Executor: {:?}", executor);
-
-        // // Create a sample VenueOrder
-        let instrument = binance_btc_usdt_perp();
-        let execution_order_id = ExecutionOrderId::new_v4();
-        let order = VenueOrderBuilder::default()
-            .execution_order_id(execution_order_id)
-            .instrument(instrument)
-            .order_type(VenueOrderType::Limit)
-            .side(MarketSide::Buy)
-            .quantity(Decimal::from_f64(0.1).unwrap())
-            .price(Some(Decimal::from_f64(50000.).unwrap()))
-            .build()
-            .unwrap();
-
-        // Call place_order
-        executor.place_order(order.clone()).await.unwrap();
-
-        info!("Executor: {:?}", executor);
-
-        // Assert that the order is in the executor's orders map
-        assert!(executor.orders.contains_key(&order.id));
     }
 }

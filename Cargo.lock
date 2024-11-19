@@ -165,7 +165,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arkin-core",
+ "arkin-execution",
+ "arkin-portfolio",
  "async-trait",
+ "dashmap",
  "derive_builder",
  "mockall",
  "rust_decimal",
@@ -175,6 +178,7 @@ dependencies = [
  "test-log",
  "thiserror 2.0.3",
  "time",
+ "tokio",
  "tokio-util",
  "tracing",
 ]
@@ -217,6 +221,7 @@ dependencies = [
  "config",
  "derive_builder",
  "futures-util",
+ "mockall",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
@@ -226,6 +231,7 @@ dependencies = [
  "thiserror 2.0.3",
  "time",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -380,8 +386,10 @@ dependencies = [
  "test-log",
  "thiserror 2.0.3",
  "time",
+ "tokio",
  "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

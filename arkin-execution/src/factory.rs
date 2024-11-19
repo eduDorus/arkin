@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
-use crate::{ExecutionConfig, ExecutorFactory, OrderManager, OrderManagerType, SingleExecutorOrderManagerBuilder};
+use crate::{ExecutionConfig, ExecutorFactory, OrderManager, OrderManagerType, SimpleOrderManagerBuilder};
 
 pub struct ExecutionFactory {}
 
 impl ExecutionFactory {
     pub fn from_config(config: &ExecutionConfig) -> Arc<dyn OrderManager> {
         let order_manager: Arc<dyn OrderManager> = match &config.order_manager {
-            OrderManagerType::SingleExecutor(c) => {
+            OrderManagerType::SimpleExecutor(c) => {
                 let executor = ExecutorFactory::from_config(&c.executor);
 
                 Arc::new(
-                    SingleExecutorOrderManagerBuilder::default()
+                    SimpleOrderManagerBuilder::default()
                         .executor(executor)
                         .build()
-                        .expect("Failed to build SingleExecutorOrderManager"),
+                        .expect("Failed to build SimpleOrderManager"),
                 )
             }
         };

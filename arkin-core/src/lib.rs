@@ -19,6 +19,7 @@ pub mod prelude {
     pub use crate::events::*;
     pub use crate::logging::*;
     pub use crate::models::*;
+    pub use crate::test_utils::*;
     pub use crate::types::*;
     pub use crate::utils::*;
 }

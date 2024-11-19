@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 config = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
@@ -23,3 +24,5 @@ async-trait = { workspace = true }
 thiserror = { workspace = true }
 serde_json = { workspace = true }
 derive_builder = { workspace = true }
+
+mockall = { workspace = true }
