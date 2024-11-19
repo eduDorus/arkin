@@ -20,7 +20,11 @@ tokio-util = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 time = { workspace = true }
-
 derive_builder = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+mockall = { workspace = true }
+test-case = { workspace = true }
+test-log = { workspace = true }

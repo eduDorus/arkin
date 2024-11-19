@@ -1,19 +1,20 @@
-use std::time::Duration;
 use std::{fmt, sync::Arc};
 
+use derive_builder::Builder;
 use strum::Display;
 use time::OffsetDateTime;
-use tracing::warn;
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    constants::TIMESTAMP_FORMAT,
     events::{EventType, EventTypeOf},
     types::Commission,
     Event, Notional, Price, Quantity,
 };
 
-use super::{Account, ExecutionOrder, Instrument, MarketSide, Strategy};
+use super::{ExecutionOrderId, Fill, Instrument, MarketSide};
+
+pub type VenueOrderId = Uuid;
 
 #[derive(Debug, Display, Clone)]
 pub enum VenueOrderType {
@@ -32,103 +33,82 @@ pub enum VenueOrderTimeInForce {
 #[derive(Debug, Display, Clone, PartialEq, Eq)]
 pub enum VenueOrderStatus {
     New,
-    Open,
+    Placed,
     PartiallyFilled,
+    PartiallyFilledCancelled,
     Filled,
     Cancelled,
     Rejected,
     Expired,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct VenueOrder {
-    pub id: Uuid,
-    pub account: Account,
+    #[builder(default = Uuid::new_v4())]
+    pub id: VenueOrderId,
+    pub execution_order_id: ExecutionOrderId,
     pub instrument: Arc<Instrument>,
-    pub strategy: Strategy,
-    pub execution_order: ExecutionOrder,
-    pub venue_order_id: u64,
     pub side: MarketSide,
     pub order_type: VenueOrderType,
+    #[builder(default = VenueOrderTimeInForce::Gtc)]
     pub time_in_force: VenueOrderTimeInForce,
-    pub price: Price,
+    pub price: Option<Price>,
+    #[builder(default = Price::ZERO)]
     pub avg_fill_price: Price,
     pub quantity: Quantity,
+    #[builder(default = Quantity::ZERO)]
     pub filled_quantity: Quantity,
+    #[builder(default = Commission::ZERO)]
     pub total_commission: Commission,
+    #[builder(default = VenueOrderStatus::New)]
     pub status: VenueOrderStatus,
-    pub created_at: OffsetDateTime,
-    pub updated_at: OffsetDateTime,
 }
 
 impl VenueOrder {
     pub fn new_market(
-        account: Account,
+        execution_order_id: ExecutionOrderId,
         instrument: Arc<Instrument>,
-        strategy: Strategy,
-        execution_order: ExecutionOrder,
         side: MarketSide,
         quantity: Quantity,
-        created_at: OffsetDateTime,
     ) -> Self {
         VenueOrder {
             id: Uuid::new_v4(),
-            account,
+            execution_order_id,
             instrument,
-            strategy,
-            execution_order,
-            venue_order_id: 0,
             side,
             order_type: VenueOrderType::Market,
             time_in_force: VenueOrderTimeInForce::Gtc,
-            price: Price::ZERO,
+            price: None,
             avg_fill_price: Price::ZERO,
             quantity,
             filled_quantity: Quantity::ZERO,
             total_commission: Commission::ZERO,
             status: VenueOrderStatus::New,
-            created_at,
-            updated_at: created_at,
         }
     }
 
-    pub fn new_limit(
-        account: Account,
-        instrument: Arc<Instrument>,
-        strategy: Strategy,
-        execution_order: ExecutionOrder,
-        side: MarketSide,
-        price: Price,
-        quantity: Quantity,
-        created_at: OffsetDateTime,
-    ) -> Self {
+    pub fn new_limit(instrument: Arc<Instrument>, side: MarketSide, price: Price, quantity: Quantity) -> Self {
         VenueOrder {
             id: Uuid::new_v4(),
-            account,
+            execution_order_id: Uuid::new_v4(),
             instrument,
-            strategy,
-            execution_order,
-            venue_order_id: 0,
             side,
             order_type: VenueOrderType::Limit,
             time_in_force: VenueOrderTimeInForce::Gtc,
-            price,
+            price: Some(price),
             avg_fill_price: Price::ZERO,
             quantity,
             filled_quantity: Quantity::ZERO,
             total_commission: Commission::ZERO,
             status: VenueOrderStatus::New,
-            created_at,
-            updated_at: created_at,
         }
     }
 
-    pub fn update(&mut self, event_time: OffsetDateTime, price: Price, quantity: Quantity, commission: Commission) {
+    pub fn update(&mut self, price: Price, quantity: Quantity, commission: Commission) {
         self.avg_fill_price =
             (self.avg_fill_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
         self.filled_quantity += quantity;
         self.total_commission += commission;
-        self.updated_at = event_time;
 
         // Update the state
         match self.filled_quantity == self.quantity {
@@ -137,27 +117,44 @@ impl VenueOrder {
         }
     }
 
-    pub fn update_status(&mut self, event_time: OffsetDateTime, new_status: VenueOrderStatus) {
+    pub fn add_fill(&mut self, fill: Fill) {
+        self.avg_fill_price = (self.avg_fill_price * self.filled_quantity + fill.price * fill.quantity)
+            / (self.filled_quantity + fill.quantity);
+        self.filled_quantity += fill.quantity;
+        self.total_commission += fill.commission;
+        self.status = match self.filled_quantity == self.quantity {
+            true => VenueOrderStatus::Filled,
+            false => VenueOrderStatus::PartiallyFilled,
+        };
+    }
+
+    pub fn update_status(&mut self, new_status: VenueOrderStatus) {
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
-            self.updated_at = event_time;
         } else {
-            warn!(
+            error!(
                 "Invalid state transition from {} to {} for order {}",
                 self.status, new_status, self.id
             );
         }
     }
 
+    pub fn cancel(&mut self) {
+        self.status = match self.status {
+            VenueOrderStatus::PartiallyFilled => VenueOrderStatus::PartiallyFilledCancelled,
+            _ => VenueOrderStatus::Cancelled,
+        };
+    }
+
     fn is_valid_transition(&self, new_status: &VenueOrderStatus) -> bool {
         matches!(
             (&self.status, new_status),
-            (VenueOrderStatus::New, VenueOrderStatus::Open)
+            (VenueOrderStatus::New, VenueOrderStatus::Placed)
                 | (VenueOrderStatus::New, VenueOrderStatus::Rejected)
                 | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
-                | (VenueOrderStatus::Open, VenueOrderStatus::PartiallyFilled)
-                | (VenueOrderStatus::Open, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::Open, VenueOrderStatus::Cancelled)
+                | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
+                | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
+                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelled)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Cancelled)
         )
@@ -168,20 +165,11 @@ impl VenueOrder {
     }
 
     pub fn is_active(&self) -> bool {
-        matches!(self.status, VenueOrderStatus::Open | VenueOrderStatus::PartiallyFilled)
+        matches!(self.status, VenueOrderStatus::Placed | VenueOrderStatus::PartiallyFilled)
     }
 
     pub fn has_fill(&self) -> bool {
         self.filled_quantity > Quantity::ZERO
-    }
-
-    pub fn fill_time(&self) -> Option<Duration> {
-        match self.has_fill() {
-            false => Some(Duration::from_millis(
-                (self.updated_at - self.created_at).whole_milliseconds() as u64
-            )),
-            true => None,
-        }
     }
 
     pub fn notional(&self) -> Notional {
@@ -217,15 +205,14 @@ impl fmt::Display for VenueOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} {} {} {} {} price: {}/{} quantity: {}/{} {}",
-            self.updated_at.format(TIMESTAMP_FORMAT).expect("Unable to format timestamp"),
-            self.account,
+            "id: {} exec_id: {} {} {} {} price: {}/{} quantity: {}/{} {}",
+            self.id,
+            self.execution_order_id,
             self.instrument,
-            self.strategy,
             self.side,
             self.order_type,
             self.avg_fill_price,
-            self.price,
+            self.price.unwrap_or(Price::ZERO),
             self.filled_quantity,
             self.quantity,
             self.status

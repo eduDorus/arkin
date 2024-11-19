@@ -28,4 +28,6 @@ thiserror = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
-rstest = { workspace = true }
+mockall = { workspace = true }
+test-case = { workspace = true }
+test-log = { workspace = true }

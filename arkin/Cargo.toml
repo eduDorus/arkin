@@ -24,7 +24,6 @@ arkin-allocation = { path = "../arkin-allocation" }
 arkin-execution = { path = "../arkin-execution" }
 arkin-engine = { path = "../arkin-engine" }
 arkin-binance = { path = "../arkin-binance" }
-#arkin-market = { path = "../arkin-market" }
 
 futures-util = { workspace = true }
 tokio = { workspace = true }
@@ -34,7 +33,6 @@ tokio-rustls = { workspace = true }
 time = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
-rayon = { workspace = true }
 rust_decimal = { workspace = true }
 async-trait = { workspace = true }
 flume = { workspace = true }

@@ -5,9 +5,8 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
 use rust_decimal::prelude::*;
-use time::OffsetDateTime;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::info;
+use tracing::{info, instrument, warn};
 
 use crate::{Portfolio, PortfolioError};
 
@@ -17,198 +16,207 @@ pub struct SingleStrategyPortfolio {
     #[builder(default = "Decimal::ONE")]
     leverage: Decimal,
     #[builder(default = "DashMap::new()")]
-    positions: DashMap<(StrategyId, Instrument), Position>,
+    positions: DashMap<Arc<Instrument>, Position>,
+    #[builder(default = "DashMap::new()")]
+    balances: DashMap<String, Holding>,
+}
+
+impl SingleStrategyPortfolio {
+    fn update_balance(&self, holding: Holding) {
+        if let Some(mut balance) = self.balances.get_mut(&holding.asset) {
+            balance.quantity = holding.quantity;
+        } else {
+            self.balances.insert(holding.asset.clone(), holding);
+        }
+    }
+    fn update_position(&self, fill: Fill) {
+        if let Some(mut position) = self.positions.get_mut(&fill.instrument) {
+            let (decreasing, increasing) = match (position.side, fill.side) {
+                (PositionSide::Long, MarketSide::Sell) | (PositionSide::Short, MarketSide::Buy) => (true, false),
+                _ => (false, true),
+            };
+
+            if increasing {
+                self.increase_position(&mut position, fill);
+            } else if decreasing {
+                let remaining = self.decrease_position(&mut position, fill.clone());
+                // Close position
+                if position.quantity.is_zero() {
+                    self.positions.remove(&position.instrument);
+                }
+
+                // If there is some remaining quantity, create a new position
+                if let Some(remaining_quantity) = remaining {
+                    let mut remaining_fill = fill;
+                    remaining_fill.quantity = remaining_quantity;
+                    self.create_new_position(remaining_fill);
+                }
+            }
+        } else {
+            self.create_new_position(fill);
+        }
+    }
+
+    fn increase_position(&self, position: &mut Position, fill: Fill) {
+        let new_total_quantity = position.quantity + fill.quantity;
+        position.avg_open_price =
+            (position.avg_open_price * position.quantity + fill.price * fill.quantity) / new_total_quantity;
+        position.quantity = new_total_quantity;
+        position.commission += fill.commission;
+        position.updated_at = fill.created_at;
+
+        info!("Increased position: {}", position);
+    }
+
+    fn decrease_position(&self, position: &mut Position, fill: Fill) -> Option<Quantity> {
+        let close_quantity = position.quantity.min(fill.quantity);
+        let pnl = self.calculate_pnl(position, fill.price, close_quantity);
+
+        position.realized_pnl += pnl;
+        position.quantity -= close_quantity;
+        position.avg_close_price = Some(fill.price);
+        position.commission += fill.commission;
+        position.updated_at = fill.created_at;
+
+        if position.quantity.is_zero() {
+            position.status = PositionStatus::Closed;
+        }
+        info!("Reduced position: {}", position);
+
+        if close_quantity < fill.quantity {
+            Some(fill.quantity - close_quantity)
+        } else {
+            None
+        }
+    }
+
+    fn create_new_position(&self, fill: Fill) {
+        let position = Position::from(fill);
+
+        info!("Created new position: {}", position);
+        self.positions.insert(position.instrument.clone(), position);
+    }
+
+    fn calculate_pnl(&self, position: &Position, close_price: Price, close_quantity: Quantity) -> Notional {
+        match position.side {
+            PositionSide::Long => Price::from(close_price - position.avg_open_price) * close_quantity,
+            PositionSide::Short => Price::from(position.avg_open_price - close_price) * close_quantity,
+        }
+    }
+
+    fn reconcilliate_position(&self, position: Position) {
+        // Check if our position matches the incoming position
+        if let Some(mut p) = self.positions.get_mut(&position.instrument) {
+            // Update each field and warn if there is a mismatch
+            if p.side != position.side {
+                warn!("Mismatch in side: {:?} != {:?}", p.side, position.side);
+                p.side = position.side;
+            }
+            if p.avg_open_price != position.avg_open_price {
+                warn!(
+                    "Mismatch in avg_open_price: {} != {}",
+                    p.avg_open_price, position.avg_open_price
+                );
+                p.avg_open_price = position.avg_open_price;
+            }
+            if p.avg_close_price != position.avg_close_price {
+                warn!(
+                    "Mismatch in avg_close_price: {:?} != {:?}",
+                    p.avg_close_price, position.avg_close_price
+                );
+                p.avg_close_price = position.avg_close_price;
+            }
+            if p.quantity != position.quantity {
+                warn!("Mismatch in quantity: {} != {}", p.quantity, position.quantity);
+                p.quantity = position.quantity;
+            }
+            if p.realized_pnl != position.realized_pnl {
+                warn!("Mismatch in realized_pnl: {} != {}", p.realized_pnl, position.realized_pnl);
+                p.realized_pnl = position.realized_pnl;
+            }
+            if p.commission != position.commission {
+                warn!("Mismatch in commission: {} != {}", p.commission, position.commission);
+                p.commission = position.commission;
+            }
+            if p.status != position.status {
+                warn!("Mismatch in status: {:?} != {:?}", p.status, position.status);
+                p.status = position.status;
+            }
+        } else {
+            // Create a new position
+            warn!("Position not found, creating new position: {}", position);
+            self.positions.insert(position.instrument.clone(), position);
+        }
+    }
 }
 
 #[async_trait]
 impl Portfolio for SingleStrategyPortfolio {
+    #[instrument(skip(self))]
     async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), PortfolioError> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn cleanup(&self) -> Result<(), PortfolioError> {
         Ok(())
     }
 
-    async fn update_position(
-        &self,
-        event_time: OffsetDateTime,
-        instrument: Arc<Instrument>,
-        side: MarketSide,
-        price: Price,
-        quantity: Quantity,
-    ) -> Result<(), PortfolioError> {
-        info!(
-            "Updating position: {} {} {} {} {}",
-            event_time, instrument, side, price, quantity
-        );
+    #[instrument(skip(self))]
+    async fn position_update(&self, position: Position) -> Result<(), PortfolioError> {
+        self.reconcilliate_position(position);
         Ok(())
     }
 
+    #[instrument(skip(self))]
+    async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError> {
+        self.update_position(fill);
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError> {
+        self.update_balance(holding);
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn balances(&self) -> Vec<Holding> {
+        self.balances.iter().map(|v| v.clone()).collect()
+    }
+
+    #[instrument(skip(self))]
     async fn positions(&self) -> Vec<Position> {
         self.positions.iter().map(|v| v.clone()).collect()
     }
 
+    #[instrument(skip(self))]
     async fn capital(&self) -> Notional {
         self.capital + self.total_pnl().await - self.total_commission().await
     }
 
+    #[instrument(skip(self))]
     async fn buying_power(&self) -> Notional {
         self.capital * self.leverage - self.total_exposure().await
     }
 
+    #[instrument(skip(self))]
     async fn total_exposure(&self) -> Notional {
         self.positions.iter().fold(Notional::default(), |acc, e| {
             acc + e.avg_open_price * e.quantity + e.realized_pnl
         })
     }
 
+    #[instrument(skip(self))]
     async fn total_pnl(&self) -> Notional {
         Notional::ZERO
     }
 
+    #[instrument(skip(self))]
     async fn total_commission(&self) -> Notional {
         Notional::ZERO
     }
 }
-
-// impl DefaultPortfolio {
-//     pub fn update_position(
-//         &self,
-//         event_time: OffsetDateTime,
-//         strategy: Strategy,
-//         instrument: Instrument,
-//         side: MarketSide,
-//         price: Price,
-//         quantity: Quantity,
-//         commission: Notional,
-//     ) {
-//         let key = (strategy_id.clone(), instrument.clone());
-
-//         if let Some(mut position) = self.positions.get_mut(&key) {
-//             let (decreasing, increasing) = match (position.side, side) {
-//                 (PositionSide::Long, Side::Sell) | (PositionSide::Short, Side::Buy) => (true, false),
-//                 _ => (false, true),
-//             };
-
-//             if increasing {
-//                 self.increase_position(&mut position, price, quantity, commission, event_time);
-//             } else if decreasing {
-//                 let remaining = self.decrease_position(&mut position, price, quantity, commission, event_time);
-//                 if position.quantity.is_zero() {
-//                     // Append the position to the history
-//                     self.position_history
-//                         .entry(key.clone())
-//                         .or_insert(Vec::new())
-//                         .push(position.clone());
-
-//                     // Release the mutable reference
-//                     drop(position);
-//                     self.positions.remove(&key);
-//                 }
-//                 if let Some(remaining_quantity) = remaining {
-//                     self.create_new_position(
-//                         event_time,
-//                         strategy_id,
-//                         instrument,
-//                         side,
-//                         price,
-//                         remaining_quantity,
-//                         Notional::default(),
-//                     );
-//                 }
-//             }
-//         } else {
-//             self.create_new_position(event_time, strategy_id, instrument, side, price, quantity, commission);
-//         }
-//     }
-
-//     fn increase_position(
-//         &self,
-//         position: &mut Position,
-//         price: Price,
-//         quantity: Quantity,
-//         commission: Notional,
-//         event_time: OffsetDateTime,
-//     ) {
-//         let new_total_quantity = position.quantity + quantity;
-//         position.avg_open_price = (position.avg_open_price * position.quantity + price * quantity) / new_total_quantity;
-//         position.quantity = new_total_quantity;
-//         position.trade_volume += price * quantity;
-//         position.commission += commission;
-//         position.updated_at = event_time;
-
-//         info!("Increased position: {}", position);
-//     }
-
-//     fn decrease_position(
-//         &self,
-//         position: &mut Position,
-//         price: Price,
-//         quantity: Quantity,
-//         commission: Notional,
-//         event_time: OffsetDateTime,
-//     ) -> Option<Quantity> {
-//         let close_quantity = position.quantity.min(quantity);
-//         let pnl = self.calculate_pnl(position, price, close_quantity);
-
-//         position.realized_pnl += pnl;
-//         position.trade_volume += price * close_quantity;
-//         position.quantity -= close_quantity;
-//         position.avg_close_price = price;
-//         position.commission += commission;
-//         position.updated_at = event_time;
-
-//         if position.quantity.is_zero() {
-//             position.status = PositionStatus::Closed;
-//         }
-//         info!("Reduced position: {}", position);
-
-//         if close_quantity < quantity {
-//             Some(quantity - close_quantity)
-//         } else {
-//             None
-//         }
-//     }
-
-//     fn create_new_position(
-//         &self,
-//         event_time: OffsetDateTime,
-//         strategy_id: StrategyId,
-//         instrument: Instrument,
-//         side: Side,
-//         price: Price,
-//         quantity: Quantity,
-//         commission: Notional,
-//     ) {
-//         let new_position = Position {
-//             strategy_id: strategy_id.clone(),
-//             instrument: instrument.clone(),
-//             side: match side {
-//                 Side::Buy => PositionSide::Long,
-//                 Side::Sell => PositionSide::Short,
-//             },
-//             avg_open_price: price,
-//             avg_close_price: Price::default(),
-//             quantity,
-//             trade_volume: price * quantity,
-//             realized_pnl: Notional::default(),
-//             commission,
-//             status: PositionStatus::Open,
-//             created_at: event_time,
-//             updated_at: event_time,
-//         };
-
-//         info!("Created new position: {}", new_position);
-//         self.positions.insert((strategy_id, instrument), new_position);
-//     }
-
-//     fn calculate_pnl(&self, position: &Position, close_price: Price, close_quantity: Quantity) -> Notional {
-//         match position.side {
-//             PositionSide::Long => Price::from(close_price - position.avg_open_price) * close_quantity,
-//             PositionSide::Short => Price::from(position.avg_open_price - close_price) * close_quantity,
-//         }
-//     }
 
 //     pub fn open_position(&self, strategy_id: &StrategyId, instrument: &Instrument) -> Option<Position> {
 //         self.positions.get(&(strategy_id.clone(), instrument.clone())).and_then(|v| {

@@ -21,8 +21,5 @@ sqlx = { workspace = true }
 futures-util = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
-
-rstest = { workspace = true }
-
-[dev-dependencies]
 serde_json = { workspace = true }
+derive_builder = { workspace = true }

@@ -3,7 +3,16 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum OrderManagerError {
     #[error(transparent)]
+    PortfolioError(#[from] arkin_portfolio::PortfolioError),
+
+    #[error(transparent)]
     ExecutorError(#[from] ExecutorError),
+
+    #[error("ExecutionOrder not found: {0}")]
+    ExecutionOrderNotFound(String),
+
+    #[error("VeneueOrder not found: {0}")]
+    VenueOrderNotFound(String),
 
     #[error("Unknown error")]
     Unknown,

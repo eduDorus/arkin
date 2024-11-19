@@ -1,5 +1,6 @@
 use std::fmt;
 
+use derive_builder::Builder;
 use rust_decimal::prelude::Decimal;
 use strum::Display;
 use uuid::Uuid;
@@ -8,8 +9,10 @@ use crate::{prelude::INSTRUMENT_TIMESTAMP_FORMAT, Maturity, Price};
 
 use super::Venue;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Builder)]
+#[builder(setter(into))]
 pub struct Instrument {
+    #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
     pub venue: Venue,
     pub symbol: String,

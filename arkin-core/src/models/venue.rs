@@ -1,5 +1,6 @@
 use std::fmt;
 
+use derive_builder::Builder;
 use uuid::Uuid;
 
 use crate::{
@@ -7,8 +8,10 @@ use crate::{
     Event,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Builder)]
+#[builder(setter(into))]
 pub struct Venue {
+    #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
     pub name: String,
     pub venue_type: String,

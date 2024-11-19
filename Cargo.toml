@@ -51,11 +51,9 @@ rayon = "1.10"
 # Async
 tokio = { version = "1.41", features = [ "full" ] }
 flume = "0.11"
-futures-util = { version = "0.3", features = [ "io" ] }
 async-trait = "0.1"
-async-stream = "0.3"
+futures-util = { version = "0.3", features = [ "io" ] }
 tokio-util = { version = "0.7", features = [ "rt" ] }
-# trait-variant = "0.1.2"
 
 # HTTP & Websockets
 tokio-rustls = { version = "0.26" }
@@ -69,7 +67,6 @@ bytes = "1.8"
 
 # Data Structures
 dashmap = { version = "6.1", features = [ "inline", "rayon" ], default-features = false }
-# scc = "2.1"
 
 # Serialization
 serde = { version = "1.0", features = [ "derive" ] }
@@ -99,25 +96,16 @@ backoff = { version = "0.4", features = [ "tokio" ] }
 # Allocator
 mimalloc = { version = "0.1", default-features = false }
 
-# CLI
-#clap={ version="4.5", features=["std", "derive", "color", "suggestions"] }
-
 # Graph Library
 petgraph = { version = "0.6", features = [ "graphmap" ], default-features = false }
 
 # TA
 yata = "0.7"
 
-# Optimization
-# clarabel = { version = "0.9" }
-
-# Statistics & Math
-# tch = { version = "0.17.0", features = [ "download-libtorch" ] }
-
 # Testing
-rstest = { version = "0.23" }
-async-std = { version = "1.13", features = [ "attributes" ] }
-ctor = "0.2"
+mockall = "0.13"
+test-case = "3.3"
+test-log = { version = "0.2", features = [ "color", "trace" ], default-features = false }
 
 [profile.release]
 lto = "thin"
