@@ -1,19 +1,5 @@
 [workspace]
-members = [
-  "arkin",
-  "arkin-core",
-  "arkin-persistence",
-  "arkin-portfolio",
-  "arkin-ingestors",
-  "arkin-insights",
-  "arkin-strategies",
-  "arkin-allocation",
-  "arkin-execution",
-  "arkin-engine",
-  "arkin-binance",
-  # "test-integration",
-  # "test-utils",
-]
+members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-portfolio", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-execution", "arkin-engine", "arkin-binance", "test-integration" ]
 
 default-members = [ "arkin" ]
 

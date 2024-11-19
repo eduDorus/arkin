@@ -228,6 +228,8 @@ dependencies = [
  "serde_json",
  "sqlx",
  "strum",
+ "test-case",
+ "test-log",
  "thiserror 2.0.3",
  "time",
  "tokio",
@@ -3475,6 +3477,10 @@ dependencies = [
  "syn 2.0.87",
  "test-case-core",
 ]
+
+[[package]]
+name = "test-integration"
+version = "0.1.0"
 
 [[package]]
 name = "test-log"
