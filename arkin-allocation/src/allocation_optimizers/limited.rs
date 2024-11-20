@@ -9,14 +9,12 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument};
 
 use arkin_core::prelude::*;
-use arkin_execution::prelude::*;
 use arkin_portfolio::prelude::*;
 
 use crate::{AllocationOptim, AllocationOptimError};
 
 #[derive(Debug, Builder)]
 pub struct LimitedAllocationOptim {
-    order_manager: Arc<dyn OrderManager>,
     portfolio: Arc<dyn Portfolio>,
     #[builder(default = "DashMap::new()")]
     signals: DashMap<(StrategyId, Arc<Instrument>), Signal>,

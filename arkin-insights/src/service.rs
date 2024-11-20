@@ -94,17 +94,15 @@ impl Insights for InsightsService {
     }
 
     #[instrument(skip_all)]
-    async fn process(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<(), InsightsError> {
+    async fn process(
+        &self,
+        instruments: &[Arc<Instrument>],
+        event_time: OffsetDateTime,
+    ) -> Result<Vec<Insight>, InsightsError> {
         info!("Running insights pipeline at event time: {}", event_time);
 
-        // Generate insights
         let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
-
-        for insight in &insights {
-            info!("Generated insight: {}", insight);
-        }
-
-        self.persistence_service.insert_insight_batch_vec(insights).await?;
-        Ok(())
+        self.persistence_service.insert_insight_batch_vec(insights.clone()).await?;
+        Ok(insights)
     }
 }

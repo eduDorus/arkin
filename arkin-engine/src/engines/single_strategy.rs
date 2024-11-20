@@ -70,8 +70,32 @@ impl SingleStrategyEngine {
         loop {
             tokio::select! {
                 (event_time, frequency) = time_helper.tick() => {
-                     self.insights.load(&self.instruments, event_time, frequency).await?;
-                     self.insights.process(&self.instruments, event_time).await?;
+                    info!("Processing pipeline for {:?}", event_time);
+                    info!("Loading insights...");
+                    self.insights.load(&self.instruments, event_time, frequency).await?;
+
+                    info!("Processing insights...");
+                    let insights = self.insights.process(&self.instruments, event_time).await?;
+                    for insight in &insights {
+                        info!("Insight: {}", insight);
+                    }
+
+                    info!("Processing strategy...");
+                    let signals = self.strategy.insight_update(&self.instruments, event_time, &insights).await?;
+                    info!("Adding signals to allocation optimizer...");
+                    for signal in &signals {
+                        info!("Signal: {}", signal);
+                    }
+                    self.allocation_optim.new_signals(signals).await?;
+
+                    info!("Processing allocation optimizer...");
+                    let execution_orders = self.allocation_optim.optimize().await?;
+                    for order in &execution_orders {
+                        info!("Execution Order: {}", order);
+                    }
+
+                    info!("Placing orders on the order manager...");
+                    self.order_manager.place_orders(execution_orders).await?;
                 }
                 _ = tokio::signal::ctrl_c() => {
                     info!("Received Ctrl-C, shutting down...");
@@ -86,7 +110,7 @@ impl SingleStrategyEngine {
 
 #[async_trait]
 impl TradingEngine for SingleStrategyEngine {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn start(&self) -> Result<(), TradingEngineError> {
         // Start the persistor
         self.persistor
@@ -131,7 +155,7 @@ impl TradingEngine for SingleStrategyEngine {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn stop(&self) -> Result<(), TradingEngineError> {
         info!("Stopping ingestors...");
         self.ingestor_shutdown.cancel();

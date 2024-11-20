@@ -33,7 +33,7 @@ async fn main() {
     let order_manager = ExecutionFactory::from_config(&config, portfolio.clone());
 
     let config = load::<AllocationOptimConfig>();
-    let allocation = AllocationFactory::from_config(&config, portfolio.clone(), order_manager.clone());
+    let allocation = AllocationFactory::from_config(&config, portfolio.clone());
 
     let config = load::<InsightsConfig>();
     let insights = Arc::new(InsightsService::from_config(

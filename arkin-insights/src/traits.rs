@@ -23,5 +23,9 @@ pub trait Insights: std::fmt::Debug + Send + Sync {
         frequency: Duration,
     ) -> Result<(), InsightsError>;
 
-    async fn process(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<(), InsightsError>;
+    async fn process(
+        &self,
+        instruments: &[Arc<Instrument>],
+        event_time: OffsetDateTime,
+    ) -> Result<Vec<Insight>, InsightsError>;
 }

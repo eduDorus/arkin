@@ -18,8 +18,8 @@ pub enum StrategyAlgorithmConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrossoverConfig {
     pub id: StrategyId,
-    pub price_spread_id: FeatureId,
-    pub volume_spread_id: FeatureId,
+    pub fast_ma: FeatureId,
+    pub slow_ma: FeatureId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

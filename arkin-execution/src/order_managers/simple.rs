@@ -51,6 +51,14 @@ impl OrderManager for SimpleOrderManager {
     }
 
     #[instrument(skip_all)]
+    async fn place_orders(&self, orders: Vec<ExecutionOrder>) -> Result<(), OrderManagerError> {
+        for order in orders {
+            self.execution_orders.insert(order.id, order.clone());
+        }
+        Ok(())
+    }
+
+    #[instrument(skip_all)]
     async fn cancel_order(&self, id: ExecutionOrderId) -> Result<(), OrderManagerError> {
         let venue_order_ids = self
             .venue_orders

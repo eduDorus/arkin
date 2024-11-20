@@ -14,8 +14,8 @@ impl StrategyFactory {
                     StrategyAlgorithmConfig::Crossover(c) => Arc::new(
                         CrossoverStrategyBuilder::default()
                             .id(c.id.clone())
-                            .price_source(c.price_spread_id.clone())
-                            .volume_source(c.volume_spread_id.clone())
+                            .fast_ma(c.fast_ma.clone())
+                            .slow_ma(c.slow_ma.clone())
                             .build()
                             .expect("Failed to build CrossoverStrategy"),
                     ),

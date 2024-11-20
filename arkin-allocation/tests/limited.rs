@@ -2,22 +2,19 @@ use std::sync::Arc;
 
 use rust_decimal::prelude::*;
 use test_log::test;
+use time::OffsetDateTime;
 
 use arkin_allocation::prelude::*;
 use arkin_core::prelude::*;
-use arkin_execution::prelude::*;
 use arkin_portfolio::prelude::*;
-use time::OffsetDateTime;
 
 #[test(tokio::test)]
 async fn test_limited_allocation() {
     let portfolio = Arc::new(MockPortfolio::new());
-    let order_manager = Arc::new(MockOrderManager::new());
 
     // Setup allocation
     let allocation_optim = LimitedAllocationOptimBuilder::default()
         .portfolio(portfolio)
-        .order_manager(order_manager)
         .max_allocation(Decimal::from_f64(0.8).unwrap())
         .max_allocation_per_signal(Decimal::from_f64(0.1).unwrap())
         .build()

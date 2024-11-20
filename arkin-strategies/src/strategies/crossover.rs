@@ -1,5 +1,9 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use derive_builder::Builder;
+use rust_decimal::prelude::*;
+use time::OffsetDateTime;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument};
 
@@ -11,54 +15,84 @@ use crate::{Algorithm, StrategyError};
 #[allow(unused)]
 pub struct CrossoverStrategy {
     id: StrategyId,
-    price_source: FeatureId,
-    volume_source: FeatureId,
+    fast_ma: FeatureId,
+    slow_ma: FeatureId,
 }
 
 #[async_trait]
 impl Algorithm for CrossoverStrategy {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), StrategyError> {
         info!("Starting Crossover Strategy...");
         info!("Crossover Strategy started");
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), StrategyError> {
         info!("Cleaning up Crossover Strategy...");
         info!("Crossover Strategy cleaned up");
         Ok(())
     }
 
-    #[instrument(skip(self))]
-    async fn on_insights(&self, _insights: Vec<Insight>) -> Result<Vec<Signal>, StrategyError> {
+    #[instrument(skip_all)]
+    async fn insight_update(
+        &self,
+        instruments: &[Arc<Instrument>],
+        event_time: OffsetDateTime,
+        insights: &[Insight],
+    ) -> Result<Vec<Signal>, StrategyError> {
         info!("Processing insights for Crossover Strategy...");
-        // insights
-        //     .instruments()
-        //     .par_iter()
-        //     .map(|i| {
-        //         let price_spread = insights
-        //             .get_instrument_insight(i, &self.source[0])
-        //             .expect("Missing vwap spread");
-        //         let volume_spread = insights
-        //             .get_instrument_insight(i, &self.source[1])
-        //             .expect("Missing volume spread");
+        let signals = instruments
+            .iter()
+            .filter_map(|i| {
+                let fast_ma = insights.iter().find(|x| {
+                    if let Some(inst) = x.instrument.as_ref() {
+                        inst == i && x.feature_id == self.fast_ma
+                    } else {
+                        false
+                    }
+                });
 
-        //         let weight = if volume_spread.value() > Decimal::ZERO {
-        //             match price_spread.value().cmp(Decimal::ZERO) {
-        //                 std::cmp::Ordering::Greater => Weight::from(-1),
-        //                 std::cmp::Ordering::Less => Weight::from(1),
-        //                 std::cmp::Ordering::Equal => Weight::from(0),
-        //             }
-        //         } else {
-        //             Weight::from(0)
-        //         };
+                let slow_ma = insights.iter().find(|x| {
+                    if let Some(inst) = x.instrument.as_ref() {
+                        inst == i && x.feature_id == self.slow_ma
+                    } else {
+                        false
+                    }
+                });
 
-        //         vec![Signal::new(i.clone(), self.id.clone(), weight, price_spread.event_time.clone())]
-        //     })
-        //     .flatten()
-        //     .collect()
-        Ok(vec![])
+                match (fast_ma, slow_ma) {
+                    (Some(f), Some(s)) => match f.value > s.value {
+                        true => {
+                            return Some(
+                                SignalBuilder::default()
+                                    .event_time(event_time)
+                                    .instrument(i.clone())
+                                    .strateg_id(self.id.clone())
+                                    .weight(Decimal::ONE)
+                                    .build()
+                                    .expect("Failed to create signal"),
+                            )
+                        }
+                        false => {
+                            let mut weight = Decimal::ONE;
+                            weight.set_sign_negative(true);
+                            return Some(
+                                SignalBuilder::default()
+                                    .event_time(event_time)
+                                    .instrument(i.clone())
+                                    .strateg_id(self.id.clone())
+                                    .weight(weight)
+                                    .build()
+                                    .expect("Failed to create signal"),
+                            );
+                        }
+                    },
+                    _ => return None,
+                }
+            })
+            .collect::<Vec<_>>();
+        Ok(signals)
     }
 }

@@ -93,7 +93,7 @@ impl BinanceIngestor {
 
 #[async_trait]
 impl Ingestor for BinanceIngestor {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting binance ingestor...");
 
@@ -138,7 +138,7 @@ impl Ingestor for BinanceIngestor {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), IngestorError> {
         info!("Cleaning up binance ingestor...");
         Ok(())

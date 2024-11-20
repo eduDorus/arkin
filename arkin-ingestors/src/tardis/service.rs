@@ -347,7 +347,7 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 
 #[async_trait]
 impl Ingestor for TardisIngestor {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting tardis ingestor...");
         let persistence_service = Arc::clone(&self.persistence_service);
@@ -427,7 +427,7 @@ impl Ingestor for TardisIngestor {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), IngestorError> {
         info!("Cleaning up tardis ingestor...");
         Ok(())

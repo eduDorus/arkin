@@ -333,7 +333,7 @@ impl AppState {
 
 #[async_trait]
 impl State for AppState {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn insert_trade(&self, trade: Trade) {
         let instrument = trade.instrument.clone();
         let mut trades = self.trades.entry(instrument).or_insert_with(BTreeSet::new);
@@ -341,13 +341,13 @@ impl State for AppState {
         trades.insert(trade);
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn read_last_trade(&self, instrument: &Arc<Instrument>) -> Option<Trade> {
         let trades = self.trades.get(instrument).unwrap();
         trades.iter().next_back().cloned()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn read_range_trades(
         &self,
         instrument: &Arc<Instrument>,
@@ -363,7 +363,7 @@ impl State for AppState {
             .collect()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn insert_tick(&self, tick: Tick) {
         let instrument = tick.instrument.clone();
         let mut ticks = self.ticks.entry(instrument).or_insert_with(BTreeSet::new);
@@ -371,13 +371,13 @@ impl State for AppState {
         ticks.insert(tick);
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn read_last_tick(&self, instrument: &Arc<Instrument>) -> Option<Tick> {
         let ticks = self.ticks.get(instrument).unwrap();
         ticks.iter().next_back().cloned()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn read_range_ticks(
         &self,
         instrument: &Arc<Instrument>,
@@ -419,7 +419,7 @@ impl BinanceIngestor {
 
 #[async_trait]
 impl Ingestor for BinanceIngestor {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn start(&self, tracker: TaskTracker, shutdown: CancellationToken) {
         info!("Starting Binance Ingestor");
         let url = self.url.clone();
@@ -513,21 +513,21 @@ impl DefaultPortfolio {
 
 #[async_trait]
 impl Portfolio for DefaultPortfolio {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn positions(&self) -> HashMap<String, Position> {
         info!("Fetching positions");
         let lock = self.positions.lock().await;
         lock.clone()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn position_instrument(&self, instrument: String) -> Option<Position> {
         info!("Fetching position for instrument: {}", instrument);
         let lock = self.positions.lock().await;
         lock.get(&instrument).cloned()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn update_position(&self, instrument: String, price: Price, quantity: Quantity) {
         info!(
             "Updating position for instrument: {} price: {} quantity: {}",
@@ -556,7 +556,7 @@ impl Portfolio for DefaultPortfolio {
         }
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn reconsile_positions(&self, instrument: String, price: Price, quantity: Quantity) {
         info!(
             "Reconciling positions for instrument: {} price: {} quantity: {}",
