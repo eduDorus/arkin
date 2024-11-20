@@ -6,7 +6,7 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -19,6 +19,7 @@ use crate::{PersistenceConfig, PersistenceError};
 
 #[derive(Debug)]
 pub struct PersistenceService {
+    auto_commit_interval: Duration,
     // venue_service: Arc<VenueService>,
     instrument_service: Arc<InstrumentService>,
     tick_service: Arc<TickService>,
@@ -64,6 +65,7 @@ impl PersistenceService {
         let insights_service = Arc::new(InsightsService::new(insights_repo.clone(), config.batch_size));
 
         Self {
+            auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
             // venue_service,
             instrument_service,
             tick_service,
@@ -76,8 +78,30 @@ impl PersistenceService {
 #[async_trait]
 impl Persistor for PersistenceService {
     #[instrument(skip(self))]
-    async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), PersistenceError> {
+    async fn start(&self, tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), PersistenceError> {
         info!("Starting persistence service...");
+        let tick_service = self.tick_service.clone();
+        let trade_service = self.trade_service.clone();
+        let insights_service = self.insights_service.clone();
+
+        let mut interval = tokio::time::interval(self.auto_commit_interval);
+        tracker.spawn(async move {
+            loop {
+                tokio::select! {
+                        _ = interval.tick() => {
+                            debug!("Auto commit persistence service...");
+                            tick_service.flush().await.unwrap();
+                            trade_service.flush().await.unwrap();
+                            insights_service.flush().await.unwrap();
+                        }
+
+                        _ = shutdown.cancelled() => {
+                            break;
+                        }
+                }
+            }
+        });
+
         info!("Persistence service started");
         Ok(())
     }

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PersistenceConfig {
     pub database: DatabaseConfig,
+    pub auto_commit_interval: u64,
     pub batch_size: usize,
 }
 

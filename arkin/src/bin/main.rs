@@ -30,10 +30,10 @@ async fn main() {
     let portfolio = PortfolioFactory::from_config(&config);
 
     let config = load::<ExecutionConfig>();
-    let order_manager = ExecutionFactory::from_config(&config);
+    let order_manager = ExecutionFactory::from_config(&config, portfolio.clone());
 
     let config = load::<AllocationOptimConfig>();
-    let allocation = AllocationFactory::from_config(&config);
+    let allocation = AllocationFactory::from_config(&config, portfolio.clone(), order_manager.clone());
 
     let config = load::<InsightsConfig>();
     let insights = Arc::new(InsightsService::from_config(
@@ -47,7 +47,18 @@ async fn main() {
     let config = load::<IngestorsConfig>();
     let ingestors = IngestorFactory::from_config(&config, persistence_service.clone());
 
+    // Work around for fetching instruments
+    let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
+    let mut instruments = vec![];
+    for symbol in venue_symbols {
+        match persistence_service.read_instrument_by_venue_symbol(symbol.to_string()).await {
+            Ok(instr) => instruments.push(instr),
+            Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
+        }
+    }
+
     let engine = SingleStrategyEngineBuilder::default()
+        .instruments(instruments)
         .persistor(persistence_service)
         .portfolio(portfolio)
         .ingestors(ingestors)
@@ -60,14 +71,6 @@ async fn main() {
 
     engine.start().await.expect("Failed to start engine");
 
-    match tokio::signal::ctrl_c().await {
-        Ok(()) => {
-            info!("Shutdown signal received...");
-        }
-        Err(err) => {
-            error!("Unable to listen for shutdown signal: {}", err);
-        }
-    }
     info!("Waiting for shutdown to complete...");
     engine.stop().await.expect("Failed to stop engine");
     info!("Shutdown complete");

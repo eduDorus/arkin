@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 
@@ -9,7 +10,7 @@ use async_trait::async_trait;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tracing::{debug, info, instrument};
+use tracing::{info, instrument};
 
 use crate::errors::InsightsError;
 use crate::pipeline::ComputationGraph;
@@ -46,46 +47,61 @@ impl InsightsService {
 
 #[async_trait]
 impl Insights for InsightsService {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), InsightsError> {
         info!("Starting insights service...");
         info!("Insights service started");
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), InsightsError> {
         info!("Cleaning up insights service...");
         info!("Insights service cleaned up");
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
+    async fn load(
+        &self,
+        instruments: &[Arc<Instrument>],
+        event_time: OffsetDateTime,
+        frequency: Duration,
+    ) -> Result<(), InsightsError> {
+        info!("Loading insights from {} to {}", event_time, event_time - frequency);
+
+        // let ticks = self.persistence_service.read_ticks_range(instruments, from, to).await?;
+        let trades = self
+            .persistence_service
+            .read_trades_range(instruments, event_time - frequency, event_time)
+            .await?;
+
+        let insights = trades.into_iter().map(|t| t.to_insights()).flatten().collect::<Vec<_>>();
+        info!("Adding {} insights to state", insights.len());
+        self.state.insert_batch(insights);
+        Ok(())
+    }
+    #[instrument(skip_all)]
     async fn insert(&self, insight: Insight) -> Result<(), InsightsError> {
         self.state.insert(insight);
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn insert_batch(&self, insights: Vec<Insight>) -> Result<(), InsightsError> {
         self.state.insert_batch(insights);
         Ok(())
     }
 
-    #[instrument(skip(self))]
-    async fn process(
-        &self,
-        instruments: &[Arc<Instrument>],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
-    ) -> Result<(), InsightsError> {
-        info!("Running insights pipeline from {} to {}", from, to);
+    #[instrument(skip_all)]
+    async fn process(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<(), InsightsError> {
+        info!("Running insights pipeline at event time: {}", event_time);
 
         // Generate insights
-        let insights = self.pipeline.calculate(self.state.clone(), instruments, to);
+        let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
 
         for insight in &insights {
-            debug!("Generated insight: {}", insight);
+            info!("Generated insight: {}", insight);
         }
 
         self.persistence_service.insert_insight_batch_vec(insights).await?;

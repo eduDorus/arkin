@@ -32,25 +32,11 @@ pub struct BinanceIngestor {
     duplicate_lookback: usize,
 }
 
-// impl BinanceIngestor {
-//     pub fn from_config(config: &BinanceIngestorConfig, persistence_service: Arc<PersistenceService>) -> Self {
-//         Self {
-//             persistence_service,
-//             url: config.ws_url.parse().expect("Failed to parse ws binance URL"),
-//             channels: config.ws_channels.to_owned(),
-//             api_key: config.api_key.to_owned(),
-//             api_secret: config.api_secret.to_owned(),
-//             connections_per_manager: config.connections_per_manager,
-//             duplicate_lookback: config.duplicate_lookback,
-//         }
-//     }
-// }
-
 impl BinanceIngestor {
     async fn process_event(persistence_service: Arc<dyn Persistor>, data: String) {
         match serde_json::from_str::<BinanceSwapEvent>(&data) {
             Ok(e) => {
-                info!("{}", e);
+                debug!("BinanceSwapEvent: {}", e);
                 if let Ok(instrument) = persistence_service.read_instrument_by_venue_symbol(e.venue_symbol()).await {
                     debug!("Instrument found: {}", instrument.symbol);
                     match e {

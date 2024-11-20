@@ -86,8 +86,8 @@ async fn main() -> Result<()> {
     // insights_service.insert_batch(tick_insights);
     info!("Done inserting insights into state");
 
-    while let Some((from, to)) = clock.next() {
-        insights_service.process(&instruments, from, to).await?;
+    while let Some((event_time, _to)) = clock.next() {
+        insights_service.process(&instruments, event_time).await?;
     }
 
     persistence_service.flush().await?;

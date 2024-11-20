@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use derive_builder::Builder;
@@ -6,6 +6,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument};
 
 use arkin_allocation::prelude::*;
+use arkin_core::prelude::*;
 use arkin_execution::prelude::*;
 use arkin_ingestors::prelude::*;
 use arkin_insights::prelude::*;
@@ -17,6 +18,8 @@ use crate::{TradingEngine, TradingEngineError};
 
 #[derive(Builder, Debug)]
 pub struct SingleStrategyEngine {
+    instruments: Vec<Arc<Instrument>>,
+
     #[builder(default)]
     persistor_task_tracker: TaskTracker,
     #[builder(default)]
@@ -60,6 +63,27 @@ pub struct SingleStrategyEngine {
     order_manager: Arc<dyn OrderManager>,
 }
 
+impl SingleStrategyEngine {
+    async fn pipeline(&self) -> Result<(), TradingEngineError> {
+        let mut time_helper = TickHelper::new(Duration::from_secs(60));
+
+        loop {
+            tokio::select! {
+                (event_time, frequency) = time_helper.tick() => {
+                     self.insights.load(&self.instruments, event_time, frequency).await?;
+                     self.insights.process(&self.instruments, event_time).await?;
+                }
+                _ = tokio::signal::ctrl_c() => {
+                    info!("Received Ctrl-C, shutting down...");
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl TradingEngine for SingleStrategyEngine {
     #[instrument(skip(self))]
@@ -100,6 +124,10 @@ impl TradingEngine for SingleStrategyEngine {
         self.order_manager
             .start(self.order_manager_task_tracker.clone(), self.order_manager_shutdown.clone())
             .await?;
+
+        // Run the pipeline
+        self.pipeline().await?;
+
         Ok(())
     }
 
