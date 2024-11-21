@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use arkin_core::prelude::*;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
+use rust_decimal::prelude::*;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument, warn};
 
@@ -182,18 +183,19 @@ impl Portfolio for SingleStrategyPortfolio {
     }
 
     #[instrument(skip_all)]
-    async fn balances(&self) -> Vec<Holding> {
-        self.holdings.iter().map(|v| v.clone()).collect()
+    async fn balances(&self) -> HashMap<String, Holding> {
+        self.holdings.iter().map(|v| (v.key().clone(), v.value().clone())).collect()
     }
 
     #[instrument(skip_all)]
-    async fn positions(&self) -> Vec<Position> {
-        self.positions.iter().map(|v| v.clone()).collect()
+    async fn positions(&self) -> HashMap<Arc<Instrument>, Position> {
+        self.positions.iter().map(|v| (v.key().clone(), v.value().clone())).collect()
     }
 
     #[instrument(skip_all)]
     async fn capital(&self) -> Notional {
-        unimplemented!("capital")
+        // TODO: Implement capital calculation
+        Notional::from_f64(10_000.0).unwrap()
     }
 
     #[instrument(skip_all)]

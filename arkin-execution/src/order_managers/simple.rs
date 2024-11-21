@@ -16,7 +16,7 @@ pub struct SimpleOrderManager {
     executor: Arc<dyn Executor>,
     portfolio: Arc<dyn Portfolio>,
     #[builder(default = DashMap::new())]
-    execution_orders: DashMap<ExecutionOrderId, ExecutionOrder>,
+    execution_orders: DashMap<Arc<Instrument>, ExecutionOrder>,
     #[builder(default = DashMap::new())]
     venue_orders: DashMap<VenueOrderId, VenueOrder>,
 }
@@ -46,41 +46,38 @@ impl OrderManager for SimpleOrderManager {
 
     #[instrument(skip_all)]
     async fn place_order(&self, order: ExecutionOrder) -> Result<(), OrderManagerError> {
-        self.execution_orders.insert(order.id, order.clone());
+        // Check if we have already an order for this instrument
+        if self.execution_orders.contains_key(&order.instrument) {
+            self.cancel_order(&order.instrument).await?;
+        } else {
+            self.execution_orders.insert(order.instrument.clone(), order);
+        }
         Ok(())
     }
 
     #[instrument(skip_all)]
     async fn place_orders(&self, orders: Vec<ExecutionOrder>) -> Result<(), OrderManagerError> {
         for order in orders {
-            self.execution_orders.insert(order.id, order.clone());
+            self.place_order(order).await?;
         }
         Ok(())
     }
 
     #[instrument(skip_all)]
-    async fn cancel_order(&self, id: ExecutionOrderId) -> Result<(), OrderManagerError> {
-        let venue_order_ids = self
-            .venue_orders
-            .iter()
-            .filter_map(|x| {
-                let venue_order = x.value();
-                if venue_order.execution_order_id == id {
-                    Some(venue_order.id)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        self.executor.cancel_orders(venue_order_ids).await?;
-        self.execution_orders.remove(&id);
+    async fn cancel_order(&self, instrument: &Arc<Instrument>) -> Result<(), OrderManagerError> {
+        self.execution_orders.alter(instrument, |_, mut v| {
+            v.cancel();
+            v
+        });
         Ok(())
     }
 
     #[instrument(skip_all)]
     async fn cancel_all_orders(&self) -> Result<(), OrderManagerError> {
-        self.executor.cancel_all_orders().await?;
+        self.execution_orders.alter_all(|_, mut v| {
+            v.cancel();
+            v
+        });
         Ok(())
     }
 

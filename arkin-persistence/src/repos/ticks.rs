@@ -96,6 +96,23 @@ impl TickRepo {
         Ok(())
     }
 
+    pub async fn read_tick(&self, event_time: OffsetDateTime, instrument_id: Uuid) -> Result<Option<DBTick>> {
+        let tick = sqlx::query_as!(
+            DBTick,
+            r#"
+            SELECT * FROM ticks
+            WHERE event_time < $1 AND instrument_id = $2
+            ORDER BY event_time DESC
+            "#,
+            event_time,
+            instrument_id,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(tick)
+    }
+
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],

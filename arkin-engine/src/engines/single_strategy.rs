@@ -89,7 +89,7 @@ impl SingleStrategyEngine {
                     self.allocation_optim.new_signals(signals).await?;
 
                     info!("Processing allocation optimizer...");
-                    let execution_orders = self.allocation_optim.optimize().await?;
+                    let execution_orders = self.allocation_optim.optimize(event_time).await?;
                     for order in &execution_orders {
                         info!("Execution Order: {}", order);
                     }

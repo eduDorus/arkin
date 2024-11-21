@@ -165,7 +165,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arkin-core",
- "arkin-execution",
+ "arkin-persistence",
  "arkin-portfolio",
  "async-trait",
  "dashmap",

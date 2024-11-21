@@ -14,7 +14,7 @@ async fn test_single_strategy_position_update() {
     // Create Position
     let instrument = binance_btc_usdt_perp();
     let position = PositionBuilder::default()
-        .instrument(instrument)
+        .instrument(instrument.clone())
         .side(PositionSide::Long)
         .avg_open_price(Decimal::from_f64(100.0).unwrap())
         .quantity(Decimal::from_f64(1.0).unwrap())
@@ -30,7 +30,7 @@ async fn test_single_strategy_position_update() {
 
     let positions = portfolio.positions().await;
     assert_eq!(positions.len(), 1);
-    assert_eq!(positions[0], position);
+    assert_eq!(positions.get(&instrument).unwrap(), &position);
 }
 
 #[test(tokio::test)]
@@ -56,11 +56,12 @@ async fn test_single_strategy_portfolio_fill_update() {
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
 
     let positions = portfolio.positions().await;
+    let new_position = positions.get(&instrument).unwrap();
     assert_eq!(positions.len(), 1);
-    assert_eq!(positions[0].instrument, instrument);
-    assert_eq!(positions[0].avg_open_price, fill.price);
-    assert_eq!(positions[0].quantity, fill.quantity);
-    assert_eq!(positions[0].commission, fill.commission);
+    assert_eq!(new_position.instrument, instrument);
+    assert_eq!(new_position.avg_open_price, fill.price);
+    assert_eq!(new_position.quantity, fill.quantity);
+    assert_eq!(new_position.commission, fill.commission);
 
     // Update Fill
     let fill = FillBuilder::default()
@@ -76,11 +77,12 @@ async fn test_single_strategy_portfolio_fill_update() {
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
 
     let positions = portfolio.positions().await;
+    let new_position = positions.get(&instrument).unwrap();
     assert_eq!(positions.len(), 1);
-    assert_eq!(positions[0].instrument, instrument);
-    assert_eq!(positions[0].avg_open_price, Decimal::from_f64(100.0).unwrap());
-    assert_eq!(positions[0].avg_close_price, Some(Decimal::from_f64(101.0).unwrap()));
-    assert_eq!(positions[0].quantity, Decimal::from_f64(0.0).unwrap());
-    assert_eq!(positions[0].commission, Decimal::from_f64(4.0).unwrap());
-    assert_eq!(positions[0].realized_pnl, Decimal::from_f64(1.0).unwrap());
+    assert_eq!(new_position.instrument, instrument);
+    assert_eq!(new_position.avg_open_price, Decimal::from_f64(100.0).unwrap());
+    assert_eq!(new_position.avg_close_price, Some(Decimal::from_f64(101.0).unwrap()));
+    assert_eq!(new_position.quantity, Decimal::from_f64(0.0).unwrap());
+    assert_eq!(new_position.commission, Decimal::from_f64(4.0).unwrap());
+    assert_eq!(new_position.realized_pnl, Decimal::from_f64(1.0).unwrap());
 }

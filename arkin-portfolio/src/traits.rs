@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use mockall::automock;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -17,8 +20,8 @@ pub trait Portfolio: std::fmt::Debug + Send + Sync {
     async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError>;
     async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError>;
 
-    async fn balances(&self) -> Vec<Holding>;
-    async fn positions(&self) -> Vec<Position>;
+    async fn balances(&self) -> HashMap<String, Holding>;
+    async fn positions(&self) -> HashMap<Arc<Instrument>, Position>;
     async fn capital(&self) -> Notional;
     async fn buying_power(&self) -> Notional;
     async fn total_exposure(&self) -> Notional;

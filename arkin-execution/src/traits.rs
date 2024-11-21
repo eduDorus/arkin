@@ -1,8 +1,10 @@
-use async_trait::async_trait;
+use std::sync::Arc;
 
-use arkin_core::prelude::*;
+use async_trait::async_trait;
 use mockall::automock;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
+
+use arkin_core::prelude::*;
 
 use crate::{ExecutorError, OrderManagerError};
 
@@ -16,7 +18,7 @@ pub trait OrderManager: std::fmt::Debug + Send + Sync {
 
     async fn place_order(&self, order: ExecutionOrder) -> Result<(), OrderManagerError>;
     async fn place_orders(&self, orders: Vec<ExecutionOrder>) -> Result<(), OrderManagerError>;
-    async fn cancel_order(&self, id: ExecutionOrderId) -> Result<(), OrderManagerError>;
+    async fn cancel_order(&self, instrument: &Arc<Instrument>) -> Result<(), OrderManagerError>;
     async fn cancel_all_orders(&self) -> Result<(), OrderManagerError>;
 
     async fn order_update(&self, fill: Fill) -> Result<(), OrderManagerError>;

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use mockall::automock;
 use time::OffsetDateTime;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use uuid::Uuid;
@@ -9,6 +10,7 @@ use arkin_core::prelude::*;
 
 use crate::PersistenceError;
 
+#[automock]
 #[async_trait]
 pub trait Persistor: std::fmt::Debug + Send + Sync {
     async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), PersistenceError>;
@@ -22,6 +24,11 @@ pub trait Persistor: std::fmt::Debug + Send + Sync {
     async fn insert_tick(&self, tick: Tick) -> Result<(), PersistenceError>;
     async fn insert_tick_batch(&self, tick: Tick) -> Result<(), PersistenceError>;
     async fn insert_tick_batch_vec(&self, ticks: Vec<Tick>) -> Result<(), PersistenceError>;
+    async fn read_latest_tick(
+        &self,
+        event_time: OffsetDateTime,
+        instrument: &Arc<Instrument>,
+    ) -> Result<Option<Tick>, PersistenceError>;
 
     async fn read_trades_range(
         &self,

@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum OrderManagerError {
+    #[error("Instrument already has order: {0}")]
+    OrderAlreadyExists(String),
+
     #[error(transparent)]
     PortfolioError(#[from] arkin_portfolio::PortfolioError),
 

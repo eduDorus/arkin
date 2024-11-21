@@ -1,5 +1,6 @@
 use std::{cmp::Ordering, fmt, sync::Arc};
 
+use derive_builder::Builder;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use time::OffsetDateTime;
@@ -15,8 +16,10 @@ use crate::{
 
 use super::{Insight, Instrument};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct Tick {
+    #[builder(default = OffsetDateTime::now_utc())]
     pub event_time: OffsetDateTime,
     pub instrument: Arc<Instrument>,
     pub tick_id: u64,

@@ -159,6 +159,18 @@ impl Persistor for PersistenceService {
     }
 
     #[instrument(skip_all)]
+    async fn read_latest_tick(
+        &self,
+        event_time: OffsetDateTime,
+        instrument: &Arc<Instrument>,
+    ) -> Result<Option<Tick>, PersistenceError> {
+        self.tick_service
+            .read_latest_tick(event_time, instrument)
+            .await
+            .map_err(|e| e.into())
+    }
+
+    #[instrument(skip_all)]
     async fn read_trades_range(
         &self,
         instruments: &[Arc<Instrument>],

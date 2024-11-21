@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::repos::TickRepo;
+use crate::{repos::TickRepo, PersistenceError};
 
 use super::instruments::InstrumentService;
 
@@ -77,6 +77,30 @@ impl TickService {
 
         self.commit().await?;
         Ok(())
+    }
+
+    pub async fn read_latest_tick(
+        &self,
+        event_time: OffsetDateTime,
+        instrument: &Arc<Instrument>,
+    ) -> Result<Option<Tick>, PersistenceError> {
+        let db_tick = self.tick_repo.read_tick(event_time, instrument.id).await?;
+        let tick = match db_tick {
+            Some(db_tick) => {
+                let instrument = self.instrument_service.read_by_id(db_tick.instrument_id).await?;
+                Some(Tick {
+                    instrument,
+                    event_time: db_tick.event_time,
+                    tick_id: db_tick.tick_id as u64,
+                    bid_price: db_tick.bid_price,
+                    bid_quantity: db_tick.bid_quantity,
+                    ask_price: db_tick.ask_price,
+                    ask_quantity: db_tick.ask_quantity,
+                })
+            }
+            None => None,
+        };
+        Ok(tick)
     }
 
     pub async fn read_range(

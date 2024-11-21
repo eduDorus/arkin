@@ -1,20 +1,23 @@
 #![allow(dead_code)]
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
 use rust_decimal::prelude::*;
+use time::OffsetDateTime;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 
 use arkin_core::prelude::*;
+use arkin_persistence::prelude::*;
 use arkin_portfolio::prelude::*;
 
 use crate::{AllocationOptim, AllocationOptimError};
 
 #[derive(Debug, Builder)]
 pub struct LimitedAllocationOptim {
+    persistence: Arc<dyn Persistor>,
     portfolio: Arc<dyn Portfolio>,
     #[builder(default = "DashMap::new()")]
     signals: DashMap<(StrategyId, Arc<Instrument>), Signal>,
@@ -65,83 +68,69 @@ impl AllocationOptim for LimitedAllocationOptim {
     }
 
     #[instrument(skip_all)]
-    async fn optimize(&self) -> Result<Vec<ExecutionOrder>, AllocationOptimError> {
-        Ok(vec![])
-        // let signals = strategy_snapshot.signals();
+    async fn optimize(&self, event_time: OffsetDateTime) -> Result<Vec<ExecutionOrder>, AllocationOptimError> {
+        // Check if we have any signals
+        if self.signals.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        // // Check if we have any signals
-        // if signals.len() == 0 {
-        //     return Vec::new();
-        // }
+        // Calculate money allocated to each signal
+        let max_allocation = self.portfolio.capital().await * self.max_allocation;
+        let max_allocation_per_signal = max_allocation * self.max_allocation_per_signal;
 
-        // // Calculate money allocated to each signal
-        // let max_allocation = portfolio_snapshot.capital() * self.max_allocation;
-        // let max_allocation_per_signal = portfolio_snapshot.capital() * self.max_allocation_per_signal;
-        // let allocation_per_signal = (max_allocation / Decimal::from(signals.len())).min(max_allocation_per_signal);
+        // Calculate optimal position for each signal
+        let mut optimal_positions = HashMap::new();
+        for entry in self.signals.iter() {
+            let signal = entry.value();
+            let signal_allocation = max_allocation_per_signal * signal.weight;
+            let res = self.persistence.read_latest_tick(event_time, &signal.instrument).await?;
+            match res {
+                Some(tick) => {
+                    let quantity = signal_allocation / tick.mid_price();
+                    optimal_positions.insert(signal.instrument.clone(), quantity);
+                }
+                None => {
+                    warn!("No tick found for instrument: {}", signal.instrument);
+                }
+            }
+        }
 
-        // // Calculate current position size for each signal
-        // let current_positions = portfolio_snapshot
-        //     .positions()
-        //     .into_iter()
-        //     .map(|position| {
-        //         let quantity = match position.side {
-        //             PositionSide::Long => position.quantity,
-        //             PositionSide::Short => -position.quantity,
-        //         };
-        //         ((position.strategy, position.instrument), quantity)
-        //     })
-        //     .collect::<HashMap<_, _>>();
+        // Calculate difference between current and expected positions
+        let current_positions = self.portfolio.positions().await;
+        let mut position_diff = HashMap::new();
+        for (instrument, expected_quantity) in optimal_positions.iter() {
+            let order_quantity = if let Some(position) = current_positions.get(instrument) {
+                (expected_quantity - position.quantity).round_dp(instrument.quantity_precision)
+            } else {
+                expected_quantity.round_dp(instrument.quantity_precision)
+            };
+            position_diff.insert(instrument, order_quantity);
+        }
 
-        // // Calculate expected position size for each signal
-        // let expected_positions = signals
-        //     .into_iter()
-        //     .map(|signal| {
-        //         let signal_allocation = allocation_per_signal * signal.weight;
-        //         let current_tick = market_snapshot.last_tick(&signal.instrument).unwrap();
-        //         let quantityu = signal_allocation / current_tick.mid_price();
-        //         ((signal.strategy, signal.instrument), quantityu)
-        //     })
-        //     .collect::<HashMap<_, _>>();
+        // Create execution orders
+        let mut execution_orders = Vec::with_capacity(position_diff.len());
+        for (instrument, quantity) in position_diff.into_iter() {
+            if quantity == Decimal::zero() {
+                continue;
+            }
 
-        // // Calculate the difference between current and expected positions
-        // let position_diff = expected_positions
-        //     .into_iter()
-        //     .map(|(key, expected_quantity)| {
-        //         let current_quantity = current_positions.get(&key).unwrap_or(Decimal::zero()).to_owned();
-        //         info!("Expected Amount: {} Current Amount: {}", expected_quantity, current_quantity);
-        //         let diff = (expected_quantity - current_quantity).round_dp(4);
-        //         (key, diff)
-        //     })
-        //     .collect::<HashMap<_, _>>();
+            let order_side = if quantity > Decimal::zero() {
+                MarketSide::Buy
+            } else {
+                MarketSide::Sell
+            };
+            let order = ExecutionOrderBuilder::default()
+                .event_time(event_time)
+                .instrument(instrument.clone())
+                .execution_type(ExecutionOrderStrategy::Market)
+                .side(order_side)
+                .quantity(quantity.abs())
+                .build()
+                .expect("Failed to build ExecutionOrder");
 
-        // // Calculate the orders to be executed
-        // position_diff
-        //     .into_iter()
-        //     .filter_map(|((strategy_id, instrument), quantity)| {
-        //         if quantity == Decimal::zero() {
-        //             return None;
-        //         }
+            execution_orders.push(order);
+        }
 
-        //         let order_side = if quantity > Decimal::zero() {
-        //             Side::Buy
-        //         } else {
-        //             Side::Sell
-        //         };
-        //         let order_price = market_snapshot.last_tick(&instrument).unwrap().mid_price();
-        //         info!("Order price: {}", order_price);
-
-        //         let order = ExecutionOrder::new(
-        //             market_snapshot.timestamp(),
-        //             0,
-        //             strategy_id.to_owned(),
-        //             instrument.to_owned(),
-        //             order_side,
-        //             ExecutionOrderType::Maker,
-        //             VenueOrderTimeInForce::Gtc,
-        //             quantity.abs(),
-        //         );
-        //         Some(order)
-        //     })
-        //     .collect::<Vec<_>>()
+        Ok(execution_orders)
     }
 }

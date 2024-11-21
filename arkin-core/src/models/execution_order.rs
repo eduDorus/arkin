@@ -3,6 +3,7 @@ use std::{fmt, sync::Arc};
 use derive_builder::Builder;
 use rust_decimal::Decimal;
 use strum::Display;
+use time::OffsetDateTime;
 use tracing::warn;
 use uuid::Uuid;
 
@@ -28,8 +29,10 @@ pub enum ExecutionOrderStatus {
     New,
     InProgress,
     PartiallyFilled,
+    PartiallyFilledCancelling,
     PartiallyFilledCancelled,
     Filled,
+    Cancelling,
     Cancelled,
 }
 
@@ -38,6 +41,8 @@ pub enum ExecutionOrderStatus {
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub event_time: OffsetDateTime,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
     pub execution_type: ExecutionOrderStrategy,
@@ -77,17 +82,28 @@ impl ExecutionOrder {
         }
     }
 
+    pub fn cancel(&mut self) {
+        match self.status {
+            ExecutionOrderStatus::New => self.status = ExecutionOrderStatus::Cancelled,
+            ExecutionOrderStatus::InProgress => self.status = ExecutionOrderStatus::Cancelling,
+            ExecutionOrderStatus::PartiallyFilled => self.status = ExecutionOrderStatus::PartiallyFilledCancelling,
+            _ => warn!("Cannot cancel order in state {}", self.status),
+        }
+    }
+
     fn is_valid_transition(&self, new_status: &ExecutionOrderStatus) -> bool {
-        matches!((&self.status, new_status), |(
-            ExecutionOrderStatus::New,
-            ExecutionOrderStatus::Cancelled,
-        )| (
-            ExecutionOrderStatus::New,
-            ExecutionOrderStatus::InProgress,
-        ) | (
-            ExecutionOrderStatus::PartiallyFilled,
-            ExecutionOrderStatus::PartiallyFilledCancelled
-        ))
+        match (&self.status, new_status) {
+            (ExecutionOrderStatus::New, ExecutionOrderStatus::InProgress)
+            | (ExecutionOrderStatus::New, ExecutionOrderStatus::Cancelled)
+            | (ExecutionOrderStatus::InProgress, ExecutionOrderStatus::PartiallyFilled)
+            | (ExecutionOrderStatus::InProgress, ExecutionOrderStatus::Filled)
+            | (ExecutionOrderStatus::InProgress, ExecutionOrderStatus::Cancelling)
+            | (ExecutionOrderStatus::PartiallyFilled, ExecutionOrderStatus::PartiallyFilledCancelling)
+            | (ExecutionOrderStatus::PartiallyFilled, ExecutionOrderStatus::Filled)
+            | (ExecutionOrderStatus::PartiallyFilledCancelling, ExecutionOrderStatus::PartiallyFilledCancelled)
+            | (ExecutionOrderStatus::Cancelling, ExecutionOrderStatus::Cancelled) => true,
+            _ => false,
+        }
     }
 
     pub fn remaining_quantity(&self) -> Quantity {
@@ -138,14 +154,8 @@ impl fmt::Display for ExecutionOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} price: {}/{} quantity: {}/{} {}",
-            self.instrument,
-            self.side,
-            self.execution_type,
-            self.avg_fill_price,
-            self.filled_quantity,
-            self.quantity,
-            self.status
+            "ExecutionOrder: instrument={} execution_type={} side={} quantity={}/{} status={}",
+            self.instrument, self.execution_type, self.side, self.filled_quantity, self.quantity, self.status
         )
     }
 }
