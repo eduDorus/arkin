@@ -6,6 +6,7 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
 use arkin_core::prelude::*;
+use tracing::instrument;
 
 #[derive(Debug, Default)]
 pub struct InsightsState {
@@ -13,6 +14,7 @@ pub struct InsightsState {
 }
 
 impl InsightsState {
+    #[instrument(skip_all)]
     pub fn insert(&self, event: Insight) {
         let key = (event.instrument, event.feature_id);
         let mut composit_key = CompositeIndex::new(event.event_time);
@@ -24,6 +26,7 @@ impl InsightsState {
         entry.insert(composit_key, event.value);
     }
 
+    #[instrument(skip_all)]
     pub fn insert_batch(&self, events: Vec<Insight>) {
         events.into_par_iter().for_each(|event| {
             let key = (event.instrument, event.feature_id);
@@ -37,6 +40,7 @@ impl InsightsState {
         });
     }
 
+    #[instrument(skip_all)]
     pub fn last(
         &self,
         instrument: Option<Arc<Instrument>>,
@@ -53,6 +57,7 @@ impl InsightsState {
         None
     }
 
+    #[instrument(skip_all)]
     pub fn window(
         &self,
         instrument: Option<Arc<Instrument>>,
@@ -70,6 +75,7 @@ impl InsightsState {
         }
     }
 
+    #[instrument(skip_all)]
     pub fn periods(
         &self,
         instrument: Option<Arc<Instrument>>,

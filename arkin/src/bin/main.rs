@@ -24,7 +24,7 @@ async fn main() {
     info!("Starting Arkin Order Manager 🚀");
 
     let config = load::<PersistenceConfig>();
-    let persistence_service = Arc::new(PersistenceService::from_config(&config));
+    let persistence = Arc::new(PersistenceService::from_config(&config));
 
     let config = load::<PortfolioConfig>();
     let portfolio = PortfolioFactory::from_config(&config);
@@ -33,25 +33,22 @@ async fn main() {
     let order_manager = ExecutionFactory::from_config(&config, portfolio.clone());
 
     let config = load::<AllocationOptimConfig>();
-    let allocation = AllocationFactory::from_config(&config, portfolio.clone());
+    let allocation = AllocationFactory::from_config(&config, persistence.clone(), portfolio.clone());
 
     let config = load::<InsightsConfig>();
-    let insights = Arc::new(InsightsService::from_config(
-        &config.insights_service,
-        persistence_service.clone(),
-    ));
+    let insights = Arc::new(InsightsService::from_config(&config.insights_service, persistence.clone()));
 
     let config = load::<StrategyConfig>();
     let strategy = StrategyFactory::from_config(&config).pop().expect("No strategy found");
 
     let config = load::<IngestorsConfig>();
-    let ingestors = IngestorFactory::from_config(&config, persistence_service.clone());
+    let ingestors = IngestorFactory::from_config(&config, persistence.clone());
 
     // Work around for fetching instruments
     let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
     let mut instruments = vec![];
     for symbol in venue_symbols {
-        match persistence_service.read_instrument_by_venue_symbol(symbol.to_string()).await {
+        match persistence.read_instrument_by_venue_symbol(symbol.to_string()).await {
             Ok(instr) => instruments.push(instr),
             Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
         }
@@ -59,7 +56,7 @@ async fn main() {
 
     let engine = SingleStrategyEngineBuilder::default()
         .instruments(instruments)
-        .persistor(persistence_service)
+        .persistor(persistence)
         .portfolio(portfolio)
         .ingestors(ingestors)
         .insights(insights)

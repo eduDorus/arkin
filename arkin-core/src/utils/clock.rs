@@ -4,6 +4,7 @@ use futures_util::{stream, Stream};
 use time::OffsetDateTime;
 use tracing::info;
 
+#[derive(Debug, Clone)]
 pub struct Clock {
     start: OffsetDateTime,
     end: OffsetDateTime,

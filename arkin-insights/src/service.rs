@@ -66,14 +66,15 @@ impl Insights for InsightsService {
         &self,
         instruments: &[Arc<Instrument>],
         event_time: OffsetDateTime,
-        frequency: Duration,
+        lookback: Duration,
     ) -> Result<(), InsightsError> {
-        info!("Loading insights from {} to {}", event_time, event_time - frequency);
+        let start = event_time - lookback;
+        info!("Loading insights from {} to {}", start, event_time);
 
         // let ticks = self.persistence_service.read_ticks_range(instruments, from, to).await?;
         let trades = self
             .persistence_service
-            .read_trades_range(instruments, event_time - frequency, event_time)
+            .read_trades_range(instruments, start, event_time)
             .await?;
 
         let insights = trades.into_iter().map(|t| t.to_insights()).flatten().collect::<Vec<_>>();
@@ -102,6 +103,9 @@ impl Insights for InsightsService {
         info!("Running insights pipeline at event time: {}", event_time);
 
         let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
+        for insight in insights.iter() {
+            info!("{}", insight);
+        }
         self.persistence_service.insert_insight_batch_vec(insights.clone()).await?;
         Ok(insights)
     }

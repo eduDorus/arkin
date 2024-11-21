@@ -20,7 +20,7 @@ pub trait Insights: std::fmt::Debug + Send + Sync {
         &self,
         instruments: &[Arc<Instrument>],
         event_time: OffsetDateTime,
-        frequency: Duration,
+        lookback: Duration,
     ) -> Result<(), InsightsError>;
 
     async fn process(

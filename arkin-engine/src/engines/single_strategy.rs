@@ -1,7 +1,11 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use async_trait::async_trait;
 use derive_builder::Builder;
+use time::OffsetDateTime;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument};
 
@@ -64,6 +68,40 @@ pub struct SingleStrategyEngine {
 }
 
 impl SingleStrategyEngine {
+    #[instrument(skip_all)]
+    async fn load_state(&self) -> Result<(), TradingEngineError> {
+        // Setup Insights
+        let start = Instant::now();
+        let end_time = OffsetDateTime::now_utc();
+        // Round to a minute
+        let end_time = end_time.replace_second(0).expect("Failed to replace second");
+        let end_time = end_time.replace_nanosecond(0).expect("Failed to replace nanosecond");
+
+        let lookback_data = Duration::from_secs(86400);
+        let lookback_insights = Duration::from_secs(86400);
+        self.insights.load(&self.instruments, end_time, lookback_data).await?;
+        let mut clock = Clock::new(end_time - lookback_insights, end_time, Duration::from_secs(60));
+        while let Some((_start, end)) = clock.next() {
+            self.insights.process(&self.instruments, end).await?;
+        }
+
+        // If we are now at the start of a new minute, we need to load the last minute of data
+        let diff = OffsetDateTime::now_utc() - end_time;
+        if diff > Duration::from_secs(60) {
+            info!("Hopping to the next minute to load the last minute of data");
+            self.insights
+                .load(&self.instruments, end_time + Duration::from_secs(60), Duration::from_secs(60))
+                .await?;
+            self.insights
+                .process(&self.instruments, end_time + Duration::from_secs(60))
+                .await?;
+        }
+
+        info!("Loaded state in {:?}", start.elapsed());
+        Ok(())
+    }
+
+    #[instrument(skip_all)]
     async fn pipeline(&self) -> Result<(), TradingEngineError> {
         let mut time_helper = TickHelper::new(Duration::from_secs(60));
 
@@ -148,6 +186,9 @@ impl TradingEngine for SingleStrategyEngine {
         self.order_manager
             .start(self.order_manager_task_tracker.clone(), self.order_manager_shutdown.clone())
             .await?;
+
+        // Load the state
+        self.load_state().await?;
 
         // Run the pipeline
         self.pipeline().await?;
