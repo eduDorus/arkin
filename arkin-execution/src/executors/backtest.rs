@@ -42,7 +42,7 @@ impl Executor for BacktestExecutor {
                     match order.status {
                         VenueOrderStatus::New => {
                             order.status = VenueOrderStatus::Placed;
-                            let _ = order_manager.order_status_update(order.id, VenueOrderStatus::Placed).await;
+                            // let _ = order_manager.order_status_update(order.id, VenueOrderStatus::Placed).await;
                         }
                         VenueOrderStatus::Placed => {
                             let fill = FillBuilder::default()

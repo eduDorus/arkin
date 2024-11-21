@@ -9,7 +9,7 @@ use crate::{
     types::{Commission, Price, Quantity},
 };
 
-use super::{Instrument, MarketSide, VenueOrderId};
+use super::{ExecutionOrderId, Instrument, MarketSide, VenueOrderId};
 
 #[derive(Display, Clone, Copy, PartialEq, Eq)]
 pub enum FillSide {
@@ -23,6 +23,7 @@ pub struct Fill {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
     pub venue_order_id: VenueOrderId,
+    pub execution_order_id: ExecutionOrderId,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
     pub price: Price,

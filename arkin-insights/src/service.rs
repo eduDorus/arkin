@@ -103,9 +103,6 @@ impl Insights for InsightsService {
         info!("Running insights pipeline at event time: {}", event_time);
 
         let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
-        for insight in insights.iter() {
-            info!("{}", insight);
-        }
         self.persistence_service.insert_insight_batch_vec(insights.clone()).await?;
         Ok(insights)
     }

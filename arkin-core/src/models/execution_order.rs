@@ -91,6 +91,40 @@ impl ExecutionOrder {
         }
     }
 
+    pub fn is_new(&self) -> bool {
+        self.status == ExecutionOrderStatus::New
+    }
+
+    pub fn is_in_progress(&self) -> bool {
+        matches!(
+            self.status,
+            ExecutionOrderStatus::InProgress | ExecutionOrderStatus::PartiallyFilled
+        )
+    }
+
+    pub fn is_cancelling(&self) -> bool {
+        matches!(
+            self.status,
+            ExecutionOrderStatus::Cancelling | ExecutionOrderStatus::PartiallyFilledCancelling
+        )
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        matches!(
+            self.status,
+            ExecutionOrderStatus::PartiallyFilledCancelled | ExecutionOrderStatus::Cancelled
+        )
+    }
+
+    pub fn is_closed(&self) -> bool {
+        matches!(
+            self.status,
+            ExecutionOrderStatus::PartiallyFilledCancelled
+                | ExecutionOrderStatus::Cancelled
+                | ExecutionOrderStatus::Filled
+        )
+    }
+
     fn is_valid_transition(&self, new_status: &ExecutionOrderStatus) -> bool {
         match (&self.status, new_status) {
             (ExecutionOrderStatus::New, ExecutionOrderStatus::InProgress)
@@ -108,13 +142,6 @@ impl ExecutionOrder {
 
     pub fn remaining_quantity(&self) -> Quantity {
         self.quantity - self.filled_quantity
-    }
-
-    pub fn is_active(&self) -> bool {
-        matches!(
-            self.status,
-            ExecutionOrderStatus::InProgress | ExecutionOrderStatus::PartiallyFilled
-        )
     }
 
     pub fn has_fill(&self) -> bool {
