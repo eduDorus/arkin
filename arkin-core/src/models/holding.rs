@@ -3,9 +3,11 @@ use std::fmt;
 use derive_builder::Builder;
 use rust_decimal::Decimal;
 
+use crate::types::AssetId;
+
 #[derive(Debug, Clone, Builder)]
 pub struct Holding {
-    pub asset: String,
+    pub asset: AssetId,
     pub quantity: Decimal,
 }
 

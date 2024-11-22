@@ -5,6 +5,7 @@ use time::OffsetDateTime;
 
 pub type StrategyId = Arc<String>;
 pub type FeatureId = Arc<String>;
+pub type AssetId = Arc<String>;
 
 // Common types
 pub type Price = Decimal;

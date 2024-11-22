@@ -20,7 +20,7 @@ pub trait Portfolio: std::fmt::Debug + Send + Sync {
     async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError>;
     async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError>;
 
-    async fn balances(&self) -> HashMap<String, Holding>;
+    async fn balances(&self) -> HashMap<AssetId, Holding>;
     async fn positions(&self) -> HashMap<Arc<Instrument>, Position>;
     async fn capital(&self) -> Notional;
     async fn buying_power(&self) -> Notional;

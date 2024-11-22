@@ -15,14 +15,18 @@ pub struct SingleStrategyPortfolio {
     #[builder(default = "DashMap::new()")]
     positions: DashMap<Arc<Instrument>, Position>,
     #[builder(default = "DashMap::new()")]
-    holdings: DashMap<String, Holding>,
+    holdings: DashMap<AssetId, Holding>,
 }
 
 impl SingleStrategyPortfolio {
     #[instrument(skip_all)]
     fn update_balance(&self, holding: Holding) {
-        if let Some(mut balance) = self.holdings.get_mut(&holding.asset) {
-            balance.quantity = holding.quantity;
+        // Check if we have the asset in the holdings else create
+        if self.holdings.contains_key(&holding.asset) {
+            self.holdings.alter(&holding.asset, |_, mut h| {
+                h.quantity = holding.quantity;
+                h
+            });
         } else {
             self.holdings.insert(holding.asset.clone(), holding);
         }
@@ -183,7 +187,7 @@ impl Portfolio for SingleStrategyPortfolio {
     }
 
     #[instrument(skip_all)]
-    async fn balances(&self) -> HashMap<String, Holding> {
+    async fn balances(&self) -> HashMap<AssetId, Holding> {
         self.holdings.iter().map(|v| (v.key().clone(), v.value().clone())).collect()
     }
 

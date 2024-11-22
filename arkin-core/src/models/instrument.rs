@@ -5,7 +5,7 @@ use rust_decimal::prelude::Decimal;
 use strum::Display;
 use uuid::Uuid;
 
-use crate::{prelude::INSTRUMENT_TIMESTAMP_FORMAT, Maturity, Price};
+use crate::{prelude::INSTRUMENT_TIMESTAMP_FORMAT, types::AssetId, Maturity, Price};
 
 use super::Venue;
 
@@ -18,8 +18,8 @@ pub struct Instrument {
     pub symbol: String,
     pub venue_symbol: String,
     pub instrument_type: InstrumentType,
-    pub base_asset: String,
-    pub quote_asset: String,
+    pub base_asset: AssetId,
+    pub quote_asset: AssetId,
     pub maturity: Option<Maturity>,
     pub strike: Option<Price>,
     pub option_type: Option<OptionType>,
@@ -37,8 +37,8 @@ impl Instrument {
     pub fn new_spot(
         venue: Venue,
         venue_symbol: String,
-        base_asset: String,
-        quote_asset: String,
+        base_asset: AssetId,
+        quote_asset: AssetId,
         price_precision: u32,
         quantity_precision: u32,
         base_precision: u32,
@@ -46,8 +46,6 @@ impl Instrument {
         tick_size: Decimal,
         lot_size: Decimal,
     ) -> Self {
-        let base_asset = base_asset.to_uppercase();
-        let quote_asset = quote_asset.to_uppercase();
         Instrument {
             id: Uuid::new_v4(),
             symbol: format!("SPOT-{}-{}@{}", base_asset, quote_asset, venue),
@@ -73,8 +71,8 @@ impl Instrument {
     pub fn new_perpetual(
         venue: Venue,
         venue_symbol: String,
-        base_asset: String,
-        quote_asset: String,
+        base_asset: AssetId,
+        quote_asset: AssetId,
         price_precision: u32,
         quantity_precision: u32,
         base_precision: u32,
@@ -82,8 +80,6 @@ impl Instrument {
         tick_size: Decimal,
         lot_size: Decimal,
     ) -> Self {
-        let base_asset = base_asset.to_uppercase();
-        let quote_asset = quote_asset.to_uppercase();
         Instrument {
             id: Uuid::new_v4(),
             symbol: format!("PERP-{}-{}@{}", base_asset, quote_asset, venue),
@@ -109,8 +105,8 @@ impl Instrument {
     pub fn new_future(
         venue: Venue,
         venue_symbol: String,
-        base_asset: String,
-        quote_asset: String,
+        base_asset: AssetId,
+        quote_asset: AssetId,
         maturity: Maturity,
         price_precision: u32,
         quantity_precision: u32,
@@ -119,8 +115,6 @@ impl Instrument {
         tick_size: Decimal,
         lot_size: Decimal,
     ) -> Self {
-        let base_asset = base_asset.to_uppercase();
-        let quote_asset = quote_asset.to_uppercase();
         Instrument {
             id: Uuid::new_v4(),
             symbol: format!(
@@ -152,8 +146,8 @@ impl Instrument {
     pub fn new_option(
         venue: Venue,
         venue_symbol: String,
-        base_asset: String,
-        quote_asset: String,
+        base_asset: AssetId,
+        quote_asset: AssetId,
         maturity: Maturity,
         strike: Price,
         option_type: OptionType,
@@ -164,8 +158,6 @@ impl Instrument {
         tick_size: Decimal,
         lot_size: Decimal,
     ) -> Self {
-        let base_asset = base_asset.to_uppercase();
-        let quote_asset = quote_asset.to_uppercase();
         Instrument {
             id: Uuid::new_v4(),
             symbol: format!(

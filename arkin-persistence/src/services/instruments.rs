@@ -42,9 +42,35 @@ impl InstrumentCache {
 }
 
 #[derive(Debug)]
+pub struct AssetCache {
+    assets: DashMap<String, AssetId>,
+}
+
+impl AssetCache {
+    pub fn new() -> Self {
+        Self {
+            assets: DashMap::new(),
+        }
+    }
+
+    pub fn insert(&self, id: String) -> AssetId {
+        let key = id.clone().to_uppercase();
+        let asset = Arc::new(id.to_uppercase());
+        self.assets.insert(key, asset.clone());
+        asset
+    }
+
+    pub fn get_by_name(&self, id: String) -> Option<AssetId> {
+        let key = id.to_uppercase();
+        self.assets.get(&key).map(|entry| entry.value().clone())
+    }
+}
+
+#[derive(Debug)]
 pub struct InstrumentService {
     instrument_repo: InstrumentRepo,
     instrument_cache: InstrumentCache,
+    asset_cache: AssetCache,
     venue_service: VenueService,
 }
 
@@ -53,6 +79,7 @@ impl InstrumentService {
         Self {
             instrument_repo,
             instrument_cache: InstrumentCache::new(),
+            asset_cache: AssetCache::new(),
             venue_service,
         }
     }
@@ -78,14 +105,24 @@ impl InstrumentService {
                         .await?
                         .ok_or_else(|| Error::msg("Venue not found"))?;
 
+                    let base_asset = self
+                        .asset_cache
+                        .get_by_name(db_instrument.base_asset.clone())
+                        .unwrap_or_else(|| self.asset_cache.insert(db_instrument.base_asset.clone()));
+
+                    let quote_asset = self
+                        .asset_cache
+                        .get_by_name(db_instrument.quote_asset.clone())
+                        .unwrap_or_else(|| self.asset_cache.insert(db_instrument.quote_asset.clone()));
+
                     let instrument = Instrument {
                         id: db_instrument.id,
                         symbol: db_instrument.symbol,
                         venue_symbol: db_instrument.venue_symbol,
                         venue,
                         instrument_type: db_instrument.instrument_type.into(),
-                        base_asset: db_instrument.base_asset,
-                        quote_asset: db_instrument.quote_asset,
+                        base_asset,
+                        quote_asset,
                         maturity: db_instrument.maturity,
                         strike: db_instrument.strike,
                         option_type: db_instrument.option_type.map(|v| v.into()),
@@ -128,14 +165,24 @@ impl InstrumentService {
                         .await?
                         .ok_or_else(|| Error::msg("Venue not found"))?;
 
+                    let base_asset = self
+                        .asset_cache
+                        .get_by_name(db_instrument.base_asset.clone())
+                        .unwrap_or_else(|| self.asset_cache.insert(db_instrument.base_asset.clone()));
+
+                    let quote_asset = self
+                        .asset_cache
+                        .get_by_name(db_instrument.quote_asset.clone())
+                        .unwrap_or_else(|| self.asset_cache.insert(db_instrument.quote_asset.clone()));
+
                     let instrument = Instrument {
                         id: db_instrument.id,
                         symbol: db_instrument.symbol,
                         venue_symbol: db_instrument.venue_symbol,
                         venue,
                         instrument_type: db_instrument.instrument_type.into(),
-                        base_asset: db_instrument.base_asset,
-                        quote_asset: db_instrument.quote_asset,
+                        base_asset,
+                        quote_asset,
                         maturity: db_instrument.maturity,
                         strike: db_instrument.strike,
                         option_type: db_instrument.option_type.map(|v| v.into()),
