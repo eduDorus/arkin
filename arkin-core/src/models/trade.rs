@@ -5,9 +5,8 @@ use time::OffsetDateTime;
 
 use crate::{
     constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
-    events::{EventType, EventTypeOf},
     models::Insight,
-    Event, Price, Quantity,
+    Event, Price, Quantity, UpdateEventType,
 };
 
 use super::{Instrument, MarketSide};
@@ -59,27 +58,9 @@ impl Trade {
     }
 }
 
-impl EventTypeOf for Trade {
-    fn event_type() -> EventType {
-        EventType::Trade
-    }
-}
-
-impl TryFrom<Event> for Trade {
-    type Error = ();
-
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::Trade(trade) = event {
-            Ok(trade)
-        } else {
-            Err(())
-        }
-    }
-}
-
-impl From<Trade> for Event {
-    fn from(v: Trade) -> Self {
-        Event::Trade(v)
+impl Event for Trade {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::Trade
     }
 }
 

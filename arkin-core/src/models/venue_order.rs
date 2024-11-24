@@ -6,11 +6,7 @@ use time::OffsetDateTime;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::{
-    events::{EventType, EventTypeOf},
-    types::Commission,
-    Event, Notional, Price, Quantity,
-};
+use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEventType};
 
 use super::{ExecutionOrderId, Fill, Instrument, MarketSide};
 
@@ -35,8 +31,10 @@ pub enum VenueOrderStatus {
     New,
     Placed,
     PartiallyFilled,
+    PartiallyFilledCancelling,
     PartiallyFilledCancelled,
     Filled,
+    Cancelling,
     Cancelled,
     Rejected,
     Expired,
@@ -140,10 +138,20 @@ impl VenueOrder {
     }
 
     pub fn cancel(&mut self) {
-        self.status = match self.status {
-            VenueOrderStatus::PartiallyFilled => VenueOrderStatus::PartiallyFilledCancelled,
-            _ => VenueOrderStatus::Cancelled,
-        };
+        match self.status {
+            VenueOrderStatus::New => self.status = VenueOrderStatus::Cancelled,
+            VenueOrderStatus::Placed => self.status = VenueOrderStatus::Cancelling,
+            VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledCancelling,
+            _ => error!("Cannot cancel order in state {}", self.status),
+        }
+    }
+
+    pub fn ack_cancel(&mut self) {
+        match self.status {
+            VenueOrderStatus::Cancelling => self.status = VenueOrderStatus::Cancelled,
+            VenueOrderStatus::PartiallyFilledCancelling => self.status = VenueOrderStatus::PartiallyFilledCancelled,
+            _ => error!("Cannot ack cancel order in state {}", self.status),
+        }
     }
 
     fn is_valid_transition(&self, new_status: &VenueOrderStatus) -> bool {
@@ -154,9 +162,14 @@ impl VenueOrder {
                 | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelled)
+                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelling)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Cancelled)
+                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Cancelling)
+                | (
+                    VenueOrderStatus::PartiallyFilledCancelling,
+                    VenueOrderStatus::PartiallyFilledCancelled
+                )
+                | (VenueOrderStatus::Cancelling, VenueOrderStatus::Cancelled)
         )
     }
 
@@ -168,6 +181,20 @@ impl VenueOrder {
         matches!(self.status, VenueOrderStatus::Placed | VenueOrderStatus::PartiallyFilled)
     }
 
+    pub fn is_cancelling(&self) -> bool {
+        matches!(
+            self.status,
+            VenueOrderStatus::Cancelling | VenueOrderStatus::PartiallyFilledCancelling
+        )
+    }
+
+    pub fn is_finalized(&self) -> bool {
+        matches!(
+            self.status,
+            VenueOrderStatus::PartiallyFilledCancelled | VenueOrderStatus::Cancelled | VenueOrderStatus::Filled
+        )
+    }
+
     pub fn has_fill(&self) -> bool {
         self.filled_quantity > Quantity::ZERO
     }
@@ -177,27 +204,9 @@ impl VenueOrder {
     }
 }
 
-impl EventTypeOf for VenueOrder {
-    fn event_type() -> EventType {
-        EventType::VenueOrder
-    }
-}
-
-impl TryFrom<Event> for VenueOrder {
-    type Error = ();
-
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::VenueOrder(order) = event {
-            Ok(order)
-        } else {
-            Err(())
-        }
-    }
-}
-
-impl From<VenueOrder> for Event {
-    fn from(order: VenueOrder) -> Self {
-        Event::VenueOrder(order)
+impl Event for VenueOrder {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::VenueOrder
     }
 }
 

@@ -26,12 +26,15 @@ async fn main() -> Result<()> {
     // Install the default CryptoProvider
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
 
+    let pubsub = Arc::new(PubSub::new());
+
     let config = load::<PersistenceConfig>();
-    let persistence_service = Arc::new(PersistenceService::from_config(&config));
+    let persistence_service = Arc::new(PersistenceService::from_config(&config, pubsub.clone()));
 
     let config = load::<InsightsConfig>();
     let insights_service = Arc::new(InsightsService::from_config(
         &config.insights_service,
+        pubsub.clone(),
         persistence_service.clone(),
     ));
 

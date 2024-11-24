@@ -3,13 +3,13 @@ use std::{fmt, sync::Arc};
 use time::OffsetDateTime;
 
 use crate::{
-    events::{Event, EventType, EventTypeOf},
     types::{Price, Quantity},
+    Event, UpdateEventType,
 };
 
 use super::Instrument;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Book {
     pub received_time: OffsetDateTime,
     pub event_time: OffsetDateTime,
@@ -35,21 +35,9 @@ impl Book {
     }
 }
 
-impl EventTypeOf for Book {
-    fn event_type() -> EventType {
-        EventType::Book
-    }
-}
-
-impl TryFrom<Event> for Book {
-    type Error = ();
-
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::Book(book) = event {
-            Ok(book)
-        } else {
-            Err(())
-        }
+impl Event for Book {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::Book
     }
 }
 
@@ -66,7 +54,7 @@ impl fmt::Display for Book {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct BookUpdateSide {
     pub price: Price,
     pub quantity: Quantity,

@@ -23,21 +23,35 @@ async fn main() {
     // Install the default CryptoProvider
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
 
+    let pubsub = Arc::new(PubSub::new());
+
     let config = load::<PersistenceConfig>();
-    let persistence_service = Arc::new(PersistenceService::from_config(&config));
+    let persistence_service = Arc::new(PersistenceService::from_config(&config, pubsub.clone()));
 
     let config = load::<IngestorsConfig>();
-    let ingestors = IngestorFactory::from_config(&config, persistence_service.clone());
+    let ingestors = IngestorFactory::from_config(&config, pubsub.clone(), persistence_service.clone());
 
     // Start the ingestors
     let ingestor_task_tracker = TaskTracker::new();
     let ingestor_shutdown = CancellationToken::new();
-    for ingestor in &ingestors {
-        ingestor
-            .start(ingestor_task_tracker.clone(), ingestor_shutdown.clone())
-            .await
-            .expect("Failed to start ingestor");
+    for ingestor in ingestors {
+        let shutdown = ingestor_shutdown.clone();
+        ingestor_task_tracker.spawn(async move {
+            if let Err(e) = ingestor.start(shutdown).await {
+                error!("Failed to start ingestor: {}", e);
+            }
+        });
     }
+
+    // Start the persistence service
+    let persistence_task_tracker = TaskTracker::new();
+    let persistence_shutdown = CancellationToken::new();
+    let shutdown = persistence_shutdown.clone();
+    persistence_task_tracker.spawn(async move {
+        if let Err(e) = persistence_service.start(shutdown).await {
+            error!("Failed to start persistence service: {}", e);
+        }
+    });
 
     match tokio::signal::ctrl_c().await {
         Ok(_) => {
@@ -49,4 +63,10 @@ async fn main() {
     ingestor_shutdown.cancel();
     ingestor_task_tracker.close();
     ingestor_task_tracker.wait().await;
+    info!("All ingestors have shut down");
+
+    persistence_shutdown.cancel();
+    persistence_task_tracker.close();
+    persistence_task_tracker.wait().await;
+    info!("Persistence service has shut down");
 }

@@ -15,7 +15,6 @@ use time::{OffsetDateTime, PrimitiveDateTime};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::pin;
 use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
 use tracing::{debug, error, info, instrument};
 
 use crate::config::TardisIngestorConfig;
@@ -348,7 +347,7 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 #[async_trait]
 impl Ingestor for TardisIngestor {
     #[instrument(skip_all)]
-    async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), IngestorError> {
+    async fn start(&self, _shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting tardis ingestor...");
         let persistence_service = Arc::clone(&self.persistence_service);
 

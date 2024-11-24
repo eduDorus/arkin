@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use derive_builder::Builder;
 use time::OffsetDateTime;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use arkin_allocation::prelude::*;
 use arkin_core::prelude::*;
@@ -22,6 +22,7 @@ use crate::{TradingEngine, TradingEngineError};
 
 #[derive(Builder, Debug)]
 pub struct SingleStrategyEngine {
+    pubsub: Arc<PubSub>,
     instruments: Vec<Arc<Instrument>>,
 
     #[builder(default)]
@@ -151,41 +152,69 @@ impl TradingEngine for SingleStrategyEngine {
     #[instrument(skip_all)]
     async fn start(&self) -> Result<(), TradingEngineError> {
         // Start the persistor
-        self.persistor
-            .start(self.persistor_task_tracker.clone(), self.persistor_shutdown.clone())
-            .await?;
+        let shutdown = self.persistor_shutdown.clone();
+        let persistor = self.persistor.clone();
+        self.persistor_task_tracker.spawn(async move {
+            if let Err(e) = persistor.start(shutdown).await {
+                error!("Error in persistor: {}", e);
+            }
+        });
 
         // Start the portfolio
-        self.portfolio
-            .start(self.portfolio_task_tracker.clone(), self.portfolio_shutdown.clone())
-            .await?;
+        let shutdown = self.portfolio_shutdown.clone();
+        let portfolio = self.portfolio.clone();
+        self.portfolio_task_tracker.spawn(async move {
+            if let Err(e) = portfolio.start(shutdown).await {
+                error!("Error in portfolio: {}", e);
+            }
+        });
 
         // Start the ingestors
         for ingestor in &self.ingestors {
-            ingestor
-                .start(self.ingestor_task_tracker.clone(), self.ingestor_shutdown.clone())
-                .await?;
+            let shutdown = self.ingestor_shutdown.clone();
+            let ingestor = ingestor.clone();
+            self.ingestor_task_tracker.spawn(async move {
+                if let Err(e) = ingestor.start(shutdown).await {
+                    error!("Error in ingestor: {}", e);
+                }
+            });
         }
 
         // Start the insights
-        self.insights
-            .start(self.insights_task_tracker.clone(), self.insights_shutdown.clone())
-            .await?;
+        let shutdown = self.insights_shutdown.clone();
+        let insights = self.insights.clone();
+        self.insights_task_tracker.spawn(async move {
+            if let Err(e) = insights.start(shutdown).await {
+                error!("Error in insights: {}", e);
+            }
+        });
 
         // Start the strategies
-        self.strategy
-            .start(self.strategy_task_tracker.clone(), self.strategy_shutdown.clone())
-            .await?;
+        let shutdown = self.strategy_shutdown.clone();
+        let strategy = self.strategy.clone();
+        self.strategy_task_tracker.spawn(async move {
+            if let Err(e) = strategy.start(shutdown).await {
+                error!("Error in strategy: {}", e);
+            }
+        });
 
         // Start the allocation optimizer
-        self.allocation_optim
-            .start(self.allocation_task_tracker.clone(), self.allocation_shutdown.clone())
-            .await?;
+        let shutdown = self.allocation_shutdown.clone();
+        let allocation_optim = self.allocation_optim.clone();
+        self.allocation_task_tracker.spawn(async move {
+            if let Err(e) = allocation_optim.start(shutdown).await {
+                error!("Error in allocation optimizer: {}", e);
+            }
+        });
 
         // Start the order manager
-        self.order_manager
-            .start(self.order_manager_task_tracker.clone(), self.order_manager_shutdown.clone())
-            .await?;
+        let shutdown = self.order_manager_shutdown.clone();
+        let order_manager = self.order_manager.clone();
+        self.order_manager_task_tracker.spawn(async move {
+            if let Err(e) = order_manager.start(shutdown).await {
+                error!("Error in order manager: {}", e);
+            }
+        });
 
         // Load the state
         self.load_state().await?;
@@ -234,7 +263,6 @@ impl TradingEngine for SingleStrategyEngine {
         self.persistor_shutdown.cancel();
         self.persistor_task_tracker.close();
         self.persistor_task_tracker.wait().await;
-        self.persistor.cleanup().await?;
         Ok(())
     }
 }

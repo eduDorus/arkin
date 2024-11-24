@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
 use crate::{
@@ -14,7 +15,8 @@ pub struct IngestorFactory {}
 impl IngestorFactory {
     pub fn from_config(
         config: &IngestorsConfig,
-        persistence_service: Arc<PersistenceService>,
+        pubsub: Arc<PubSub>,
+        persistence: Arc<PersistenceService>,
     ) -> Vec<Arc<dyn Ingestor>> {
         config
             .ingestors
@@ -23,7 +25,8 @@ impl IngestorFactory {
                 let ingestor: Arc<dyn Ingestor> = match config {
                     IngestorConfig::Binance(c) => Arc::new(
                         BinanceIngestorBuilder::default()
-                            .persistence_service(persistence_service.clone())
+                            .pubsub(pubsub.clone())
+                            .persistence(persistence.clone())
                             .url(c.ws_url.parse().expect("Failed to parse ws binance URL"))
                             .channels(c.ws_channels.to_owned())
                             .api_key(c.api_key.to_owned())
@@ -33,7 +36,7 @@ impl IngestorFactory {
                             .build()
                             .expect("Failed to build BinanceIngestor"),
                     ),
-                    IngestorConfig::Tardis(c) => Arc::new(TardisIngestor::from_config(c, persistence_service.clone())),
+                    IngestorConfig::Tardis(c) => Arc::new(TardisIngestor::from_config(c, persistence.clone())),
                 };
                 ingestor
             })

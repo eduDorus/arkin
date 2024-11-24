@@ -6,7 +6,8 @@ use dashmap::DashMap;
 use derive_builder::Builder;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio::select;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument, warn};
 
 use arkin_core::prelude::*;
@@ -17,6 +18,7 @@ use crate::{AllocationOptim, AllocationOptimError};
 
 #[derive(Debug, Builder)]
 pub struct LimitedAllocationOptim {
+    pubsub: Arc<PubSub>,
     persistence: Arc<dyn Persistor>,
     portfolio: Arc<dyn Portfolio>,
     #[builder(default = "DashMap::new()")]
@@ -30,13 +32,19 @@ pub struct LimitedAllocationOptim {
 #[async_trait]
 impl AllocationOptim for LimitedAllocationOptim {
     #[instrument(skip_all)]
-    async fn start(
-        &self,
-        _task_tracker: TaskTracker,
-        _shutdown: CancellationToken,
-    ) -> Result<(), AllocationOptimError> {
+    async fn start(&self, _shutdown: CancellationToken) -> Result<(), AllocationOptimError> {
         info!("Starting LimitedAllocation...");
-        info!("LimitedAllocation started");
+        let mut signals = self.pubsub.subscribe::<Signal>();
+        loop {
+            select! {
+                Ok(signal) = signals.recv() => {
+                    self.new_signal(signal).await?;
+                }
+                _ = _shutdown.cancelled() => {
+                    break;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -110,25 +118,34 @@ impl AllocationOptim for LimitedAllocationOptim {
         // Create execution orders
         let mut execution_orders = Vec::with_capacity(position_diff.len());
         for (instrument, quantity) in position_diff.into_iter() {
+            // Skip if quantity is zero
             if quantity == Decimal::zero() {
                 continue;
             }
 
+            // Determine order side
             let order_side = if quantity > Decimal::zero() {
                 MarketSide::Buy
             } else {
                 MarketSide::Sell
             };
-            let order = ExecutionOrderBuilder::default()
-                .event_time(event_time)
-                .instrument(instrument.clone())
-                .execution_type(ExecutionOrderStrategy::Market)
-                .side(order_side)
-                .quantity(quantity.abs())
-                .build()
-                .expect("Failed to build ExecutionOrder");
 
-            execution_orders.push(order);
+            // Create execution order
+            // let order = ExecutionOrderBuilder::default()
+            //     .event_time(event_time)
+            //     .instrument(instrument.clone())
+            //     .execution_type(ExecutionOrderStrategy::Market {
+            //         side: order_side,
+            //         quantity: quantity.abs(),
+            //         split: false,
+            //         vwap: false,
+            //     })
+            //     .side(order_side)
+            //     .quantity(quantity.abs())
+            //     .build()
+            //     .expect("Failed to build ExecutionOrder");
+
+            // execution_orders.push(order);
         }
 
         Ok(execution_orders)

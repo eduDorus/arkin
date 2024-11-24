@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 use arkin_portfolio::prelude::*;
 
@@ -10,12 +11,14 @@ pub struct AllocationFactory {}
 impl AllocationFactory {
     pub fn from_config(
         config: &AllocationOptimConfig,
+        pubsub: Arc<PubSub>,
         persistance: Arc<dyn Persistor>,
         portfolio: Arc<dyn Portfolio>,
     ) -> Arc<dyn AllocationOptim> {
         let allocation: Arc<dyn AllocationOptim> = match &config.allocation_optim {
             AllocationTypeConfig::Limited(c) => Arc::new(
                 LimitedAllocationOptimBuilder::default()
+                    .pubsub(pubsub.clone())
                     .persistence(persistance)
                     .portfolio(portfolio)
                     .max_allocation(c.max_allocation)

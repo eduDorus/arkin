@@ -4,16 +4,16 @@ use arkin_portfolio::Portfolio;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument, warn};
 
 use arkin_core::prelude::*;
 
-use crate::{Executor, OrderManager, OrderManagerError};
+use crate::{OrderManager, OrderManagerError};
 
 #[derive(Debug, Builder)]
 pub struct SimpleOrderManager {
-    executor: Arc<dyn Executor>,
+    pubsub: Arc<PubSub>,
     portfolio: Arc<dyn Portfolio>,
     #[builder(default = OrderQueue::default())]
     execution_orders: OrderQueue,
@@ -25,6 +25,10 @@ pub struct OrderQueue {
 }
 
 impl OrderQueue {
+    pub fn get_order_by_id(&self, id: ExecutionOrderId) -> Option<ExecutionOrder> {
+        self.orders.get(&id).map(|e| e.value().clone())
+    }
+
     pub fn list_new_orders(&self) -> Vec<ExecutionOrder> {
         self.orders
             .iter()
@@ -123,19 +127,42 @@ impl OrderQueue {
 #[async_trait]
 impl OrderManager for SimpleOrderManager {
     #[instrument(skip_all)]
-    async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
         info!("Starting order manager...");
-        self.executor.start(task_tracker.clone(), shutdown.clone()).await?;
-        info!("Order manager started");
+        let mut execution_orders = self.pubsub.subscribe::<ExecutionOrder>();
+        let mut fills = self.pubsub.subscribe::<Fill>();
+        loop {
+            tokio::select! {
+                Ok(order) = execution_orders.recv() => {
+                    match self.place_order(order).await {
+                        Ok(_) => info!("Order processed"),
+                        Err(e) => warn!("Failed to process order: {}", e),
+                    }
+                }
+                Ok(fill) = fills.recv() => {
+                    match self.order_update(fill).await {
+                        Ok(_) => info!("Fill processed"),
+                        Err(e) => warn!("Failed to process fill: {}", e),
+                    }
+                }
+                _ = shutdown.cancelled() => {
+                    break;
+                }
+            }
+        }
         Ok(())
     }
 
     #[instrument(skip_all)]
     async fn cleanup(&self) -> Result<(), OrderManagerError> {
         info!("Cleaning up order manager...");
-        self.executor.cleanup().await?;
         info!("Order manager cleaned up");
         Ok(())
+    }
+
+    #[instrument(skip_all)]
+    async fn order_by_id(&self, id: ExecutionOrderId) -> Option<ExecutionOrder> {
+        self.execution_orders.get_order_by_id(id)
     }
 
     #[instrument(skip_all)]
@@ -165,7 +192,7 @@ impl OrderManager for SimpleOrderManager {
 
     #[instrument(skip_all)]
     async fn place_order(&self, order: ExecutionOrder) -> Result<(), OrderManagerError> {
-        self.execution_orders.add_order(order);
+        self.execution_orders.add_order(order.clone());
         Ok(())
     }
 

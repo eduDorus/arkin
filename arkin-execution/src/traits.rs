@@ -2,17 +2,19 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use mockall::automock;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 
 use arkin_core::prelude::*;
 
-use crate::{ExecutorError, OrderManagerError};
+use crate::{ExecutorError, OrderManagerError, StrategyError};
 
 #[automock]
 #[async_trait]
 pub trait OrderManager: std::fmt::Debug + Send + Sync {
-    async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), OrderManagerError>;
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), OrderManagerError>;
     async fn cleanup(&self) -> Result<(), OrderManagerError>;
+
+    async fn order_by_id(&self, id: ExecutionOrderId) -> Option<ExecutionOrder>;
 
     async fn list_new_orders(&self) -> Vec<ExecutionOrder>;
     async fn list_open_orders(&self) -> Vec<ExecutionOrder>;
@@ -46,9 +48,17 @@ pub trait OrderManager: std::fmt::Debug + Send + Sync {
 
 #[automock]
 #[async_trait]
+pub trait ExecutionStrategy: Send + Sync {
+    async fn start(&self) -> Result<(), StrategyError>;
+}
+
+#[automock]
+#[async_trait]
 pub trait Executor: std::fmt::Debug + Send + Sync {
-    async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), ExecutorError>;
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError>;
     async fn cleanup(&self) -> Result<(), ExecutorError>;
+
+    // async fn subscribe(&self) -> Result<Receiver<Fill>, ExecutorError>;
 
     async fn place_order(&self, order: VenueOrder) -> Result<(), ExecutorError>;
     async fn place_orders(&self, orders: Vec<VenueOrder>) -> Result<(), ExecutorError>;

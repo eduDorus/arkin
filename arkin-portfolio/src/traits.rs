@@ -3,22 +3,20 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use mockall::automock;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use arkin_core::prelude::*;
+use tokio_util::sync::CancellationToken;
 
 use crate::PortfolioError;
 
 #[automock]
 #[async_trait]
 pub trait Portfolio: std::fmt::Debug + Send + Sync {
-    async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), PortfolioError>;
-    async fn cleanup(&self) -> Result<(), PortfolioError>;
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError>;
 
-    // Update
     async fn position_update(&self, position: Position) -> Result<(), PortfolioError>;
-    async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError>;
     async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError>;
+    async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError>;
 
     async fn balances(&self) -> HashMap<AssetId, Holding>;
     async fn positions(&self) -> HashMap<Arc<Instrument>, Position>;

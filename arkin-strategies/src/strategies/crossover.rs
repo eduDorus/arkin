@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use derive_builder::Builder;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument};
 
 use arkin_core::prelude::*;
@@ -14,6 +14,7 @@ use crate::{Algorithm, StrategyError};
 #[derive(Debug, Clone, Builder)]
 #[allow(unused)]
 pub struct CrossoverStrategy {
+    pubsub: Arc<PubSub>,
     id: StrategyId,
     fast_ma: FeatureId,
     slow_ma: FeatureId,
@@ -22,9 +23,8 @@ pub struct CrossoverStrategy {
 #[async_trait]
 impl Algorithm for CrossoverStrategy {
     #[instrument(skip_all)]
-    async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), StrategyError> {
+    async fn start(&self, _shutdown: CancellationToken) -> Result<(), StrategyError> {
         info!("Starting Crossover Strategy...");
-        info!("Crossover Strategy started");
         Ok(())
     }
 

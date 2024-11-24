@@ -3,11 +3,7 @@ use std::{fmt, sync::Arc};
 use derive_builder::Builder;
 use time::OffsetDateTime;
 
-use crate::{
-    constants,
-    events::{EventType, EventTypeOf},
-    Event, StrategyId, Weight,
-};
+use crate::{constants, Event, StrategyId, UpdateEventType, Weight};
 
 use super::Instrument;
 
@@ -20,27 +16,9 @@ pub struct Signal {
     pub weight: Weight,
 }
 
-impl EventTypeOf for Signal {
-    fn event_type() -> EventType {
-        EventType::Signal
-    }
-}
-
-impl TryFrom<Event> for Signal {
-    type Error = ();
-
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::Signal(signal) = event {
-            Ok(signal)
-        } else {
-            Err(())
-        }
-    }
-}
-
-impl From<Signal> for Event {
-    fn from(signal: Signal) -> Self {
-        Event::Signal(signal)
+impl Event for Signal {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::Signal
     }
 }
 

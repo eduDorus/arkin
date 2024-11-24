@@ -22,6 +22,18 @@ pub enum OrderManagerError {
 }
 
 #[derive(Debug, Error)]
+pub enum StrategyError {
+    #[error("OrderManager error occurred: {0}")]
+    OrderManagerError(String),
+
+    #[error("Executor error occurred: {0}")]
+    ExecutorError(String),
+
+    #[error("Unknown error")]
+    Unknown,
+}
+
+#[derive(Debug, Error)]
 pub enum ExecutorError {
     #[error("Network error occurred: {0}")]
     NetworkError(String),

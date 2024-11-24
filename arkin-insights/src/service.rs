@@ -9,7 +9,6 @@ use arkin_persistence::prelude::*;
 use async_trait::async_trait;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
 use tracing::{info, instrument};
 
 use crate::errors::InsightsError;
@@ -31,14 +30,20 @@ pub trait Computation: Debug + Send + Sync {
 #[derive(Debug)]
 pub struct InsightsService {
     state: Arc<InsightsState>,
+    pubsub: Arc<PubSub>,
     persistence_service: Arc<PersistenceService>,
     pipeline: ComputationGraph,
 }
 
 impl InsightsService {
-    pub fn from_config(config: &InsightsServiceConfig, persistence_service: Arc<PersistenceService>) -> Self {
+    pub fn from_config(
+        config: &InsightsServiceConfig,
+        pubsub: Arc<PubSub>,
+        persistence_service: Arc<PersistenceService>,
+    ) -> Self {
         Self {
             state: Arc::new(InsightsState::default()),
+            pubsub,
             persistence_service,
             pipeline: ComputationGraph::from_config(&config.pipeline),
         }
@@ -48,7 +53,7 @@ impl InsightsService {
 #[async_trait]
 impl Insights for InsightsService {
     #[instrument(skip_all)]
-    async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), InsightsError> {
+    async fn start(&self, _shutdown: CancellationToken) -> Result<(), InsightsError> {
         info!("Starting insights service...");
         info!("Insights service started");
         Ok(())
@@ -103,7 +108,10 @@ impl Insights for InsightsService {
         info!("Running insights pipeline at event time: {}", event_time);
 
         let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
-        self.persistence_service.insert_insight_batch_vec(insights.clone()).await?;
+        for insight in &insights {
+            self.pubsub.publish::<Insight>(insight.clone());
+        }
+        self.pubsub.publish::<InsightTick>(InsightTick);
         Ok(insights)
     }
 }

@@ -3,11 +3,6 @@ use std::fmt;
 use derive_builder::Builder;
 use uuid::Uuid;
 
-use crate::{
-    events::{EventType, EventTypeOf},
-    Event,
-};
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Builder)]
 #[builder(setter(into))]
 pub struct Venue {
@@ -30,29 +25,5 @@ impl Venue {
             name,
             venue_type,
         }
-    }
-}
-
-impl EventTypeOf for Venue {
-    fn event_type() -> EventType {
-        EventType::Venue
-    }
-}
-
-impl TryFrom<Event> for Venue {
-    type Error = ();
-
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::Venue(venue) = event {
-            Ok(venue)
-        } else {
-            Err(())
-        }
-    }
-}
-
-impl From<Venue> for Event {
-    fn from(venue: Venue) -> Self {
-        Event::Venue(venue)
     }
 }

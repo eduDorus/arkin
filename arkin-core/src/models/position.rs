@@ -5,7 +5,7 @@ use rust_decimal::Decimal;
 use strum::Display;
 use uuid::Uuid;
 
-use crate::{types::Commission, Notional, Price, Quantity};
+use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEventType};
 
 use super::{Fill, Instrument, MarketSide};
 
@@ -82,6 +82,12 @@ impl Position {
         } else {
             Decimal::ZERO
         }
+    }
+}
+
+impl Event for Position {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::Position
     }
 }
 

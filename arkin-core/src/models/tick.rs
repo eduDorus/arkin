@@ -10,8 +10,7 @@ use crate::{
         TICK_ASK_PRICE_FEATURE_ID, TICK_ASK_QUANTITY_FEATURE_ID, TICK_BID_PRICE_FEATURE_ID,
         TICK_BID_QUANTITY_FEATURE_ID,
     },
-    events::{EventType, EventTypeOf},
-    Event, Price, Quantity,
+    Event, Price, Quantity, UpdateEventType,
 };
 
 use super::{Insight, Instrument};
@@ -96,27 +95,9 @@ impl Tick {
     }
 }
 
-impl EventTypeOf for Tick {
-    fn event_type() -> EventType {
-        EventType::Tick
-    }
-}
-
-impl TryFrom<Event> for Tick {
-    type Error = ();
-
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::Tick(tick) = event {
-            Ok(tick)
-        } else {
-            Err(())
-        }
-    }
-}
-
-impl From<Tick> for Event {
-    fn from(value: Tick) -> Self {
-        Event::Tick(value)
+impl Event for Tick {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::Tick
     }
 }
 

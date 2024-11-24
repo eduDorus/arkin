@@ -21,7 +21,8 @@ use crate::IngestorError;
 #[derive(Debug, Builder, Clone)]
 // #[builder(setter(into))]
 pub struct BinanceIngestor {
-    persistence_service: Arc<dyn Persistor>,
+    pubsub: Arc<PubSub>,
+    persistence: Arc<dyn Persistor>,
     url: Url,
     channels: Vec<String>,
     #[builder(default)]
@@ -33,11 +34,11 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    async fn process_event(persistence_service: Arc<dyn Persistor>, data: String) {
+    async fn process_event(pubsub: Arc<PubSub>, persistence: Arc<dyn Persistor>, data: String) {
         match serde_json::from_str::<BinanceSwapEvent>(&data) {
             Ok(e) => {
                 debug!("BinanceSwapEvent: {}", e);
-                if let Ok(instrument) = persistence_service.read_instrument_by_venue_symbol(e.venue_symbol()).await {
+                if let Ok(instrument) = persistence.read_instrument_by_venue_symbol(e.venue_symbol()).await {
                     debug!("Instrument found: {}", instrument.symbol);
                     match e {
                         BinanceSwapEvent::AggTrade(trade) => {
@@ -60,9 +61,7 @@ impl BinanceIngestor {
                                 trade.price,
                                 trade.quantity,
                             );
-                            if let Err(e) = persistence_service.insert_trade(trade).await {
-                                error!("Failed to insert trade: {}", e);
-                            }
+                            pubsub.publish::<Trade>(trade);
                         }
                         BinanceSwapEvent::Tick(tick) => {
                             let tick = Tick::new(
@@ -74,9 +73,7 @@ impl BinanceIngestor {
                                 tick.ask_price,
                                 tick.ask_quantity,
                             );
-                            if let Err(e) = persistence_service.insert_tick(tick).await {
-                                error!("Failed to insert tick: {}", e);
-                            }
+                            pubsub.publish::<Tick>(tick);
                         }
                     }
                 } else {
@@ -94,7 +91,7 @@ impl BinanceIngestor {
 #[async_trait]
 impl Ingestor for BinanceIngestor {
     #[instrument(skip_all)]
-    async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), IngestorError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting binance ingestor...");
 
         // Check for API key and secret
@@ -108,33 +105,34 @@ impl Ingestor for BinanceIngestor {
         let (tx, rx) = flume::unbounded();
         let subscription = Subscription::new(self.channels.iter().map(|c| c.as_str()).collect());
 
-        task_tracker.spawn(async move {
-            ws_manager.run(tx, subscription).await.unwrap();
+        let ws_manager_tracker = TaskTracker::new();
+        let ws_manager_shutdown = shutdown.clone();
+        ws_manager_tracker.spawn(async move {
+            ws_manager.run(tx, subscription, ws_manager_shutdown).await.unwrap();
         });
 
-        let persistence_service = self.persistence_service.clone();
-        let shutdown = shutdown.clone();
-        task_tracker.spawn(async move {
-            loop {
-                tokio::select! {
-                            _ = shutdown.cancelled() => {
-                                info!("Shutting down binance ingestor...");
-                                break;
-                            }
-                            res = rx.recv_async() => {
-                        match res {
-                            Ok(data) => {
-                                Self::process_event(persistence_service.clone(), data).await;
-                            }
-                            Err(e) => {
-                                error!("{}", e);
-                                break;
-                            }
+        loop {
+            tokio::select! {
+                res = rx.recv_async() => {
+                    match res {
+                        Ok(data) => {
+                            Self::process_event(self.pubsub.clone(), self.persistence.clone(), data).await;
+                        }
+                        Err(e) => {
+                            error!("{}", e);
+                            break;
                         }
                     }
                 }
+                _ = shutdown.cancelled() => {
+                    info!("Shutting down binance ingestor...");
+                    ws_manager_tracker.close();
+                    ws_manager_tracker.wait().await;
+                    break;
+                }
             }
-        });
+        }
+
         Ok(())
     }
 

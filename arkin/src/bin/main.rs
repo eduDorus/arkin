@@ -23,26 +23,34 @@ async fn main() {
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
     info!("Starting Arkin Order Manager 🚀");
 
+    let pubsub = Arc::new(PubSub::new());
+
     let config = load::<PersistenceConfig>();
-    let persistence = Arc::new(PersistenceService::from_config(&config));
+    let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()));
 
     let config = load::<PortfolioConfig>();
-    let portfolio = PortfolioFactory::from_config(&config);
+    let portfolio = PortfolioFactory::from_config(&config, pubsub.clone());
 
     let config = load::<ExecutionConfig>();
-    let order_manager = ExecutionFactory::from_config(&config, portfolio.clone());
+    let order_manager = ExecutionFactory::from_config(&config, pubsub.clone(), portfolio.clone());
 
     let config = load::<AllocationOptimConfig>();
-    let allocation = AllocationFactory::from_config(&config, persistence.clone(), portfolio.clone());
+    let allocation = AllocationFactory::from_config(&config, pubsub.clone(), persistence.clone(), portfolio.clone());
 
     let config = load::<InsightsConfig>();
-    let insights = Arc::new(InsightsService::from_config(&config.insights_service, persistence.clone()));
+    let insights = Arc::new(InsightsService::from_config(
+        &config.insights_service,
+        pubsub.clone(),
+        persistence.clone(),
+    ));
 
     let config = load::<StrategyConfig>();
-    let strategy = StrategyFactory::from_config(&config).pop().expect("No strategy found");
+    let strategy = StrategyFactory::from_config(&config, pubsub.clone())
+        .pop()
+        .expect("No strategy found");
 
     let config = load::<IngestorsConfig>();
-    let ingestors = IngestorFactory::from_config(&config, persistence.clone());
+    let ingestors = IngestorFactory::from_config(&config, pubsub.clone(), persistence.clone());
 
     // Work around for fetching instruments
     let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
@@ -55,6 +63,7 @@ async fn main() {
     }
 
     let engine = SingleStrategyEngineBuilder::default()
+        .pubsub(pubsub)
         .instruments(instruments)
         .persistor(persistence)
         .portfolio(portfolio)

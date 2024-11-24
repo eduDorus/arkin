@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use rust_decimal::prelude::*;
 use test_log::test;
 
@@ -8,14 +6,8 @@ use arkin_execution::prelude::*;
 
 #[test(tokio::test)]
 async fn test_place_order() {
-    // Create a mock OrderManager
-    let mock_order_manager = MockOrderManager::new();
-
     // Build the SimulationExecutor with the mock OrderManager
-    let executor = BacktestExecutorBuilder::default()
-        .order_manager(Arc::new(mock_order_manager))
-        .build()
-        .unwrap();
+    let executor = BacktestExecutorBuilder::default().build().unwrap();
 
     // // Create a sample VenueOrder
     let instrument = binance_btc_usdt_perp();

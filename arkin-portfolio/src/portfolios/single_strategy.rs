@@ -5,13 +5,14 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
 use rust_decimal::prelude::*;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument, warn};
 
 use crate::{Portfolio, PortfolioError};
 
 #[derive(Debug, Clone, Builder)]
 pub struct SingleStrategyPortfolio {
+    pubsub: Arc<PubSub>,
     #[builder(default = "DashMap::new()")]
     positions: DashMap<Arc<Instrument>, Position>,
     #[builder(default = "DashMap::new()")]
@@ -158,13 +159,35 @@ impl SingleStrategyPortfolio {
 
 #[async_trait]
 impl Portfolio for SingleStrategyPortfolio {
-    #[instrument(skip_all)]
-    async fn start(&self, _task_tracker: TaskTracker, _shutdown: CancellationToken) -> Result<(), PortfolioError> {
-        Ok(())
-    }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), PortfolioError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError> {
+        let mut balance_updates = self.pubsub.subscribe::<Holding>();
+        let mut position_updates = self.pubsub.subscribe::<Position>();
+        let mut fill_updates = self.pubsub.subscribe::<Fill>();
+        loop {
+            tokio::select! {
+                Ok(balance) = balance_updates.recv() => {
+                    match self.balance_update(balance).await {
+                        Ok(_) => info!("Balance update processed"),
+                        Err(e) => warn!("Failed to process balance update: {}", e),
+                    }
+                }
+                Ok(position) = position_updates.recv() => {
+                    match self.position_update(position).await {
+                        Ok(_) => info!("Position update processed"),
+                        Err(e) => warn!("Failed to process position update: {}", e),
+                    }
+                }
+                Ok(fill) = fill_updates.recv() => {
+                    match self.fill_update(fill).await {
+                        Ok(_) => info!("Fill update processed"),
+                        Err(e) => warn!("Failed to process fill update: {}", e),
+                    }
+                }
+                _ = shutdown.cancelled() => {
+                    break;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -175,14 +198,14 @@ impl Portfolio for SingleStrategyPortfolio {
     }
 
     #[instrument(skip_all)]
-    async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError> {
-        self.update_position(fill);
+    async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError> {
+        self.update_balance(holding);
         Ok(())
     }
 
     #[instrument(skip_all)]
-    async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError> {
-        self.update_balance(holding);
+    async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError> {
+        self.update_position(fill);
         Ok(())
     }
 

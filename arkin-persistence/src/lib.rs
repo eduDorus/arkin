@@ -7,7 +7,7 @@ mod traits;
 
 pub use config::*;
 pub use errors::*;
-pub use service::PersistenceService;
+pub use service::*;
 pub use traits::*;
 
 pub mod prelude {

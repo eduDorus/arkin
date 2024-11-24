@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use time::OffsetDateTime;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 
 use arkin_core::prelude::*;
 
@@ -10,7 +10,7 @@ use crate::StrategyError;
 
 #[async_trait]
 pub trait Algorithm: std::fmt::Debug + Send + Sync {
-    async fn start(&self, task_tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), StrategyError>;
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), StrategyError>;
     async fn cleanup(&self) -> Result<(), StrategyError>;
 
     async fn insight_update(

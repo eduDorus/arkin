@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 
-use crate::{constants::TIMESTAMP_FORMAT, FeatureId};
+use crate::{constants::TIMESTAMP_FORMAT, Event, FeatureId, UpdateEventType};
 
 use super::Instrument;
 
@@ -37,6 +37,12 @@ impl Insight {
             feature_id,
             value,
         }
+    }
+}
+
+impl Event for Insight {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::Insight
     }
 }
 

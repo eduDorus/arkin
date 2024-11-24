@@ -1,72 +1,93 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
-use rust_decimal::prelude::*;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument};
 
 use arkin_core::prelude::*;
 
-use crate::{Executor, ExecutorError, OrderManager};
+use crate::{Executor, ExecutorError};
 
 #[derive(Debug, Builder)]
+#[builder(setter(into))]
 pub struct BacktestExecutor {
-    order_manager: Arc<dyn OrderManager>,
+    pubsub: Arc<PubSub>,
     #[builder(default)]
     orders: DashMap<VenueOrderId, VenueOrder>,
+}
+
+impl BacktestExecutor {
+    pub async fn ack_orders(&self) -> Vec<VenueOrderId> {
+        // Change order state of new orders to open
+        let mut acked_orders = vec![];
+        self.orders.alter_all(|_, mut order| {
+            if order.status == VenueOrderStatus::New {
+                order.update_status(VenueOrderStatus::Placed);
+                acked_orders.push(order.id.clone());
+            }
+            order
+        });
+        for order in acked_orders.iter() {
+            info!("Order acked: {:?}", order);
+        }
+        acked_orders
+    }
+
+    pub async fn ack_cancels(&self) -> Vec<VenueOrderId> {
+        // Change order state of cancelling orders to cancelled
+        let mut acked_orders = vec![];
+        self.orders.alter_all(|_, mut order| {
+            if order.is_cancelling() {
+                order.ack_cancel();
+                acked_orders.push(order.id.clone());
+            }
+            order
+        });
+        for order in acked_orders.iter() {
+            info!("Order cancelled: {:?}", order);
+        }
+        acked_orders
+    }
+
+    pub fn list_orders(&self) -> Vec<VenueOrder> {
+        self.orders.iter().map(|order| order.value().clone()).collect()
+    }
+
+    pub fn list_open_orders(&self) -> Vec<VenueOrder> {
+        self.orders
+            .iter()
+            .filter(|order| !order.value().is_active())
+            .map(|order| order.value().clone())
+            .collect()
+    }
+
+    pub fn list_finalized_orders(&self) -> Vec<VenueOrder> {
+        self.orders
+            .iter()
+            .filter(|order| order.value().is_finalized())
+            .map(|order| order.value().clone())
+            .collect()
+    }
 }
 
 #[async_trait]
 impl Executor for BacktestExecutor {
     #[instrument(skip_all)]
-    async fn start(&self, tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), ExecutorError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError> {
         info!("Starting simulation executor...");
-        let order_manager = self.order_manager.clone();
-        let orders = self.orders.clone();
-        tracker.spawn(async move {
-            loop {
-                if shutdown.is_cancelled() {
-                    info!("Stopping SimExecutor...");
+        let mut venue_orders = self.pubsub.subscribe::<VenueOrder>();
+        loop {
+            tokio::select! {
+                Ok(order) = venue_orders.recv() => {
+                    self.orders.insert(order.id.clone(), order);
+                }
+                _ = shutdown.cancelled() => {
                     break;
                 }
-                // Generate random number between 0-3s
-                let delay = rand::random::<u64>() % 4;
-                tokio::time::sleep(Duration::from_secs(delay)).await;
-                // info!("Executing orders");
-
-                // Check if any orders are ready to be executed
-                for mut entry in orders.iter_mut() {
-                    let order = entry.value_mut();
-                    match order.status {
-                        VenueOrderStatus::New => {
-                            order.status = VenueOrderStatus::Placed;
-                            // let _ = order_manager.order_status_update(order.id, VenueOrderStatus::Placed).await;
-                        }
-                        VenueOrderStatus::Placed => {
-                            let fill = FillBuilder::default()
-                                .venue_order_id(order.id)
-                                .price(order.price.unwrap_or(Decimal::ZERO))
-                                .quantity(order.quantity)
-                                .build()
-                                .unwrap();
-                            let _ = order_manager.order_update(fill).await;
-                            order.status = VenueOrderStatus::Filled;
-                        }
-                        _ => {}
-                    }
-                }
-
-                // Remove filled orders
-                orders.retain(|_, order| {
-                    order.status != VenueOrderStatus::Filled
-                        || order.status != VenueOrderStatus::Cancelled
-                        || order.status != VenueOrderStatus::Rejected
-                });
             }
-        });
-        info!("Simulation executor started");
+        }
         Ok(())
     }
 
@@ -134,5 +155,73 @@ impl Executor for BacktestExecutor {
             order.cancel();
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use rust_decimal::prelude::*;
+    use test_log::test;
+
+    #[test(tokio::test)]
+    async fn test_backtest_executor_place_order() {
+        // Create executor
+        let executor = BacktestExecutorBuilder::default().build().unwrap();
+
+        // Create a sample VenueOrder
+        let instrument = binance_btc_usdt_perp();
+        let order = VenueOrderBuilder::default()
+            .execution_order_id(ExecutionOrderId::new_v4())
+            .instrument(instrument)
+            .order_type(VenueOrderType::Limit)
+            .side(MarketSide::Buy)
+            .quantity(Decimal::from_f64(0.1).unwrap())
+            .price(Some(Decimal::from_f64(50000.).unwrap()))
+            .build()
+            .unwrap();
+
+        // Call place_order
+        executor.place_order(order.clone()).await.unwrap();
+
+        executor.ack_orders().await;
+
+        // Get the list of orders
+        let orders = executor
+            .orders
+            .iter()
+            .map(|order| order.value().clone())
+            .collect::<Vec<VenueOrder>>();
+        assert_eq!(orders.len(), 1);
+        assert_eq!(orders[0].status, VenueOrderStatus::Placed);
+    }
+
+    #[test(tokio::test)]
+    async fn test_backtest_executor_cancel_order() {
+        // Create executor
+        let executor = BacktestExecutorBuilder::default().build().unwrap();
+
+        // Create a sample VenueOrder
+        let instrument = binance_btc_usdt_perp();
+        let order = VenueOrderBuilder::default()
+            .execution_order_id(ExecutionOrderId::new_v4())
+            .instrument(instrument)
+            .order_type(VenueOrderType::Limit)
+            .side(MarketSide::Buy)
+            .quantity(Decimal::from_f64(0.1).unwrap())
+            .price(Some(Decimal::from_f64(50000.).unwrap()))
+            .build()
+            .unwrap();
+
+        // Call place_order
+        executor.place_order(order.clone()).await.unwrap();
+        executor.ack_orders().await;
+        executor.cancel_order(order.id).await.unwrap();
+        executor.ack_cancels().await;
+
+        let orders = executor.list_finalized_orders();
+        assert_eq!(orders.len(), 1);
+        assert_eq!(orders[0].status, VenueOrderStatus::Cancelled);
     }
 }

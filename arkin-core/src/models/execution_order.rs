@@ -7,11 +7,7 @@ use time::OffsetDateTime;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::{
-    events::{EventType, EventTypeOf},
-    types::Commission,
-    Event, Notional, Price, Quantity,
-};
+use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEventType};
 
 use super::{Fill, Instrument, MarketSide};
 
@@ -19,9 +15,35 @@ pub type ExecutionOrderId = Uuid;
 
 #[derive(Debug, Display, Clone, PartialEq, Eq)]
 pub enum ExecutionOrderStrategy {
-    Market,
-    Limit(Price),
-    WideQuoting(Decimal),
+    Market(Market),
+    Limit(Limit),
+    WideQuoting(WideQuoting),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Builder)]
+#[builder(setter(into))]
+pub struct Market {
+    pub side: MarketSide,
+    pub quantity: Quantity,
+    pub split: bool,
+    pub vwap: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Builder)]
+#[builder(setter(into))]
+pub struct Limit {
+    pub side: MarketSide,
+    pub quantity: Quantity,
+    pub price: Price,
+    pub time_in_force: Option<OffsetDateTime>,
+    pub split: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Builder)]
+#[builder(setter(into))]
+pub struct WideQuoting {
+    pub spread_from_mid: Decimal,
+    pub requote_price_move_pct: Decimal,
 }
 
 #[derive(Debug, Display, Clone, PartialEq, Eq)]
@@ -153,27 +175,9 @@ impl ExecutionOrder {
     }
 }
 
-impl EventTypeOf for ExecutionOrder {
-    fn event_type() -> EventType {
-        EventType::ExecutionOrder
-    }
-}
-
-impl TryFrom<Event> for ExecutionOrder {
-    type Error = ();
-
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::ExecutionOrder(order) = event {
-            Ok(order)
-        } else {
-            Err(())
-        }
-    }
-}
-
-impl From<ExecutionOrder> for Event {
-    fn from(order: ExecutionOrder) -> Self {
-        Event::ExecutionOrder(order)
+impl Event for ExecutionOrder {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::ExecutionOrder
     }
 }
 

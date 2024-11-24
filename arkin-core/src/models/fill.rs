@@ -5,8 +5,8 @@ use strum::Display;
 use uuid::Uuid;
 
 use crate::{
-    events::{Event, EventType, EventTypeOf},
     types::{Commission, Price, Quantity},
+    Event, UpdateEventType,
 };
 
 use super::{ExecutionOrderId, Instrument, MarketSide, VenueOrderId};
@@ -31,21 +31,9 @@ pub struct Fill {
     pub commission: Commission,
 }
 
-impl EventTypeOf for Fill {
-    fn event_type() -> EventType {
-        EventType::Fill
-    }
-}
-
-impl TryFrom<Event> for Fill {
-    type Error = ();
-
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
-        if let Event::Fill(fill) = event {
-            Ok(fill)
-        } else {
-            Err(())
-        }
+impl Event for Fill {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::Fill
     }
 }
 

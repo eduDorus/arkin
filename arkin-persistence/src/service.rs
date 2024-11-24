@@ -5,8 +5,7 @@ use async_trait::async_trait;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -19,16 +18,17 @@ use crate::{PersistenceConfig, PersistenceError};
 
 #[derive(Debug)]
 pub struct PersistenceService {
-    auto_commit_interval: Duration,
+    pub pubsub: Arc<PubSub>,
+    pub auto_commit_interval: Duration,
     // venue_service: Arc<VenueService>,
-    instrument_service: Arc<InstrumentService>,
-    tick_service: Arc<TickService>,
-    trade_service: Arc<TradeService>,
-    insights_service: Arc<InsightsService>,
+    pub instrument_service: Arc<InstrumentService>,
+    pub tick_service: Arc<TickService>,
+    pub trade_service: Arc<TradeService>,
+    pub insights_service: Arc<InsightsService>,
 }
 
 impl PersistenceService {
-    pub fn from_config(config: &PersistenceConfig) -> Self {
+    pub fn from_config(config: &PersistenceConfig, pubsub: Arc<PubSub>) -> Self {
         let db_config = config.database.clone();
         let conn_options = PgConnectOptions::new()
             .host(&db_config.host)
@@ -65,6 +65,7 @@ impl PersistenceService {
         let insights_service = Arc::new(InsightsService::new(insights_repo.clone(), config.batch_size));
 
         Self {
+            pubsub,
             auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
             // venue_service,
             instrument_service,
@@ -78,39 +79,51 @@ impl PersistenceService {
 #[async_trait]
 impl Persistor for PersistenceService {
     #[instrument(skip_all)]
-    async fn start(&self, tracker: TaskTracker, shutdown: CancellationToken) -> Result<(), PersistenceError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), PersistenceError> {
         info!("Starting persistence service...");
         let tick_service = self.tick_service.clone();
         let trade_service = self.trade_service.clone();
         let insights_service = self.insights_service.clone();
 
         let mut interval = tokio::time::interval(self.auto_commit_interval);
-        tracker.spawn(async move {
-            loop {
-                tokio::select! {
-                        _ = interval.tick() => {
-                            debug!("Auto commit persistence service...");
-                            tick_service.flush().await.unwrap();
-                            trade_service.flush().await.unwrap();
-                            insights_service.flush().await.unwrap();
-                        }
 
-                        _ = shutdown.cancelled() => {
-                            break;
+        let mut trades = self.pubsub.subscribe::<Trade>();
+        let mut ticks = self.pubsub.subscribe::<Tick>();
+        let mut insights = self.pubsub.subscribe::<Insight>();
+
+        loop {
+            tokio::select! {
+                    Ok(trade) = trades.recv() => {
+                        if let Err(e) = trade_service.insert_batch(trade).await {
+                            error!("Failed to insert trade: {}", e);
                         }
-                }
+                    }
+                    Ok(tick) = ticks.recv() => {
+                        if let Err(e) = tick_service.insert_batch(tick).await {
+                            error!("Failed to insert tick: {}", e);
+                        }
+                    }
+                    Ok(insight) = insights.recv() => {
+                        if let Err(e) = insights_service.insert_batch(insight).await {
+                            error!("Failed to insert insight: {}", e);
+                        }
+                    }
+                    _ = interval.tick() => {
+                        debug!("Auto commit persistence service...");
+                        if let Err(e) = self.flush().await {
+                            error!("Failed to auto commit persistence service: {}", e);
+                        }
+                    }
+                    _ = shutdown.cancelled() => {
+                        if let Err(e) = self.flush().await {
+                            error!("Failed to commit persistence service on shutdown: {}", e);
+                        }
+                        break;
+                    }
             }
-        });
+        }
 
         info!("Persistence service started");
-        Ok(())
-    }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), PersistenceError> {
-        info!("Cleaning up persistence service...");
-        self.flush().await?;
-        info!("Persistence service cleaned up");
         Ok(())
     }
 

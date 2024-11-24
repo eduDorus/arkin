@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{Executor, ExecutorTypeConfig, MockOrderManager};
+use crate::{Executor, ExecutorTypeConfig};
 
 use super::BacktestExecutorBuilder;
 
@@ -11,7 +11,6 @@ impl ExecutorFactory {
         let executor: Arc<dyn Executor> = match config {
             ExecutorTypeConfig::Simulation(_c) => Arc::new(
                 BacktestExecutorBuilder::default()
-                    .order_manager(Arc::new(MockOrderManager::new()))
                     .build()
                     .expect("Failed to build BacktestExecutor"),
             ),

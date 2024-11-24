@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use arkin_core::prelude::*;
 use async_tungstenite::{
@@ -9,13 +9,9 @@ use async_tungstenite::{
 };
 use flume::Sender;
 use futures_util::{SinkExt, StreamExt};
-use tokio::{
-    net::TcpStream,
-    select,
-    sync::{OwnedSemaphorePermit, Semaphore},
-    time::sleep,
-};
+use tokio::{net::TcpStream, select, sync::Semaphore};
 use tokio_rustls::client::TlsStream;
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error, info};
 use url::Url;
 
@@ -50,11 +46,16 @@ impl WebSocketManager {
         }
     }
 
-    pub async fn run(&mut self, manager_tx: Sender<String>, subscription: Subscription) -> Result<(), IngestorError> {
+    pub async fn run(
+        &mut self,
+        manager_tx: Sender<String>,
+        subscription: Subscription,
+        shutdown: CancellationToken,
+    ) -> Result<(), IngestorError> {
         // Use select for new data in receiver or spawn new connection on permit
         info!("Starting WebSocket manager...");
         let (sender, receiver) = flume::unbounded::<Message>();
-
+        let websocket_tracker = TaskTracker::new();
         loop {
             select! {
                 msg = receiver.recv_async() => {
@@ -70,36 +71,31 @@ impl WebSocketManager {
                     if self.deduplicator.check(&data) {
                         manager_tx.send_async(data).await.unwrap();
                     }
-                },
+                }
                 permit = self.limit_connections.clone().acquire_owned() => {
                     // This should never fail, as the semaphore is never closed.
+                    if shutdown.is_cancelled() {
+                        continue;
+                    }
                     let permit = permit?;
                     debug!("Acquired permit: {:?}", permit);
-                    match self.start_handler(permit, sender.clone(), subscription.clone()).await {
-                        Ok(_) => info!("Started new handler"),
-                        Err(e) => {
-                            error!("Failed to start new handler: {:?}", e);
-                            sleep(Duration::from_secs(5)).await;
+                    let mut handle = Handler::new(&self.url, sender.clone(), subscription.clone(), shutdown.clone()).await?;
+                    websocket_tracker.spawn(async move {
+                        if let Err(err) = handle.run().await {
+                            error!("Websocket handler: {:?}", err);
                         }
-                    }
+                        drop(permit)
+                    });
+
+                }
+                _ = shutdown.cancelled() => {
+                    info!("Shutting down WebSocket manager...");
+                    websocket_tracker.close();
+                    websocket_tracker.wait().await;
+                    break;
                 }
             }
         }
-    }
-
-    async fn start_handler(
-        &self,
-        permit: OwnedSemaphorePermit,
-        sender: Sender<Message>,
-        subscription: Subscription,
-    ) -> Result<(), IngestorError> {
-        let mut handle = Handler::new(&self.url, sender, subscription).await?;
-        tokio::spawn(async move {
-            if let Err(err) = handle.run().await {
-                error!("Websocket handler: {:?}", err);
-            }
-            drop(permit)
-        });
         Ok(())
     }
 }
@@ -119,10 +115,18 @@ pub struct Handler {
 
     /// Send messages to the WebSocket Manager
     sender: Sender<Message>,
+
+    /// Shutdown signal
+    shutdown: CancellationToken,
 }
 
 impl Handler {
-    pub async fn new(url: &Url, sender: Sender<Message>, subscription: Subscription) -> Result<Self, IngestorError> {
+    pub async fn new(
+        url: &Url,
+        sender: Sender<Message>,
+        subscription: Subscription,
+        shutdown: CancellationToken,
+    ) -> Result<Self, IngestorError> {
         let (mut stream, _) = connect_async(url.to_string()).await?;
         // Send ping
         let ping = Message::Ping(vec![]);
@@ -133,6 +137,7 @@ impl Handler {
             subscription,
             stream,
             sender,
+            shutdown,
         })
     }
 
@@ -153,9 +158,18 @@ impl Handler {
         sub.update_id(self.id);
         self.stream.send(sub.into()).await?;
 
-        while let Some(msg) = self.stream.next().await {
-            let msg = msg?;
-            self.handle_message(msg).await?;
+        loop {
+            select! {
+                    Some(msg) = self.stream.next() => {
+                        let msg = msg?;
+                        self.handle_message(msg).await?;
+                    }
+                    _ = self.shutdown.cancelled() => {
+                        info!("Shutting down handler...");
+                        self.stream.send(Message::Close(None)).await?;
+                        break;
+                    }
+            }
         }
         Ok(())
     }
