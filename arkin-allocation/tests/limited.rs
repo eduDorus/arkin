@@ -18,7 +18,7 @@ async fn test_limited_allocation() {
         Ok(Some(
             TickBuilder::default()
                 .event_time(OffsetDateTime::now_utc())
-                .instrument(binance_btc_usdt_perp())
+                .instrument(test_inst_binance_btc_usdt_perp())
                 .tick_id(1234 as u64)
                 .ask_price(dec!(51))
                 .ask_quantity(dec!(1))
@@ -46,7 +46,7 @@ async fn test_limited_allocation() {
     let event_time = OffsetDateTime::now_utc();
     let signal = SignalBuilder::default()
         .event_time(event_time)
-        .instrument(binance_btc_usdt_perp())
+        .instrument(test_inst_binance_btc_usdt_perp())
         .strateg_id(Arc::new(String::from("CrossOver")))
         .weight(Decimal::from_f64(1.0).unwrap())
         .build()

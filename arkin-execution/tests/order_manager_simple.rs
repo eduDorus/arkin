@@ -22,7 +22,7 @@ async fn test_place_execution_order() {
         .unwrap();
 
     // Create a test ExecutionOrder
-    let instrument = binance_btc_usdt_perp();
+    let instrument = test_inst_binance_btc_usdt_perp();
     let first_order = ExecutionOrderBuilder::default()
         .instrument(instrument.clone())
         .execution_type(ExecutionOrderStrategy::WideQuoting(

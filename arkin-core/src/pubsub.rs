@@ -10,7 +10,11 @@ use tracing::{debug, error};
 
 use strum::EnumDiscriminants;
 
-use crate::{Book, ExecutionOrder, Fill, Holding, Insight, Instrument, Position, Signal, Tick, Trade, VenueOrder};
+use crate::types::Commission;
+use crate::{
+    Book, ExecutionOrder, Fill, Holding, Insight, Instrument, Position, Price, Quantity, Signal, Tick, Trade,
+    VenueOrder, VenueOrderId, VenueOrderStatus,
+};
 
 pub trait Event: fmt::Debug + Send + Sync + Clone + 'static {
     fn event_type() -> UpdateEventType;
@@ -76,6 +80,50 @@ impl From<SignalTick> for UpdateEvent {
     }
 }
 
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
+pub struct VenueOrderState {
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub event_time: OffsetDateTime,
+    pub id: VenueOrderId,
+    pub status: VenueOrderStatus,
+}
+
+impl Event for VenueOrderState {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::VenueOrderState
+    }
+}
+
+impl From<VenueOrderState> for UpdateEvent {
+    fn from(update: VenueOrderState) -> Self {
+        UpdateEvent::VenueOrderState(update)
+    }
+}
+
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
+pub struct VenueOrderFill {
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub event_time: OffsetDateTime,
+    pub id: VenueOrderId,
+    pub price: Price,
+    pub quantity: Quantity,
+    pub commission: Commission,
+}
+
+impl Event for VenueOrderFill {
+    fn event_type() -> UpdateEventType {
+        UpdateEventType::VenueOrderFill
+    }
+}
+
+impl From<VenueOrderFill> for UpdateEvent {
+    fn from(update: VenueOrderFill) -> Self {
+        UpdateEvent::VenueOrderFill(update)
+    }
+}
+
 #[derive(Debug, Clone, EnumDiscriminants)]
 #[strum_discriminants(name(UpdateEventType))]
 #[strum_discriminants(derive(Hash))]
@@ -93,6 +141,8 @@ pub enum UpdateEvent {
     SignalTick(SignalTick),
     ExecutionOrder(ExecutionOrder),
     VenueOrder(VenueOrder),
+    VenueOrderState(VenueOrderState),
+    VenueOrderFill(VenueOrderFill),
 }
 
 impl UpdateEvent {

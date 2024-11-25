@@ -10,7 +10,7 @@ async fn test_place_order() {
     let executor = BacktestExecutorBuilder::default().build().unwrap();
 
     // // Create a sample VenueOrder
-    let instrument = binance_btc_usdt_perp();
+    let instrument = test_inst_binance_btc_usdt_perp();
     let execution_order_id = ExecutionOrderId::new_v4();
     let order = VenueOrderBuilder::default()
         .execution_order_id(execution_order_id)

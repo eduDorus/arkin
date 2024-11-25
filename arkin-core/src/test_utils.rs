@@ -3,7 +3,10 @@ use std::{str::FromStr, sync::Arc};
 use rust_decimal::prelude::*;
 use uuid::Uuid;
 
-use crate::{Instrument, InstrumentBuilder, InstrumentStatus, InstrumentType, Venue, VenueBuilder};
+use crate::{
+    Instrument, InstrumentBuilder, InstrumentStatus, InstrumentType, Price, Quantity, Tick, TickBuilder, Venue,
+    VenueBuilder,
+};
 
 pub fn binance_venue() -> Venue {
     VenueBuilder::default()
@@ -14,7 +17,7 @@ pub fn binance_venue() -> Venue {
         .expect("Failed to build Venue in test utils")
 }
 
-pub fn binance_btc_usdt_perp() -> Arc<Instrument> {
+pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
     let venue = binance_venue();
     let instrument = InstrumentBuilder::default()
         .id(Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"))
@@ -40,7 +43,7 @@ pub fn binance_btc_usdt_perp() -> Arc<Instrument> {
     Arc::new(instrument)
 }
 
-pub fn binance_eth_usdt_perp() -> Arc<Instrument> {
+pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
     let venue = binance_venue();
     let instrument = InstrumentBuilder::default()
         .id(Uuid::from_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").expect("Invalid UUID"))
@@ -64,4 +67,22 @@ pub fn binance_eth_usdt_perp() -> Arc<Instrument> {
         .build()
         .expect("Failed to build Instrument in test utils");
     Arc::new(instrument)
+}
+
+pub fn test_tick(
+    instrument: Arc<Instrument>,
+    bid_price: Price,
+    bid_quantity: Quantity,
+    ask_price: Price,
+    ask_quantity: Quantity,
+) -> Tick {
+    TickBuilder::default()
+        .instrument(instrument)
+        .tick_id(0 as u64)
+        .bid_price(bid_price)
+        .bid_quantity(bid_quantity)
+        .ask_price(ask_price)
+        .ask_quantity(ask_quantity)
+        .build()
+        .expect("Failed to build Tick in test utils")
 }

@@ -6,13 +6,13 @@ use time::OffsetDateTime;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEventType};
+use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEventType, VenueOrderFill};
 
-use super::{ExecutionOrderId, Fill, Instrument, MarketSide};
+use super::{ExecutionOrderId, Instrument, MarketSide};
 
 pub type VenueOrderId = Uuid;
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Display, Clone, PartialEq, Eq)]
 pub enum VenueOrderType {
     Market,
     Limit,
@@ -115,7 +115,7 @@ impl VenueOrder {
         }
     }
 
-    pub fn add_fill(&mut self, fill: Fill) {
+    pub fn add_fill(&mut self, fill: VenueOrderFill) {
         self.avg_fill_price = (self.avg_fill_price * self.filled_quantity + fill.price * fill.quantity)
             / (self.filled_quantity + fill.quantity);
         self.filled_quantity += fill.quantity;

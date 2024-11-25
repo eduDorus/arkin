@@ -1,4 +1,4 @@
-use arkin_core::{test_utils::binance_btc_usdt_perp, FillBuilder, MarketSide, PositionBuilder, PositionSide};
+use arkin_core::{test_utils::test_inst_binance_btc_usdt_perp, FillBuilder, MarketSide, PositionBuilder, PositionSide};
 use arkin_portfolio::{Portfolio, SingleStrategyPortfolioBuilder};
 use rust_decimal::prelude::*;
 use test_log::test;
@@ -12,7 +12,7 @@ async fn test_single_strategy_position_update() {
         .expect("Failed to build SimplePortfolio");
 
     // Create Position
-    let instrument = binance_btc_usdt_perp();
+    let instrument = test_inst_binance_btc_usdt_perp();
     let position = PositionBuilder::default()
         .instrument(instrument.clone())
         .side(PositionSide::Long)
@@ -41,7 +41,7 @@ async fn test_single_strategy_portfolio_fill_update() {
         .expect("Failed to build SimplePortfolio");
 
     // Create Fill
-    let instrument = binance_btc_usdt_perp();
+    let instrument = test_inst_binance_btc_usdt_perp();
     let fill = FillBuilder::default()
         .venue_order_id(Uuid::new_v4())
         .instrument(instrument.clone())
