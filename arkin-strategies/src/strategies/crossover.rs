@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use derive_builder::Builder;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
+use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument};
 
@@ -25,13 +26,18 @@ impl Algorithm for CrossoverStrategy {
     #[instrument(skip_all)]
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), StrategyError> {
         info!("Starting Crossover Strategy...");
-        Ok(())
-    }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), StrategyError> {
-        info!("Cleaning up Crossover Strategy...");
-        info!("Crossover Strategy cleaned up");
+        let mut insight_ticks = self.pubsub.subscribe::<InsightTick>();
+        loop {
+            select! {
+                Ok(tick) = insight_ticks.recv() => {
+                    info!("CrossoverStrategy received insight tick: {}", tick.event_time);
+                    self.insight_tick(tick).await?;
+                }
+                _ = _shutdown.cancelled() => {
+                    break;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -94,5 +100,27 @@ impl Algorithm for CrossoverStrategy {
             })
             .collect::<Vec<_>>();
         Ok(signals)
+    }
+
+    #[instrument(skip_all)]
+    async fn insight_tick(&self, tick: InsightTick) -> Result<(), StrategyError> {
+        info!("Processing insight tick for Crossover Strategy...");
+        let signals = self
+            .insight_update(&tick.instruments, tick.event_time, tick.insights.as_slice())
+            .await?;
+        let signal_tick = SignalTickBuilder::default()
+            .event_time(tick.event_time)
+            .instruments(tick.instruments)
+            .signals(signals)
+            .build()
+            .expect("Failed to create signal tick");
+
+        info!(
+            "Publishing signal tick: {} with {} signals",
+            signal_tick.event_time,
+            signal_tick.signals.len()
+        );
+        self.pubsub.publish::<SignalTick>(signal_tick);
+        Ok(())
     }
 }

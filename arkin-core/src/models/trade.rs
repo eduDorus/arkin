@@ -6,7 +6,7 @@ use time::OffsetDateTime;
 use crate::{
     constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
     models::Insight,
-    Event, Price, Quantity, UpdateEventType,
+    Event, Price, Quantity, UpdateEvent, UpdateEventType,
 };
 
 use super::{Instrument, MarketSide};
@@ -61,6 +61,12 @@ impl Trade {
 impl Event for Trade {
     fn event_type() -> UpdateEventType {
         UpdateEventType::Trade
+    }
+}
+
+impl From<Trade> for UpdateEvent {
+    fn from(trade: Trade) -> Self {
+        UpdateEvent::Trade(trade)
     }
 }
 

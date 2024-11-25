@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 use arkin_core::prelude::*;
 
@@ -134,15 +134,15 @@ impl OrderManager for SimpleOrderManager {
         loop {
             tokio::select! {
                 Ok(order) = execution_orders.recv() => {
-                    match self.place_order(order).await {
-                        Ok(_) => info!("Order processed"),
-                        Err(e) => warn!("Failed to process order: {}", e),
+                    info!("SimpleOrderManager received order: {}", order.id);
+                    if let Err(e) = self.place_order(order).await {
+                        error!("Failed to process order: {}", e);
                     }
                 }
                 Ok(fill) = fills.recv() => {
-                    match self.order_update(fill).await {
-                        Ok(_) => info!("Fill processed"),
-                        Err(e) => warn!("Failed to process fill: {}", e),
+                    info!("SimpleOrderManager received fill: {}", fill.execution_order_id);
+                    if let Err(e) = self.order_update(fill).await {
+                        error!("Failed to process fill: {}", e);
                     }
                 }
                 _ = shutdown.cancelled() => {
@@ -150,13 +150,6 @@ impl OrderManager for SimpleOrderManager {
                 }
             }
         }
-        Ok(())
-    }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), OrderManagerError> {
-        info!("Cleaning up order manager...");
-        info!("Order manager cleaned up");
         Ok(())
     }
 

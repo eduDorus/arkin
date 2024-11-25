@@ -11,7 +11,6 @@ use crate::StrategyError;
 #[async_trait]
 pub trait Algorithm: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), StrategyError>;
-    async fn cleanup(&self) -> Result<(), StrategyError>;
 
     async fn insight_update(
         &self,
@@ -19,6 +18,7 @@ pub trait Algorithm: std::fmt::Debug + Send + Sync {
         event_time: OffsetDateTime,
         insights: &[Insight],
     ) -> Result<Vec<Signal>, StrategyError>;
+    async fn insight_tick(&self, tick: InsightTick) -> Result<(), StrategyError>;
     // async fn on_tick(&self, tick: Tick) -> Result<(), StrategyError>;
     // async fn on_order(&self, order: Order) -> Result<(), StrategyError>;
     // async fn on_trade(&self, trade: Trade) -> Result<(), StrategyError>;

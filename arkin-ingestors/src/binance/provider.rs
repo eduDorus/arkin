@@ -135,12 +135,6 @@ impl Ingestor for BinanceIngestor {
 
         Ok(())
     }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), IngestorError> {
-        info!("Cleaning up binance ingestor...");
-        Ok(())
-    }
 }
 
 #[derive(Serialize, Clone)]

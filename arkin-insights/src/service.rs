@@ -8,6 +8,7 @@ use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 use async_trait::async_trait;
 use time::OffsetDateTime;
+use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument};
 
@@ -55,14 +56,19 @@ impl Insights for InsightsService {
     #[instrument(skip_all)]
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), InsightsError> {
         info!("Starting insights service...");
-        info!("Insights service started");
-        Ok(())
-    }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), InsightsError> {
-        info!("Cleaning up insights service...");
-        info!("Insights service cleaned up");
+        let mut interval_tick = self.pubsub.subscribe::<IntervalTick>();
+        loop {
+            select! {
+                Ok(time_tick) = interval_tick.recv() => {
+                    info!("InsightsService received interval tick: {}", time_tick.event_time);
+                    self.load(&time_tick.instruments, time_tick.event_time, time_tick.frequency).await?;
+                    self.process(&time_tick.instruments, time_tick.event_time).await?;
+                }
+                _ = _shutdown.cancelled() => {
+                    break;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -106,12 +112,20 @@ impl Insights for InsightsService {
         event_time: OffsetDateTime,
     ) -> Result<Vec<Insight>, InsightsError> {
         info!("Running insights pipeline at event time: {}", event_time);
-
         let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
-        for insight in &insights {
-            self.pubsub.publish::<Insight>(insight.clone());
-        }
-        self.pubsub.publish::<InsightTick>(InsightTick);
+        let insights_tick = InsightTickBuilder::default()
+            .event_time(event_time)
+            .instruments(instruments.to_vec())
+            .insights(insights.clone())
+            .build()
+            .unwrap();
+
+        info!(
+            "Publishing insights tick: {} with {} insights",
+            insights_tick.event_time,
+            insights.len()
+        );
+        self.pubsub.publish::<InsightTick>(insights_tick);
         Ok(insights)
     }
 }

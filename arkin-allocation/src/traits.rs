@@ -11,7 +11,6 @@ use crate::AllocationOptimError;
 #[async_trait]
 pub trait AllocationOptim: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), AllocationOptimError>;
-    async fn cleanup(&self) -> Result<(), AllocationOptimError>;
 
     async fn list_signals(&self) -> Result<Vec<Signal>, AllocationOptimError>;
 

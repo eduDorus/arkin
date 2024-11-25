@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 
+tokio = { workspace = true }
 tokio-util = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }

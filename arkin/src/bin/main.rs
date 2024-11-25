@@ -31,11 +31,8 @@ async fn main() {
     let config = load::<PortfolioConfig>();
     let portfolio = PortfolioFactory::from_config(&config, pubsub.clone());
 
-    let config = load::<ExecutionConfig>();
-    let order_manager = ExecutionFactory::from_config(&config, pubsub.clone(), portfolio.clone());
-
-    let config = load::<AllocationOptimConfig>();
-    let allocation = AllocationFactory::from_config(&config, pubsub.clone(), persistence.clone(), portfolio.clone());
+    let config = load::<IngestorsConfig>();
+    let ingestors = IngestorFactory::from_config(&config, pubsub.clone(), persistence.clone());
 
     let config = load::<InsightsConfig>();
     let insights = Arc::new(InsightsService::from_config(
@@ -49,8 +46,14 @@ async fn main() {
         .pop()
         .expect("No strategy found");
 
-    let config = load::<IngestorsConfig>();
-    let ingestors = IngestorFactory::from_config(&config, pubsub.clone(), persistence.clone());
+    let config = load::<AllocationOptimConfig>();
+    let allocation = AllocationFactory::from_config(&config, pubsub.clone(), persistence.clone(), portfolio.clone());
+
+    let config = load::<OrderManagerConfig>();
+    let order_manager = ExecutionFactory::from_config(&config, pubsub.clone(), portfolio.clone());
+
+    let config = load::<ExecutorConfig>();
+    let executor = ExecutorFactory::from_config(&config, pubsub.clone());
 
     // Work around for fetching instruments
     let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
@@ -72,6 +75,7 @@ async fn main() {
         .strategy(strategy)
         .allocation_optim(allocation)
         .order_manager(order_manager)
+        .executor(executor)
         .build()
         .expect("Failed to build DefaultEngine");
 

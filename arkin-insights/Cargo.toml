@@ -9,6 +9,7 @@ license.workspace = true
 arkin-core = { path = "../arkin-core" }
 arkin-persistence = { path = "../arkin-persistence" }
 
+tokio = { workspace = true }
 tokio-util = { workspace = true }
 dashmap = { workspace = true }
 anyhow = { workspace = true }

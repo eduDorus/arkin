@@ -81,6 +81,7 @@ impl Executor for BacktestExecutor {
         loop {
             tokio::select! {
                 Ok(order) = venue_orders.recv() => {
+                    info!("SimulationExecutor received order: {}", order.id);
                     self.orders.insert(order.id.clone(), order);
                 }
                 _ = shutdown.cancelled() => {
@@ -88,13 +89,6 @@ impl Executor for BacktestExecutor {
                 }
             }
         }
-        Ok(())
-    }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), ExecutorError> {
-        info!("Cleaning up simulation executor...");
-        info!("Simulation executor cleaned up");
         Ok(())
     }
 

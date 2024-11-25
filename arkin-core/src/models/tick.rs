@@ -10,7 +10,7 @@ use crate::{
         TICK_ASK_PRICE_FEATURE_ID, TICK_ASK_QUANTITY_FEATURE_ID, TICK_BID_PRICE_FEATURE_ID,
         TICK_BID_QUANTITY_FEATURE_ID,
     },
-    Event, Price, Quantity, UpdateEventType,
+    Event, Price, Quantity, UpdateEvent, UpdateEventType,
 };
 
 use super::{Insight, Instrument};
@@ -98,6 +98,12 @@ impl Tick {
 impl Event for Tick {
     fn event_type() -> UpdateEventType {
         UpdateEventType::Tick
+    }
+}
+
+impl From<Tick> for UpdateEvent {
+    fn from(tick: Tick) -> Self {
+        UpdateEvent::Tick(tick)
     }
 }
 

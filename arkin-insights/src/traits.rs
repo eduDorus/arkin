@@ -11,7 +11,6 @@ use crate::InsightsError;
 #[async_trait]
 pub trait Insights: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), InsightsError>;
-    async fn cleanup(&self) -> Result<(), InsightsError>;
 
     async fn insert(&self, insight: Insight) -> Result<(), InsightsError>;
     async fn insert_batch(&self, insights: Vec<Insight>) -> Result<(), InsightsError>;

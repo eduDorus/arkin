@@ -425,10 +425,4 @@ impl Ingestor for TardisIngestor {
         }
         Ok(())
     }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), IngestorError> {
-        info!("Cleaning up tardis ingestor...");
-        Ok(())
-    }
 }

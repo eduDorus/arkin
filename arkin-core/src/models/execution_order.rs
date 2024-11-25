@@ -7,7 +7,7 @@ use time::OffsetDateTime;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEventType};
+use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEvent, UpdateEventType};
 
 use super::{Fill, Instrument, MarketSide};
 
@@ -25,7 +25,9 @@ pub enum ExecutionOrderStrategy {
 pub struct Market {
     pub side: MarketSide,
     pub quantity: Quantity,
+    #[builder(default = false)]
     pub split: bool,
+    #[builder(default = false)]
     pub vwap: bool,
 }
 
@@ -178,6 +180,12 @@ impl ExecutionOrder {
 impl Event for ExecutionOrder {
     fn event_type() -> UpdateEventType {
         UpdateEventType::ExecutionOrder
+    }
+}
+
+impl From<ExecutionOrder> for UpdateEvent {
+    fn from(order: ExecutionOrder) -> Self {
+        UpdateEvent::ExecutionOrder(order)
     }
 }
 

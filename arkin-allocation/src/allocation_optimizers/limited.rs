@@ -32,26 +32,21 @@ pub struct LimitedAllocationOptim {
 #[async_trait]
 impl AllocationOptim for LimitedAllocationOptim {
     #[instrument(skip_all)]
-    async fn start(&self, _shutdown: CancellationToken) -> Result<(), AllocationOptimError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), AllocationOptimError> {
         info!("Starting LimitedAllocation...");
-        let mut signals = self.pubsub.subscribe::<Signal>();
+        let mut signal_tick = self.pubsub.subscribe::<SignalTick>();
         loop {
             select! {
-                Ok(signal) = signals.recv() => {
-                    self.new_signal(signal).await?;
+                Ok(tick) = signal_tick.recv() => {
+                    info!("LimitedAllocationOptim received signal tick: {}", tick.event_time);
+                    self.new_signals(tick.signals).await?;
+                    self.optimize(tick.event_time).await?;
                 }
-                _ = _shutdown.cancelled() => {
+                _ = shutdown.cancelled() => {
                     break;
                 }
             }
         }
-        Ok(())
-    }
-
-    #[instrument(skip_all)]
-    async fn cleanup(&self) -> Result<(), AllocationOptimError> {
-        info!("Cleaning up LimitedAllocation...");
-        info!("LimitedAllocation cleaned up");
         Ok(())
     }
 
@@ -79,6 +74,7 @@ impl AllocationOptim for LimitedAllocationOptim {
     async fn optimize(&self, event_time: OffsetDateTime) -> Result<Vec<ExecutionOrder>, AllocationOptimError> {
         // Check if we have any signals
         if self.signals.is_empty() {
+            warn!("No signals found for optimization");
             return Ok(Vec::new());
         }
 
@@ -131,21 +127,27 @@ impl AllocationOptim for LimitedAllocationOptim {
             };
 
             // Create execution order
-            // let order = ExecutionOrderBuilder::default()
-            //     .event_time(event_time)
-            //     .instrument(instrument.clone())
-            //     .execution_type(ExecutionOrderStrategy::Market {
-            //         side: order_side,
-            //         quantity: quantity.abs(),
-            //         split: false,
-            //         vwap: false,
-            //     })
-            //     .side(order_side)
-            //     .quantity(quantity.abs())
-            //     .build()
-            //     .expect("Failed to build ExecutionOrder");
+            let order = ExecutionOrderBuilder::default()
+                .event_time(event_time)
+                .instrument(instrument.clone())
+                .execution_type(ExecutionOrderStrategy::Market(
+                    MarketBuilder::default()
+                        .side(order_side)
+                        .quantity(quantity.abs())
+                        .build()
+                        .unwrap(),
+                ))
+                .side(order_side)
+                .quantity(quantity.abs())
+                .build()
+                .expect("Failed to build ExecutionOrder");
 
-            // execution_orders.push(order);
+            execution_orders.push(order);
+        }
+
+        for order in execution_orders.iter() {
+            info!("Publishing execution order: {}", order);
+            self.pubsub.publish::<ExecutionOrder>(order.clone());
         }
 
         Ok(execution_orders)

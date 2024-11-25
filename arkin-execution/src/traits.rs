@@ -12,7 +12,6 @@ use crate::{ExecutorError, OrderManagerError, StrategyError};
 #[async_trait]
 pub trait OrderManager: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), OrderManagerError>;
-    async fn cleanup(&self) -> Result<(), OrderManagerError>;
 
     async fn order_by_id(&self, id: ExecutionOrderId) -> Option<ExecutionOrder>;
 
@@ -56,7 +55,6 @@ pub trait ExecutionStrategy: Send + Sync {
 #[async_trait]
 pub trait Executor: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError>;
-    async fn cleanup(&self) -> Result<(), ExecutorError>;
 
     // async fn subscribe(&self) -> Result<Receiver<Fill>, ExecutorError>;
 
