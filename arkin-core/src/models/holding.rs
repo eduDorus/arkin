@@ -5,7 +5,7 @@ use rust_decimal::Decimal;
 
 use crate::{types::AssetId, Event, UpdateEvent, UpdateEventType};
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, Builder, PartialEq)]
 pub struct Holding {
     pub asset: AssetId,
     pub quantity: Decimal,

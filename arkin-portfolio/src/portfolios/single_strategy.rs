@@ -95,10 +95,10 @@ impl Portfolio for SingleStrategyPortfolio {
     async fn fill_update(&self, fill: ExecutionOrderFill) -> Result<(), PortfolioError> {
         info!("Processing fill update: {}", fill);
         // Reduce the balance of the quote asset
-        let market_value = fill.market_value();
+        let cost = fill.total_cost();
         let quote_asset = fill.instrument.quote_asset.clone();
         if let Some(mut holding) = self.holdings.get_mut(&quote_asset) {
-            holding.quantity -= market_value;
+            holding.quantity += cost;
         } else {
             return Err(PortfolioError::AssetNotFound(quote_asset.to_string()));
         }

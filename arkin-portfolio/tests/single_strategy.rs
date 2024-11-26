@@ -1,84 +1,268 @@
-use arkin_core::{test_utils::test_inst_binance_btc_usdt_perp, PositionBuilder, PositionSide};
-use arkin_portfolio::{Portfolio, SingleStrategyPortfolioBuilder};
-use rust_decimal::prelude::*;
+use std::sync::Arc;
+
+use rust_decimal_macros::dec;
 use test_log::test;
 
-#[test(tokio::test)]
-async fn test_single_strategy_position_update() {
-    // Create Portfolio
-    let portfolio = SingleStrategyPortfolioBuilder::default()
-        .build()
-        .expect("Failed to build SimplePortfolio");
+use arkin_core::prelude::*;
+use arkin_portfolio::prelude::*;
 
-    // Create Position
+#[test(tokio::test)]
+async fn test_single_strategy_long_position() {
+    let pubsub = Arc::new(PubSub::new());
+
+    // Create Portfolio
+    let portfolio = Arc::new(
+        SingleStrategyPortfolioBuilder::default()
+            .pubsub(pubsub.clone())
+            .build()
+            .expect("Failed to build SimplePortfolio"),
+    );
+
+    // Create instrument
     let instrument = test_inst_binance_btc_usdt_perp();
-    let position = PositionBuilder::default()
+
+    // Create balance
+    let balance = HoldingBuilder::default()
+        .asset(instrument.quote_asset.clone())
+        .quantity(dec!(10000))
+        .build()
+        .unwrap();
+    portfolio
+        .balance_update(balance.clone())
+        .await
+        .expect("Failed to update balance");
+
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10000));
+
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
-        .side(PositionSide::Long)
-        .open_price(Decimal::from_f64(100.0).unwrap())
-        .open_quantity(Decimal::from_f64(1.0).unwrap())
-        .total_commission(Decimal::from_f64(0.0).unwrap())
+        .side(MarketSide::Buy)
+        .price(dec!(100.0))
+        .quantity(dec!(1.0))
+        .commission(dec!(2.0))
         .build()
         .unwrap();
 
-    // Update Position
-    portfolio
-        .position_update(position.clone())
-        .await
-        .expect("Failed to update position");
-
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let positions = portfolio.list_open_positions().await;
     assert_eq!(positions.len(), 1);
+
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(9898));
+
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
+        .instrument(instrument.clone())
+        .side(MarketSide::Sell)
+        .price(dec!(120.0))
+        .quantity(dec!(0.5))
+        .commission(dec!(2.0))
+        .build()
+        .unwrap();
+
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(9956));
+
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
+        .instrument(instrument.clone())
+        .side(MarketSide::Sell)
+        .price(dec!(110.0))
+        .quantity(dec!(0.5))
+        .commission(dec!(2.0))
+        .build()
+        .unwrap();
+
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10009));
+
+    let open_positions = portfolio.list_open_positions().await;
+    assert_eq!(open_positions.len(), 0);
+
+    let realized_pnl = portfolio.pnl_instrument(&instrument).await;
+    assert_eq!(realized_pnl, dec!(15));
+
+    let commission = portfolio.commission_instrument(&instrument).await;
+    assert_eq!(commission, dec!(6));
 }
 
-// #[test(tokio::test)]
-// async fn test_single_strategy_portfolio_fill_update() {
-//     // Create Portfolio
-//     let portfolio = SingleStrategyPortfolioBuilder::default()
-//         .build()
-//         .expect("Failed to build SimplePortfolio");
+#[test(tokio::test)]
+async fn test_single_strategy_short_position() {
+    let pubsub = Arc::new(PubSub::new());
 
-//     // Create Fill
-//     let instrument = test_inst_binance_btc_usdt_perp();
-//     let fill = ExecutionOrderFillBuilder::default()
-//         .instrument(instrument.clone())
-//         .side(MarketSide::Buy)
-//         .price(Decimal::from_f64(100.0).unwrap())
-//         .quantity(Decimal::from_f64(1.0).unwrap())
-//         .commission(Decimal::from_f64(2.0).unwrap())
-//         .build()
-//         .unwrap();
+    // Create Portfolio
+    let portfolio = Arc::new(
+        SingleStrategyPortfolioBuilder::default()
+            .pubsub(pubsub.clone())
+            .build()
+            .expect("Failed to build SimplePortfolio"),
+    );
 
-//     // Update Fill
-//     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    // Create instrument
+    let instrument = test_inst_binance_btc_usdt_perp();
 
-//     let positions = portfolio.list_open_positions().await;
-//     let new_position = positions.get(&instrument).unwrap();
-//     assert_eq!(positions.len(), 1);
-//     assert_eq!(new_position.instrument, instrument);
-//     assert_eq!(new_position.avg_open_price, fill.price);
-//     assert_eq!(new_position.quantity, fill.quantity);
-//     assert_eq!(new_position.total_commission, fill.commission);
+    // Create balance
+    let balance = HoldingBuilder::default()
+        .asset(instrument.quote_asset.clone())
+        .quantity(dec!(10000))
+        .build()
+        .unwrap();
+    portfolio
+        .balance_update(balance.clone())
+        .await
+        .expect("Failed to update balance");
 
-//     // Update Fill
-//     let fill = ExecutionOrderFillBuilder::default()
-//         .instrument(instrument.clone())
-//         .side(MarketSide::Sell)
-//         .price(Decimal::from_f64(101.0).unwrap())
-//         .quantity(Decimal::from_f64(1.0).unwrap())
-//         .commission(Decimal::from_f64(2.0).unwrap())
-//         .build()
-//         .unwrap();
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10000));
 
-//     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
+        .instrument(instrument.clone())
+        .side(MarketSide::Sell)
+        .price(dec!(100.0))
+        .quantity(dec!(1.0))
+        .commission(dec!(2.0))
+        .build()
+        .unwrap();
 
-//     let positions = portfolio.list_open_positions().await;
-//     let new_position = positions.get(&instrument).unwrap();
-//     assert_eq!(positions.len(), 1);
-//     assert_eq!(new_position.instrument, instrument);
-//     assert_eq!(new_position.avg_open_price, Decimal::from_f64(100.0).unwrap());
-//     assert_eq!(new_position.avg_close_price, Some(Decimal::from_f64(101.0).unwrap()));
-//     assert_eq!(new_position.quantity, Decimal::from_f64(0.0).unwrap());
-//     assert_eq!(new_position.total_commission, Decimal::from_f64(4.0).unwrap());
-//     assert_eq!(new_position.realized_pnl, Decimal::from_f64(1.0).unwrap());
-// }
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    let positions = portfolio.list_open_positions().await;
+    assert_eq!(positions.len(), 1);
+
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10098));
+
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
+        .instrument(instrument.clone())
+        .side(MarketSide::Buy)
+        .price(dec!(80.0))
+        .quantity(dec!(0.5))
+        .commission(dec!(2.0))
+        .build()
+        .unwrap();
+
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10056));
+
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
+        .instrument(instrument.clone())
+        .side(MarketSide::Buy)
+        .price(dec!(90.0))
+        .quantity(dec!(0.5))
+        .commission(dec!(2.0))
+        .build()
+        .unwrap();
+
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10009));
+
+    let open_positions = portfolio.list_open_positions().await;
+    assert_eq!(open_positions.len(), 0);
+
+    let realized_pnl = portfolio.pnl_instrument(&instrument).await;
+    assert_eq!(realized_pnl, dec!(15));
+
+    let commission = portfolio.commission_instrument(&instrument).await;
+    assert_eq!(commission, dec!(6));
+}
+
+#[test(tokio::test)]
+async fn test_single_strategy_swap_position() {
+    let pubsub = Arc::new(PubSub::new());
+
+    // Create Portfolio
+    let portfolio = Arc::new(
+        SingleStrategyPortfolioBuilder::default()
+            .pubsub(pubsub.clone())
+            .build()
+            .expect("Failed to build SimplePortfolio"),
+    );
+
+    // Create instrument
+    let instrument = test_inst_binance_btc_usdt_perp();
+
+    // Create balance
+    let balance = HoldingBuilder::default()
+        .asset(instrument.quote_asset.clone())
+        .quantity(dec!(10000))
+        .build()
+        .unwrap();
+    portfolio
+        .balance_update(balance.clone())
+        .await
+        .expect("Failed to update balance");
+
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10000));
+
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
+        .instrument(instrument.clone())
+        .side(MarketSide::Buy)
+        .price(dec!(100.0))
+        .quantity(dec!(1.0))
+        .commission(dec!(2.0))
+        .build()
+        .unwrap();
+
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    let positions = portfolio.list_open_positions().await;
+    assert_eq!(positions.len(), 1);
+
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(9898));
+
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
+        .instrument(instrument.clone())
+        .side(MarketSide::Sell)
+        .price(dec!(120.0))
+        .quantity(dec!(2.0))
+        .commission(dec!(2.0))
+        .build()
+        .unwrap();
+
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10136));
+
+    // Create fill
+    let fill = ExecutionOrderFillBuilder::default()
+        .id(ExecutionOrderId::new_v4())
+        .instrument(instrument.clone())
+        .side(MarketSide::Buy)
+        .price(dec!(100.0))
+        .quantity(dec!(1.0))
+        .commission(dec!(2.0))
+        .build()
+        .unwrap();
+
+    portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+    let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
+    assert_eq!(portfolio_balance.quantity, dec!(10034));
+
+    let open_positions = portfolio.list_open_positions().await;
+    assert_eq!(open_positions.len(), 0);
+
+    let realized_pnl = portfolio.pnl_instrument(&instrument).await;
+    assert_eq!(realized_pnl, dec!(40));
+
+    let commission = portfolio.commission_instrument(&instrument).await;
+    assert_eq!(commission, dec!(6));
+}

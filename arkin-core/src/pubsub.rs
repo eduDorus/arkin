@@ -4,6 +4,7 @@ use std::{any::Any, time::Duration};
 
 use dashmap::DashMap;
 use derive_builder::Builder;
+use rust_decimal_macros::dec;
 use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{debug, error};
@@ -172,12 +173,16 @@ pub struct ExecutionOrderFill {
 impl ExecutionOrderFill {
     /// The total value of your current position based on the latest market prices.
     pub fn market_value(&self) -> Notional {
-        self.price * self.quantity_with_side() * self.instrument.contract_size
+        self.price * self.quantity_with_side() * self.instrument.contract_size * dec!(-1)
     }
 
     /// The total value of the underlying asset that a financial derivative represents. It provides a measure of the total exposure.
     pub fn notional_value(&self) -> Notional {
         self.price * self.quantity * self.instrument.contract_size
+    }
+
+    pub fn total_cost(&self) -> Notional {
+        self.market_value() - self.commission
     }
 
     pub fn quantity_with_side(&self) -> Notional {
@@ -218,8 +223,8 @@ impl fmt::Display for ExecutionOrderFill {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "instrument: {} side: {} price: {} quantity: {}",
-            self.instrument, self.side, self.price, self.quantity,
+            "instrument={} side={} price={} quantity={} commission={}",
+            self.instrument, self.side, self.price, self.quantity, self.commission
         )
     }
 }

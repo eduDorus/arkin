@@ -92,9 +92,11 @@ impl Position {
                 } else {
                     let mut current_fill = fill.clone();
                     current_fill.quantity = max_fill_quantity;
+                    current_fill.commission = (current_fill.commission / fill.quantity) * max_fill_quantity;
                     self.decrease_position(current_fill);
                     let mut remaining_fill = fill.clone();
                     remaining_fill.quantity = remaining_fill_quantity;
+                    remaining_fill.commission = (remaining_fill.commission / fill.quantity) * remaining_fill_quantity;
                     Some(remaining_fill)
                 }
             }
@@ -120,7 +122,10 @@ impl Position {
             self.status = PositionStatus::Closed;
         }
         self.total_commission += fill.commission;
-        self.realized_pnl += fill.price * fill.quantity - self.open_price * fill.quantity;
+        self.realized_pnl += match self.side {
+            PositionSide::Long => fill.price * fill.quantity - self.open_price * fill.quantity,
+            PositionSide::Short => self.open_price * fill.quantity - fill.price * fill.quantity,
+        };
         self.updated_at = fill.event_time;
     }
 
