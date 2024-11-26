@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
 
-use crate::{config::TradeCountConfig, service::Computation, state::InsightsState};
+use crate::{config::TradeCountConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct TradeCountFeature {

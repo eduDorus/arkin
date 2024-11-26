@@ -7,7 +7,7 @@ use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
 
-use crate::{config::OHLCVConfig, service::Computation, state::InsightsState};
+use crate::{config::OHLCVConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct OHLCVFeature {

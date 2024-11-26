@@ -7,7 +7,7 @@ use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
 
-use crate::{config::MACDConfig, service::Computation, state::InsightsState};
+use crate::{config::MACDConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct MACDFeature {

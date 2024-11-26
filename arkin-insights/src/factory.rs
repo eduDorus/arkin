@@ -1,11 +1,11 @@
 use crate::{
     config::FeatureConfig,
-    service::Computation,
     simple::{HistVolFeature, OHLCVFeature, PctChangeFeature, StdDevFeature, TradeCountFeature, VWAPFeature},
     ta::{
         BollingerBandsFeature, ExponentialMovingAverageFeature, MACDFeature, RelativeStrengthIndexFeature,
         SimpleMovingAverageFeature,
     },
+    Computation,
 };
 
 pub struct FeatureFactory {}

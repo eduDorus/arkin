@@ -7,7 +7,7 @@ use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
 
-use crate::{config::BollingerBandsConfig, service::Computation, state::InsightsState};
+use crate::{config::BollingerBandsConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct BollingerBandsFeature {

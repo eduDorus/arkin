@@ -22,7 +22,7 @@ pub async fn start_portfolio(
 ) -> Result<(), PortfolioError> {
     let mut balance_updates = pubsub.subscribe::<Holding>();
     let mut position_updates = pubsub.subscribe::<Position>();
-    let mut fill_updates = pubsub.subscribe::<Fill>();
+    let mut fill_updates = pubsub.subscribe::<ExecutionOrderFill>();
     loop {
         tokio::select! {
             Ok(balance) = balance_updates.recv() => {

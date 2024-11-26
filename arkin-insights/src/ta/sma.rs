@@ -7,7 +7,7 @@ use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
 
-use crate::{config::SMAConfig, service::Computation, state::InsightsState};
+use crate::{config::SMAConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct SimpleMovingAverageFeature {

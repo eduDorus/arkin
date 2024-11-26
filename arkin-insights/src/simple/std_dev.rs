@@ -7,7 +7,7 @@ use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
 
-use crate::{config::StdDevConfig, service::Computation, state::InsightsState};
+use crate::{config::StdDevConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct StdDevFeature {

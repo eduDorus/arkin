@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
 use rust_decimal::prelude::*;
+use rust_decimal_macros::dec;
 use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -27,6 +28,23 @@ pub struct LimitedAllocationOptim {
     max_allocation: Decimal,
     #[builder(default = "Decimal::from_f32(0.2).unwrap()")]
     max_allocation_per_signal: Decimal,
+    #[builder(default = "dec!(100)")]
+    min_trade_value: Decimal,
+    #[builder(default = "AssetId::from(\"USDT\".to_string())")]
+    reference_currency: AssetId,
+}
+
+pub struct OptimalPosition {
+    pub instrument: Arc<Instrument>,
+    pub price: Price,
+    pub quantity: Quantity,
+}
+
+pub struct DiffPosition {
+    pub instrument: Arc<Instrument>,
+    pub price: Price,
+    pub quantity: Quantity,
+    pub diff: Quantity,
 }
 
 #[async_trait]
@@ -57,6 +75,7 @@ impl AllocationOptim for LimitedAllocationOptim {
 
     #[instrument(skip_all)]
     async fn new_signal(&self, signal: Signal) -> Result<(), AllocationOptimError> {
+        info!("Received new signal: {}", signal);
         let key = (signal.strateg_id.clone(), signal.instrument.clone());
         self.signals.insert(key, signal);
         Ok(())
@@ -79,8 +98,12 @@ impl AllocationOptim for LimitedAllocationOptim {
         }
 
         // Calculate money allocated to each signal
-        let max_allocation = self.portfolio.capital().await * self.max_allocation;
+        let capital = self.portfolio.capital(&self.reference_currency).await;
+        let max_allocation = capital * self.max_allocation;
         let max_allocation_per_signal = max_allocation * self.max_allocation_per_signal;
+        info!("Capital: {}", capital);
+        info!("Max allocation: {}", max_allocation);
+        info!("Max allocation per signal: {}", max_allocation_per_signal);
 
         // Calculate optimal position for each signal
         let mut optimal_positions = HashMap::new();
@@ -91,36 +114,74 @@ impl AllocationOptim for LimitedAllocationOptim {
             match res {
                 Some(tick) => {
                     let quantity = signal_allocation / tick.mid_price();
-                    optimal_positions.insert(signal.instrument.clone(), quantity);
+                    let optimal_position = OptimalPosition {
+                        instrument: signal.instrument.clone(),
+                        price: tick.mid_price(),
+                        quantity: quantity.round_dp(signal.instrument.quantity_precision),
+                    };
+                    optimal_positions.insert(signal.instrument.clone(), optimal_position);
                 }
                 None => {
                     warn!("No tick found for instrument: {}", signal.instrument);
                 }
             }
         }
+        for (instrument, position) in optimal_positions.iter() {
+            info!(
+                "Optimal position for {} with price {} and quantity {}",
+                instrument, position.price, position.quantity
+            );
+        }
 
         // Calculate difference between current and expected positions
-        let current_positions = self.portfolio.positions().await;
+        let current_positions = self
+            .portfolio
+            .list_open_positions_with_quote_asset(&self.reference_currency)
+            .await;
         let mut position_diff = HashMap::new();
-        for (instrument, expected_quantity) in optimal_positions.iter() {
-            let order_quantity = if let Some(position) = current_positions.get(instrument) {
-                (expected_quantity - position.quantity).round_dp(instrument.quantity_precision)
+        for (instrument, optimal_position) in optimal_positions.iter() {
+            let diff_position = if let Some(position) = current_positions.get(instrument) {
+                let diff =
+                    (optimal_position.quantity - position.quantity_with_side()).round_dp(instrument.quantity_precision);
+                DiffPosition {
+                    instrument: instrument.clone(),
+                    price: optimal_position.price,
+                    quantity: optimal_position.quantity,
+                    diff,
+                }
             } else {
-                expected_quantity.round_dp(instrument.quantity_precision)
+                let diff = optimal_position.quantity.round_dp(instrument.quantity_precision);
+                DiffPosition {
+                    instrument: instrument.clone(),
+                    price: optimal_position.price,
+                    quantity: optimal_position.quantity,
+                    diff,
+                }
             };
-            position_diff.insert(instrument, order_quantity);
+            position_diff.insert(instrument, diff_position);
+        }
+        for (instrument, position) in position_diff.iter() {
+            info!(
+                "Change to optimal position for {} with price {} would be {}",
+                instrument, position.price, position.diff
+            );
         }
 
         // Create execution orders
         let mut execution_orders = Vec::with_capacity(position_diff.len());
-        for (instrument, quantity) in position_diff.into_iter() {
+        for (instrument, position) in position_diff.into_iter() {
             // Skip if quantity is zero
-            if quantity == Decimal::zero() {
+            let value = position.price * position.diff.abs();
+            if value < self.min_trade_value {
+                info!(
+                    "Skipping trade for {} as value of {} is below minimum trade size of {}",
+                    instrument, value, self.min_trade_value
+                );
                 continue;
             }
 
             // Determine order side
-            let order_side = if quantity > Decimal::zero() {
+            let order_side = if position.quantity > Decimal::zero() {
                 MarketSide::Buy
             } else {
                 MarketSide::Sell
@@ -133,12 +194,10 @@ impl AllocationOptim for LimitedAllocationOptim {
                 .execution_type(ExecutionOrderStrategy::Market(
                     MarketBuilder::default()
                         .side(order_side)
-                        .quantity(quantity.abs())
+                        .quantity(position.diff.abs())
                         .build()
                         .unwrap(),
                 ))
-                .side(order_side)
-                .quantity(quantity.abs())
                 .build()
                 .expect("Failed to build ExecutionOrder");
 

@@ -5,9 +5,9 @@ use rust_decimal::Decimal;
 use strum::Display;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEventType};
+use crate::{types::Commission, Event, ExecutionOrderFill, Notional, Price, Quantity, UpdateEventType};
 
-use super::{Fill, Instrument, MarketSide};
+use super::{Instrument, MarketSide};
 
 #[derive(Clone, Display, Copy, PartialEq, Eq, Debug)]
 pub enum PositionSide {
@@ -50,8 +50,12 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn market_value(&self, price: Price) -> Notional {
-        price * self.quantity
+    pub fn value(&self) -> Notional {
+        self.avg_open_price * self.quantity_with_side() + self.realized_pnl - self.commission
+    }
+
+    pub fn notional(&self) -> Notional {
+        self.avg_open_price * self.quantity
     }
 
     pub fn quantity_with_side(&self) -> Quantity {
@@ -91,8 +95,8 @@ impl Event for Position {
     }
 }
 
-impl From<Fill> for Position {
-    fn from(fill: Fill) -> Self {
+impl From<ExecutionOrderFill> for Position {
+    fn from(fill: ExecutionOrderFill) -> Self {
         PositionBuilder::default()
             .instrument(fill.instrument)
             .side(fill.side)

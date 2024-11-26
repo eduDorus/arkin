@@ -3,7 +3,7 @@ use std::fmt;
 use derive_builder::Builder;
 use rust_decimal::Decimal;
 
-use crate::{types::AssetId, Event, UpdateEventType};
+use crate::{types::AssetId, Event, UpdateEvent, UpdateEventType};
 
 #[derive(Debug, Clone, Builder)]
 pub struct Holding {
@@ -14,6 +14,12 @@ pub struct Holding {
 impl Event for Holding {
     fn event_type() -> UpdateEventType {
         UpdateEventType::Balance
+    }
+}
+
+impl From<Holding> for UpdateEvent {
+    fn from(holding: Holding) -> Self {
+        UpdateEvent::Balance(holding)
     }
 }
 

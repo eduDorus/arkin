@@ -73,7 +73,7 @@ impl OrderQueue {
         self.orders.insert(order.id.clone(), order);
     }
 
-    pub fn add_fill(&self, fill: Fill) {
+    pub fn add_fill(&self, fill: VenueOrderFill) {
         self.orders.alter(&fill.execution_order_id, |_, mut v| {
             if !v.is_closed() {
                 v.add_fill(fill.clone());
@@ -130,20 +130,42 @@ impl OrderManager for SimpleOrderManager {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
         info!("Starting order manager...");
         let mut execution_orders = self.pubsub.subscribe::<ExecutionOrder>();
-        let mut fills = self.pubsub.subscribe::<Fill>();
+        let mut fills = self.pubsub.subscribe::<VenueOrderFill>();
         loop {
             tokio::select! {
-                Ok(order) = execution_orders.recv() => {
-                    info!("SimpleOrderManager received order: {}", order.id);
-                    if let Err(e) = self.place_order(order).await {
+                Ok(mut order) = execution_orders.recv() => {
+                    info!("SimpleOrderManager received order: {}", order.id.clone());
+                    order.update_status(ExecutionOrderStatus::InProgress);
+                    if let Err(e) = self.place_order(order.clone()).await {
                         error!("Failed to process order: {}", e);
                     }
+                    let venue_order = match &order.execution_type {
+                        ExecutionOrderStrategy::Market(_) => {
+                            VenueOrderBuilder::default().execution_order_id(order.id.to_owned()).instrument(order.instrument.to_owned()).side(order.side().to_owned()).order_type(VenueOrderType::Market).price(None).quantity(order.quantity().to_owned()).build().expect("Failed to create order")
+                        },
+                        ExecutionOrderStrategy::Limit(o) => {
+                            VenueOrderBuilder::default()
+                                .execution_order_id(order.id.to_owned())
+                                .instrument(order.instrument.to_owned())
+                                .side(order.side().to_owned())
+                                .order_type(VenueOrderType::Limit)
+                                .price(Some(o.price))
+                                .quantity(order.quantity().to_owned())
+                                .build().expect("Failed to create order")
+                        }
+                    };
+
+                    info!("Publishing VenueOrder to pubsub: {}", venue_order.execution_order_id);
+                    self.pubsub.publish::<VenueOrder>(venue_order);
                 }
                 Ok(fill) = fills.recv() => {
                     info!("SimpleOrderManager received fill: {}", fill.execution_order_id);
-                    if let Err(e) = self.order_update(fill).await {
+                    if let Err(e) = self.order_update(fill.clone()).await {
                         error!("Failed to process fill: {}", e);
                     }
+
+                    info!("Publishing ExecutionOrderFill to pubsub: {}", fill.execution_order_id);
+                    self.pubsub.publish::<ExecutionOrderFill>(fill.into());
                 }
                 _ = shutdown.cancelled() => {
                     break;
@@ -234,7 +256,7 @@ impl OrderManager for SimpleOrderManager {
     }
 
     #[instrument(skip_all)]
-    async fn order_update(&self, fill: Fill) -> Result<(), OrderManagerError> {
+    async fn order_update(&self, fill: VenueOrderFill) -> Result<(), OrderManagerError> {
         self.execution_orders.add_fill(fill);
         Ok(())
     }

@@ -17,17 +17,6 @@ use crate::pipeline::ComputationGraph;
 use crate::traits::Insights;
 use crate::{config::InsightsServiceConfig, state::InsightsState};
 
-pub trait Computation: Debug + Send + Sync {
-    fn inputs(&self) -> Vec<FeatureId>;
-    fn outputs(&self) -> Vec<FeatureId>;
-    fn calculate(
-        &self,
-        instruments: &[Arc<Instrument>],
-        timestamp: OffsetDateTime,
-        state: Arc<InsightsState>,
-    ) -> Result<Vec<Insight>>;
-}
-
 #[derive(Debug)]
 pub struct InsightsService {
     state: Arc<InsightsState>,
@@ -61,8 +50,8 @@ impl Insights for InsightsService {
             select! {
                 Ok(time_tick) = interval_tick.recv() => {
                     info!("InsightsService received interval tick: {}", time_tick.event_time);
-                    self.load(&time_tick.instruments, time_tick.event_time, time_tick.frequency).await?;
-                    self.process(&time_tick.instruments, time_tick.event_time).await?;
+                    self.load(time_tick.event_time, &time_tick.instruments, time_tick.frequency).await?;
+                    self.process(time_tick.event_time, &time_tick.instruments, true).await?;
                 }
                 _ = _shutdown.cancelled() => {
                     break;
@@ -75,8 +64,8 @@ impl Insights for InsightsService {
     #[instrument(skip_all)]
     async fn load(
         &self,
-        instruments: &[Arc<Instrument>],
         event_time: OffsetDateTime,
+        instruments: &[Arc<Instrument>],
         lookback: Duration,
     ) -> Result<(), InsightsError> {
         let start = event_time - lookback;
@@ -108,8 +97,9 @@ impl Insights for InsightsService {
     #[instrument(skip_all)]
     async fn process(
         &self,
-        instruments: &[Arc<Instrument>],
         event_time: OffsetDateTime,
+        instruments: &[Arc<Instrument>],
+        publish: bool,
     ) -> Result<Vec<Insight>, InsightsError> {
         info!("Running insights pipeline at event time: {}", event_time);
         let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
@@ -120,12 +110,14 @@ impl Insights for InsightsService {
             .build()
             .unwrap();
 
-        info!(
-            "Publishing insights tick: {} with {} insights",
-            insights_tick.event_time,
-            insights.len()
-        );
-        self.pubsub.publish::<InsightTick>(insights_tick);
+        if publish {
+            info!(
+                "Publishing insights tick: {} with {} insights",
+                insights_tick.event_time,
+                insights.len()
+            );
+            self.pubsub.publish::<InsightTick>(insights_tick);
+        }
         Ok(insights)
     }
 }

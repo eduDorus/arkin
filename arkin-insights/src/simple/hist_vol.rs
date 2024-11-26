@@ -6,7 +6,7 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::debug;
 
-use crate::{config::HistVolConfig, service::Computation, state::InsightsState};
+use crate::{config::HistVolConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct HistVolFeature {

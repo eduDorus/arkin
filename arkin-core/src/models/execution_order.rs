@@ -7,17 +7,29 @@ use time::OffsetDateTime;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEvent, UpdateEventType};
+use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEvent, UpdateEventType, VenueOrderFill};
 
-use super::{Fill, Instrument, MarketSide};
+use super::{Instrument, MarketSide};
 
 pub type ExecutionOrderId = Uuid;
 
-#[derive(Debug, Display, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExecutionOrderStrategy {
     Market(Market),
     Limit(Limit),
-    WideQuoting(WideQuoting),
+    // WideQuoting(WideQuoting),
+}
+
+impl fmt::Display for ExecutionOrderStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ExecutionOrderStrategy::Market(o) => write!(f, "MKT side={} quantity={}", o.side, o.quantity),
+            ExecutionOrderStrategy::Limit(o) => {
+                write!(f, "LMT side={} price={} quantity={}", o.side, o.price, o.quantity)
+            }
+            // ExecutionOrderStrategy::WideQuoting(o) => write!(f, "WideQuoting: {}", o),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Builder)]
@@ -68,11 +80,9 @@ pub struct ExecutionOrder {
     #[builder(default = OffsetDateTime::now_utc())]
     pub event_time: OffsetDateTime,
     pub instrument: Arc<Instrument>,
-    pub side: MarketSide,
     pub execution_type: ExecutionOrderStrategy,
     #[builder(default = Price::ZERO)]
     pub avg_fill_price: Price,
-    pub quantity: Quantity,
     #[builder(default = Quantity::ZERO)]
     pub filled_quantity: Quantity,
     #[builder(default = Notional::ZERO)]
@@ -82,14 +92,14 @@ pub struct ExecutionOrder {
 }
 
 impl ExecutionOrder {
-    pub fn add_fill(&mut self, fill: Fill) {
+    pub fn add_fill(&mut self, fill: VenueOrderFill) {
         self.avg_fill_price = (self.avg_fill_price * self.filled_quantity + fill.price * fill.quantity)
             / (self.filled_quantity + fill.quantity);
         self.filled_quantity += fill.quantity;
         self.total_commission += fill.commission;
 
         // Update the state
-        match self.filled_quantity == self.quantity {
+        match self.filled_quantity == self.quantity() {
             true => self.status = ExecutionOrderStatus::Filled,
             false => self.status = ExecutionOrderStatus::PartiallyFilled,
         }
@@ -112,6 +122,20 @@ impl ExecutionOrder {
             ExecutionOrderStatus::InProgress => self.status = ExecutionOrderStatus::Cancelling,
             ExecutionOrderStatus::PartiallyFilled => self.status = ExecutionOrderStatus::PartiallyFilledCancelling,
             _ => warn!("Cannot cancel order in state {}", self.status),
+        }
+    }
+
+    pub fn quantity(&self) -> Quantity {
+        match &self.execution_type {
+            ExecutionOrderStrategy::Market(o) => o.quantity,
+            ExecutionOrderStrategy::Limit(o) => o.quantity,
+        }
+    }
+
+    pub fn side(&self) -> MarketSide {
+        match &self.execution_type {
+            ExecutionOrderStrategy::Market(o) => o.side,
+            ExecutionOrderStrategy::Limit(o) => o.side,
         }
     }
 
@@ -165,7 +189,7 @@ impl ExecutionOrder {
     }
 
     pub fn remaining_quantity(&self) -> Quantity {
-        self.quantity - self.filled_quantity
+        self.quantity() - self.filled_quantity
     }
 
     pub fn has_fill(&self) -> bool {
@@ -193,8 +217,8 @@ impl fmt::Display for ExecutionOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "ExecutionOrder: instrument={} execution_type={} side={} quantity={}/{} status={}",
-            self.instrument, self.execution_type, self.side, self.filled_quantity, self.quantity, self.status
+            "ExecutionOrder: instrument={} execution_type={} filled_quantity={} status={}",
+            self.instrument, self.execution_type, self.filled_quantity, self.status
         )
     }
 }

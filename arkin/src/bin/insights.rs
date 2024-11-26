@@ -90,7 +90,7 @@ async fn main() -> Result<()> {
     info!("Done inserting insights into state");
 
     while let Some((_tick_start, tick_end)) = clock.next() {
-        insights_service.process(&instruments, tick_end).await?;
+        insights_service.process(tick_end, &instruments, true).await?;
     }
 
     persistence_service.flush().await?;

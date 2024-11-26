@@ -1,6 +1,6 @@
-mod backtest;
 mod factory;
+mod simulation;
 
-pub use backtest::BacktestExecutor;
-pub use backtest::BacktestExecutorBuilder;
 pub use factory::ExecutorFactory;
+pub use simulation::SimulationExecutor;
+pub use simulation::SimulationExecutorBuilder;

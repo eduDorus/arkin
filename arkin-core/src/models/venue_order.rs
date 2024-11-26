@@ -50,6 +50,7 @@ pub struct VenueOrder {
     pub order_type: VenueOrderType,
     #[builder(default = VenueOrderTimeInForce::Gtc)]
     pub time_in_force: VenueOrderTimeInForce,
+    #[builder(default = None)]
     pub price: Option<Price>,
     #[builder(default = Price::ZERO)]
     pub avg_fill_price: Price,

@@ -46,9 +46,13 @@ impl TickHelper {
 
     pub async fn tick(&mut self) -> (OffsetDateTime, Duration) {
         self.interval.tick().await;
-        let ts = OffsetDateTime::now_utc()
-            .replace_nanosecond(0)
-            .expect("Failed to replace nanosecond");
+        let mut ts = OffsetDateTime::now_utc();
+        // Round to nearest second (Tick can be off by a few nanoseconds in either direction)
+        if ts.nanosecond() > 500_000_000 {
+            ts = ts + Duration::from_secs(1);
+        }
+        ts = ts.replace_nanosecond(0).expect("Failed to replace nanosecond");
+
         let frequency = self.frequency;
         (ts, frequency)
     }

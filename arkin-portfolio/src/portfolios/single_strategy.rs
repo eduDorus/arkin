@@ -4,9 +4,8 @@ use arkin_core::prelude::*;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
-use rust_decimal::prelude::*;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 use crate::{Portfolio, PortfolioError};
 
@@ -34,17 +33,15 @@ impl SingleStrategyPortfolio {
     }
 
     #[instrument(skip_all)]
-    fn update_position(&self, fill: Fill) {
+    fn update_position(&self, fill: ExecutionOrderFill) {
         let position_side = self.positions.get(&fill.instrument).map(|p| p.side);
         if let Some(position_side) = position_side {
             info!("Position side: {:?}", position_side);
             match (position_side, fill.side) {
                 (PositionSide::Long, MarketSide::Buy) | (PositionSide::Short, MarketSide::Sell) => {
-                    info!("Increasing position: {}", fill);
                     self.increase_position(fill);
                 }
                 _ => {
-                    info!("Decreasing position: {}", fill);
                     self.decrease_position(fill);
                 }
             }
@@ -55,7 +52,8 @@ impl SingleStrategyPortfolio {
     }
 
     #[instrument(skip_all)]
-    fn increase_position(&self, fill: Fill) {
+    fn increase_position(&self, fill: ExecutionOrderFill) {
+        info!("Increasing position: {}", fill.instrument);
         self.positions.alter(&fill.instrument, |_, mut p| {
             let new_total_quantity = p.quantity + fill.quantity;
             p.avg_open_price = (p.avg_open_price * p.quantity + fill.price * fill.quantity) / new_total_quantity;
@@ -67,7 +65,8 @@ impl SingleStrategyPortfolio {
     }
 
     #[instrument(skip_all)]
-    fn decrease_position(&self, fill: Fill) {
+    fn decrease_position(&self, fill: ExecutionOrderFill) {
+        info!("Decreasing position: {:?}", fill.instrument);
         let initial_quantity = self.positions.get(&fill.instrument).map(|p| p.quantity).unwrap_or_default();
 
         // Update the position
@@ -103,7 +102,7 @@ impl SingleStrategyPortfolio {
     }
 
     #[instrument(skip_all)]
-    fn create_new_position(&self, fill: Fill) {
+    fn create_new_position(&self, fill: ExecutionOrderFill) {
         let position = Position::from(fill);
 
         info!("Created new position: {}", position);
@@ -159,28 +158,27 @@ impl SingleStrategyPortfolio {
 
 #[async_trait]
 impl Portfolio for SingleStrategyPortfolio {
+    #[instrument(skip_all)]
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError> {
+        info!("Starting portfolio...");
         let mut balance_updates = self.pubsub.subscribe::<Holding>();
         let mut position_updates = self.pubsub.subscribe::<Position>();
-        let mut fill_updates = self.pubsub.subscribe::<Fill>();
+        let mut fill_updates = self.pubsub.subscribe::<ExecutionOrderFill>();
         loop {
             tokio::select! {
                 Ok(balance) = balance_updates.recv() => {
-                    match self.balance_update(balance).await {
-                        Ok(_) => info!("Balance update processed"),
-                        Err(e) => warn!("Failed to process balance update: {}", e),
+                    if let Err(e) = self.balance_update(balance).await {
+                        error!("Failed to process balance update: {}", e);
                     }
                 }
                 Ok(position) = position_updates.recv() => {
-                    match self.position_update(position).await {
-                        Ok(_) => info!("Position update processed"),
-                        Err(e) => warn!("Failed to process position update: {}", e),
+                    if let Err(e) = self.position_update(position).await {
+                        error!("Failed to process position update: {}", e);
                     }
                 }
                 Ok(fill) = fill_updates.recv() => {
-                    match self.fill_update(fill).await {
-                        Ok(_) => info!("Fill update processed"),
-                        Err(e) => warn!("Failed to process fill update: {}", e),
+                    if let Err(e) = self.fill_update(fill).await {
+                        error!("Failed to process fill update: {}", e);
                     }
                 }
                 _ = shutdown.cancelled() => {
@@ -193,19 +191,22 @@ impl Portfolio for SingleStrategyPortfolio {
 
     #[instrument(skip_all)]
     async fn position_update(&self, position: Position) -> Result<(), PortfolioError> {
+        info!("Processing position update: {}", position);
         self.reconcilliate_position(position);
         Ok(())
     }
 
     #[instrument(skip_all)]
     async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError> {
+        info!("Processing balance update: {}", holding);
         self.update_balance(holding);
         Ok(())
     }
 
     #[instrument(skip_all)]
-    async fn fill_update(&self, fill: Fill) -> Result<(), PortfolioError> {
-        self.update_position(fill);
+    async fn fill_update(&self, fill: ExecutionOrderFill) -> Result<(), PortfolioError> {
+        info!("Processing fill update: {}", fill);
+        self.update_position(fill.clone());
         Ok(())
     }
 
@@ -215,14 +216,34 @@ impl Portfolio for SingleStrategyPortfolio {
     }
 
     #[instrument(skip_all)]
-    async fn positions(&self) -> HashMap<Arc<Instrument>, Position> {
+    async fn balance(&self, asset: &AssetId) -> Option<Holding> {
+        self.holdings.get(asset).map(|v| v.value().clone())
+    }
+
+    #[instrument(skip_all)]
+    async fn list_positions(&self) -> HashMap<Arc<Instrument>, Position> {
         self.positions.iter().map(|v| (v.key().clone(), v.value().clone())).collect()
     }
 
     #[instrument(skip_all)]
-    async fn capital(&self) -> Notional {
-        // TODO: Implement capital calculation
-        Notional::from_f64(10_000.0).unwrap()
+    async fn list_open_positions_with_quote_asset(&self, quote_asset: &AssetId) -> HashMap<Arc<Instrument>, Position> {
+        self.positions
+            .iter()
+            .filter(|e| e.value().instrument.quote_asset == *quote_asset && e.value().status == PositionStatus::Open)
+            .map(|e| (e.key().clone(), e.value().clone()))
+            .collect()
+    }
+
+    #[instrument(skip_all)]
+    async fn capital(&self, asset: &AssetId) -> Notional {
+        let current_balance = self.balance(asset).await;
+        let current_positions = self.list_open_positions_with_quote_asset(asset).await;
+        let positions_value = current_positions.iter().fold(Notional::ZERO, |acc, (_, p)| acc + p.value());
+
+        match current_balance {
+            Some(b) => b.quantity + positions_value,
+            None => positions_value,
+        }
     }
 
     #[instrument(skip_all)]

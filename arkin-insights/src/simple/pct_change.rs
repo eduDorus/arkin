@@ -7,7 +7,7 @@ use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
 
-use crate::{config::PctChangeConfig, service::Computation, state::InsightsState};
+use crate::{config::PctChangeConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct PctChangeFeature {

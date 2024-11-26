@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
@@ -29,9 +29,9 @@ async fn test_limited_allocation() {
         ))
     });
 
-    let mut portfolio = MockPortfolio::new();
-    portfolio.expect_capital().returning(|| Decimal::from_f64(10000.0).unwrap());
-    portfolio.expect_positions().returning(|| HashMap::new());
+    let portfolio = MockPortfolio::new();
+    // portfolio.expect_capital().returning(|| Decimal::from_f64(10000.0).unwrap());
+    // portfolio.expect_positions().returning(|| HashMap::new());
 
     // Setup allocation
     let allocation_optim = LimitedAllocationOptimBuilder::default()

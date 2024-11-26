@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
 
-use crate::{config::VWAPConfig, service::Computation, state::InsightsState};
+use crate::{config::VWAPConfig, state::InsightsState, Computation};
 
 #[derive(Debug)]
 pub struct VWAPFeature {

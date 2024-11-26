@@ -7,7 +7,7 @@ use arkin_execution::prelude::*;
 #[test(tokio::test)]
 async fn test_place_order() {
     // Build the SimulationExecutor with the mock OrderManager
-    let executor = BacktestExecutorBuilder::default().build().unwrap();
+    let executor = SimulationExecutorBuilder::default().build().unwrap();
 
     // // Create a sample VenueOrder
     let instrument = test_inst_binance_btc_usdt_perp();

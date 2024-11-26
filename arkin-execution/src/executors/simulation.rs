@@ -7,7 +7,7 @@ use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument, warn};
 
 use arkin_core::prelude::*;
 
@@ -15,17 +15,19 @@ use crate::{Executor, ExecutorError};
 
 #[derive(Debug, Builder)]
 #[builder(setter(into))]
-pub struct BacktestExecutor {
+pub struct SimulationExecutor {
     pubsub: Arc<PubSub>,
     #[builder(default)]
     orders: DashMap<VenueOrderId, VenueOrder>,
-    #[builder(default = dec!(0.002))]
+    #[builder(default = dec!(0.0002))]
     taker_commission: Decimal,
-    #[builder(default = dec!(0.001))]
+    #[builder(default = dec!(0.0001))]
     maker_commission: Decimal,
+    #[builder(default = DashMap::new())]
+    balances: DashMap<AssetId, Holding>,
 }
 
-impl BacktestExecutor {
+impl SimulationExecutor {
     pub fn list_open_orders(&self) -> Vec<VenueOrder> {
         self.orders
             .iter()
@@ -36,7 +38,7 @@ impl BacktestExecutor {
 
     pub fn fill_order(&self, id: VenueOrderId, fill: VenueOrderFill) {
         if let Some(mut order) = self.orders.get_mut(&id) {
-            info!("Filling order: {:?}", fill);
+            info!("Filling order: {}", fill);
             order.add_fill(fill);
         }
 
@@ -46,19 +48,40 @@ impl BacktestExecutor {
             self.orders.remove(&id);
         }
     }
+
+    pub fn update_balance(&self, holding: Holding) {
+        self.balances.insert(holding.asset.clone(), holding);
+    }
+
+    pub fn get_balance(&self, asset: &AssetId) -> Option<Holding> {
+        self.balances.get(asset).map(|holding| holding.value().clone())
+    }
 }
 
 #[async_trait]
-impl Executor for BacktestExecutor {
+impl Executor for SimulationExecutor {
     #[instrument(skip_all)]
     async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError> {
         info!("Starting simulation executor...");
+        // TODO: Send current balance
+        let holding = HoldingBuilder::default()
+            .asset(AssetId::from("USDT".to_string()))
+            .quantity(dec!(10000))
+            .build()
+            .expect("Failed to build Holding");
+        self.update_balance(holding.clone());
+        info!("Sending initial balance: {}", holding);
+        self.pubsub.publish::<Holding>(holding);
+
         let mut tick_updates = self.pubsub.subscribe::<Tick>();
         let mut venue_orders = self.pubsub.subscribe::<VenueOrder>();
         loop {
             select! {
                 Ok(order) = venue_orders.recv() => {
                     info!("SimulationExecutor received order: {}", order.id);
+
+                    // Check if the order is valid and we have enough balance
+
                     // Notify the order has been received
                     self.orders.insert(order.id.clone(), order.clone());
                     let update = VenueOrderStateBuilder::default()
@@ -71,7 +94,7 @@ impl Executor for BacktestExecutor {
 
                 }
                 Ok(tick) = tick_updates.recv() => {
-                    info!("SimulationExecutor received tick: {}", tick.instrument);
+                    debug!("SimulationExecutor received tick: {}", tick.instrument);
                     // Fill the order
                     let open_orders = self.list_open_orders();
 
@@ -84,20 +107,55 @@ impl Executor for BacktestExecutor {
                                 tick.bid_price()
                             };
                             let quantity = order.quantity;
-                            let commission = match order.order_type {
+
+                            // Calculate commission
+                            let mut commission = match order.order_type {
                                 VenueOrderType::Market => (price * quantity) * self.taker_commission,
                                 VenueOrderType::Limit => (price * quantity) * self.maker_commission,
                             };
-                            let fill = VenueOrderFillBuilder::default()
-                                .id(order.id.clone())
-                                .price(price)
-                                .quantity(order.quantity)
-                                .commission(commission)
-                                .build()
-                                .unwrap();
+                            commission = commission.round_dp(order.instrument.price_precision);
 
-                            self.fill_order(order.id.clone(), fill.clone());
-                            self.pubsub.publish::<VenueOrderFill>(fill);
+                            // Check if we have enough balance
+                            if let Some(balance) = self.get_balance(&order.instrument.quote_asset) {
+                                // Create the fill
+                                let fill = VenueOrderFillBuilder::default()
+                                    .id(order.id.clone())
+                                    .execution_order_id(order.execution_order_id.clone())
+                                    .instrument(order.instrument.clone())
+                                    .side(order.side.clone())
+                                    .price(price)
+                                    .quantity(order.quantity)
+                                    .commission(commission)
+                                    .build()
+                                    .expect("Failed to build VenueOrderFill");
+
+
+                                if balance.quantity < fill.value() {
+                                    warn!("Insufficient balance to fill order: {:?}", order.id);
+                                    continue;
+                                }
+
+
+
+                                // Subtract the value from the balance
+                                let new_balance = balance.quantity - fill.value();
+                                let holding = HoldingBuilder::default()
+                                    .asset(fill.instrument.quote_asset.clone())
+                                    .quantity(new_balance)
+                                    .build()
+                                    .expect("Failed to build Holding");
+                                self.update_balance(holding.clone());
+                                self.fill_order(order.id.clone(), fill.clone());
+
+                                // Publish
+                                info!("Publishing new balance: {}", holding);
+                                self.pubsub.publish::<Holding>(holding);
+                                info!("Publishing order filled: {}", order);
+                                self.pubsub.publish::<VenueOrderFill>(fill);
+                            } else {
+                                warn!("No balance found for asset: {:?}", order.instrument.quote_asset);
+                                continue;
+                            }
                         }
                     }
 
@@ -182,7 +240,7 @@ mod tests {
     async fn test_backtest_executor_place_order() {
         // Create executor
         let pubsub = Arc::new(PubSub::new());
-        let executor = Arc::new(BacktestExecutorBuilder::default().pubsub(pubsub.clone()).build().unwrap());
+        let executor = Arc::new(SimulationExecutorBuilder::default().pubsub(pubsub.clone()).build().unwrap());
 
         // Start executor
         let tracker = TaskTracker::new();

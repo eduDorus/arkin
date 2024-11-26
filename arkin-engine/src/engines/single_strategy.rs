@@ -86,10 +86,10 @@ impl SingleStrategyEngine {
 
         let lookback_data = Duration::from_secs(2 * 3600);
         let lookback_insights = Duration::from_secs(3600);
-        self.insights.load(&self.instruments, end_time, lookback_data).await?;
+        self.insights.load(end_time, &self.instruments, lookback_data).await?;
         let mut clock = Clock::new(end_time - lookback_insights, end_time, Duration::from_secs(60));
         while let Some((_start, end)) = clock.next() {
-            self.insights.process(&self.instruments, end).await?;
+            self.insights.process(end, &self.instruments, false).await?;
         }
 
         // If we are now at the start of a new minute, we need to load the last minute of data
@@ -97,10 +97,10 @@ impl SingleStrategyEngine {
         if diff > Duration::from_secs(60) {
             info!("Hopping to the next minute to load the last minute of data");
             self.insights
-                .load(&self.instruments, end_time + Duration::from_secs(60), Duration::from_secs(60))
+                .load(end_time + Duration::from_secs(60), &self.instruments, Duration::from_secs(60))
                 .await?;
             self.insights
-                .process(&self.instruments, end_time + Duration::from_secs(60))
+                .process(end_time + Duration::from_secs(60), &self.instruments, false)
                 .await?;
         }
 
@@ -147,6 +147,7 @@ impl TradingEngine for SingleStrategyEngine {
                 error!("Error in persistor: {}", e);
             }
         });
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Start the portfolio
         let shutdown = self.portfolio_shutdown.clone();
@@ -156,6 +157,7 @@ impl TradingEngine for SingleStrategyEngine {
                 error!("Error in portfolio: {}", e);
             }
         });
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Start the ingestors
         for ingestor in &self.ingestors {
@@ -167,6 +169,7 @@ impl TradingEngine for SingleStrategyEngine {
                 }
             });
         }
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Start the insights
         let shutdown = self.insights_shutdown.clone();
@@ -176,6 +179,7 @@ impl TradingEngine for SingleStrategyEngine {
                 error!("Error in insights: {}", e);
             }
         });
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Start the strategies
         let shutdown = self.strategy_shutdown.clone();
@@ -185,6 +189,7 @@ impl TradingEngine for SingleStrategyEngine {
                 error!("Error in strategy: {}", e);
             }
         });
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Start the allocation optimizer
         let shutdown = self.allocation_shutdown.clone();
@@ -194,6 +199,7 @@ impl TradingEngine for SingleStrategyEngine {
                 error!("Error in allocation optimizer: {}", e);
             }
         });
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Start the order manager
         let shutdown = self.order_manager_shutdown.clone();
@@ -203,6 +209,7 @@ impl TradingEngine for SingleStrategyEngine {
                 error!("Error in order manager: {}", e);
             }
         });
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Start the executor
         let shutdown = self.executor_shutdown.clone();
@@ -212,6 +219,7 @@ impl TradingEngine for SingleStrategyEngine {
                 error!("Error in executor: {}", e);
             }
         });
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Load the state
         self.load_state().await?;

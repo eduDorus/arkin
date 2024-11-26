@@ -35,7 +35,7 @@ pub trait OrderManager: std::fmt::Debug + Send + Sync {
     async fn cancel_orders_by_instrument(&self, instrument: &Arc<Instrument>) -> Result<(), OrderManagerError>;
     async fn cancel_all_orders(&self) -> Result<(), OrderManagerError>;
 
-    async fn order_update(&self, fill: Fill) -> Result<(), OrderManagerError>;
+    async fn order_update(&self, fill: VenueOrderFill) -> Result<(), OrderManagerError>;
     async fn order_status_update(
         &self,
         id: ExecutionOrderId,
