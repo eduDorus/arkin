@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use derive_builder::Builder;
 use time::OffsetDateTime;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{error, info, instrument};
+use tracing::{error, info};
 
 use arkin_allocation::prelude::*;
 use arkin_core::prelude::*;
@@ -75,7 +75,6 @@ pub struct SingleStrategyEngine {
 }
 
 impl SingleStrategyEngine {
-    #[instrument(skip_all)]
     async fn load_state(&self) -> Result<(), TradingEngineError> {
         // Setup Insights
         let start = Instant::now();
@@ -108,7 +107,6 @@ impl SingleStrategyEngine {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn pipeline(&self) -> Result<(), TradingEngineError> {
         let mut time_helper = TickHelper::new(Duration::from_secs(60));
 
@@ -137,7 +135,6 @@ impl SingleStrategyEngine {
 
 #[async_trait]
 impl TradingEngine for SingleStrategyEngine {
-    #[instrument(skip_all)]
     async fn start(&self) -> Result<(), TradingEngineError> {
         // Start the persistor
         let shutdown = self.persistor_shutdown.clone();
@@ -230,7 +227,6 @@ impl TradingEngine for SingleStrategyEngine {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn stop(&self) -> Result<(), TradingEngineError> {
         info!("Stopping ingestors...");
         self.ingestor_shutdown.cancel();

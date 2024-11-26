@@ -3,6 +3,8 @@ use std::{fmt, sync::Arc};
 use derive_builder::Builder;
 use rust_decimal::Decimal;
 use strum::Display;
+use time::OffsetDateTime;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{types::Commission, Event, ExecutionOrderFill, Notional, Price, Quantity, UpdateEventType};
@@ -30,38 +32,116 @@ pub enum PositionStatus {
     Closed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Builder)]
+#[derive(Debug, Clone, Builder)]
 #[builder(setter(into))]
 pub struct Position {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
     pub instrument: Arc<Instrument>,
     pub side: PositionSide,
-    pub avg_open_price: Price,
-    #[builder(default = None)]
-    pub avg_close_price: Option<Price>,
-    pub quantity: Quantity,
+    pub open_price: Price,
+    pub open_quantity: Quantity,
+    #[builder(default = Decimal::ZERO)]
+    pub close_price: Price,
+    #[builder(default = Decimal::ZERO)]
+    pub close_quantity: Quantity,
+    pub last_price: Price,
     #[builder(default = Decimal::ZERO)]
     pub realized_pnl: Notional,
     #[builder(default = Decimal::ZERO)]
-    pub commission: Commission,
+    pub total_commission: Commission,
     #[builder(default = PositionStatus::Open)]
     pub status: PositionStatus,
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub created_at: OffsetDateTime,
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub updated_at: OffsetDateTime,
+}
+
+pub enum Action {
+    Increase,
+    Decrease,
 }
 
 impl Position {
-    pub fn value(&self) -> Notional {
-        self.avg_open_price * self.quantity_with_side() + self.realized_pnl - self.commission
+    pub fn update_price(&mut self, price: Price) {
+        self.last_price = price;
     }
 
-    pub fn notional(&self) -> Notional {
-        self.avg_open_price * self.quantity
+    pub fn update_fill(&mut self, fill: ExecutionOrderFill) -> Option<ExecutionOrderFill> {
+        let action = match (self.side, fill.side) {
+            (PositionSide::Long, MarketSide::Buy) => Action::Increase,
+            (PositionSide::Long, MarketSide::Sell) => Action::Decrease,
+            (PositionSide::Short, MarketSide::Buy) => Action::Decrease,
+            (PositionSide::Short, MarketSide::Sell) => Action::Increase,
+        };
+
+        match action {
+            Action::Increase => {
+                info!("Increasing position with fill: {}", fill);
+                self.increase_position(fill);
+                None
+            }
+            Action::Decrease => {
+                let max_fill_quantity = fill.quantity.min(self.open_quantity);
+                let remaining_fill_quantity = fill.quantity - max_fill_quantity;
+
+                if remaining_fill_quantity.is_zero() {
+                    self.decrease_position(fill);
+                    None
+                } else {
+                    let mut current_fill = fill.clone();
+                    current_fill.quantity = max_fill_quantity;
+                    self.decrease_position(current_fill);
+                    let mut remaining_fill = fill.clone();
+                    remaining_fill.quantity = remaining_fill_quantity;
+                    Some(remaining_fill)
+                }
+            }
+        }
+    }
+
+    fn increase_position(&mut self, fill: ExecutionOrderFill) {
+        info!("Increasing position with fill: {}", fill);
+        self.open_price = (self.open_price * self.open_quantity)
+            + (fill.price * fill.quantity) / (self.open_quantity + fill.quantity);
+        self.open_quantity += fill.quantity;
+        self.total_commission += fill.commission;
+        self.updated_at = fill.event_time;
+    }
+
+    fn decrease_position(&mut self, fill: ExecutionOrderFill) {
+        info!("Decreasing position with fill: {}", fill);
+        self.close_price = (self.close_price * self.close_quantity)
+            + (fill.price * fill.quantity) / (self.close_quantity + fill.quantity);
+        self.close_quantity += fill.quantity;
+        if self.quantity().is_zero() {
+            info!("Closing position with fill: {}", fill);
+            self.status = PositionStatus::Closed;
+        }
+        self.total_commission += fill.commission;
+        self.realized_pnl += fill.price * fill.quantity - self.open_price * fill.quantity;
+        self.updated_at = fill.event_time;
+    }
+
+    /// The total value of your current position based on the latest market prices.
+    pub fn market_value(&self) -> Notional {
+        self.last_price * self.quantity_with_side() * self.instrument.contract_size
+    }
+
+    /// The total value of the underlying asset that a financial derivative represents. It provides a measure of the total exposure.
+    pub fn notional_value(&self) -> Notional {
+        self.last_price * self.quantity() * self.instrument.contract_size
+    }
+
+    pub fn quantity(&self) -> Quantity {
+        self.open_quantity - self.close_quantity
     }
 
     pub fn quantity_with_side(&self) -> Quantity {
         match self.side {
-            PositionSide::Long => self.quantity,
-            PositionSide::Short => -self.quantity,
+            PositionSide::Long => self.quantity(),
+            PositionSide::Short => -self.quantity(),
         }
     }
 
@@ -78,13 +158,13 @@ impl Position {
     }
 
     pub fn return_pct(&self) -> Decimal {
-        if let Some(avg_close_price) = self.avg_close_price {
-            match self.side {
-                PositionSide::Long => (avg_close_price - self.avg_open_price) / self.avg_open_price,
-                PositionSide::Short => (self.avg_open_price - avg_close_price) / self.avg_open_price,
-            }
-        } else {
+        if self.close_price.is_zero() {
             Decimal::ZERO
+        } else {
+            match self.side {
+                PositionSide::Long => (self.close_price - self.open_price) / self.open_price,
+                PositionSide::Short => (self.open_price - self.close_price) / self.open_price,
+            }
         }
     }
 }
@@ -100,11 +180,32 @@ impl From<ExecutionOrderFill> for Position {
         PositionBuilder::default()
             .instrument(fill.instrument)
             .side(fill.side)
-            .avg_open_price(fill.price)
-            .quantity(fill.quantity)
-            .commission(fill.commission)
+            .open_price(fill.price)
+            .last_price(fill.price)
+            .open_quantity(fill.quantity)
+            .total_commission(fill.commission)
             .build()
             .expect("Failed to build position from fill")
+    }
+}
+
+impl PartialEq for Position {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for Position {}
+
+impl PartialOrd for Position {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Position {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.created_at.cmp(&other.created_at)
     }
 }
 
@@ -112,14 +213,16 @@ impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Position: {} {} avg open: {} avg close: {} quantity: {} pnl: {} commission: {}",
+            "Position: instrument={} side={} open_price={} open_quantity={} close_price={} close_quantity={} total_quantity={} realized_pnl={} total_commission={}",
             self.instrument,
             self.side,
-            self.avg_open_price,
-            self.avg_close_price.unwrap_or(Decimal::ZERO),
-            self.quantity,
+            self.open_price,
+            self.open_quantity,
+            self.close_price,
+            self.close_quantity,
+            self.quantity(),
             self.realized_pnl,
-            self.commission,
+            self.total_commission,
         )
     }
 }

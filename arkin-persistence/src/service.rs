@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -78,7 +78,6 @@ impl PersistenceService {
 
 #[async_trait]
 impl Persistor for PersistenceService {
-    #[instrument(skip_all)]
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PersistenceError> {
         info!("Starting persistence service...");
         let tick_service = self.tick_service.clone();
@@ -133,7 +132,6 @@ impl Persistor for PersistenceService {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn flush(&self) -> Result<(), PersistenceError> {
         self.tick_service.flush().await?;
         self.trade_service.flush().await?;
@@ -141,17 +139,14 @@ impl Persistor for PersistenceService {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn insert_instrument(&self, instrument: Instrument) -> Result<(), PersistenceError> {
         self.instrument_service.insert(instrument).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn read_instrument_by_id(&self, id: Uuid) -> Result<Arc<Instrument>, PersistenceError> {
         self.instrument_service.read_by_id(id).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn read_instrument_by_venue_symbol(&self, venue_symbol: String) -> Result<Arc<Instrument>, PersistenceError> {
         let instrument_service = &self.instrument_service;
 
@@ -161,23 +156,19 @@ impl Persistor for PersistenceService {
             .map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_tick(&self, tick: Tick) -> Result<(), PersistenceError> {
         self.tick_service.insert(tick).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_tick_batch(&self, tick: Tick) -> Result<(), PersistenceError> {
         let tick_service = &self.tick_service;
         tick_service.insert_batch(tick).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_tick_batch_vec(&self, ticks: Vec<Tick>) -> Result<(), PersistenceError> {
         self.tick_service.insert_batch_vec(ticks).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn read_latest_tick(
         &self,
         event_time: OffsetDateTime,
@@ -189,7 +180,6 @@ impl Persistor for PersistenceService {
             .map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn read_trades_range(
         &self,
         instruments: &[Arc<Instrument>],
@@ -199,23 +189,19 @@ impl Persistor for PersistenceService {
         self.trade_service.read_range(instruments, from, to).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_trade(&self, trade: Trade) -> Result<(), PersistenceError> {
         self.trade_service.insert(trade).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_trade_batch(&self, trade: Trade) -> Result<(), PersistenceError> {
         let trade_service = &self.trade_service;
         trade_service.insert_batch(trade).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_trade_batch_vec(&self, trades: Vec<Trade>) -> Result<(), PersistenceError> {
         self.trade_service.insert_batch_vec(trades).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn read_ticks_range(
         &self,
         instruments: &[Arc<Instrument>],
@@ -225,17 +211,14 @@ impl Persistor for PersistenceService {
         self.tick_service.read_range(instruments, from, to).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_insight(&self, insight: Insight) -> Result<(), PersistenceError> {
         self.insights_service.insert(insight).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_insight_batch(&self, insight: Insight) -> Result<(), PersistenceError> {
         self.insights_service.insert_batch(insight).await.map_err(|e| e.into())
     }
 
-    #[instrument(skip_all)]
     async fn insert_insight_batch_vec(&self, insights: Vec<Insight>) -> Result<(), PersistenceError> {
         self.insights_service.insert_batch_vec(insights).await.map_err(|e| e.into())
     }

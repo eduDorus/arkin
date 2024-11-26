@@ -7,7 +7,7 @@ use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info};
 
 use arkin_core::prelude::*;
 
@@ -49,8 +49,15 @@ impl SimulationExecutor {
         }
     }
 
-    pub fn update_balance(&self, holding: Holding) {
-        self.balances.insert(holding.asset.clone(), holding);
+    pub fn update_balance(&self, asset: &AssetId, quantity: Decimal) {
+        let mut entry = self.balances.entry(asset.clone()).or_insert(
+            HoldingBuilder::default()
+                .asset(asset.clone())
+                .quantity(dec!(0))
+                .build()
+                .expect("Failed to build Holding"),
+        );
+        entry.quantity += quantity;
     }
 
     pub fn get_balance(&self, asset: &AssetId) -> Option<Holding> {
@@ -60,7 +67,6 @@ impl SimulationExecutor {
 
 #[async_trait]
 impl Executor for SimulationExecutor {
-    #[instrument(skip_all)]
     async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError> {
         info!("Starting simulation executor...");
         // TODO: Send current balance
@@ -69,7 +75,7 @@ impl Executor for SimulationExecutor {
             .quantity(dec!(10000))
             .build()
             .expect("Failed to build Holding");
-        self.update_balance(holding.clone());
+        self.update_balance(&holding.asset, holding.quantity);
         info!("Sending initial balance: {}", holding);
         self.pubsub.publish::<Holding>(holding);
 
@@ -79,8 +85,8 @@ impl Executor for SimulationExecutor {
             select! {
                 Ok(order) = venue_orders.recv() => {
                     info!("SimulationExecutor received order: {}", order.id);
-
                     // Check if the order is valid and we have enough balance
+                    // TODO: Check if the order is valid
 
                     // Notify the order has been received
                     self.orders.insert(order.id.clone(), order.clone());
@@ -115,8 +121,6 @@ impl Executor for SimulationExecutor {
                             };
                             commission = commission.round_dp(order.instrument.price_precision);
 
-                            // Check if we have enough balance
-                            if let Some(balance) = self.get_balance(&order.instrument.quote_asset) {
                                 // Create the fill
                                 let fill = VenueOrderFillBuilder::default()
                                     .id(order.id.clone())
@@ -130,35 +134,17 @@ impl Executor for SimulationExecutor {
                                     .expect("Failed to build VenueOrderFill");
 
 
-                                if balance.quantity < fill.value() {
-                                    warn!("Insufficient balance to fill order: {:?}", order.id);
-                                    continue;
-                                }
-
-
-
                                 // Subtract the value from the balance
-                                let new_balance = balance.quantity - fill.value();
-                                let holding = HoldingBuilder::default()
-                                    .asset(fill.instrument.quote_asset.clone())
-                                    .quantity(new_balance)
-                                    .build()
-                                    .expect("Failed to build Holding");
-                                self.update_balance(holding.clone());
+                                self.update_balance(&order.instrument.base_asset, fill.market_value() + fill.commission);
                                 self.fill_order(order.id.clone(), fill.clone());
 
                                 // Publish
-                                info!("Publishing new balance: {}", holding);
-                                self.pubsub.publish::<Holding>(holding);
+                                // info!("Publishing new balance: {}", holding);
+                                // self.pubsub.publish::<Holding>(holding);
                                 info!("Publishing order filled: {}", order);
                                 self.pubsub.publish::<VenueOrderFill>(fill);
-                            } else {
-                                warn!("No balance found for asset: {:?}", order.instrument.quote_asset);
-                                continue;
                             }
                         }
-                    }
-
                 }
                 _ = shutdown.cancelled() => {
                     break;
@@ -168,14 +154,12 @@ impl Executor for SimulationExecutor {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn place_order(&self, order: VenueOrder) -> Result<(), ExecutorError> {
         info!("Placing order: {:?}", order);
         self.orders.insert(order.id, order);
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn place_orders(&self, orders: Vec<VenueOrder>) -> Result<(), ExecutorError> {
         info!("Placing orders: {:?}", orders);
         for order in orders {
@@ -184,17 +168,14 @@ impl Executor for SimulationExecutor {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn modify_order(&self, _order: VenueOrder) -> Result<(), ExecutorError> {
         unimplemented!("SimulationExecutor::modify_order")
     }
 
-    #[instrument(skip_all)]
     async fn modify_orders(&self, _orders: Vec<VenueOrder>) -> Result<(), ExecutorError> {
         unimplemented!("SimulationExecutor::modify_orders")
     }
 
-    #[instrument(skip_all)]
     async fn cancel_order(&self, id: VenueOrderId) -> Result<(), ExecutorError> {
         info!("Cancelling order: {:?}", id);
         if let Some(mut order) = self.orders.get_mut(&id) {
@@ -205,7 +186,6 @@ impl Executor for SimulationExecutor {
         }
     }
 
-    #[instrument(skip_all)]
     async fn cancel_orders(&self, ids: Vec<VenueOrderId>) -> Result<(), ExecutorError> {
         info!("Cancelling orders: {:?}", ids);
         for id in ids {
@@ -218,7 +198,6 @@ impl Executor for SimulationExecutor {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn cancel_all_orders(&self) -> Result<(), ExecutorError> {
         info!("Cancelling all orders");
         for mut order in self.orders.iter_mut() {

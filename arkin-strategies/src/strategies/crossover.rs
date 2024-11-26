@@ -6,7 +6,7 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, instrument};
+use tracing::info;
 
 use arkin_core::prelude::*;
 
@@ -23,7 +23,6 @@ pub struct CrossoverStrategy {
 
 #[async_trait]
 impl Algorithm for CrossoverStrategy {
-    #[instrument(skip_all)]
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), StrategyError> {
         info!("Starting Crossover Strategy...");
         let mut insight_ticks = self.pubsub.subscribe::<InsightTick>();
@@ -41,7 +40,6 @@ impl Algorithm for CrossoverStrategy {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn insight_update(
         &self,
         instruments: &[Arc<Instrument>],
@@ -102,7 +100,6 @@ impl Algorithm for CrossoverStrategy {
         Ok(signals)
     }
 
-    #[instrument(skip_all)]
     async fn insight_tick(&self, tick: InsightTick) -> Result<(), StrategyError> {
         info!("Processing insight tick for Crossover Strategy...");
         let signals = self

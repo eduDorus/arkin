@@ -7,7 +7,7 @@ use derive_builder::Builder;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, warn};
 use url::Url;
 
 use arkin_core::prelude::*;
@@ -90,7 +90,6 @@ impl BinanceIngestor {
 
 #[async_trait]
 impl Ingestor for BinanceIngestor {
-    #[instrument(skip_all)]
     async fn start(&self, shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting binance ingestor...");
 

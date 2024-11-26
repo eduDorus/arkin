@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, instrument};
+use tracing::info;
 
 use crate::errors::InsightsError;
 use crate::pipeline::ComputationGraph;
@@ -42,7 +42,6 @@ impl InsightsService {
 
 #[async_trait]
 impl Insights for InsightsService {
-    #[instrument(skip_all)]
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), InsightsError> {
         info!("Starting insights service...");
         let mut interval_tick = self.pubsub.subscribe::<IntervalTick>();
@@ -61,7 +60,6 @@ impl Insights for InsightsService {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn load(
         &self,
         event_time: OffsetDateTime,
@@ -82,19 +80,17 @@ impl Insights for InsightsService {
         self.state.insert_batch(insights);
         Ok(())
     }
-    #[instrument(skip_all)]
+
     async fn insert(&self, insight: Insight) -> Result<(), InsightsError> {
         self.state.insert(insight);
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn insert_batch(&self, insights: Vec<Insight>) -> Result<(), InsightsError> {
         self.state.insert_batch(insights);
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn process(
         &self,
         event_time: OffsetDateTime,

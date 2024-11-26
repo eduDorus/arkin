@@ -26,8 +26,7 @@ impl fmt::Display for ExecutionOrderStrategy {
             ExecutionOrderStrategy::Market(o) => write!(f, "MKT side={} quantity={}", o.side, o.quantity),
             ExecutionOrderStrategy::Limit(o) => {
                 write!(f, "LMT side={} price={} quantity={}", o.side, o.price, o.quantity)
-            }
-            // ExecutionOrderStrategy::WideQuoting(o) => write!(f, "WideQuoting: {}", o),
+            } // ExecutionOrderStrategy::WideQuoting(o) => write!(f, "WideQuoting: {}", o),
         }
     }
 }

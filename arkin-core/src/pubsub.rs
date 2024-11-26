@@ -116,15 +116,21 @@ pub struct VenueOrderFill {
 }
 
 impl VenueOrderFill {
-    pub fn notional(&self) -> Notional {
-        match self.side {
-            MarketSide::Buy => self.price * self.quantity,
-            MarketSide::Sell => self.price * -self.quantity,
-        }
+    /// The total value of your current position based on the latest market prices.
+    pub fn market_value(&self) -> Notional {
+        self.price * self.quantity_with_side() * self.instrument.contract_size
     }
 
-    pub fn value(&self) -> Notional {
-        self.notional() + self.commission
+    /// The total value of the underlying asset that a financial derivative represents. It provides a measure of the total exposure.
+    pub fn notional_value(&self) -> Notional {
+        self.price * self.quantity * self.instrument.contract_size
+    }
+
+    pub fn quantity_with_side(&self) -> Notional {
+        match self.side {
+            MarketSide::Buy => self.quantity,
+            MarketSide::Sell => -self.quantity,
+        }
     }
 }
 
@@ -164,10 +170,20 @@ pub struct ExecutionOrderFill {
 }
 
 impl ExecutionOrderFill {
-    pub fn notional(&self) -> Notional {
+    /// The total value of your current position based on the latest market prices.
+    pub fn market_value(&self) -> Notional {
+        self.price * self.quantity_with_side() * self.instrument.contract_size
+    }
+
+    /// The total value of the underlying asset that a financial derivative represents. It provides a measure of the total exposure.
+    pub fn notional_value(&self) -> Notional {
+        self.price * self.quantity * self.instrument.contract_size
+    }
+
+    pub fn quantity_with_side(&self) -> Notional {
         match self.side {
-            MarketSide::Buy => self.price * self.quantity,
-            MarketSide::Sell => self.price * -self.quantity,
+            MarketSide::Buy => self.quantity,
+            MarketSide::Sell => -self.quantity,
         }
     }
 }

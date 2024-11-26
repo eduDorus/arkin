@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, warn};
 
 use arkin_core::prelude::*;
 
@@ -126,7 +126,6 @@ impl OrderQueue {
 
 #[async_trait]
 impl OrderManager for SimpleOrderManager {
-    #[instrument(skip_all)]
     async fn start(&self, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
         info!("Starting order manager...");
         let mut execution_orders = self.pubsub.subscribe::<ExecutionOrder>();
@@ -175,43 +174,35 @@ impl OrderManager for SimpleOrderManager {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn order_by_id(&self, id: ExecutionOrderId) -> Option<ExecutionOrder> {
         self.execution_orders.get_order_by_id(id)
     }
 
-    #[instrument(skip_all)]
     async fn list_new_orders(&self) -> Vec<ExecutionOrder> {
         self.execution_orders.list_new_orders()
     }
 
-    #[instrument(skip_all)]
     async fn list_open_orders(&self) -> Vec<ExecutionOrder> {
         self.execution_orders.list_open_orders()
     }
 
-    #[instrument(skip_all)]
     async fn list_cancelling_orders(&self) -> Vec<ExecutionOrder> {
         self.execution_orders.list_cancelling_orders()
     }
 
-    #[instrument(skip_all)]
     async fn list_cancelled_orders(&self) -> Vec<ExecutionOrder> {
         self.execution_orders.list_cancelled_orders()
     }
 
-    #[instrument(skip_all)]
     async fn list_closed_orders(&self) -> Vec<ExecutionOrder> {
         self.execution_orders.list_closed_orders()
     }
 
-    #[instrument(skip_all)]
     async fn place_order(&self, order: ExecutionOrder) -> Result<(), OrderManagerError> {
         self.execution_orders.add_order(order.clone());
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn place_orders(&self, orders: Vec<ExecutionOrder>) -> Result<(), OrderManagerError> {
         for order in orders {
             self.place_order(order).await?;
@@ -219,14 +210,12 @@ impl OrderManager for SimpleOrderManager {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn replace_order_by_id(&self, id: ExecutionOrderId, order: ExecutionOrder) -> Result<(), OrderManagerError> {
         self.execution_orders.cancel_order_by_id(id);
         self.execution_orders.add_order(order);
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn replace_orders_by_instrument(
         &self,
         instrument: &Arc<Instrument>,
@@ -237,31 +226,26 @@ impl OrderManager for SimpleOrderManager {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn cancel_order_by_id(&self, id: ExecutionOrderId) -> Result<(), OrderManagerError> {
         self.execution_orders.cancel_order_by_id(id);
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn cancel_orders_by_instrument(&self, instrument: &Arc<Instrument>) -> Result<(), OrderManagerError> {
         self.execution_orders.cancel_orders_by_instrument(instrument);
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn cancel_all_orders(&self) -> Result<(), OrderManagerError> {
         self.execution_orders.cancel_all_orders();
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn order_update(&self, fill: VenueOrderFill) -> Result<(), OrderManagerError> {
         self.execution_orders.add_fill(fill);
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn order_status_update(
         &self,
         id: ExecutionOrderId,
@@ -271,13 +255,11 @@ impl OrderManager for SimpleOrderManager {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn position_update(&self, position: Position) -> Result<(), OrderManagerError> {
         self.portfolio.position_update(position).await?;
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn balance_update(&self, holding: Holding) -> Result<(), OrderManagerError> {
         self.portfolio.balance_update(holding).await?;
         Ok(())

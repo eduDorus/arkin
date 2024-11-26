@@ -9,7 +9,7 @@ use rust_decimal_macros::dec;
 use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, instrument, warn};
+use tracing::{info, warn};
 
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
@@ -49,7 +49,6 @@ pub struct DiffPosition {
 
 #[async_trait]
 impl AllocationOptim for LimitedAllocationOptim {
-    #[instrument(skip_all)]
     async fn start(&self, shutdown: CancellationToken) -> Result<(), AllocationOptimError> {
         info!("Starting LimitedAllocation...");
         let mut signal_tick = self.pubsub.subscribe::<SignalTick>();
@@ -68,12 +67,10 @@ impl AllocationOptim for LimitedAllocationOptim {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn list_signals(&self) -> Result<Vec<Signal>, AllocationOptimError> {
         Ok(self.signals.iter().map(|entry| entry.value().clone()).collect())
     }
 
-    #[instrument(skip_all)]
     async fn new_signal(&self, signal: Signal) -> Result<(), AllocationOptimError> {
         info!("Received new signal: {}", signal);
         let key = (signal.strateg_id.clone(), signal.instrument.clone());
@@ -81,7 +78,6 @@ impl AllocationOptim for LimitedAllocationOptim {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn new_signals(&self, signals: Vec<Signal>) -> Result<(), AllocationOptimError> {
         for signal in signals {
             self.new_signal(signal).await?;
@@ -89,7 +85,6 @@ impl AllocationOptim for LimitedAllocationOptim {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn optimize(&self, event_time: OffsetDateTime) -> Result<Vec<ExecutionOrder>, AllocationOptimError> {
         // Check if we have any signals
         if self.signals.is_empty() {
