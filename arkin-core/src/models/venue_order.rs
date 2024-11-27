@@ -215,15 +215,11 @@ impl fmt::Display for VenueOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "id: {} exec_id: {} {} {} {} price: {}/{} quantity: {}/{} {}",
-            self.id,
-            self.execution_order_id,
+            "instrument={} side={} order_type={} price={} quantity={} status={}",
             self.instrument,
             self.side,
             self.order_type,
-            self.avg_fill_price,
             self.price.unwrap_or(Price::ZERO),
-            self.filled_quantity,
             self.quantity,
             self.status
         )

@@ -61,7 +61,7 @@ impl Portfolio for SingleStrategyPortfolio {
     }
 
     async fn price_update(&self, tick: Tick) -> Result<(), PortfolioError> {
-        debug!("PORTFOLIO: Processing price update: {}", tick);
+        debug!("Portfolio processing price update: {}", tick);
 
         // Update the price of the instrument in the position
         if let Some(mut e) = self.positions.get_mut(&tick.instrument) {
@@ -75,7 +75,7 @@ impl Portfolio for SingleStrategyPortfolio {
     }
 
     async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError> {
-        info!("Processing balance update: {}", holding);
+        info!("Portfolio processing balance update: {}", holding);
         // Check if we have the asset in the holdings else create
         if self.holdings.contains_key(&holding.asset) {
             self.holdings.alter(&holding.asset, |_, mut h| {
@@ -93,7 +93,7 @@ impl Portfolio for SingleStrategyPortfolio {
     }
 
     async fn fill_update(&self, fill: ExecutionOrderFill) -> Result<(), PortfolioError> {
-        info!("Processing fill update: {}", fill);
+        info!("Portfolio processing fill update: {}", fill);
         // Reduce the balance of the quote asset
         let cost = fill.total_cost();
         let quote_asset = fill.instrument.quote_asset.clone();

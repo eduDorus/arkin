@@ -133,7 +133,7 @@ impl OrderManager for SimpleOrderManager {
         loop {
             tokio::select! {
                 Ok(mut order) = execution_orders.recv() => {
-                    info!("SimpleOrderManager received order: {}", order.id.clone());
+                    info!("SimpleOrderManager received execution order: {}", order);
                     order.update_status(ExecutionOrderStatus::InProgress);
                     if let Err(e) = self.place_order(order.clone()).await {
                         error!("Failed to process order: {}", e);
@@ -154,16 +154,16 @@ impl OrderManager for SimpleOrderManager {
                         }
                     };
 
-                    info!("Publishing VenueOrder to pubsub: {}", venue_order.execution_order_id);
+                    info!("SimpleOrderManager publishing venue order: {}", venue_order);
                     self.pubsub.publish::<VenueOrder>(venue_order);
                 }
                 Ok(fill) = fills.recv() => {
-                    info!("SimpleOrderManager received fill: {}", fill.execution_order_id);
+                    info!("SimpleOrderManager received fill: {}", fill);
                     if let Err(e) = self.order_update(fill.clone()).await {
                         error!("Failed to process fill: {}", e);
                     }
 
-                    info!("Publishing ExecutionOrderFill to pubsub: {}", fill.execution_order_id);
+                    info!("SimpleOrderManager publishing execution order: {}", fill);
                     self.pubsub.publish::<ExecutionOrderFill>(fill.into());
                 }
                 _ = shutdown.cancelled() => {

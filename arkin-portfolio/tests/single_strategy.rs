@@ -53,6 +53,9 @@ async fn test_single_strategy_long_position() {
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(9898));
 
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(9998));
+
     // Create fill
     let fill = ExecutionOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
@@ -68,6 +71,9 @@ async fn test_single_strategy_long_position() {
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(9956));
 
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(10006));
+
     // Create fill
     let fill = ExecutionOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
@@ -82,6 +88,9 @@ async fn test_single_strategy_long_position() {
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(10009));
+
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(10009));
 
     let open_positions = portfolio.list_open_positions().await;
     assert_eq!(open_positions.len(), 0);
@@ -140,6 +149,9 @@ async fn test_single_strategy_short_position() {
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(10098));
 
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(9998));
+
     // Create fill
     let fill = ExecutionOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
@@ -155,6 +167,9 @@ async fn test_single_strategy_short_position() {
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(10056));
 
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(10006));
+
     // Create fill
     let fill = ExecutionOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
@@ -169,6 +184,9 @@ async fn test_single_strategy_short_position() {
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(10009));
+
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(10009));
 
     let open_positions = portfolio.list_open_positions().await;
     assert_eq!(open_positions.len(), 0);
@@ -227,6 +245,9 @@ async fn test_single_strategy_swap_position() {
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(9898));
 
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(9998));
+
     // Create fill
     let fill = ExecutionOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
@@ -239,8 +260,12 @@ async fn test_single_strategy_swap_position() {
         .unwrap();
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
+
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(10136));
+
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(10016));
 
     // Create fill
     let fill = ExecutionOrderFillBuilder::default()
@@ -256,6 +281,9 @@ async fn test_single_strategy_swap_position() {
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
     assert_eq!(portfolio_balance.quantity, dec!(10034));
+
+    let asset_capital = portfolio.capital(&instrument.quote_asset).await;
+    assert_eq!(asset_capital, dec!(10034));
 
     let open_positions = portfolio.list_open_positions().await;
     assert_eq!(open_positions.len(), 0);

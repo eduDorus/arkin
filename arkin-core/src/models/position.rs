@@ -110,6 +110,7 @@ impl Position {
         self.open_quantity += fill.quantity;
         self.total_commission += fill.commission;
         self.updated_at = fill.event_time;
+        info!("Updated position: {}", self);
     }
 
     fn decrease_position(&mut self, fill: ExecutionOrderFill) {
@@ -117,16 +118,19 @@ impl Position {
         self.close_price = (self.close_price * self.close_quantity)
             + (fill.price * fill.quantity) / (self.close_quantity + fill.quantity);
         self.close_quantity += fill.quantity;
-        if self.quantity().is_zero() {
-            info!("Closing position with fill: {}", fill);
-            self.status = PositionStatus::Closed;
-        }
         self.total_commission += fill.commission;
         self.realized_pnl += match self.side {
             PositionSide::Long => fill.price * fill.quantity - self.open_price * fill.quantity,
             PositionSide::Short => self.open_price * fill.quantity - fill.price * fill.quantity,
         };
         self.updated_at = fill.event_time;
+
+        if self.quantity().is_zero() {
+            self.status = PositionStatus::Closed;
+            info!("Closed position: {}", self);
+        } else {
+            info!("Updated position: {}", self);
+        }
     }
 
     /// The total value of your current position based on the latest market prices.
@@ -182,7 +186,7 @@ impl Event for Position {
 
 impl From<ExecutionOrderFill> for Position {
     fn from(fill: ExecutionOrderFill) -> Self {
-        PositionBuilder::default()
+        let postition = PositionBuilder::default()
             .instrument(fill.instrument)
             .side(fill.side)
             .open_price(fill.price)
@@ -190,7 +194,9 @@ impl From<ExecutionOrderFill> for Position {
             .open_quantity(fill.quantity)
             .total_commission(fill.commission)
             .build()
-            .expect("Failed to build position from fill")
+            .expect("Failed to build position from fill");
+        info!("Created position: {}", postition);
+        postition
     }
 }
 

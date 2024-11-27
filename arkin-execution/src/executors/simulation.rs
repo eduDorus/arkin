@@ -38,8 +38,8 @@ impl SimulationExecutor {
 
     pub fn fill_order(&self, id: VenueOrderId, fill: VenueOrderFill) {
         if let Some(mut order) = self.orders.get_mut(&id) {
-            info!("Filling order: {}", fill);
-            order.add_fill(fill);
+            order.add_fill(fill.clone());
+            info!("SimulationExecutor filled order: {}", fill);
         }
 
         // Remove the order if it is filled
@@ -95,7 +95,7 @@ impl Executor for SimulationExecutor {
                         .status(VenueOrderStatus::Placed)
                         .build()
                         .unwrap();
-                    info!("Order acked: {:?}", order.id);
+                    info!("SimulationExecutor placed order: {}", order);
                     self.pubsub.publish::<VenueOrderState>(update);
 
                 }
@@ -121,30 +121,30 @@ impl Executor for SimulationExecutor {
                             };
                             commission = commission.round_dp(order.instrument.price_precision);
 
-                                // Create the fill
-                                let fill = VenueOrderFillBuilder::default()
-                                    .id(order.id.clone())
-                                    .execution_order_id(order.execution_order_id.clone())
-                                    .instrument(order.instrument.clone())
-                                    .side(order.side.clone())
-                                    .price(price)
-                                    .quantity(order.quantity)
-                                    .commission(commission)
-                                    .build()
-                                    .expect("Failed to build VenueOrderFill");
+                            // Create the fill
+                            let fill = VenueOrderFillBuilder::default()
+                                .id(order.id.clone())
+                                .execution_order_id(order.execution_order_id.clone())
+                                .instrument(order.instrument.clone())
+                                .side(order.side.clone())
+                                .price(price)
+                                .quantity(order.quantity)
+                                .commission(commission)
+                                .build()
+                                .expect("Failed to build VenueOrderFill");
 
 
-                                // Subtract the value from the balance
-                                self.update_balance(&order.instrument.base_asset, fill.market_value() + fill.commission);
-                                self.fill_order(order.id.clone(), fill.clone());
+                            // Subtract the value from the balance
+                            // self.update_balance(&order.instrument.base_asset, fill.market_value() + fill.commission);
+                            self.fill_order(order.id.clone(), fill.clone());
 
-                                // Publish
-                                // info!("Publishing new balance: {}", holding);
-                                // self.pubsub.publish::<Holding>(holding);
-                                info!("Publishing order filled: {}", order);
-                                self.pubsub.publish::<VenueOrderFill>(fill);
-                            }
+                            // Publish
+                            // info!("Publishing new balance: {}", holding);
+                            // self.pubsub.publish::<Holding>(holding);
+                            info!("SimulationExecutor publishing order filled: {}", order);
+                            self.pubsub.publish::<VenueOrderFill>(fill);
                         }
+                    }
                 }
                 _ = shutdown.cancelled() => {
                     break;
@@ -155,13 +155,12 @@ impl Executor for SimulationExecutor {
     }
 
     async fn place_order(&self, order: VenueOrder) -> Result<(), ExecutorError> {
-        info!("Placing order: {:?}", order);
-        self.orders.insert(order.id, order);
+        self.orders.insert(order.id, order.clone());
+        info!("SimulationExecution placed order: {}", order);
         Ok(())
     }
 
     async fn place_orders(&self, orders: Vec<VenueOrder>) -> Result<(), ExecutorError> {
-        info!("Placing orders: {:?}", orders);
         for order in orders {
             self.orders.insert(order.id, order);
         }
@@ -177,9 +176,9 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_order(&self, id: VenueOrderId) -> Result<(), ExecutorError> {
-        info!("Cancelling order: {:?}", id);
         if let Some(mut order) = self.orders.get_mut(&id) {
             order.cancel();
+            info!("SimulationExecution cancelled order: {}", *order);
             Ok(())
         } else {
             return Err(ExecutorError::InvalidOrder(id.to_string()));
@@ -187,21 +186,16 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_orders(&self, ids: Vec<VenueOrderId>) -> Result<(), ExecutorError> {
-        info!("Cancelling orders: {:?}", ids);
         for id in ids {
-            if let Some(mut order) = self.orders.get_mut(&id) {
-                order.cancel();
-            } else {
-                return Err(ExecutorError::InvalidOrder(id.to_string()));
-            }
+            self.cancel_order(id).await?;
         }
         Ok(())
     }
 
     async fn cancel_all_orders(&self) -> Result<(), ExecutorError> {
-        info!("Cancelling all orders");
         for mut order in self.orders.iter_mut() {
             order.cancel();
+            info!("SimulationExecution cancelled order: {}", *order);
         }
         Ok(())
     }
