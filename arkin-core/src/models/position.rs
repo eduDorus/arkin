@@ -92,11 +92,14 @@ impl Position {
                 } else {
                     let mut current_fill = fill.clone();
                     current_fill.quantity = max_fill_quantity;
-                    current_fill.commission = (current_fill.commission / fill.quantity) * max_fill_quantity;
+                    current_fill.commission = ((current_fill.commission / fill.quantity) * max_fill_quantity)
+                        .round_dp(self.instrument.price_precision);
                     self.decrease_position(current_fill);
                     let mut remaining_fill = fill.clone();
                     remaining_fill.quantity = remaining_fill_quantity;
-                    remaining_fill.commission = (remaining_fill.commission / fill.quantity) * remaining_fill_quantity;
+                    remaining_fill.commission = ((remaining_fill.commission / fill.quantity) * remaining_fill_quantity)
+                        .round_dp(self.instrument.price_precision);
+
                     Some(remaining_fill)
                 }
             }
@@ -119,10 +122,11 @@ impl Position {
             + (fill.price * fill.quantity) / (self.close_quantity + fill.quantity);
         self.close_quantity += fill.quantity;
         self.total_commission += fill.commission;
-        self.realized_pnl += match self.side {
+        let realized_pnl = match self.side {
             PositionSide::Long => fill.price * fill.quantity - self.open_price * fill.quantity,
             PositionSide::Short => self.open_price * fill.quantity - fill.price * fill.quantity,
         };
+        self.realized_pnl += realized_pnl.round_dp(self.instrument.price_precision);
         self.updated_at = fill.event_time;
 
         if self.quantity().is_zero() {

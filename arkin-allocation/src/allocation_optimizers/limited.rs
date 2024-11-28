@@ -26,7 +26,7 @@ pub struct LimitedAllocationOptim {
     signals: DashMap<(StrategyId, Arc<Instrument>), Signal>,
     #[builder(default = "Decimal::from_f32(0.8).unwrap()")]
     max_allocation: Decimal,
-    #[builder(default = "Decimal::from_f32(0.2).unwrap()")]
+    #[builder(default = "Decimal::from_f32(1.0).unwrap()")]
     max_allocation_per_signal: Decimal,
     #[builder(default = "dec!(100)")]
     min_trade_value: Decimal,
@@ -95,7 +95,8 @@ impl AllocationOptim for LimitedAllocationOptim {
         // Calculate money allocated to each signal
         let capital = self.portfolio.capital(&self.reference_currency).await;
         let max_allocation = capital * self.max_allocation;
-        let max_allocation_per_signal = max_allocation * self.max_allocation_per_signal;
+        let amount_of_signals = Decimal::from_usize(self.signals.len()).expect("Failed to convert usize to Decimal");
+        let max_allocation_per_signal = (max_allocation / amount_of_signals) * self.max_allocation_per_signal;
         info!("Capital: {}", capital);
         info!("Max allocation: {}", max_allocation);
         info!("Max allocation per signal: {}", max_allocation_per_signal);
@@ -118,7 +119,8 @@ impl AllocationOptim for LimitedAllocationOptim {
                     let optimal_position = OptimalPosition {
                         instrument: signal.instrument.clone(),
                         price: tick.mid_price(),
-                        quantity: quantity.round_dp(signal.instrument.quantity_precision),
+                        quantity: quantity
+                            .round_dp_with_strategy(signal.instrument.quantity_precision, RoundingStrategy::ToZero),
                     };
                     optimal_positions.insert(signal.instrument.clone(), optimal_position);
                 }
@@ -143,8 +145,8 @@ impl AllocationOptim for LimitedAllocationOptim {
         for (instrument, optimal_position) in optimal_positions.iter() {
             let diff_position = if let Some(position) = current_positions.get(instrument) {
                 // TODO: Handle position side
-                let diff =
-                    (optimal_position.quantity - position.quantity_with_side()).round_dp(instrument.quantity_precision);
+                let diff = (optimal_position.quantity - position.quantity_with_side())
+                    .round_dp_with_strategy(instrument.quantity_precision, RoundingStrategy::ToZero);
                 DiffPosition {
                     instrument: instrument.clone(),
                     price: optimal_position.price,
@@ -152,7 +154,9 @@ impl AllocationOptim for LimitedAllocationOptim {
                     diff,
                 }
             } else {
-                let diff = optimal_position.quantity.round_dp(instrument.quantity_precision);
+                let diff = optimal_position
+                    .quantity
+                    .round_dp_with_strategy(instrument.quantity_precision, RoundingStrategy::ToZero);
                 DiffPosition {
                     instrument: instrument.clone(),
                     price: optimal_position.price,
