@@ -33,21 +33,6 @@ CREATE TABLE IF NOT EXISTS venues (
 );
 
 
-CREATE TABLE IF NOT EXISTS accounts (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    venue_id uuid NOT NULL REFERENCES venues(id),
-    name VARCHAR NOT NULL,
-    balance DECIMAL NOT NULL
-);
-
-
-CREATE TABLE IF NOT EXISTS strategies (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    name VARCHAR NOT NULL UNIQUE,
-    description TEXT
-);
-
-
 CREATE TABLE IF NOT EXISTS instruments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     venue_id uuid NOT NULL REFERENCES venues(id),
@@ -70,26 +55,28 @@ CREATE TABLE IF NOT EXISTS instruments (
 );
 
 
-CREATE TABLE IF NOT EXISTS signals (
+CREATE TABLE IF NOT EXISTS positions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
-    strategy_id uuid NOT NULL REFERENCES strategies(id),
-    signal NUMERIC NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    side position_side NOT NULL,
+    open_price NUMERIC NOT NULL,
+    open_quantity NUMERIC NOT NULL,
+    close_price NUMERIC NOT NULL,
+    close_quantity DECIMAL NOT NULL,
+    realized_pnl DECIMAL NOT NULL,
+    total_commission DECIMAL NOT NULL,
+    status position_status NOT NULL,
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 
 
 CREATE TABLE IF NOT EXISTS execution_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    account_id uuid NOT NULL REFERENCES accounts(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
-    strategy_id uuid NOT NULL REFERENCES strategies(id),
-    signal_id uuid NOT NULL REFERENCES signals(id),
     side market_side NOT NULL,
     execution_type execution_order_type NOT NULL,
-    current_price NUMERIC NOT NULL,
-    avg_fill_price NUMERIC NOT NULL,
-    quantity NUMERIC NOT NULL,
+    fill_price NUMERIC NOT NULL,
     filled_quantity NUMERIC NOT NULL,
     total_commission NUMERIC NOT NULL,
     status execution_order_status NOT NULL,
@@ -100,17 +87,14 @@ CREATE TABLE IF NOT EXISTS execution_orders (
 
 CREATE TABLE IF NOT EXISTS venue_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    account_id uuid NOT NULL REFERENCES accounts(id),
-    instrument_id uuid NOT NULL REFERENCES instruments(id),
-    strategy_id uuid NOT NULL REFERENCES strategies(id),
     execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
-    venue_order_id BIGINT,
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
     side market_side NOT NULL,
     order_type venue_order_type NOT NULL,
     time_in_force venue_order_time_in_force NOT NULL,
-    price NUMERIC NOT NULL,
-    avg_fill_price NUMERIC NOT NULL,
+    price NUMERIC,
     quantity NUMERIC NOT NULL,
+    fill_price NUMERIC NOT NULL,
     filled_quantity NUMERIC NOT NULL,
     total_commission NUMERIC NOT NULL,
     status venue_order_status NOT NULL,
@@ -119,35 +103,43 @@ CREATE TABLE IF NOT EXISTS venue_orders (
 );
 
 
-CREATE TABLE IF NOT EXISTS fills (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    account_id uuid NOT NULL REFERENCES accounts(id),
+CREATE TABLE IF NOT EXISTS insights (
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    instrument_id uuid REFERENCES instruments(id),
+    feature_id VARCHAR NOT NULL,
+    value NUMERIC NOT NULL,
+    PRIMARY KEY (instrument_id, feature_id, event_time)
+);
+SELECT create_hypertable('insights', by_range('event_time', interval '1 day'));
+SELECT add_dimension('insights', by_hash('instrument_id', 4));
+
+
+
+CREATE TABLE IF NOT EXISTS signals (
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instrument_id uuid NOT NULL REFERENCES instruments(id),
-    strategy_id uuid NOT NULL REFERENCES strategies(id),
+    strategy_id VARCHAR NOT NULL,
+    signal NUMERIC NOT NULL,
+    PRIMARY KEY (instrument_id, strategy_id, event_time)
+);
+SELECT create_hypertable('signals', by_range('event_time', interval '7 day'));
+SELECT add_dimension('signals', by_hash('instrument_id', 4));
+
+
+
+CREATE TABLE IF NOT EXISTS venue_order_fills (
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    venue_order_id uuid NOT NULL REFERENCES venue_orders(id),
     execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
-    venue_order_id BIGINT,
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
     side market_side NOT NULL,
     price NUMERIC NOT NULL,
     quantity NUMERIC NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    PRIMARY KEY (venue_order_id, execution_order_id, instrument_id, event_time)
 );
+SELECT create_hypertable('venue_order_fills', by_range('event_time', interval '7 day'));
+SELECT add_dimension('venue_order_fills', by_hash('instrument_id', 4));
 
-
-CREATE TABLE IF NOT EXISTS positions (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    account_id uuid NOT NULL REFERENCES accounts(id),
-    instrument_id uuid NOT NULL REFERENCES instruments(id),
-    strategy_id uuid NOT NULL REFERENCES strategies(id),
-    side position_side NOT NULL,
-    avg_open_price NUMERIC NOT NULL,
-    avg_close_price NUMERIC,
-    quantity DECIMAL NOT NULL,
-    realized_pnl DECIMAL,
-    commission DECIMAL NOT NULL,
-    status position_status NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
-);
 
 
 CREATE TABLE IF NOT EXISTS ticks (
@@ -160,9 +152,9 @@ CREATE TABLE IF NOT EXISTS ticks (
     ask_quantity NUMERIC NOT NULL,
     PRIMARY KEY (instrument_id, tick_id, event_time)
 );
-CREATE INDEX ON ticks (instrument_id, event_time DESC);
 SELECT create_hypertable('ticks', by_range('event_time', interval '1 day'));
 SELECT add_dimension('ticks', by_hash('instrument_id', 4));
+
 
 
 CREATE TABLE IF NOT EXISTS trade (
@@ -174,23 +166,11 @@ CREATE TABLE IF NOT EXISTS trade (
     quantity NUMERIC NOT NULL
     PRIMARY KEY (instrument_id, trade_id, event_time)
 );
-CREATE INDEX ON trades (instrument_id, event_time DESC);
 SELECT create_hypertable('trades', by_range('event_time', interval '1 day'));
 SELECT add_dimension('trades', by_hash('instrument_id', 4));
 
 
-CREATE TABLE IF NOT EXISTS insights (
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    instrument_id uuid REFERENCES instruments(id),
-    feature_id VARCHAR NOT NULL,
-    value NUMERIC NOT NULL,
-    PRIMARY KEY (instrument_id, feature_id, event_time)
-);
-CREATE INDEX ON insights (instrument_id, event_time DESC);
-CREATE INDEX ON insights (feature_id, event_time DESC);
-SELECT create_hypertable('insights', by_range('event_time', interval '1 day'));
-SELECT add_dimension('insights', by_hash('instrument_id', 4));
-SELECT add_dimension('insights', by_hash('feature_id', 4));
+
 
 
 -- INITIAL DATA

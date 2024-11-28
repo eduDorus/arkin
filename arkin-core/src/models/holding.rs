@@ -13,13 +13,13 @@ pub struct Holding {
 
 impl EventTypeOf for Holding {
     fn event_type() -> EventType {
-        EventType::Balance
+        EventType::BalanceUpdate
     }
 }
 
 impl From<Holding> for Event {
     fn from(holding: Holding) -> Self {
-        Event::Balance(holding)
+        Event::BalanceUpdate(holding)
     }
 }
 

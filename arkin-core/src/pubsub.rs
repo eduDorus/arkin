@@ -11,8 +11,8 @@ use tracing::{debug, error};
 use strum::EnumDiscriminants;
 
 use crate::{
-    Book, ExecutionOrder, ExecutionOrderFill, Holding, Insight, Instrument, Position, Signal, Tick, Trade, VenueOrder,
-    VenueOrderFill, VenueOrderId, VenueOrderStatus,
+    Book, ExecutionOrder, Holding, Insight, Instrument, Position, Signal, Tick, Trade, VenueOrder, VenueOrderFill,
+    VenueOrderId, VenueOrderStatus,
 };
 
 pub trait EventTypeOf: fmt::Debug + Send + Sync + Clone + 'static {
@@ -108,15 +108,14 @@ pub enum Event {
     Tick(Tick),
     Trade(Trade),
     Book(Book),
-    Balance(Holding),
-    Position(Position),
+    BalanceUpdate(Holding),
+    PositionUpdate(Position),
     Insight(Insight),
     InsightTick(InsightTick),
     Signal(Signal),
     SignalTick(SignalTick),
-    ExecutionOrder(ExecutionOrder),
-    ExecutionOrderFill(ExecutionOrderFill),
-    VenueOrder(VenueOrder),
+    ExecutionOrderNew(ExecutionOrder),
+    VenueOrderNew(VenueOrder),
     VenueOrderState(VenueOrderState),
     VenueOrderFill(VenueOrderFill),
 }

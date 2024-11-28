@@ -1,7 +1,6 @@
 mod book;
 mod common;
 mod execution_order;
-mod execution_order_fill;
 mod holding;
 mod insight;
 mod instrument;
@@ -16,7 +15,6 @@ mod venue_order_fill;
 pub use book::*;
 pub use common::*;
 pub use execution_order::*;
-pub use execution_order_fill::*;
 pub use holding::*;
 pub use insight::*;
 pub use instrument::*;

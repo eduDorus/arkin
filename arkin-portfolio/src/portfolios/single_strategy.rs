@@ -29,7 +29,7 @@ impl Portfolio for SingleStrategyPortfolio {
         let mut price_updates = self.pubsub.subscribe::<Tick>();
         let mut balance_updates = self.pubsub.subscribe::<Holding>();
         let mut position_updates = self.pubsub.subscribe::<Position>();
-        let mut fill_updates = self.pubsub.subscribe::<ExecutionOrderFill>();
+        let mut fill_updates = self.pubsub.subscribe::<VenueOrderFill>();
         loop {
             tokio::select! {
                 Ok(tick) = price_updates.recv() => {
@@ -92,7 +92,7 @@ impl Portfolio for SingleStrategyPortfolio {
         unimplemented!("Position update not implemented");
     }
 
-    async fn fill_update(&self, fill: ExecutionOrderFill) -> Result<(), PortfolioError> {
+    async fn fill_update(&self, fill: VenueOrderFill) -> Result<(), PortfolioError> {
         info!("Portfolio processing fill update: {}", fill);
         // Reduce the balance of the quote asset
         let cost = fill.total_cost();
@@ -109,7 +109,7 @@ impl Portfolio for SingleStrategyPortfolio {
         if let Some(last_position) = entry.value().last() {
             if last_position.is_open() {
                 let mut position = last_position.clone();
-                let remaining_fill = position.update_fill(fill);
+                let remaining_fill = position.add_fill(fill);
                 entry.value_mut().replace(position);
                 if let Some(remaining_fill) = remaining_fill {
                     let new_position = Position::from(remaining_fill);

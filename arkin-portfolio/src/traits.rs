@@ -27,7 +27,7 @@ pub trait Portfolio: std::fmt::Debug + Send + Sync {
 
     /// Update the current fill of a given order
     /// This comes from the order manager and updates a given position
-    async fn fill_update(&self, fill: ExecutionOrderFill) -> Result<(), PortfolioError>;
+    async fn fill_update(&self, fill: VenueOrderFill) -> Result<(), PortfolioError>;
 
     /// Provides the current price of a specific assets in the portfolio
     async fn balance(&self, asset: &AssetId) -> Option<Holding>;

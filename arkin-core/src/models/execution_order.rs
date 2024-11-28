@@ -23,9 +23,9 @@ pub enum ExecutionOrderStrategy {
 impl fmt::Display for ExecutionOrderStrategy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ExecutionOrderStrategy::Market(o) => write!(f, "MKT side={} quantity={}", o.side, o.quantity),
+            ExecutionOrderStrategy::Market(o) => write!(f, "type=market side={} quantity={}", o.side, o.quantity),
             ExecutionOrderStrategy::Limit(o) => {
-                write!(f, "LMT side={} price={} quantity={}", o.side, o.price, o.quantity)
+                write!(f, "type=limit side={} price={} quantity={}", o.side, o.price, o.quantity)
             } // ExecutionOrderStrategy::WideQuoting(o) => write!(f, "WideQuoting: {}", o),
         }
     }
@@ -76,26 +76,29 @@ pub enum ExecutionOrderStatus {
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub event_time: OffsetDateTime,
     pub instrument: Arc<Instrument>,
     pub execution_type: ExecutionOrderStrategy,
     #[builder(default = Price::ZERO)]
-    pub avg_fill_price: Price,
+    pub fill_price: Price,
     #[builder(default = Quantity::ZERO)]
     pub filled_quantity: Quantity,
     #[builder(default = Notional::ZERO)]
     pub total_commission: Commission,
     #[builder(default = ExecutionOrderStatus::New)]
     pub status: ExecutionOrderStatus,
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub created_at: OffsetDateTime,
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub updated_at: OffsetDateTime,
 }
 
 impl ExecutionOrder {
     pub fn add_fill(&mut self, fill: VenueOrderFill) {
-        self.avg_fill_price = (self.avg_fill_price * self.filled_quantity + fill.price * fill.quantity)
+        self.fill_price = (self.fill_price * self.filled_quantity + fill.price * fill.quantity)
             / (self.filled_quantity + fill.quantity);
         self.filled_quantity += fill.quantity;
         self.total_commission += fill.commission;
+        self.updated_at = fill.event_time;
 
         // Update the state
         match self.filled_quantity == self.quantity() {
@@ -196,19 +199,19 @@ impl ExecutionOrder {
     }
 
     pub fn notional(&self) -> Notional {
-        self.avg_fill_price * self.filled_quantity
+        self.fill_price * self.filled_quantity
     }
 }
 
 impl EventTypeOf for ExecutionOrder {
     fn event_type() -> EventType {
-        EventType::ExecutionOrder
+        EventType::ExecutionOrderNew
     }
 }
 
 impl From<ExecutionOrder> for Event {
     fn from(order: ExecutionOrder) -> Self {
-        Event::ExecutionOrder(order)
+        Event::ExecutionOrderNew(order)
     }
 }
 

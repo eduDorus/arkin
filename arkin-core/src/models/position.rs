@@ -7,7 +7,7 @@ use time::OffsetDateTime;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{types::Commission, EventType, EventTypeOf, ExecutionOrderFill, Notional, Price, Quantity};
+use crate::{types::Commission, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
 
 use super::{Instrument, MarketSide};
 
@@ -68,7 +68,7 @@ impl Position {
         self.last_price = price;
     }
 
-    pub fn update_fill(&mut self, fill: ExecutionOrderFill) -> Option<ExecutionOrderFill> {
+    pub fn add_fill(&mut self, fill: VenueOrderFill) -> Option<VenueOrderFill> {
         info!("Updating position with fill: {}", fill);
         let action = match (self.side, fill.side) {
             (PositionSide::Long, MarketSide::Buy) => Action::Increase,
@@ -106,7 +106,7 @@ impl Position {
         }
     }
 
-    fn increase_position(&mut self, fill: ExecutionOrderFill) {
+    fn increase_position(&mut self, fill: VenueOrderFill) {
         info!("Increasing position: {}", self);
         self.open_price = (self.open_price * self.open_quantity)
             + (fill.price * fill.quantity) / (self.open_quantity + fill.quantity);
@@ -116,7 +116,7 @@ impl Position {
         info!("Updated position: {}", self);
     }
 
-    fn decrease_position(&mut self, fill: ExecutionOrderFill) {
+    fn decrease_position(&mut self, fill: VenueOrderFill) {
         info!("Decreasing position: {}", self);
         self.close_price = (self.close_price * self.close_quantity)
             + (fill.price * fill.quantity) / (self.close_quantity + fill.quantity);
@@ -158,16 +158,11 @@ impl Position {
         }
     }
 
-    pub fn is_open(&self) -> bool {
-        self.status == PositionStatus::Open
-    }
-
-    pub fn is_closed(&self) -> bool {
-        self.status == PositionStatus::Closed
-    }
-
-    pub fn is_profitable(&self) -> bool {
-        self.realized_pnl > Decimal::ZERO
+    pub fn unrealized_pnl(&self) -> Notional {
+        match self.side {
+            PositionSide::Long => (self.last_price - self.open_price) * self.quantity(),
+            PositionSide::Short => (self.open_price - self.last_price) * self.quantity(),
+        }
     }
 
     pub fn return_pct(&self) -> Decimal {
@@ -180,16 +175,28 @@ impl Position {
             }
         }
     }
+
+    pub fn is_open(&self) -> bool {
+        self.status == PositionStatus::Open
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.status == PositionStatus::Closed
+    }
+
+    pub fn is_profitable(&self) -> bool {
+        self.realized_pnl > Decimal::ZERO
+    }
 }
 
 impl EventTypeOf for Position {
     fn event_type() -> EventType {
-        EventType::Position
+        EventType::PositionUpdate
     }
 }
 
-impl From<ExecutionOrderFill> for Position {
-    fn from(fill: ExecutionOrderFill) -> Self {
+impl From<VenueOrderFill> for Position {
+    fn from(fill: VenueOrderFill) -> Self {
         let postition = PositionBuilder::default()
             .instrument(fill.instrument)
             .side(fill.side)
@@ -228,15 +235,14 @@ impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "instrument={} side={} open_price={} open_quantity={} close_price={} close_quantity={} total_quantity={} realized_pnl={} total_commission={}",
+            "instrument={} side={} open_price={} close_price={} quantity={} realized_pnl={} unrealized_pnl={} total_commission={}",
             self.instrument,
             self.side,
             self.open_price,
-            self.open_quantity,
             self.close_price,
-            self.close_quantity,
             self.quantity(),
             self.realized_pnl,
+            self.unrealized_pnl(),
             self.total_commission,
         )
     }

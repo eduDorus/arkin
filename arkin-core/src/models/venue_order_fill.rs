@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use derive_builder::Builder;
+use rust_decimal::Decimal;
 use time::OffsetDateTime;
 
 use crate::{
@@ -27,12 +28,16 @@ pub struct VenueOrderFill {
 impl VenueOrderFill {
     /// The total value of your current position based on the latest market prices.
     pub fn market_value(&self) -> MarketValue {
-        self.price * self.quantity_with_side() * self.instrument.contract_size
+        self.price * self.quantity_with_side() * self.instrument.contract_size * Decimal::NEGATIVE_ONE
     }
 
     /// The total value of the underlying asset that a financial derivative represents. It provides a measure of the total exposure.
     pub fn notional_value(&self) -> Notional {
         self.price * self.quantity * self.instrument.contract_size
+    }
+
+    pub fn total_cost(&self) -> Decimal {
+        self.market_value() - self.commission
     }
 
     pub fn quantity_with_side(&self) -> Quantity {

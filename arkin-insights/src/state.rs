@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use dashmap::DashMap;
+use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
@@ -24,7 +25,7 @@ impl InsightsState {
     }
 
     pub fn insert_batch(&self, events: Vec<Insight>) {
-        events.into_iter().for_each(|event| {
+        events.into_par_iter().for_each(|event| {
             let key = (event.instrument, event.feature_id);
             let mut composit_key = CompositeIndex::new(event.event_time);
 

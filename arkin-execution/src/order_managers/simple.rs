@@ -162,9 +162,6 @@ impl OrderManager for SimpleOrderManager {
                     if let Err(e) = self.order_update(fill.clone()).await {
                         error!("Failed to process fill: {}", e);
                     }
-
-                    info!("SimpleOrderManager publishing execution order: {}", fill);
-                    self.pubsub.publish::<ExecutionOrderFill>(fill.into());
                 }
                 _ = shutdown.cancelled() => {
                     break;

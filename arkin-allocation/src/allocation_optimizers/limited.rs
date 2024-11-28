@@ -195,7 +195,6 @@ impl AllocationOptim for LimitedAllocationOptim {
 
             // Create execution order
             let order = ExecutionOrderBuilder::default()
-                .event_time(event_time)
                 .instrument(instrument.clone())
                 .execution_type(ExecutionOrderStrategy::Market(
                     MarketBuilder::default()
@@ -204,6 +203,8 @@ impl AllocationOptim for LimitedAllocationOptim {
                         .build()
                         .unwrap(),
                 ))
+                .created_at(event_time)
+                .updated_at(event_time)
                 .build()
                 .expect("Failed to build ExecutionOrder");
 

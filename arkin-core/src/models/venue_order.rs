@@ -6,7 +6,7 @@ use time::OffsetDateTime;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::{types::Commission, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
+use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity, VenueOrderFill};
 
 use super::{ExecutionOrderId, Instrument, MarketSide};
 
@@ -52,72 +52,24 @@ pub struct VenueOrder {
     pub time_in_force: VenueOrderTimeInForce,
     #[builder(default = None)]
     pub price: Option<Price>,
-    #[builder(default = Price::ZERO)]
-    pub avg_fill_price: Price,
     pub quantity: Quantity,
+    #[builder(default = Price::ZERO)]
+    pub fill_price: Price,
     #[builder(default = Quantity::ZERO)]
     pub filled_quantity: Quantity,
     #[builder(default = Commission::ZERO)]
     pub total_commission: Commission,
     #[builder(default = VenueOrderStatus::New)]
     pub status: VenueOrderStatus,
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub created_at: OffsetDateTime,
+    #[builder(default = OffsetDateTime::now_utc())]
+    pub updated_at: OffsetDateTime,
 }
 
 impl VenueOrder {
-    pub fn new_market(
-        execution_order_id: ExecutionOrderId,
-        instrument: Arc<Instrument>,
-        side: MarketSide,
-        quantity: Quantity,
-    ) -> Self {
-        VenueOrder {
-            id: Uuid::new_v4(),
-            execution_order_id,
-            instrument,
-            side,
-            order_type: VenueOrderType::Market,
-            time_in_force: VenueOrderTimeInForce::Gtc,
-            price: None,
-            avg_fill_price: Price::ZERO,
-            quantity,
-            filled_quantity: Quantity::ZERO,
-            total_commission: Commission::ZERO,
-            status: VenueOrderStatus::New,
-        }
-    }
-
-    pub fn new_limit(instrument: Arc<Instrument>, side: MarketSide, price: Price, quantity: Quantity) -> Self {
-        VenueOrder {
-            id: Uuid::new_v4(),
-            execution_order_id: Uuid::new_v4(),
-            instrument,
-            side,
-            order_type: VenueOrderType::Limit,
-            time_in_force: VenueOrderTimeInForce::Gtc,
-            price: Some(price),
-            avg_fill_price: Price::ZERO,
-            quantity,
-            filled_quantity: Quantity::ZERO,
-            total_commission: Commission::ZERO,
-            status: VenueOrderStatus::New,
-        }
-    }
-
-    pub fn update(&mut self, price: Price, quantity: Quantity, commission: Commission) {
-        self.avg_fill_price =
-            (self.avg_fill_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
-        self.filled_quantity += quantity;
-        self.total_commission += commission;
-
-        // Update the state
-        match self.filled_quantity == self.quantity {
-            true => self.status = VenueOrderStatus::Filled,
-            false => self.status = VenueOrderStatus::PartiallyFilled,
-        }
-    }
-
     pub fn add_fill(&mut self, fill: VenueOrderFill) {
-        self.avg_fill_price = (self.avg_fill_price * self.filled_quantity + fill.price * fill.quantity)
+        self.fill_price = (self.fill_price * self.filled_quantity + fill.price * fill.quantity)
             / (self.filled_quantity + fill.quantity);
         self.filled_quantity += fill.quantity;
         self.total_commission += fill.commission;
@@ -125,6 +77,7 @@ impl VenueOrder {
             true => VenueOrderStatus::Filled,
             false => VenueOrderStatus::PartiallyFilled,
         };
+        self.updated_at = fill.event_time;
     }
 
     pub fn update_status(&mut self, new_status: VenueOrderStatus) {
@@ -155,6 +108,10 @@ impl VenueOrder {
         }
     }
 
+    pub fn remaining_quantity(&self) -> Quantity {
+        self.quantity - self.filled_quantity
+    }
+
     fn is_valid_transition(&self, new_status: &VenueOrderStatus) -> bool {
         matches!(
             (&self.status, new_status),
@@ -172,10 +129,6 @@ impl VenueOrder {
                 )
                 | (VenueOrderStatus::Cancelling, VenueOrderStatus::Cancelled)
         )
-    }
-
-    pub fn remaining_quantity(&self) -> Quantity {
-        self.quantity - self.filled_quantity
     }
 
     pub fn is_active(&self) -> bool {
@@ -199,15 +152,17 @@ impl VenueOrder {
     pub fn has_fill(&self) -> bool {
         self.filled_quantity > Quantity::ZERO
     }
-
-    pub fn notional(&self) -> Notional {
-        self.avg_fill_price * self.filled_quantity
-    }
 }
 
 impl EventTypeOf for VenueOrder {
     fn event_type() -> EventType {
-        EventType::VenueOrder
+        EventType::VenueOrderNew
+    }
+}
+
+impl From<VenueOrder> for Event {
+    fn from(order: VenueOrder) -> Self {
+        Event::VenueOrderNew(order)
     }
 }
 

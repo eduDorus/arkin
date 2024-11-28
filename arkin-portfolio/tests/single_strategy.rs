@@ -36,7 +36,7 @@ async fn test_single_strategy_long_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
@@ -57,7 +57,7 @@ async fn test_single_strategy_long_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Sell)
@@ -75,7 +75,7 @@ async fn test_single_strategy_long_position() {
     assert_eq!(asset_capital, dec!(10006));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Sell)
@@ -132,7 +132,7 @@ async fn test_single_strategy_short_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Sell)
@@ -153,7 +153,7 @@ async fn test_single_strategy_short_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
@@ -171,7 +171,7 @@ async fn test_single_strategy_short_position() {
     assert_eq!(asset_capital, dec!(10006));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
@@ -228,7 +228,7 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
@@ -249,7 +249,7 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Sell)
@@ -268,7 +268,7 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(asset_capital, dec!(10016));
 
     // Create fill
-    let fill = ExecutionOrderFillBuilder::default()
+    let fill = VenueOrderFillBuilder::default()
         .id(ExecutionOrderId::new_v4())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
