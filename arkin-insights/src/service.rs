@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{debug, error, info};
 
 use crate::errors::InsightsError;
 use crate::pipeline::ComputationGraph;
@@ -23,6 +23,7 @@ pub struct InsightsService {
     pubsub: Arc<PubSub>,
     persistence_service: Arc<PersistenceService>,
     pipeline: ComputationGraph,
+    state_lookback: Duration,
 }
 
 impl InsightsService {
@@ -36,6 +37,7 @@ impl InsightsService {
             pubsub,
             persistence_service,
             pipeline: ComputationGraph::from_config(&config.pipeline),
+            state_lookback: Duration::from_secs(config.state_lookback),
         }
     }
 }
@@ -45,12 +47,23 @@ impl Insights for InsightsService {
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), InsightsError> {
         info!("Starting insights service...");
         let mut interval_tick = self.pubsub.subscribe::<IntervalTick>();
+        let mut trades = self.pubsub.subscribe::<Trade>();
         loop {
             select! {
                 Ok(time_tick) = interval_tick.recv() => {
-                    info!("InsightsService received interval tick: {}", time_tick.event_time);
-                    self.load(time_tick.event_time, &time_tick.instruments, time_tick.frequency).await?;
-                    self.process(time_tick.event_time, &time_tick.instruments, true).await?;
+                    debug!("InsightsService received interval tick: {}", time_tick.event_time);
+                    if let Err(e) = self.process(time_tick.event_time, &time_tick.instruments, true).await {
+                        error!("Error processing interval tick: {}", e);
+                    }
+                    if let Err(e) = self.remove(time_tick.event_time).await {
+                        error!("Error removing insights: {}", e);
+                    }
+                }
+                Ok(trade) = trades.recv() => {
+                    debug!("InsightsService received trade: {}", trade.event_time);
+                    if let Err(e) = self.insert_batch(trade.to_insights()).await {
+                        error!("Error inserting trade: {}", e);
+                    }
                 }
                 _ = _shutdown.cancelled() => {
                     break;
@@ -88,6 +101,11 @@ impl Insights for InsightsService {
 
     async fn insert_batch(&self, insights: Vec<Insight>) -> Result<(), InsightsError> {
         self.state.insert_batch(insights);
+        Ok(())
+    }
+
+    async fn remove(&self, event_time: OffsetDateTime) -> Result<(), InsightsError> {
+        self.state.remove(event_time - self.state_lookback);
         Ok(())
     }
 

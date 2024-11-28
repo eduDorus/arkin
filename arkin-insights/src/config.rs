@@ -10,6 +10,7 @@ pub struct InsightsConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InsightsServiceConfig {
     pub pipeline: PipelineConfig,
+    pub state_lookback: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

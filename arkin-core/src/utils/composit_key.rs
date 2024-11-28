@@ -6,8 +6,8 @@ use crate::constants::TIMESTAMP_FORMAT;
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, Eq, PartialEq, Hash)]
 pub struct CompositeIndex {
-    timestamp: OffsetDateTime,
-    index: u64,
+    pub timestamp: OffsetDateTime,
+    pub index: u64,
 }
 
 impl CompositeIndex {

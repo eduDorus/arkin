@@ -37,6 +37,13 @@ impl InsightsState {
         });
     }
 
+    pub fn remove(&self, event_time: OffsetDateTime) {
+        self.features.retain(|_, v| {
+            v.retain(|i, _| i.timestamp >= event_time);
+            !v.is_empty()
+        });
+    }
+
     pub fn last(
         &self,
         instrument: Option<Arc<Instrument>>,

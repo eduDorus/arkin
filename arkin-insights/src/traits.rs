@@ -16,6 +16,9 @@ pub trait Insights: std::fmt::Debug + Send + Sync {
     async fn insert(&self, insight: Insight) -> Result<(), InsightsError>;
     async fn insert_batch(&self, insights: Vec<Insight>) -> Result<(), InsightsError>;
 
+    /// Remove all insights with event_time <= provided event_time
+    async fn remove(&self, event_time: OffsetDateTime) -> Result<(), InsightsError>;
+
     async fn load(
         &self,
         event_time: OffsetDateTime,
