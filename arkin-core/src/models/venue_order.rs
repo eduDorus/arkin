@@ -6,7 +6,7 @@ use time::OffsetDateTime;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEventType, VenueOrderFill};
+use crate::{types::Commission, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
 
 use super::{ExecutionOrderId, Instrument, MarketSide};
 
@@ -205,9 +205,9 @@ impl VenueOrder {
     }
 }
 
-impl Event for VenueOrder {
-    fn event_type() -> UpdateEventType {
-        UpdateEventType::VenueOrder
+impl EventTypeOf for VenueOrder {
+    fn event_type() -> EventType {
+        EventType::VenueOrder
     }
 }
 

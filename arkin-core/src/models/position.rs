@@ -7,7 +7,7 @@ use time::OffsetDateTime;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, ExecutionOrderFill, Notional, Price, Quantity, UpdateEventType};
+use crate::{types::Commission, EventType, EventTypeOf, ExecutionOrderFill, Notional, Price, Quantity};
 
 use super::{Instrument, MarketSide};
 
@@ -182,9 +182,9 @@ impl Position {
     }
 }
 
-impl Event for Position {
-    fn event_type() -> UpdateEventType {
-        UpdateEventType::Position
+impl EventTypeOf for Position {
+    fn event_type() -> EventType {
+        EventType::Position
     }
 }
 
@@ -228,7 +228,7 @@ impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Position: instrument={} side={} open_price={} open_quantity={} close_price={} close_quantity={} total_quantity={} realized_pnl={} total_commission={}",
+            "instrument={} side={} open_price={} open_quantity={} close_price={} close_quantity={} total_quantity={} realized_pnl={} total_commission={}",
             self.instrument,
             self.side,
             self.open_price,

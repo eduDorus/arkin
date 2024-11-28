@@ -6,7 +6,7 @@ use time::OffsetDateTime;
 use crate::{
     constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
     models::Insight,
-    Event, Price, Quantity, UpdateEvent, UpdateEventType,
+    Event, EventType, EventTypeOf, Price, Quantity,
 };
 
 use super::{Instrument, MarketSide};
@@ -58,21 +58,15 @@ impl Trade {
     }
 }
 
-impl Event for Trade {
-    fn event_type() -> UpdateEventType {
-        UpdateEventType::Trade
+impl EventTypeOf for Trade {
+    fn event_type() -> EventType {
+        EventType::Trade
     }
 }
 
-impl From<Trade> for UpdateEvent {
+impl From<Trade> for Event {
     fn from(trade: Trade) -> Self {
-        UpdateEvent::Trade(trade)
-    }
-}
-
-impl fmt::Display for Trade {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {} {}", self.instrument, self.event_time, self.price, self.quantity)
+        Event::Trade(trade)
     }
 }
 
@@ -95,5 +89,15 @@ impl PartialOrd for Trade {
 impl Ord for Trade {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.event_time, self.trade_id).cmp(&(other.event_time, other.trade_id))
+    }
+}
+
+impl fmt::Display for Trade {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "instrument={} side={} price={} quantity={}",
+            self.instrument, self.side, self.price, self.quantity
+        )
     }
 }

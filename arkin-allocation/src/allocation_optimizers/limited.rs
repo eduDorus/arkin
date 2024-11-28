@@ -73,7 +73,7 @@ impl AllocationOptim for LimitedAllocationOptim {
 
     async fn new_signal(&self, signal: Signal) -> Result<(), AllocationOptimError> {
         info!("Received new signal: {}", signal);
-        let key = (signal.strateg_id.clone(), signal.instrument.clone());
+        let key = (signal.strategy_id.clone(), signal.instrument.clone());
         self.signals.insert(key, signal);
         Ok(())
     }

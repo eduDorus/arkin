@@ -10,6 +10,7 @@ pub type AssetId = Arc<String>;
 // Common types
 pub type Price = Decimal;
 pub type Quantity = Decimal;
+pub type MarketValue = Decimal;
 pub type Notional = Decimal;
 pub type Weight = Decimal;
 pub type Maturity = OffsetDateTime;

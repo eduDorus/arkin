@@ -73,7 +73,7 @@ impl Algorithm for CrossoverStrategy {
                                 SignalBuilder::default()
                                     .event_time(event_time)
                                     .instrument(i.clone())
-                                    .strateg_id(self.id.clone())
+                                    .strategy_id(self.id.clone())
                                     .weight(Decimal::ONE)
                                     .build()
                                     .expect("Failed to create signal"),
@@ -86,7 +86,7 @@ impl Algorithm for CrossoverStrategy {
                                 SignalBuilder::default()
                                     .event_time(event_time)
                                     .instrument(i.clone())
-                                    .strateg_id(self.id.clone())
+                                    .strategy_id(self.id.clone())
                                     .weight(weight)
                                     .build()
                                     .expect("Failed to create signal"),

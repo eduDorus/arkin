@@ -79,7 +79,7 @@ impl Portfolio for SingleStrategyPortfolio {
         // Check if we have the asset in the holdings else create
         if self.holdings.contains_key(&holding.asset) {
             self.holdings.alter(&holding.asset, |_, mut h| {
-                h.quantity = holding.quantity;
+                h.balance = holding.balance;
                 h
             });
         } else {
@@ -98,7 +98,7 @@ impl Portfolio for SingleStrategyPortfolio {
         let cost = fill.total_cost();
         let quote_asset = fill.instrument.quote_asset.clone();
         if let Some(mut holding) = self.holdings.get_mut(&quote_asset) {
-            holding.quantity += cost;
+            holding.balance += cost;
         } else {
             return Err(PortfolioError::AssetNotFound(quote_asset.to_string()));
         }
@@ -211,7 +211,7 @@ impl Portfolio for SingleStrategyPortfolio {
             .fold(Notional::ZERO, |acc, (_, s)| acc + s.market_value());
 
         match current_balance {
-            Some(b) => b.quantity + positions_value,
+            Some(b) => b.balance + positions_value,
             None => positions_value,
         }
     }
@@ -225,11 +225,11 @@ impl Portfolio for SingleStrategyPortfolio {
     }
 
     async fn buying_power(&self, asset: &AssetId) -> Notional {
-        self.holdings.get(asset).map(|v| v.value().quantity).unwrap_or(Notional::ZERO)
+        self.holdings.get(asset).map(|v| v.value().balance).unwrap_or(Notional::ZERO)
     }
 
     async fn total_buying_power(&self) -> HashMap<AssetId, Notional> {
-        self.holdings.iter().map(|v| (v.key().clone(), v.value().quantity)).collect()
+        self.holdings.iter().map(|v| (v.key().clone(), v.value().balance)).collect()
     }
 
     async fn pnl_asset(&self, asset: &AssetId) -> Notional {

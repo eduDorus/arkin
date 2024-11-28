@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 
-use crate::{constants::TIMESTAMP_FORMAT, Event, FeatureId, UpdateEvent, UpdateEventType};
+use crate::{Event, EventType, EventTypeOf, FeatureId};
 
 use super::Instrument;
 
@@ -40,26 +40,27 @@ impl Insight {
     }
 }
 
-impl Event for Insight {
-    fn event_type() -> UpdateEventType {
-        UpdateEventType::Insight
+impl EventTypeOf for Insight {
+    fn event_type() -> EventType {
+        EventType::Insight
     }
 }
 
-impl From<Insight> for UpdateEvent {
+impl From<Insight> for Event {
     fn from(insight: Insight) -> Self {
-        UpdateEvent::Insight(insight)
+        Event::Insight(insight)
     }
 }
 
 impl fmt::Display for Insight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let event_time = self.event_time.format(TIMESTAMP_FORMAT).expect("Failed to format time");
         write!(
             f,
-            "{} {:?} {} {}",
-            event_time,
-            self.instrument.as_ref().map(|i| i.symbol.clone()),
+            "instrument={} feature={} value={}",
+            self.instrument
+                .as_ref()
+                .map(|instrument| instrument.symbol.as_str())
+                .unwrap_or("global value"),
             self.feature_id,
             self.value
         )

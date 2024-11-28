@@ -10,7 +10,7 @@ use crate::{
         TICK_ASK_PRICE_FEATURE_ID, TICK_ASK_QUANTITY_FEATURE_ID, TICK_BID_PRICE_FEATURE_ID,
         TICK_BID_QUANTITY_FEATURE_ID,
     },
-    Event, Price, Quantity, UpdateEvent, UpdateEventType,
+    Event, EventType, EventTypeOf, Price, Quantity,
 };
 
 use super::{Insight, Instrument};
@@ -95,25 +95,15 @@ impl Tick {
     }
 }
 
-impl Event for Tick {
-    fn event_type() -> UpdateEventType {
-        UpdateEventType::Tick
+impl EventTypeOf for Tick {
+    fn event_type() -> EventType {
+        EventType::Tick
     }
 }
 
-impl From<Tick> for UpdateEvent {
+impl From<Tick> for Event {
     fn from(tick: Tick) -> Self {
-        UpdateEvent::Tick(tick)
-    }
-}
-
-impl fmt::Display for Tick {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} bid: {} {} ask: {} {}",
-            self.instrument, self.event_time, self.bid_price, self.bid_quantity, self.ask_price, self.ask_quantity
-        )
+        Event::Tick(tick)
     }
 }
 
@@ -136,5 +126,15 @@ impl PartialOrd for Tick {
 impl Ord for Tick {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.event_time, self.tick_id).cmp(&(other.event_time, other.tick_id))
+    }
+}
+
+impl fmt::Display for Tick {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "instrument={} bid_price={} bid_quantity={} ask_price={} ask_quantity={}",
+            self.instrument, self.bid_price, self.bid_quantity, self.ask_price, self.ask_quantity
+        )
     }
 }

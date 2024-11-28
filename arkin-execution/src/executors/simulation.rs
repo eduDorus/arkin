@@ -53,11 +53,11 @@ impl SimulationExecutor {
         let mut entry = self.balances.entry(asset.clone()).or_insert(
             HoldingBuilder::default()
                 .asset(asset.clone())
-                .quantity(dec!(0))
+                .balance(dec!(0))
                 .build()
                 .expect("Failed to build Holding"),
         );
-        entry.quantity += quantity;
+        entry.balance += quantity;
     }
 
     pub fn get_balance(&self, asset: &AssetId) -> Option<Holding> {
@@ -72,10 +72,10 @@ impl Executor for SimulationExecutor {
         // TODO: Send current balance
         let holding = HoldingBuilder::default()
             .asset(AssetId::from("USDT".to_string()))
-            .quantity(dec!(10000))
+            .balance(dec!(10000))
             .build()
             .expect("Failed to build Holding");
-        self.update_balance(&holding.asset, holding.quantity);
+        self.update_balance(&holding.asset, holding.balance);
         info!("Sending initial balance: {}", holding);
         self.pubsub.publish::<Holding>(holding);
 

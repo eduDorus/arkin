@@ -4,7 +4,7 @@ use time::OffsetDateTime;
 
 use crate::{
     types::{Price, Quantity},
-    Event, UpdateEventType,
+    EventTypeOf, EventType,
 };
 
 use super::Instrument;
@@ -35,9 +35,9 @@ impl Book {
     }
 }
 
-impl Event for Book {
-    fn event_type() -> UpdateEventType {
-        UpdateEventType::Book
+impl EventTypeOf for Book {
+    fn event_type() -> EventType {
+        EventType::Book
     }
 }
 

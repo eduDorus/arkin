@@ -7,7 +7,7 @@ use time::OffsetDateTime;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, Notional, Price, Quantity, UpdateEvent, UpdateEventType, VenueOrderFill};
+use crate::{types::Commission, EventTypeOf, Notional, Price, Quantity, Event, EventType, VenueOrderFill};
 
 use super::{Instrument, MarketSide};
 
@@ -200,15 +200,15 @@ impl ExecutionOrder {
     }
 }
 
-impl Event for ExecutionOrder {
-    fn event_type() -> UpdateEventType {
-        UpdateEventType::ExecutionOrder
+impl EventTypeOf for ExecutionOrder {
+    fn event_type() -> EventType {
+        EventType::ExecutionOrder
     }
 }
 
-impl From<ExecutionOrder> for UpdateEvent {
+impl From<ExecutionOrder> for Event {
     fn from(order: ExecutionOrder) -> Self {
-        UpdateEvent::ExecutionOrder(order)
+        Event::ExecutionOrder(order)
     }
 }
 

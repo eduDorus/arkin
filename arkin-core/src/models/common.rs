@@ -2,6 +2,7 @@ use rust_decimal::Decimal;
 use strum::Display;
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
+#[strum(serialize_all = "snake_case")]
 pub enum MarketSide {
     Buy,
     Sell,
