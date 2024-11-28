@@ -4,7 +4,7 @@ use time::OffsetDateTime;
 
 use crate::{
     types::{Price, Quantity},
-    EventTypeOf, EventType,
+    EventType, EventTypeOf,
 };
 
 use super::Instrument;

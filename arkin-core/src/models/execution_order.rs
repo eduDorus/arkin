@@ -7,7 +7,7 @@ use time::OffsetDateTime;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::{types::Commission, EventTypeOf, Notional, Price, Quantity, Event, EventType, VenueOrderFill};
+use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
 
 use super::{Instrument, MarketSide};
 
