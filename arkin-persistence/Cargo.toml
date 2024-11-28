@@ -19,8 +19,6 @@ futures-util = { workspace = true }
 async-trait = { workspace = true }
 uuid = { workspace = true }
 sqlx = { workspace = true }
-rayon = { workspace = true }
-parking_lot = { workspace = true }
 dashmap = { workspace = true }
 thiserror = { workspace = true }
 

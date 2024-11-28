@@ -86,7 +86,7 @@ mimalloc = { version = "0.1", default-features = false }
 petgraph = { version = "0.6", features = [ "graphmap" ], default-features = false }
 
 # TA
-yata = "0.7"
+# yata = "0.7"
 
 # Testing
 mockall = "0.13"
