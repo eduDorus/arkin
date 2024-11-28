@@ -69,6 +69,7 @@ impl Position {
     }
 
     pub fn update_fill(&mut self, fill: ExecutionOrderFill) -> Option<ExecutionOrderFill> {
+        info!("Updating position with fill: {}", fill);
         let action = match (self.side, fill.side) {
             (PositionSide::Long, MarketSide::Buy) => Action::Increase,
             (PositionSide::Long, MarketSide::Sell) => Action::Decrease,
@@ -78,7 +79,6 @@ impl Position {
 
         match action {
             Action::Increase => {
-                info!("Increasing position with fill: {}", fill);
                 self.increase_position(fill);
                 None
             }
@@ -104,7 +104,7 @@ impl Position {
     }
 
     fn increase_position(&mut self, fill: ExecutionOrderFill) {
-        info!("Increasing position with fill: {}", fill);
+        info!("Increasing position: {}", self);
         self.open_price = (self.open_price * self.open_quantity)
             + (fill.price * fill.quantity) / (self.open_quantity + fill.quantity);
         self.open_quantity += fill.quantity;
@@ -114,7 +114,7 @@ impl Position {
     }
 
     fn decrease_position(&mut self, fill: ExecutionOrderFill) {
-        info!("Decreasing position with fill: {}", fill);
+        info!("Decreasing position: {}", self);
         self.close_price = (self.close_price * self.close_quantity)
             + (fill.price * fill.quantity) / (self.close_quantity + fill.quantity);
         self.close_quantity += fill.quantity;
@@ -195,7 +195,7 @@ impl From<ExecutionOrderFill> for Position {
             .total_commission(fill.commission)
             .build()
             .expect("Failed to build position from fill");
-        info!("Created position: {}", postition);
+        info!("Created new position: {}", postition);
         postition
     }
 }

@@ -100,6 +100,12 @@ impl AllocationOptim for LimitedAllocationOptim {
         info!("Max allocation: {}", max_allocation);
         info!("Max allocation per signal: {}", max_allocation_per_signal);
 
+        // Get current positions
+        let current_positions = self.portfolio.list_open_positions().await;
+        for (_, position) in current_positions.iter() {
+            info!("Current position {}", position);
+        }
+
         // Calculate optimal position for each signal
         let mut optimal_positions = HashMap::new();
         for entry in self.signals.iter() {
@@ -136,6 +142,7 @@ impl AllocationOptim for LimitedAllocationOptim {
         let mut position_diff = HashMap::new();
         for (instrument, optimal_position) in optimal_positions.iter() {
             let diff_position = if let Some(position) = current_positions.get(instrument) {
+                // TODO: Handle position side
                 let diff =
                     (optimal_position.quantity - position.quantity_with_side()).round_dp(instrument.quantity_precision);
                 DiffPosition {
@@ -176,7 +183,7 @@ impl AllocationOptim for LimitedAllocationOptim {
             }
 
             // Determine order side
-            let order_side = if position.quantity > Decimal::zero() {
+            let order_side = if position.diff > Decimal::zero() {
                 MarketSide::Buy
             } else {
                 MarketSide::Sell

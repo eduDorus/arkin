@@ -19,9 +19,9 @@ pub struct SimulationExecutor {
     pubsub: Arc<PubSub>,
     #[builder(default)]
     orders: DashMap<VenueOrderId, VenueOrder>,
-    #[builder(default = dec!(0.0002))]
+    #[builder(default = dec!(0.0005))]
     taker_commission: Decimal,
-    #[builder(default = dec!(0.0001))]
+    #[builder(default = dec!(0.0002))]
     maker_commission: Decimal,
     #[builder(default = DashMap::new())]
     balances: DashMap<AssetId, Holding>,
@@ -84,7 +84,7 @@ impl Executor for SimulationExecutor {
         loop {
             select! {
                 Ok(order) = venue_orders.recv() => {
-                    info!("SimulationExecutor received order: {}", order.id);
+                    info!("SimulationExecutor received order: {}", order);
                     // Check if the order is valid and we have enough balance
                     // TODO: Check if the order is valid
 
