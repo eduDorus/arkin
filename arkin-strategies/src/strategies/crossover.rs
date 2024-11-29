@@ -16,7 +16,7 @@ use crate::{Algorithm, StrategyError};
 #[allow(unused)]
 pub struct CrossoverStrategy {
     pubsub: Arc<PubSub>,
-    id: StrategyId,
+    id: Arc<Strategy>,
     fast_ma: FeatureId,
     slow_ma: FeatureId,
 }
@@ -73,7 +73,7 @@ impl Algorithm for CrossoverStrategy {
                                 SignalBuilder::default()
                                     .event_time(event_time)
                                     .instrument(i.clone())
-                                    .strategy_id(self.id.clone())
+                                    .strategy(self.id.clone())
                                     .weight(Decimal::ONE)
                                     .build()
                                     .expect("Failed to create signal"),
@@ -86,7 +86,7 @@ impl Algorithm for CrossoverStrategy {
                                 SignalBuilder::default()
                                     .event_time(event_time)
                                     .instrument(i.clone())
-                                    .strategy_id(self.id.clone())
+                                    .strategy(self.id.clone())
                                     .weight(weight)
                                     .build()
                                     .expect("Failed to create signal"),

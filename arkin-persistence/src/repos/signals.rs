@@ -1,96 +1,106 @@
-use super::DBManager;
-use crate::models::Signal;
 use anyhow::Result;
-use rust_decimal::Decimal;
-use time::OffsetDateTime;
+use sqlx::PgPool;
+use tracing::debug;
 
-#[derive(sqlx::FromRow)]
-struct SignalRow {
-    event_time: OffsetDateTime,
-    instrument_type: String,
-    venue: String,
-    base: String,
-    quote: String,
-    maturity: Option<OffsetDateTime>,
-    strike: Option<Decimal>,
-    option_type: Option<String>,
-    strategy_id: String,
-    signal: Decimal,
+use arkin_core::prelude::*;
+
+use crate::BIND_LIMIT;
+
+#[derive(Debug)]
+pub struct SignalsRepo {
+    pool: PgPool,
 }
 
-impl From<Signal> for SignalRow {
-    fn from(signal: Signal) -> Self {
-        Self {
-            event_time: signal.event_time,
-            instrument_type: signal.instrument.instrument_type().to_string(),
-            venue: signal.instrument.venue().to_string(),
-            base: signal.instrument.base().to_string(),
-            quote: signal.instrument.quote().to_string(),
-            maturity: signal.instrument.maturity().map(|m| m.value()),
-            strike: signal.instrument.strike().map(|s| s.value()),
-            option_type: signal.instrument.option_type().map(|ot| ot.to_string()),
-            strategy_id: signal.strategy_id.to_string(),
-            signal: signal.signal.value(),
-        }
+impl SignalsRepo {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
-}
-impl DBManager {
-    pub async fn insert_signal(&self, signal: Signal) -> Result<()> {
-        let signal = SignalRow::from(signal);
+
+    pub async fn insert(&self, signal: Signal) -> Result<()> {
         sqlx::query!(
             r#"
-            INSERT INTO signals (event_time, instrument_type, venue, base, quote, maturity, strike, option_type, strategy_id, signal)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            INSERT INTO signals
+            (
+                event_time, 
+                instance_id,
+                instrument_id, 
+                strategy_id, 
+                weight
+            ) VALUES ($1, $2, $3, $4, $5)
             "#,
             signal.event_time,
-            signal.instrument_type,
-            signal.venue,
-            signal.base,
-            signal.quote,
-            signal.maturity,
-            signal.strike,
-            signal.option_type,
-            signal.strategy_id,
-            signal.signal,
+            signal.instance.id,
+            signal.instrument.id,
+            signal.strategy.id,
+            signal.weight,
         )
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
 
+    pub async fn insert_batch(&self, signals: Vec<Signal>) -> Result<()> {
+        // Build batched insert queries
+        for batch in signals.chunks(BIND_LIMIT / 5) {
+            // Create a query builder
+            let mut query_builder = sqlx::QueryBuilder::new(
+                r#"
+                INSERT INTO signals
+                (
+                    event_time, 
+                    instrument_id, 
+                    strategy_id, 
+                    weight
+                ) 
+                "#,
+            );
+
+            // Note that `.into_iter()` wasn't needed here since `users` is already an iterator.
+            query_builder.push_values(batch, |mut b, signal| {
+                // If you wanted to bind these by-reference instead of by-value,
+                // you'd need an iterator that yields references that live as long as `query_builder`,
+                // e.g. collect it to a `Vec` first.
+                b.push_bind(signal.event_time)
+                    .push(signal.instance.id)
+                    .push_bind(signal.instrument.id)
+                    .push_bind(signal.strategy.id)
+                    .push_bind(signal.weight);
+            });
+
+            let query = query_builder.build();
+
+            query.execute(&self.pool).await?;
+        }
+        debug!("Saved {} venue signals", signals.len());
         Ok(())
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use rust_decimal::prelude::*;
-    use time::OffsetDateTime;
+pub mod tests {
+    use crate::test_utils::connect_database;
 
     use super::*;
-    use crate::{
-        config,
-        models::{Instrument, Venue},
-    };
+    use rust_decimal_macros::dec;
+    use test_log::test;
+    use time::OffsetDateTime;
 
-    #[tokio::test]
-    #[ignore]
-    async fn test_insert_signal() {
-        let config = config::load();
-        let manager = DBManager::from_config(&config.db).await;
+    #[test(tokio::test)]
+    async fn test_signals_repo() {
+        let pool = connect_database();
+        let repo = SignalsRepo::new(pool);
+
+        let instrument = test_inst_binance_btc_usdt_perp();
+        let instance = test_instance();
+        let strategy = test_strategy();
 
         let signal = Signal {
             event_time: OffsetDateTime::now_utc(),
-            instrument: Instrument::perpetual(Venue::Binance, "BTC".into(), "USDT".into()),
-            strategy_id: "test".into(),
-            signal: Decimal::new(1, 0).into(),
+            instance,
+            instrument,
+            strategy,
+            weight: dec!(0.5),
         };
-
-        manager.insert_signal(signal).await.unwrap();
-
-        // Check that the signal was inserted
-        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM signals")
-            .fetch_one(&manager.pool)
-            .await
-            .expect("SQLX failed to fetch row");
-        assert_eq!(row.0, 1)
+        repo.insert(signal).await.unwrap();
     }
 }

@@ -23,7 +23,7 @@ pub struct LimitedAllocationOptim {
     persistence: Arc<dyn Persistor>,
     portfolio: Arc<dyn Portfolio>,
     #[builder(default = "DashMap::new()")]
-    signals: DashMap<(StrategyId, Arc<Instrument>), Signal>,
+    signals: DashMap<(Arc<Strategy>, Arc<Instrument>), Signal>,
     #[builder(default = "Decimal::from_f32(0.8).unwrap()")]
     max_allocation: Decimal,
     #[builder(default = "Decimal::from_f32(1.0).unwrap()")]
@@ -73,7 +73,7 @@ impl AllocationOptim for LimitedAllocationOptim {
 
     async fn new_signal(&self, signal: Signal) -> Result<(), AllocationOptimError> {
         info!("Received new signal: {}", signal);
-        let key = (signal.strategy_id.clone(), signal.instrument.clone());
+        let key = (signal.strategy.clone(), signal.instrument.clone());
         self.signals.insert(key, signal);
         Ok(())
     }
@@ -112,21 +112,17 @@ impl AllocationOptim for LimitedAllocationOptim {
         for entry in self.signals.iter() {
             let signal = entry.value();
             let signal_allocation = max_allocation_per_signal * signal.weight;
-            let res = self.persistence.read_latest_tick(event_time, &signal.instrument).await?;
-            match res {
-                Some(tick) => {
-                    let quantity = signal_allocation / tick.mid_price();
-                    let optimal_position = OptimalPosition {
-                        instrument: signal.instrument.clone(),
-                        price: tick.mid_price(),
-                        quantity: quantity
-                            .round_dp_with_strategy(signal.instrument.quantity_precision, RoundingStrategy::ToZero),
-                    };
-                    optimal_positions.insert(signal.instrument.clone(), optimal_position);
-                }
-                None => {
-                    warn!("No tick found for instrument: {}", signal.instrument);
-                }
+            if let Some(tick) = self.persistence.last_tick_from_cache(&signal.instrument).await {
+                let quantity = signal_allocation / tick.mid_price();
+                let optimal_position = OptimalPosition {
+                    instrument: signal.instrument.clone(),
+                    price: tick.mid_price(),
+                    quantity: quantity
+                        .round_dp_with_strategy(signal.instrument.quantity_precision, RoundingStrategy::ToZero),
+                };
+                optimal_positions.insert(signal.instrument.clone(), optimal_position);
+            } else {
+                warn!("No tick found for instrument: {}", signal.instrument);
             }
         }
         for (instrument, position) in optimal_positions.iter() {
@@ -196,13 +192,8 @@ impl AllocationOptim for LimitedAllocationOptim {
             // Create execution order
             let order = ExecutionOrderBuilder::default()
                 .instrument(instrument.clone())
-                .execution_type(ExecutionOrderStrategy::Market(
-                    MarketBuilder::default()
-                        .side(order_side)
-                        .quantity(position.diff.abs())
-                        .build()
-                        .unwrap(),
-                ))
+                .order_type(ExecutionOrderType::Maker)
+                .side(order_side)
                 .created_at(event_time)
                 .updated_at(event_time)
                 .build()

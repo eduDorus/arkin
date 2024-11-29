@@ -3,16 +3,17 @@ use std::{fmt, sync::Arc};
 use derive_builder::Builder;
 use time::OffsetDateTime;
 
-use crate::{EventType, EventTypeOf, StrategyId, Weight};
+use crate::{EventType, EventTypeOf, Weight};
 
-use super::Instrument;
+use super::{Instance, Instrument, Strategy};
 
 #[derive(Debug, Clone, Builder)]
 #[builder(setter(into))]
 pub struct Signal {
     pub event_time: OffsetDateTime,
+    pub instance: Arc<Instance>,
     pub instrument: Arc<Instrument>,
-    pub strategy_id: StrategyId,
+    pub strategy: Arc<Strategy>,
     pub weight: Weight,
 }
 
@@ -27,7 +28,7 @@ impl fmt::Display for Signal {
         write!(
             f,
             "instrument={} strategy={} weight={}",
-            self.instrument.symbol, self.strategy_id, self.weight
+            self.instrument.symbol, self.strategy.name, self.weight
         )
     }
 }

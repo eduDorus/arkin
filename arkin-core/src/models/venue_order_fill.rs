@@ -2,6 +2,7 @@ use std::{fmt, sync::Arc};
 
 use derive_builder::Builder;
 use rust_decimal::Decimal;
+use sqlx::FromRow;
 use time::OffsetDateTime;
 
 use crate::{
@@ -9,15 +10,15 @@ use crate::{
     Event, EventType, EventTypeOf, Notional, Price, Quantity,
 };
 
-use super::{ExecutionOrderId, Instrument, MarketSide, VenueOrderId};
+use super::{Instance, Instrument, MarketSide, VenueOrder};
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, Builder, FromRow)]
 #[builder(setter(into))]
 pub struct VenueOrderFill {
     #[builder(default = OffsetDateTime::now_utc())]
     pub event_time: OffsetDateTime,
-    pub id: VenueOrderId,
-    pub execution_order_id: ExecutionOrderId,
+    pub instance: Arc<Instance>,
+    pub venue_order: Arc<VenueOrder>,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
     pub price: Price,

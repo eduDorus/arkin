@@ -1,11 +1,25 @@
+mod execution_orders;
 mod insights;
+mod instances;
 mod instruments;
+mod positions;
+mod signals;
+mod strategies;
 mod ticks;
 mod trades;
+mod venue_order_fills;
+mod venue_orders;
 mod venues;
 
+pub use execution_orders::*;
 pub use insights::*;
+pub use instances::*;
 pub use instruments::*;
+pub use positions::*;
+pub use signals::*;
+pub use strategies::*;
 pub use ticks::*;
 pub use trades::*;
+pub use venue_order_fills::*;
+pub use venue_orders::*;
 pub use venues::*;

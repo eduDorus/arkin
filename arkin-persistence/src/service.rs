@@ -169,6 +169,10 @@ impl Persistor for PersistenceService {
         self.tick_service.insert_batch_vec(ticks).await.map_err(|e| e.into())
     }
 
+    async fn last_tick_from_cache(&self, instrument: &Arc<Instrument>) -> Option<Tick> {
+        self.tick_service.last_tick_from_cache(instrument)
+    }
+
     async fn read_latest_tick(
         &self,
         event_time: OffsetDateTime,
@@ -178,6 +182,15 @@ impl Persistor for PersistenceService {
             .read_latest_tick(event_time, instrument)
             .await
             .map_err(|e| e.into())
+    }
+
+    async fn read_ticks_range(
+        &self,
+        instruments: &[Arc<Instrument>],
+        from: OffsetDateTime,
+        to: OffsetDateTime,
+    ) -> Result<Vec<Tick>, PersistenceError> {
+        self.tick_service.read_range(instruments, from, to).await.map_err(|e| e.into())
     }
 
     async fn read_trades_range(
@@ -200,15 +213,6 @@ impl Persistor for PersistenceService {
 
     async fn insert_trade_batch_vec(&self, trades: Vec<Trade>) -> Result<(), PersistenceError> {
         self.trade_service.insert_batch_vec(trades).await.map_err(|e| e.into())
-    }
-
-    async fn read_ticks_range(
-        &self,
-        instruments: &[Arc<Instrument>],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
-    ) -> Result<Vec<Tick>, PersistenceError> {
-        self.tick_service.read_range(instruments, from, to).await.map_err(|e| e.into())
     }
 
     async fn insert_insight(&self, insight: Insight) -> Result<(), PersistenceError> {

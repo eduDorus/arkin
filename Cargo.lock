@@ -361,6 +361,7 @@ dependencies = [
  "futures-util",
  "mockall",
  "rust_decimal",
+ "rust_decimal_macros",
  "serde",
  "sqlx",
  "test-case",

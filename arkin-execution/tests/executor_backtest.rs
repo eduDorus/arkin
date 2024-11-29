@@ -11,9 +11,7 @@ async fn test_place_order() {
 
     // // Create a sample VenueOrder
     let instrument = test_inst_binance_btc_usdt_perp();
-    let execution_order_id = ExecutionOrderId::new_v4();
     let order = VenueOrderBuilder::default()
-        .execution_order_id(execution_order_id)
         .instrument(instrument)
         .order_type(VenueOrderType::Limit)
         .side(MarketSide::Buy)

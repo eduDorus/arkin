@@ -3,6 +3,7 @@ mod errors;
 mod repos;
 mod service;
 mod services;
+mod test_utils;
 mod traits;
 
 pub use config::*;

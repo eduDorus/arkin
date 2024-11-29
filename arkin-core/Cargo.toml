@@ -26,7 +26,6 @@ serde_json = { workspace = true }
 derive_builder = { workspace = true }
 dashmap = { workspace = true }
 
-
 mockall = { workspace = true }
 
 [dev-dependencies]

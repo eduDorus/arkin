@@ -1,46 +1,41 @@
 CREATE TYPE market_side AS ENUM ('buy', 'sell');
 CREATE TYPE option_type AS ENUM ('call', 'put');
-CREATE TYPE instrument_type AS ENUM ('spot', 'perpetual', 'future', 'option');
-CREATE TYPE instrument_status AS ENUM ('trading', 'halted');
-CREATE TYPE execution_order_type AS ENUM ('maker', 'taker', 'vwap');
-CREATE TYPE execution_order_status AS ENUM (
-    'new',
-    'open',
-    'partially_filled',
-    'filled',
-    'cancelled',
-    'rejected'
-);
-CREATE TYPE venue_order_type AS ENUM ('market', 'limit');
-CREATE TYPE venue_order_time_in_force AS ENUM ('gtc', 'ioc', 'fok', 'gtd');
-CREATE TYPE venue_order_status AS ENUM (
-    'new',
-    'open',
-    'partially_filled',
-    'filled',
-    'cancelled',
-    'rejected',
-    'expired'
-);
-CREATE TYPE position_side AS ENUM ('long', 'short');
-CREATE TYPE position_status AS ENUM ('open', 'closed');
 
+
+CREATE TYPE instance_type AS ENUM ( 'live', 'simulation', 'backtest');
+CREATE TYPE instance_status AS ENUM ('new', 'running', 'stopped', 'completed', 'failed');
+CREATE TABLE IF NOT EXISTS instances (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    name TEXT NOT NULL UNIQUE,
+    start_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP(3) WITH TIME ZONE,
+    instance_type instance_type NOT NULL,
+    status instance_status NOT NULL
+);
+
+
+CREATE TABLE IF NOT EXISTS strategies (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+);
 
 CREATE TABLE IF NOT EXISTS venues (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    name VARCHAR NOT NULL UNIQUE,
-    venue_type VARCHAR NOT NULL
+    name TEXT NOT NULL UNIQUE,
+    venue_type TEXT NOT NULL
 );
 
-
+CREATE TYPE instrument_type AS ENUM ('spot', 'perpetual', 'future', 'option');
+CREATE TYPE instrument_status AS ENUM ('trading', 'halted');
 CREATE TABLE IF NOT EXISTS instruments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     venue_id uuid NOT NULL REFERENCES venues(id),
-    symbol VARCHAR NOT NULL,
-    venue_symbol VARCHAR NOT NULL,
+    symbol TEXT NOT NULL,
+    venue_symbol TEXT NOT NULL,
     instrument_type instrument_type NOT NULL,
-    base_asset VARCHAR NOT NULL,
-    quote_asset VARCHAR NOT NULL,
+    base_asset TEXT NOT NULL,
+    quote_asset TEXT NOT NULL,
     strike DECIMAL,
     maturity TIMESTAMPTZ,
     option_type option_type,
@@ -54,9 +49,12 @@ CREATE TABLE IF NOT EXISTS instruments (
     status instrument_status NOT NULL
 );
 
-
+CREATE TYPE position_side AS ENUM ('long', 'short');
+CREATE TYPE position_status AS ENUM ('open', 'closed');
 CREATE TABLE IF NOT EXISTS positions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
+    strategy_id uuid NOT NULL REFERENCES strategies(id), -- strategy_id
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     side position_side NOT NULL,
     open_price NUMERIC NOT NULL,
@@ -70,12 +68,26 @@ CREATE TABLE IF NOT EXISTS positions (
     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 
-
+CREATE TYPE execution_order_type AS ENUM ('maker', 'taker', 'vwap', 'twap', 'algo');
+CREATE TYPE execution_order_status AS ENUM (
+    'new',
+    'in_progress',
+    'partially_filled',
+    'partially_filled_cancelling',
+    'partially_filled_cancelled',
+    'filled',
+    'cancelling',
+    'cancelled',
+);
 CREATE TABLE IF NOT EXISTS execution_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
+    strategy_id uuid NOT NULL REFERENCES strategies(id), -- strategy_id
     instrument_id uuid NOT NULL REFERENCES instruments(id),
+    order_type execution_order_type NOT NULL,
     side market_side NOT NULL,
-    execution_type execution_order_type NOT NULL,
+    price NUMERIC,
+    quantity NUMERIC NOT NULL,
     fill_price NUMERIC NOT NULL,
     filled_quantity NUMERIC NOT NULL,
     total_commission NUMERIC NOT NULL,
@@ -85,9 +97,36 @@ CREATE TABLE IF NOT EXISTS execution_orders (
 );
 
 
+CREATE TYPE venue_order_type AS ENUM (
+    'market', 
+    'limit'
+    'stop',
+    'stop_market',
+    'take_profit',
+    'take_profit_market',
+    'trailing_stop_market'
+);
+CREATE TYPE venue_order_time_in_force AS ENUM (
+    'gtc', 
+    'ioc', 
+    'fok', 
+    'gtx',
+    'gtd'
+);
+CREATE TYPE venue_order_status AS ENUM (
+    'new',
+    'placed',
+    'partially_filled',
+    'partially_filled_cancelled',
+    'partially_filled_expired',
+    'filled',
+    'cancelled',
+    'rejected',
+    'expired'
+);
 CREATE TABLE IF NOT EXISTS venue_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
+    instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     side market_side NOT NULL,
     order_type venue_order_type NOT NULL,
@@ -105,10 +144,11 @@ CREATE TABLE IF NOT EXISTS venue_orders (
 
 CREATE TABLE IF NOT EXISTS insights (
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
     instrument_id uuid REFERENCES instruments(id),
-    feature_id VARCHAR NOT NULL,
+    feature_id TEXT NOT NULL,
     value NUMERIC NOT NULL,
-    PRIMARY KEY (instrument_id, feature_id, event_time)
+    PRIMARY KEY (instrument_id, instance_id, feature_id, event_time)
 );
 SELECT create_hypertable('insights', by_range('event_time', interval '1 day'));
 SELECT add_dimension('insights', by_hash('instrument_id', 4));
@@ -117,27 +157,29 @@ SELECT add_dimension('insights', by_hash('instrument_id', 4));
 
 CREATE TABLE IF NOT EXISTS signals (
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
+    strategy_id uuid NOT NULL REFERENCES strategies(id), -- strategy_id
     instrument_id uuid NOT NULL REFERENCES instruments(id),
-    strategy_id VARCHAR NOT NULL,
-    signal NUMERIC NOT NULL,
-    PRIMARY KEY (instrument_id, strategy_id, event_time)
+    weight NUMERIC NOT NULL,
+    PRIMARY KEY (instrument_id, instance_id, strategy_id, event_time)
 );
-SELECT create_hypertable('signals', by_range('event_time', interval '7 day'));
+SELECT create_hypertable('signals', by_range('event_time', interval '1 day'));
 SELECT add_dimension('signals', by_hash('instrument_id', 4));
 
 
 
 CREATE TABLE IF NOT EXISTS venue_order_fills (
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
     venue_order_id uuid NOT NULL REFERENCES venue_orders(id),
-    execution_order_id uuid NOT NULL REFERENCES execution_orders(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     side market_side NOT NULL,
     price NUMERIC NOT NULL,
     quantity NUMERIC NOT NULL,
-    PRIMARY KEY (venue_order_id, execution_order_id, instrument_id, event_time)
+    commission NUMERIC NOT NULL,
+    PRIMARY KEY (venue_order_id, instrument_id, instance_id, event_time)
 );
-SELECT create_hypertable('venue_order_fills', by_range('event_time', interval '7 day'));
+SELECT create_hypertable('venue_order_fills', by_range('event_time', interval '1 day'));
 SELECT add_dimension('venue_order_fills', by_hash('instrument_id', 4));
 
 

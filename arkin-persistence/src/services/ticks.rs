@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use arkin_core::prelude::*;
+use dashmap::DashMap;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
 use tracing::error;
@@ -15,6 +16,7 @@ use super::instruments::InstrumentService;
 pub struct TickService {
     tick_repo: TickRepo,
     tick_batch: Mutex<Vec<Tick>>,
+    last_tick_cache: DashMap<Arc<Instrument>, Tick>,
     instrument_service: Arc<InstrumentService>,
     batch_size: usize,
 }
@@ -24,6 +26,7 @@ impl TickService {
         Self {
             tick_repo,
             tick_batch: Mutex::new(Vec::new()),
+            last_tick_cache: DashMap::new(),
             instrument_service,
             batch_size,
         }
@@ -55,11 +58,17 @@ impl TickService {
         Ok(())
     }
 
+    pub fn update_tick_cache(&self, tick: Tick) {
+        self.last_tick_cache.insert(tick.instrument.clone(), tick);
+    }
+
     pub async fn insert(&self, tick: Tick) -> Result<()> {
+        self.update_tick_cache(tick.clone());
         self.tick_repo.insert(tick).await
     }
 
     pub async fn insert_batch(&self, tick: Tick) -> Result<()> {
+        self.update_tick_cache(tick.clone());
         {
             let mut lock = self.tick_batch.lock().await;
             lock.push(tick);
@@ -77,6 +86,10 @@ impl TickService {
 
         self.commit().await?;
         Ok(())
+    }
+
+    pub fn last_tick_from_cache(&self, instrument: &Arc<Instrument>) -> Option<Tick> {
+        self.last_tick_cache.get(instrument).map(|t| t.value().clone())
     }
 
     pub async fn read_latest_tick(

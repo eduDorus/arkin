@@ -47,7 +47,7 @@ async fn test_limited_allocation() {
     let signal = SignalBuilder::default()
         .event_time(event_time)
         .instrument(test_inst_binance_btc_usdt_perp())
-        .strategy_id(Arc::new(String::from("CrossOver")))
+        .strategy(test_strategy())
         .weight(Decimal::from_f64(1.0).unwrap())
         .build()
         .expect("Failed to build Signal");

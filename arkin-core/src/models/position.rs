@@ -2,6 +2,7 @@ use std::{fmt, sync::Arc};
 
 use derive_builder::Builder;
 use rust_decimal::Decimal;
+use sqlx::prelude::Type;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::info;
@@ -9,9 +10,11 @@ use uuid::Uuid;
 
 use crate::{types::Commission, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
 
-use super::{Instrument, MarketSide};
+use super::{Instance, Instrument, MarketSide, Strategy};
 
-#[derive(Clone, Display, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type)]
+#[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "position_side", rename_all = "snake_case")]
 pub enum PositionSide {
     Long,
     Short,
@@ -26,7 +29,9 @@ impl From<MarketSide> for PositionSide {
     }
 }
 
-#[derive(Clone, Display, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type)]
+#[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "position_status", rename_all = "snake_case")]
 pub enum PositionStatus {
     Open,
     Closed,
@@ -37,6 +42,8 @@ pub enum PositionStatus {
 pub struct Position {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
+    pub instance: Arc<Instance>,
+    pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub side: PositionSide,
     pub open_price: Price,

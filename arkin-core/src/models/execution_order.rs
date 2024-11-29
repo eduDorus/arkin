@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use derive_builder::Builder;
-use rust_decimal::Decimal;
+use sqlx::{FromRow, Type};
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::warn;
@@ -9,57 +9,24 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
 
-use super::{Instrument, MarketSide};
+use super::{Instance, Instrument, MarketSide, Strategy};
 
 pub type ExecutionOrderId = Uuid;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ExecutionOrderStrategy {
-    Market(Market),
-    Limit(Limit),
-    // WideQuoting(WideQuoting),
+#[derive(Debug, Display, Clone, PartialEq, Eq, Type)]
+#[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "execution_order_type", rename_all = "snake_case")]
+pub enum ExecutionOrderType {
+    Maker,
+    Taker,
+    VWAP,
+    TWAP,
+    ALGO,
 }
 
-impl fmt::Display for ExecutionOrderStrategy {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ExecutionOrderStrategy::Market(o) => write!(f, "type=market side={} quantity={}", o.side, o.quantity),
-            ExecutionOrderStrategy::Limit(o) => {
-                write!(f, "type=limit side={} price={} quantity={}", o.side, o.price, o.quantity)
-            } // ExecutionOrderStrategy::WideQuoting(o) => write!(f, "WideQuoting: {}", o),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Builder)]
-#[builder(setter(into))]
-pub struct Market {
-    pub side: MarketSide,
-    pub quantity: Quantity,
-    #[builder(default = false)]
-    pub split: bool,
-    #[builder(default = false)]
-    pub vwap: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Builder)]
-#[builder(setter(into))]
-pub struct Limit {
-    pub side: MarketSide,
-    pub quantity: Quantity,
-    pub price: Price,
-    pub time_in_force: Option<OffsetDateTime>,
-    pub split: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Builder)]
-#[builder(setter(into))]
-pub struct WideQuoting {
-    pub spread_from_mid: Decimal,
-    pub requote_price_move_pct: Decimal,
-}
-
-#[derive(Debug, Display, Clone, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, PartialEq, Eq, Type)]
+#[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "execution_order_status", rename_all = "snake_case")]
 pub enum ExecutionOrderStatus {
     New,
     InProgress,
@@ -71,13 +38,19 @@ pub enum ExecutionOrderStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Builder)]
+#[derive(Debug, Clone, PartialEq, Eq, Builder, FromRow)]
 #[builder(setter(into))]
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
+    pub instance: Arc<Instance>,
+    pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
-    pub execution_type: ExecutionOrderStrategy,
+    pub order_type: ExecutionOrderType,
+    pub side: MarketSide,
+    #[builder(default = None)]
+    pub price: Option<Price>,
+    pub quantity: Quantity,
     #[builder(default = Price::ZERO)]
     pub fill_price: Price,
     #[builder(default = Quantity::ZERO)]
@@ -101,7 +74,7 @@ impl ExecutionOrder {
         self.updated_at = fill.event_time;
 
         // Update the state
-        match self.filled_quantity == self.quantity() {
+        match self.remaining_quantity().is_zero() {
             true => self.status = ExecutionOrderStatus::Filled,
             false => self.status = ExecutionOrderStatus::PartiallyFilled,
         }
@@ -124,20 +97,6 @@ impl ExecutionOrder {
             ExecutionOrderStatus::InProgress => self.status = ExecutionOrderStatus::Cancelling,
             ExecutionOrderStatus::PartiallyFilled => self.status = ExecutionOrderStatus::PartiallyFilledCancelling,
             _ => warn!("Cannot cancel order in state {}", self.status),
-        }
-    }
-
-    pub fn quantity(&self) -> Quantity {
-        match &self.execution_type {
-            ExecutionOrderStrategy::Market(o) => o.quantity,
-            ExecutionOrderStrategy::Limit(o) => o.quantity,
-        }
-    }
-
-    pub fn side(&self) -> MarketSide {
-        match &self.execution_type {
-            ExecutionOrderStrategy::Market(o) => o.side,
-            ExecutionOrderStrategy::Limit(o) => o.side,
         }
     }
 
@@ -191,7 +150,7 @@ impl ExecutionOrder {
     }
 
     pub fn remaining_quantity(&self) -> Quantity {
-        self.quantity() - self.filled_quantity
+        self.quantity - self.filled_quantity
     }
 
     pub fn has_fill(&self) -> bool {
@@ -219,8 +178,8 @@ impl fmt::Display for ExecutionOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "ExecutionOrder: instrument={} execution_type={} filled_quantity={} status={}",
-            self.instrument, self.execution_type, self.filled_quantity, self.status
+            "ExecutionOrder: instrument={} order_type={} filled_quantity={} status={}",
+            self.instrument, self.order_type, self.filled_quantity, self.status
         )
     }
 }

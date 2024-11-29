@@ -118,13 +118,13 @@ impl Executor for SimulationExecutor {
                             let mut commission = match order.order_type {
                                 VenueOrderType::Market => (price * quantity) * self.taker_commission,
                                 VenueOrderType::Limit => (price * quantity) * self.maker_commission,
+                                _ => unimplemented!("Unsupported order type"),
                             };
                             commission = commission.round_dp(order.instrument.price_precision);
 
                             // Create the fill
                             let fill = VenueOrderFillBuilder::default()
-                                .id(order.id.clone())
-                                .execution_order_id(order.execution_order_id.clone())
+                                .venue_order(order.clone())
                                 .instrument(order.instrument.clone())
                                 .side(order.side.clone())
                                 .price(price)
@@ -228,7 +228,6 @@ mod tests {
 
         // Create a sample VenueOrder
         let order = VenueOrderBuilder::default()
-            .execution_order_id(ExecutionOrderId::new_v4())
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Buy)

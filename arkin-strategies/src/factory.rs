@@ -16,7 +16,7 @@ impl StrategyFactory {
                     StrategyAlgorithmConfig::Crossover(c) => Arc::new(
                         CrossoverStrategyBuilder::default()
                             .pubsub(pubsub.clone())
-                            .id(c.id.clone())
+                            // .id(c.id.clone())
                             .fast_ma(c.fast_ma.clone())
                             .slow_ma(c.slow_ma.clone())
                             .build()

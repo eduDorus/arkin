@@ -1,11 +1,14 @@
 use std::{str::FromStr, sync::Arc};
 
 use rust_decimal::prelude::*;
+use rust_decimal_macros::dec;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    Instrument, InstrumentBuilder, InstrumentStatus, InstrumentType, Price, Quantity, Tick, TickBuilder, Venue,
-    VenueBuilder,
+    Instance, InstanceBuilder, InstanceStatus, InstanceType, Instrument, InstrumentBuilder, InstrumentStatus,
+    InstrumentType, MarketSide, Price, Quantity, Strategy, StrategyBuilder, Tick, TickBuilder, Venue, VenueBuilder,
+    VenueOrder, VenueOrderBuilder, VenueOrderStatus, VenueOrderTimeInForce, VenueOrderType,
 };
 
 pub fn binance_venue() -> Venue {
@@ -85,4 +88,42 @@ pub fn test_tick(
         .ask_quantity(ask_quantity)
         .build()
         .expect("Failed to build Tick in test utils")
+}
+
+pub fn test_instance() -> Arc<Instance> {
+    let instance = InstanceBuilder::default()
+        .id(Uuid::from_str("31c79d6c-8dce-44a5-a5c8-c02578671afb").expect("Invalid UUID"))
+        .name("Test Instance")
+        .start_time(OffsetDateTime::now_utc())
+        .instance_type(InstanceType::Live)
+        .status(InstanceStatus::Running)
+        .build()
+        .expect("Failed to build Instance in test utils");
+    Arc::new(instance)
+}
+
+pub fn test_strategy() -> Arc<Strategy> {
+    let strategy = StrategyBuilder::default()
+        .id(Uuid::from_str("a2d0951e-9bc6-47a4-b803-e4e0bb4e98a3").expect("Invalid UUID"))
+        .name("Test Strategy")
+        .description(Some("Test Description".into()))
+        .build()
+        .expect("Failed to build Strategy in test utils");
+    Arc::new(strategy)
+}
+
+pub fn test_venue_order() -> Arc<VenueOrder> {
+    let order = VenueOrderBuilder::default()
+        .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
+        .instance(test_instance())
+        .instrument(test_inst_binance_btc_usdt_perp())
+        .order_type(VenueOrderType::Market)
+        .time_in_force(VenueOrderTimeInForce::Gtc)
+        .side(MarketSide::Buy)
+        .price(None)
+        .quantity(dec!(1))
+        .status(VenueOrderStatus::Placed)
+        .build()
+        .expect("Failed to build VenueOrder in test utils");
+    Arc::new(order)
 }

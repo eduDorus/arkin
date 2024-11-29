@@ -74,14 +74,15 @@ impl OrderQueue {
     }
 
     pub fn add_fill(&self, fill: VenueOrderFill) {
-        self.orders.alter(&fill.execution_order_id, |_, mut v| {
-            if !v.is_closed() {
-                v.add_fill(fill.clone());
-            } else {
-                warn!("Order {} is already closed but is getting a fill", fill.execution_order_id);
-            }
-            v
-        });
+        // TODO
+        // self.orders.alter(&fill.execution_order_id, |_, mut v| {
+        //     if !v.is_closed() {
+        //         v.add_fill(fill.clone());
+        //     } else {
+        //         warn!("Order {} is already closed but is getting a fill", fill.execution_order_id);
+        //     }
+        //     v
+        // });
     }
 
     pub fn update_order_status(&self, id: ExecutionOrderId, status: ExecutionOrderStatus) {
@@ -138,21 +139,14 @@ impl OrderManager for SimpleOrderManager {
                     if let Err(e) = self.place_order(order.clone()).await {
                         error!("Failed to process order: {}", e);
                     }
-                    let venue_order = match &order.execution_type {
-                        ExecutionOrderStrategy::Market(_) => {
-                            VenueOrderBuilder::default().execution_order_id(order.id.to_owned()).instrument(order.instrument.to_owned()).side(order.side().to_owned()).order_type(VenueOrderType::Market).price(None).quantity(order.quantity().to_owned()).build().expect("Failed to create order")
-                        },
-                        ExecutionOrderStrategy::Limit(o) => {
-                            VenueOrderBuilder::default()
-                                .execution_order_id(order.id.to_owned())
-                                .instrument(order.instrument.to_owned())
-                                .side(order.side().to_owned())
-                                .order_type(VenueOrderType::Limit)
-                                .price(Some(o.price))
-                                .quantity(order.quantity().to_owned())
-                                .build().expect("Failed to create order")
-                        }
-                    };
+                    let venue_order = VenueOrderBuilder::default()
+                        .instrument(order.instrument.to_owned())
+                        .side(order.side)
+                        .order_type(order.order_type.into())
+                        .price(None)
+                        .quantity(order.quantity)
+                        .build()
+                        .expect("Failed to create order");
 
                     info!("SimpleOrderManager publishing venue order: {}", venue_order);
                     self.pubsub.publish::<VenueOrder>(venue_order);

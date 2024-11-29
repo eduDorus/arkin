@@ -19,6 +19,8 @@ async fn test_single_strategy_long_position() {
     );
 
     // Create instrument
+    let instance = test_instance();
+    let order = test_venue_order();
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
@@ -37,7 +39,8 @@ async fn test_single_strategy_long_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
         .price(dec!(100.0))
@@ -58,7 +61,8 @@ async fn test_single_strategy_long_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Sell)
         .price(dec!(120.0))
@@ -76,7 +80,8 @@ async fn test_single_strategy_long_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Sell)
         .price(dec!(110.0))
@@ -115,6 +120,8 @@ async fn test_single_strategy_short_position() {
     );
 
     // Create instrument
+    let instance = test_instance();
+    let order = test_venue_order();
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
@@ -133,7 +140,8 @@ async fn test_single_strategy_short_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Sell)
         .price(dec!(100.0))
@@ -154,7 +162,8 @@ async fn test_single_strategy_short_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
         .price(dec!(80.0))
@@ -172,7 +181,8 @@ async fn test_single_strategy_short_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
         .price(dec!(90.0))
@@ -211,6 +221,8 @@ async fn test_single_strategy_swap_position() {
     );
 
     // Create instrument
+    let instance = test_instance();
+    let order = test_venue_order();
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
@@ -229,7 +241,8 @@ async fn test_single_strategy_swap_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
         .price(dec!(100.0))
@@ -250,7 +263,8 @@ async fn test_single_strategy_swap_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Sell)
         .price(dec!(120.0))
@@ -269,7 +283,8 @@ async fn test_single_strategy_swap_position() {
 
     // Create fill
     let fill = VenueOrderFillBuilder::default()
-        .id(ExecutionOrderId::new_v4())
+        .instance(instance.clone())
+        .venue_order(order.clone())
         .instrument(instrument.clone())
         .side(MarketSide::Buy)
         .price(dec!(100.0))

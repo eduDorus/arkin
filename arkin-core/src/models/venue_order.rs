@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use derive_builder::Builder;
+use sqlx::Type;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::error;
@@ -8,33 +9,56 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity, VenueOrderFill};
 
-use super::{ExecutionOrderId, Instrument, MarketSide};
+use super::{ExecutionOrderType, Instance, Instrument, MarketSide};
 
 pub type VenueOrderId = Uuid;
 
-#[derive(Debug, Display, Clone, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, PartialEq, Eq, Type)]
+#[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "venue_order_type", rename_all = "snake_case")]
 pub enum VenueOrderType {
     Market,
     Limit,
+    Stop,
+    StopMarket,
+    TakeProfit,
+    TakeProfitMarket,
+    TrailingStopMarket,
 }
 
-#[derive(Debug, Display, Clone)]
+impl From<ExecutionOrderType> for VenueOrderType {
+    fn from(order_type: ExecutionOrderType) -> Self {
+        match order_type {
+            ExecutionOrderType::Maker => VenueOrderType::Limit,
+            ExecutionOrderType::Taker => VenueOrderType::Market,
+            ExecutionOrderType::VWAP => unimplemented!("VWAP not supported"),
+            ExecutionOrderType::TWAP => unimplemented!("TWAP not supported"),
+            ExecutionOrderType::ALGO => unimplemented!("ALGO not supported"),
+        }
+    }
+}
+
+#[derive(Debug, Display, Clone, Type)]
+#[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "venue_order_time_in_force", rename_all = "snake_case")]
 pub enum VenueOrderTimeInForce {
     Gtc,
     Ioc,
     Fok,
-    Gtd(OffsetDateTime),
+    Gtx,
+    Gtd,
 }
 
-#[derive(Debug, Display, Clone, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, PartialEq, Eq, Type)]
+#[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "venue_order_status", rename_all = "snake_case")]
 pub enum VenueOrderStatus {
     New,
     Placed,
     PartiallyFilled,
-    PartiallyFilledCancelling,
     PartiallyFilledCancelled,
+    PartiallyFilledExpired,
     Filled,
-    Cancelling,
     Cancelled,
     Rejected,
     Expired,
@@ -44,7 +68,7 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
-    pub execution_order_id: ExecutionOrderId,
+    pub instance: Arc<Instance>,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
     pub order_type: VenueOrderType,
@@ -94,17 +118,9 @@ impl VenueOrder {
     pub fn cancel(&mut self) {
         match self.status {
             VenueOrderStatus::New => self.status = VenueOrderStatus::Cancelled,
-            VenueOrderStatus::Placed => self.status = VenueOrderStatus::Cancelling,
-            VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledCancelling,
+            VenueOrderStatus::Placed => self.status = VenueOrderStatus::Cancelled,
+            VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledCancelled,
             _ => error!("Cannot cancel order in state {}", self.status),
-        }
-    }
-
-    pub fn ack_cancel(&mut self) {
-        match self.status {
-            VenueOrderStatus::Cancelling => self.status = VenueOrderStatus::Cancelled,
-            VenueOrderStatus::PartiallyFilledCancelling => self.status = VenueOrderStatus::PartiallyFilledCancelled,
-            _ => error!("Cannot ack cancel order in state {}", self.status),
         }
     }
 
@@ -120,32 +136,31 @@ impl VenueOrder {
                 | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelling)
+                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelled)
+                | (VenueOrderStatus::Placed, VenueOrderStatus::Expired)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Cancelling)
-                | (
-                    VenueOrderStatus::PartiallyFilledCancelling,
-                    VenueOrderStatus::PartiallyFilledCancelled
-                )
-                | (VenueOrderStatus::Cancelling, VenueOrderStatus::Cancelled)
+                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledCancelled)
+                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledExpired)
         )
+    }
+
+    pub fn is_new(&self) -> bool {
+        self.status == VenueOrderStatus::New
     }
 
     pub fn is_active(&self) -> bool {
         matches!(self.status, VenueOrderStatus::Placed | VenueOrderStatus::PartiallyFilled)
     }
 
-    pub fn is_cancelling(&self) -> bool {
-        matches!(
-            self.status,
-            VenueOrderStatus::Cancelling | VenueOrderStatus::PartiallyFilledCancelling
-        )
-    }
-
     pub fn is_finalized(&self) -> bool {
         matches!(
             self.status,
-            VenueOrderStatus::PartiallyFilledCancelled | VenueOrderStatus::Cancelled | VenueOrderStatus::Filled
+            VenueOrderStatus::PartiallyFilledCancelled
+                | VenueOrderStatus::PartiallyFilledExpired
+                | VenueOrderStatus::Filled
+                | VenueOrderStatus::Cancelled
+                | VenueOrderStatus::Rejected
+                | VenueOrderStatus::Expired
         )
     }
 
