@@ -1,13 +1,18 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use derive_builder::Builder;
 use rust_decimal::Decimal;
+use uuid::Uuid;
 
-use crate::{types::AssetId, Event, EventType, EventTypeOf};
+use crate::{Event, EventType, EventTypeOf};
+
+use super::{Asset, Instance};
 
 #[derive(Debug, Clone, Builder, PartialEq)]
 pub struct Holding {
-    pub asset: AssetId,
+    pub id: Uuid,
+    pub instance: Arc<Instance>,
+    pub asset: Arc<Asset>,
     pub balance: Decimal,
 }
 

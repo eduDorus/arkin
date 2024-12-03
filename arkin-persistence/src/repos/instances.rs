@@ -1,20 +1,72 @@
-use anyhow::Result;
+use std::sync::Arc;
+
+use arkin_core::{Instance, InstanceStatus, InstanceType};
+use derive_builder::Builder;
 use sqlx::PgPool;
 
-use arkin_core::prelude::*;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
-#[derive(Debug)]
-pub struct InstancesRepo {
+use crate::PersistenceError;
+
+#[derive(Debug, Clone)]
+pub struct InstanceDTO {
+    pub id: Uuid,
+    pub name: String,
+    pub start_time: OffsetDateTime,
+    pub end_time: Option<OffsetDateTime>,
+    pub instance_type: InstanceType,
+    pub status: InstanceStatus,
+}
+
+impl From<Instance> for InstanceDTO {
+    fn from(instance: Instance) -> Self {
+        Self {
+            id: instance.id,
+            name: instance.name,
+            start_time: instance.start_time,
+            end_time: instance.end_time,
+            instance_type: instance.instance_type,
+            status: instance.status,
+        }
+    }
+}
+
+impl From<Arc<Instance>> for InstanceDTO {
+    fn from(instance: Arc<Instance>) -> Self {
+        Self {
+            id: instance.id,
+            name: instance.name.clone(),
+            start_time: instance.start_time,
+            end_time: instance.end_time,
+            instance_type: instance.instance_type,
+            status: instance.status,
+        }
+    }
+}
+
+impl From<InstanceDTO> for Arc<Instance> {
+    fn from(instance: InstanceDTO) -> Self {
+        let instance = Instance {
+            id: instance.id,
+            name: instance.name,
+            start_time: instance.start_time,
+            end_time: instance.end_time,
+            instance_type: instance.instance_type,
+            status: instance.status,
+        };
+        Arc::new(instance)
+    }
+}
+
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
+pub struct InstanceRepo {
     pool: PgPool,
 }
 
-impl InstancesRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn insert(&self, instance: Instance) -> Result<()> {
+impl InstanceRepo {
+    pub async fn insert(&self, instance: InstanceDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             INSERT INTO instances
@@ -39,9 +91,9 @@ impl InstancesRepo {
         Ok(())
     }
 
-    pub async fn read_by_id(&self, id: Uuid) -> Result<Option<Instance>> {
+    pub async fn read_by_id(&self, id: &Uuid) -> Result<InstanceDTO, PersistenceError> {
         let instance = sqlx::query_as!(
-            Instance,
+            InstanceDTO,
             r#"
             SELECT 
                 id,
@@ -57,12 +109,15 @@ impl InstancesRepo {
         )
         .fetch_optional(&self.pool) // -> Vec<Country>
         .await?;
-        Ok(instance)
+        match instance {
+            Some(instance) => Ok(instance),
+            None => Err(PersistenceError::NotFound),
+        }
     }
 
-    pub async fn read_by_name(&self, name: String) -> Result<Option<Instance>> {
+    pub async fn read_by_name(&self, name: &str) -> Result<InstanceDTO, PersistenceError> {
         let instance = sqlx::query_as!(
-            Instance,
+            InstanceDTO,
             r#"
             SELECT 
                 id,
@@ -78,10 +133,13 @@ impl InstancesRepo {
         )
         .fetch_optional(&self.pool) // -> Vec<Country>
         .await?;
-        Ok(instance)
+        match instance {
+            Some(instance) => Ok(instance),
+            None => Err(PersistenceError::NotFound),
+        }
     }
 
-    pub async fn update(&self, instance: Instance) -> Result<()> {
+    pub async fn update(&self, instance: InstanceDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             UPDATE instances
@@ -105,7 +163,7 @@ impl InstancesRepo {
         Ok(())
     }
 
-    pub async fn delete(&self, id: Uuid) -> Result<()> {
+    pub async fn delete(&self, id: &Uuid) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             DELETE FROM instances
@@ -124,13 +182,14 @@ pub mod tests {
     use crate::test_utils::connect_database;
 
     use super::*;
+    use arkin_core::InstanceBuilder;
     use test_log::test;
     use time::OffsetDateTime;
 
     #[test(tokio::test)]
     async fn test_instance_repo() {
         let pool = connect_database();
-        let repo = InstancesRepo::new(pool);
+        let repo = InstanceRepoBuilder::default().pool(pool).build().unwrap();
 
         let mut instance = InstanceBuilder::default()
             .id(Uuid::new_v4())
@@ -141,29 +200,25 @@ pub mod tests {
             .build()
             .unwrap();
 
-        let result = repo.insert(instance.clone()).await;
+        let wrapped_instance = Arc::new(instance.clone());
+
+        let result = repo.insert(wrapped_instance.clone().into()).await;
         assert!(result.is_ok());
 
-        let res = repo.read_by_name("test_instance".to_string()).await.unwrap();
-        assert!(res.is_some());
-        let retrieved_instance = res.unwrap();
-        assert_eq!(retrieved_instance.name, "test_instance");
+        let res = repo.read_by_name("test_instance").await.unwrap();
+        assert_eq!(res.name, "test_instance");
 
-        let res = repo.read_by_id(instance.id).await.unwrap();
-        assert!(res.is_some());
-        let retrieved_instance = res.unwrap();
-        assert_eq!(retrieved_instance, instance);
+        let res = repo.read_by_id(&instance.id).await.unwrap();
+        assert_eq!(Into::<Arc<Instance>>::into(res), wrapped_instance);
 
         instance.status = InstanceStatus::Stopped;
-        let result = repo.update(instance.clone()).await;
+        let result = repo.update(Arc::new(instance.clone()).into()).await;
         assert!(result.is_ok());
 
-        let res = repo.read_by_id(instance.id).await.unwrap();
-        assert!(res.is_some());
-        let retrieved_instance = res.unwrap();
-        assert_eq!(retrieved_instance.status, InstanceStatus::Stopped);
+        let res = repo.read_by_id(&instance.id).await.unwrap();
+        assert_eq!(res.status, InstanceStatus::Stopped);
 
-        let result = repo.delete(instance.id).await;
+        let result = repo.delete(&instance.id).await;
         assert!(result.is_ok());
     }
 }

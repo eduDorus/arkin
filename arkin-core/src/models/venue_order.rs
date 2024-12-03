@@ -9,11 +9,11 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity, VenueOrderFill};
 
-use super::{ExecutionOrderType, Instance, Instrument, MarketSide};
+use super::{ExecutionOrderType, Instrument, MarketSide, Portfolio};
 
 pub type VenueOrderId = Uuid;
 
-#[derive(Debug, Display, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "venue_order_type", rename_all = "snake_case")]
 pub enum VenueOrderType {
@@ -38,7 +38,7 @@ impl From<ExecutionOrderType> for VenueOrderType {
     }
 }
 
-#[derive(Debug, Display, Clone, Type)]
+#[derive(Debug, Display, Clone, Copy, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "venue_order_time_in_force", rename_all = "snake_case")]
 pub enum VenueOrderTimeInForce {
@@ -49,7 +49,7 @@ pub enum VenueOrderTimeInForce {
     Gtd,
 }
 
-#[derive(Debug, Display, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "venue_order_status", rename_all = "snake_case")]
 pub enum VenueOrderStatus {
@@ -68,7 +68,7 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
-    pub instance: Arc<Instance>,
+    pub portfolio: Arc<Portfolio>,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
     pub order_type: VenueOrderType,

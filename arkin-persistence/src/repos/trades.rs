@@ -1,83 +1,64 @@
-use anyhow::Result;
-use arkin_core::prelude::*;
-use sqlx::{prelude::*, PgPool};
+use std::sync::Arc;
+
+use derive_builder::Builder;
+use sqlx::{FromRow, PgPool};
 use time::OffsetDateTime;
-use tracing::debug;
 use uuid::Uuid;
 
-use crate::BIND_LIMIT;
+use arkin_core::prelude::*;
 
-#[derive(Debug, Clone, sqlx::Type)]
-#[sqlx(type_name = "market_side", rename_all = "snake_case")]
-pub enum DBMarketSide {
-    Buy,
-    Sell,
-}
+use crate::{PersistenceError, BIND_LIMIT};
 
-impl From<MarketSide> for DBMarketSide {
-    fn from(side: MarketSide) -> Self {
-        match side {
-            MarketSide::Buy => Self::Buy,
-            MarketSide::Sell => Self::Sell,
-        }
-    }
-}
-
-impl From<DBMarketSide> for MarketSide {
-    fn from(side: DBMarketSide) -> Self {
-        match side {
-            DBMarketSide::Buy => Self::Buy,
-            DBMarketSide::Sell => Self::Sell,
-        }
-    }
-}
+const FIELD_COUNT: usize = 6;
 
 #[derive(Debug, FromRow)]
-pub struct DBTrade {
+pub struct TradeDTO {
     pub event_time: OffsetDateTime,
     pub instrument_id: Uuid,
     pub trade_id: i64,
-    pub side: DBMarketSide,
+    pub side: MarketSide,
     pub price: Price,
     pub quantity: Quantity, // Negative for sell, positive for buy
 }
 
-impl From<Trade> for DBTrade {
-    fn from(trade: Trade) -> Self {
+impl From<Arc<Trade>> for TradeDTO {
+    fn from(trade: Arc<Trade>) -> Self {
         Self {
             event_time: trade.event_time,
             instrument_id: trade.instrument.id,
             trade_id: trade.trade_id as i64,
-            side: DBMarketSide::from(trade.side),
+            side: trade.side,
             price: trade.price,
             quantity: trade.quantity,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct TradeRepo {
     pool: PgPool,
 }
 
 impl TradeRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn insert(&self, trade: Trade) -> Result<()> {
-        let trade = DBTrade::from(trade);
+    pub async fn insert(&self, trade: TradeDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
-            INSERT INTO trades (event_time, instrument_id, trade_id, side, price, quantity)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (event_time, instrument_id, trade_id)
-            DO NOTHING
+            INSERT INTO trades 
+            (
+                event_time, 
+                instrument_id, 
+                trade_id, 
+                side, 
+                price, 
+                quantity
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (event_time, instrument_id, trade_id) DO NOTHING
             "#,
             trade.event_time,
             trade.instrument_id,
             trade.trade_id,
-            trade.side as DBMarketSide,
+            trade.side as MarketSide,
             trade.price,
             trade.quantity,
         )
@@ -86,10 +67,8 @@ impl TradeRepo {
         Ok(())
     }
 
-    pub async fn insert_batch(&self, trades: Vec<Trade>) -> Result<()> {
-        let db_trades = trades.into_iter().map(DBTrade::from).collect::<Vec<_>>();
-
-        for batch in db_trades.chunks(BIND_LIMIT / 7) {
+    pub async fn insert_batch(&self, trades: Vec<TradeDTO>) -> Result<(), PersistenceError> {
+        for batch in trades.chunks(BIND_LIMIT / FIELD_COUNT) {
             // Create a query builder
             let mut query_builder = sqlx::QueryBuilder::new(
                 "INSERT INTO trades (event_time, instrument_id, trade_id, side, price, quantity) ",
@@ -114,7 +93,6 @@ impl TradeRepo {
             let query = query_builder.build();
             query.execute(&self.pool).await?;
         }
-        debug!("Saved {} trades", db_trades.len());
         Ok(())
     }
 
@@ -123,15 +101,15 @@ impl TradeRepo {
         instrument_ids: &[Uuid],
         from: OffsetDateTime,
         to: OffsetDateTime,
-    ) -> Result<Vec<DBTrade>> {
+    ) -> Result<Vec<TradeDTO>, PersistenceError> {
         let trades = sqlx::query_as!(
-            DBTrade,
+            TradeDTO,
             r#"
             SELECT
                 event_time,
                 instrument_id,
                 trade_id,
-                side as "side:DBMarketSide",
+                side as "side:MarketSide",
                 price,
                 quantity
             FROM trades

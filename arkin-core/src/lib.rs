@@ -9,7 +9,7 @@ mod utils;
 pub use config::load;
 pub use models::*;
 pub use pubsub::*;
-pub use types::{FeatureId, Maturity, Notional, Price, Quantity, StrategyId, Weight};
+pub use types::{FeatureId, Maturity, Notional, Price, Quantity, Weight};
 
 pub mod test_utils;
 

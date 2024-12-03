@@ -17,13 +17,3 @@ impl fmt::Display for Venue {
         write!(f, "{}", self.name)
     }
 }
-
-impl Venue {
-    pub fn new(name: String, venue_type: String) -> Self {
-        Venue {
-            id: Uuid::new_v4(),
-            name,
-            venue_type,
-        }
-    }
-}

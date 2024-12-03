@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arkin_portfolio::Portfolio;
+use arkin_portfolio::Accounting;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_builder::Builder;
@@ -14,7 +14,7 @@ use crate::{OrderManager, OrderManagerError};
 #[derive(Debug, Builder)]
 pub struct SimpleOrderManager {
     pubsub: Arc<PubSub>,
-    portfolio: Arc<dyn Portfolio>,
+    portfolio: Arc<dyn Accounting>,
     #[builder(default = OrderQueue::default())]
     execution_orders: OrderQueue,
 }

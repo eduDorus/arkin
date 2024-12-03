@@ -9,11 +9,11 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
 
-use super::{Instance, Instrument, MarketSide, Strategy};
+use super::{Instrument, MarketSide, Portfolio, Strategy};
 
 pub type ExecutionOrderId = Uuid;
 
-#[derive(Debug, Display, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "execution_order_type", rename_all = "snake_case")]
 pub enum ExecutionOrderType {
@@ -24,7 +24,7 @@ pub enum ExecutionOrderType {
     ALGO,
 }
 
-#[derive(Debug, Display, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "execution_order_status", rename_all = "snake_case")]
 pub enum ExecutionOrderStatus {
@@ -43,7 +43,7 @@ pub enum ExecutionOrderStatus {
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
-    pub instance: Arc<Instance>,
+    pub portfolio: Arc<Portfolio>,
     pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub order_type: ExecutionOrderType,
@@ -168,8 +168,8 @@ impl EventTypeOf for ExecutionOrder {
     }
 }
 
-impl From<ExecutionOrder> for Event {
-    fn from(order: ExecutionOrder) -> Self {
+impl From<Arc<ExecutionOrder>> for Event {
+    fn from(order: Arc<ExecutionOrder>) -> Self {
         Event::ExecutionOrderNew(order)
     }
 }

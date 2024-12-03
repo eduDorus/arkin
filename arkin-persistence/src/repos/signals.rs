@@ -1,37 +1,58 @@
-use anyhow::Result;
-use sqlx::PgPool;
+use std::sync::Arc;
+
+use derive_builder::Builder;
+use rust_decimal::Decimal;
+use sqlx::{FromRow, PgPool};
+use time::OffsetDateTime;
 use tracing::debug;
 
 use arkin_core::prelude::*;
+use uuid::Uuid;
 
-use crate::BIND_LIMIT;
+use crate::{PersistenceError, BIND_LIMIT};
 
-#[derive(Debug)]
-pub struct SignalsRepo {
+const FIELD_COUNT: usize = 5;
+
+#[derive(Debug, FromRow)]
+pub struct SignalDTO {
+    pub event_time: OffsetDateTime,
+    pub instrument_id: Uuid,
+    pub strategy_id: Uuid,
+    pub weight: Decimal,
+}
+
+impl From<Arc<Signal>> for SignalDTO {
+    fn from(signal: Arc<Signal>) -> Self {
+        Self {
+            event_time: signal.event_time,
+            instrument_id: signal.instrument.id,
+            strategy_id: signal.strategy.id,
+            weight: signal.weight,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
+pub struct SignalRepo {
     pool: PgPool,
 }
 
-impl SignalsRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn insert(&self, signal: Signal) -> Result<()> {
+impl SignalRepo {
+    pub async fn insert(&self, signal: SignalDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             INSERT INTO signals
             (
                 event_time, 
-                instance_id,
-                instrument_id, 
                 strategy_id, 
+                instrument_id, 
                 weight
-            ) VALUES ($1, $2, $3, $4, $5)
+            ) VALUES ($1, $2, $3, $4)
             "#,
             signal.event_time,
-            signal.instance.id,
-            signal.instrument.id,
-            signal.strategy.id,
+            signal.strategy_id,
+            signal.instrument_id,
             signal.weight,
         )
         .execute(&self.pool)
@@ -39,17 +60,17 @@ impl SignalsRepo {
         Ok(())
     }
 
-    pub async fn insert_batch(&self, signals: Vec<Signal>) -> Result<()> {
+    pub async fn insert_batch(&self, signals: Vec<SignalDTO>) -> Result<(), PersistenceError> {
         // Build batched insert queries
-        for batch in signals.chunks(BIND_LIMIT / 5) {
+        for batch in signals.chunks(BIND_LIMIT / FIELD_COUNT) {
             // Create a query builder
             let mut query_builder = sqlx::QueryBuilder::new(
                 r#"
                 INSERT INTO signals
                 (
                     event_time, 
-                    instrument_id, 
                     strategy_id, 
+                    instrument_id, 
                     weight
                 ) 
                 "#,
@@ -61,9 +82,8 @@ impl SignalsRepo {
                 // you'd need an iterator that yields references that live as long as `query_builder`,
                 // e.g. collect it to a `Vec` first.
                 b.push_bind(signal.event_time)
-                    .push(signal.instance.id)
-                    .push_bind(signal.instrument.id)
-                    .push_bind(signal.strategy.id)
+                    .push_bind(signal.strategy_id)
+                    .push_bind(signal.instrument_id)
                     .push_bind(signal.weight);
             });
 
@@ -88,19 +108,17 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_signals_repo() {
         let pool = connect_database();
-        let repo = SignalsRepo::new(pool);
+        let repo = SignalRepoBuilder::default().pool(pool).build().unwrap();
 
-        let instrument = test_inst_binance_btc_usdt_perp();
-        let instance = test_instance();
-        let strategy = test_strategy();
-
-        let signal = Signal {
-            event_time: OffsetDateTime::now_utc(),
-            instance,
-            instrument,
-            strategy,
-            weight: dec!(0.5),
-        };
-        repo.insert(signal).await.unwrap();
+        let signal = Arc::new(
+            SignalBuilder::default()
+                .event_time(OffsetDateTime::now_utc())
+                .instrument(test_inst_binance_btc_usdt_perp())
+                .strategy(test_strategy())
+                .weight(dec!(0.5))
+                .build()
+                .unwrap(),
+        );
+        repo.insert(signal.into()).await.unwrap();
     }
 }

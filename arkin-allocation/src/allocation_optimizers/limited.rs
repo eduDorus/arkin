@@ -21,7 +21,7 @@ use crate::{AllocationOptim, AllocationOptimError};
 pub struct LimitedAllocationOptim {
     pubsub: Arc<PubSub>,
     persistence: Arc<dyn Persistor>,
-    portfolio: Arc<dyn Portfolio>,
+    portfolio: Arc<dyn Accounting>,
     #[builder(default = "DashMap::new()")]
     signals: DashMap<(Arc<Strategy>, Arc<Instrument>), Signal>,
     #[builder(default = "Decimal::from_f32(0.8).unwrap()")]
@@ -30,8 +30,7 @@ pub struct LimitedAllocationOptim {
     max_allocation_per_signal: Decimal,
     #[builder(default = "dec!(100)")]
     min_trade_value: Decimal,
-    #[builder(default = "AssetId::from(\"USDT\".to_string())")]
-    reference_currency: AssetId,
+    reference_currency: Arc<Asset>,
 }
 
 pub struct OptimalPosition {

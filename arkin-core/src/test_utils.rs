@@ -6,10 +6,38 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    Instance, InstanceBuilder, InstanceStatus, InstanceType, Instrument, InstrumentBuilder, InstrumentStatus,
-    InstrumentType, MarketSide, Price, Quantity, Strategy, StrategyBuilder, Tick, TickBuilder, Venue, VenueBuilder,
-    VenueOrder, VenueOrderBuilder, VenueOrderStatus, VenueOrderTimeInForce, VenueOrderType,
+    Asset, AssetBuilder, ExecutionOrder, ExecutionOrderBuilder, ExecutionOrderStatus, ExecutionOrderType, Instance,
+    InstanceBuilder, InstanceStatus, InstanceType, Instrument, InstrumentBuilder, InstrumentStatus, InstrumentType,
+    MarketSide, Portfolio, PortfolioBuilder, Price, Quantity, Strategy, StrategyBuilder, Tick, TickBuilder, Venue,
+    VenueBuilder, VenueOrder, VenueOrderBuilder, VenueOrderStatus, VenueOrderTimeInForce, VenueOrderType,
 };
+
+pub fn btc_asset() -> Arc<Asset> {
+    let asset = AssetBuilder::default()
+        .id(Uuid::parse_str("894ff9df-e76e-4b2e-aaec-49988de26a84").expect("Invalid UUID"))
+        .symbol("BTC")
+        .build()
+        .expect("Failed to build Asset in test utils");
+    Arc::new(asset)
+}
+
+pub fn eth_asset() -> Arc<Asset> {
+    let asset = AssetBuilder::default()
+        .id(Uuid::parse_str("3091ac12-64a7-4824-9ea5-e1c27e10af6f").expect("Invalid UUID"))
+        .symbol("ETH")
+        .build()
+        .expect("Failed to build Asset in test utils");
+    Arc::new(asset)
+}
+
+pub fn usdt_asset() -> Arc<Asset> {
+    let asset = AssetBuilder::default()
+        .id(Uuid::parse_str("5ba12a78-1f89-41b6-87c5-020afb7f680d").expect("Invalid UUID"))
+        .symbol("USDT")
+        .build()
+        .expect("Failed to build Asset in test utils");
+    Arc::new(asset)
+}
 
 pub fn binance_venue() -> Venue {
     VenueBuilder::default()
@@ -28,8 +56,8 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
         .symbol("perp-btc-usdt@binance")
         .venue_symbol("BTCUSDT")
         .instrument_type(InstrumentType::Perpetual)
-        .base_asset(Arc::new("btc".to_string()))
-        .quote_asset(Arc::new("usdt".to_string()))
+        .base_asset(btc_asset())
+        .quote_asset(usdt_asset())
         .maturity(None)
         .strike(None)
         .option_type(None)
@@ -54,8 +82,8 @@ pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
         .symbol("perp-eth-usdt@binance")
         .venue_symbol("ETHUSDT")
         .instrument_type(InstrumentType::Perpetual)
-        .base_asset(Arc::new("eth".to_string()))
-        .quote_asset(Arc::new("usdt".to_string()))
+        .base_asset(eth_asset())
+        .quote_asset(usdt_asset())
         .maturity(None)
         .strike(None)
         .option_type(None)
@@ -102,6 +130,18 @@ pub fn test_instance() -> Arc<Instance> {
     Arc::new(instance)
 }
 
+pub fn test_portfolio() -> Arc<Portfolio> {
+    let portfolio = PortfolioBuilder::default()
+        .id(Uuid::from_str("fcb8b709-325c-4cc8-8778-4ca4a7f3616b").expect("Invalid UUID"))
+        .name("Test Portfolio")
+        .description("This Portfolio is for testing purposes")
+        .created_at(OffsetDateTime::now_utc())
+        .updated_at(OffsetDateTime::now_utc())
+        .build()
+        .expect("Failed to build Portfolio in test utils");
+    Arc::new(portfolio)
+}
+
 pub fn test_strategy() -> Arc<Strategy> {
     let strategy = StrategyBuilder::default()
         .id(Uuid::from_str("a2d0951e-9bc6-47a4-b803-e4e0bb4e98a3").expect("Invalid UUID"))
@@ -115,7 +155,7 @@ pub fn test_strategy() -> Arc<Strategy> {
 pub fn test_venue_order() -> Arc<VenueOrder> {
     let order = VenueOrderBuilder::default()
         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-        .instance(test_instance())
+        .portfolio(test_portfolio())
         .instrument(test_inst_binance_btc_usdt_perp())
         .order_type(VenueOrderType::Market)
         .time_in_force(VenueOrderTimeInForce::Gtc)
@@ -125,5 +165,44 @@ pub fn test_venue_order() -> Arc<VenueOrder> {
         .status(VenueOrderStatus::Placed)
         .build()
         .expect("Failed to build VenueOrder in test utils");
+    Arc::new(order)
+}
+
+pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
+    let order = ExecutionOrderBuilder::default()
+        .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
+        .portfolio(test_portfolio())
+        .strategy(test_strategy())
+        .instrument(test_inst_binance_btc_usdt_perp())
+        .order_type(ExecutionOrderType::Maker)
+        .side(MarketSide::Buy)
+        .price(dec!(0))
+        .quantity(dec!(1))
+        .status(ExecutionOrderStatus::New)
+        .created_at(OffsetDateTime::now_utc())
+        .updated_at(OffsetDateTime::now_utc())
+        .build()
+        .expect("Failed to build ExecutionOrder in test utils");
+    Arc::new(order)
+}
+
+pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
+    let order = ExecutionOrderBuilder::default()
+        .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
+        .portfolio(test_portfolio())
+        .strategy(test_strategy())
+        .instrument(test_inst_binance_btc_usdt_perp())
+        .order_type(ExecutionOrderType::Maker)
+        .side(MarketSide::Buy)
+        .price(dec!(0))
+        .quantity(dec!(1))
+        .fill_price(dec!(110))
+        .filled_quantity(dec!(1))
+        .total_commission(dec!(0.2))
+        .status(ExecutionOrderStatus::Filled)
+        .created_at(OffsetDateTime::now_utc())
+        .updated_at(OffsetDateTime::now_utc())
+        .build()
+        .expect("Failed to build ExecutionOrder in test utils");
     Arc::new(order)
 }

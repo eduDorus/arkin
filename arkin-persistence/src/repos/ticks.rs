@@ -1,14 +1,18 @@
-use anyhow::Result;
-use arkin_core::{prelude::Tick, Price, Quantity};
-use sqlx::{prelude::*, PgPool};
+use std::sync::Arc;
+
+use derive_builder::Builder;
+use sqlx::{FromRow, PgPool};
 use time::OffsetDateTime;
-use tracing::debug;
 use uuid::Uuid;
 
-use crate::BIND_LIMIT;
+use arkin_core::prelude::*;
+
+use crate::{PersistenceError, BIND_LIMIT};
+
+const FIELD_COUNT: usize = 7;
 
 #[derive(Debug, FromRow)]
-pub struct DBTick {
+pub struct TickDTO {
     pub event_time: OffsetDateTime,
     pub instrument_id: Uuid,
     pub tick_id: i64,
@@ -18,8 +22,8 @@ pub struct DBTick {
     pub ask_quantity: Quantity,
 }
 
-impl From<Tick> for DBTick {
-    fn from(tick: Tick) -> Self {
+impl From<Arc<Tick>> for TickDTO {
+    fn from(tick: Arc<Tick>) -> Self {
         Self {
             event_time: tick.event_time,
             instrument_id: tick.instrument.id,
@@ -32,24 +36,27 @@ impl From<Tick> for DBTick {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct TickRepo {
     pool: PgPool,
 }
 
 impl TickRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn insert(&self, tick: Tick) -> Result<()> {
-        let tick = DBTick::from(tick);
+    pub async fn insert(&self, tick: TickDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
-            INSERT INTO ticks (event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (event_time, instrument_id, tick_id)
-            DO NOTHING
+            INSERT INTO ticks 
+            (
+                event_time, 
+                instrument_id, 
+                tick_id, 
+                bid_price, 
+                bid_quantity, 
+                ask_price, 
+                ask_quantity
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (event_time, instrument_id, tick_id) DO NOTHING
             "#,
             tick.event_time,
             tick.instrument_id,
@@ -64,12 +71,9 @@ impl TickRepo {
         Ok(())
     }
 
-    pub async fn insert_batch(&self, ticks: Vec<Tick>) -> Result<()> {
-        // Convert Tick to DBTick and prepare for insertion
-        let db_ticks = ticks.into_iter().map(DBTick::from).collect::<Vec<_>>();
-
+    pub async fn insert_batch(&self, ticks: Vec<TickDTO>) -> Result<(), PersistenceError> {
         // Build batched insert queries
-        for batch in db_ticks.chunks(BIND_LIMIT / 7) {
+        for batch in ticks.chunks(BIND_LIMIT / FIELD_COUNT) {
             // Create a query builder
             let mut query_builder = sqlx::QueryBuilder::new(
                     "INSERT INTO ticks (event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity) ",
@@ -92,15 +96,26 @@ impl TickRepo {
 
             query.execute(&self.pool).await?;
         }
-        debug!("Saved {} ticks", db_ticks.len());
         Ok(())
     }
 
-    pub async fn read_tick(&self, event_time: OffsetDateTime, instrument_id: Uuid) -> Result<Option<DBTick>> {
+    pub async fn read_tick(
+        &self,
+        event_time: OffsetDateTime,
+        instrument_id: Uuid,
+    ) -> Result<Option<TickDTO>, PersistenceError> {
         let tick = sqlx::query_as!(
-            DBTick,
+            TickDTO,
             r#"
-            SELECT * FROM ticks
+            SELECT  
+                event_time, 
+                instrument_id, 
+                tick_id, 
+                bid_price, 
+                bid_quantity, 
+                ask_price, 
+                ask_quantity
+            FROM ticks
             WHERE event_time < $1 AND instrument_id = $2
             ORDER BY event_time DESC
             "#,
@@ -118,11 +133,19 @@ impl TickRepo {
         instrument_ids: &[Uuid],
         start: OffsetDateTime,
         end: OffsetDateTime,
-    ) -> Result<Vec<DBTick>> {
+    ) -> Result<Vec<TickDTO>, PersistenceError> {
         let ticks = sqlx::query_as!(
-            DBTick,
+            TickDTO,
             r#"
-            SELECT * FROM ticks
+            SELECT 
+                event_time, 
+                instrument_id, 
+                tick_id, 
+                bid_price, 
+                bid_quantity, 
+                ask_price, 
+                ask_quantity
+            FROM ticks
             WHERE instrument_id = ANY($3) AND event_time >= $1 AND event_time < $2
             ORDER BY event_time ASC
             "#,

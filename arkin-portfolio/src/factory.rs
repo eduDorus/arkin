@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 
-use crate::{Portfolio, PortfolioConfig, PortfolioType, SingleStrategyPortfolioBuilder};
+use crate::{Accounting, PortfolioConfig, PortfolioType, SingleStrategyPortfolioBuilder};
 
 pub struct PortfolioFactory {}
 
 impl PortfolioFactory {
-    pub fn from_config(config: &PortfolioConfig, pubsub: Arc<PubSub>) -> Arc<dyn Portfolio> {
-        let portfolio: Arc<dyn Portfolio> = match &config.portfolio {
+    pub fn from_config(config: &PortfolioConfig, pubsub: Arc<PubSub>) -> Arc<dyn Accounting> {
+        let portfolio: Arc<dyn Accounting> = match &config.portfolio {
             PortfolioType::SingleStrategy(_c) => Arc::new(
                 SingleStrategyPortfolioBuilder::default()
                     .pubsub(pubsub.clone())

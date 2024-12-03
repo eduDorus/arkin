@@ -13,7 +13,6 @@ tokio-util = { workspace = true }
 time = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
-anyhow = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 futures-util = { workspace = true }
@@ -22,6 +21,8 @@ uuid = { workspace = true }
 sqlx = { workspace = true }
 dashmap = { workspace = true }
 thiserror = { workspace = true }
+derive_builder = { workspace = true }
+moka2 = { workspace = true }
 
 mockall = { workspace = true }
 

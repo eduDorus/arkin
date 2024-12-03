@@ -1,126 +1,51 @@
-use anyhow::Result;
-use arkin_core::prelude::*;
+use std::sync::Arc;
+
+use derive_builder::Builder;
+use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
 use tracing::debug;
 use uuid::Uuid;
 
-#[derive(Debug, sqlx::Type)]
-#[sqlx(type_name = "instrument_type", rename_all = "snake_case")]
-pub enum DBInstrumentType {
-    Spot,
-    Perpetual,
-    Future,
-    Option,
-}
+use arkin_core::{Instrument, InstrumentOptionType, InstrumentStatus, InstrumentType, Price};
 
-impl From<InstrumentType> for DBInstrumentType {
-    fn from(v: InstrumentType) -> Self {
-        match v {
-            InstrumentType::Spot => Self::Spot,
-            InstrumentType::Perpetual => Self::Perpetual,
-            InstrumentType::Future => Self::Future,
-            InstrumentType::Option => Self::Option,
-        }
-    }
-}
-
-impl From<DBInstrumentType> for InstrumentType {
-    fn from(v: DBInstrumentType) -> Self {
-        match v {
-            DBInstrumentType::Spot => Self::Spot,
-            DBInstrumentType::Perpetual => Self::Perpetual,
-            DBInstrumentType::Future => Self::Future,
-            DBInstrumentType::Option => Self::Option,
-        }
-    }
-}
-
-#[derive(Debug, sqlx::Type)]
-#[sqlx(type_name = "option_type", rename_all = "snake_case")]
-pub enum DBOptionType {
-    Call,
-    Put,
-}
-
-impl From<OptionType> for DBOptionType {
-    fn from(option_type: OptionType) -> Self {
-        match option_type {
-            OptionType::Call => Self::Call,
-            OptionType::Put => Self::Put,
-        }
-    }
-}
-
-impl From<DBOptionType> for OptionType {
-    fn from(option_type: DBOptionType) -> Self {
-        match option_type {
-            DBOptionType::Call => Self::Call,
-            DBOptionType::Put => Self::Put,
-        }
-    }
-}
-
-#[derive(Debug, sqlx::Type)]
-#[sqlx(type_name = "instrument_status", rename_all = "snake_case")]
-pub enum DBInstrumentStatus {
-    Trading,
-    Halted,
-}
-
-impl From<InstrumentStatus> for DBInstrumentStatus {
-    fn from(status: InstrumentStatus) -> Self {
-        match status {
-            InstrumentStatus::Trading => Self::Trading,
-            InstrumentStatus::Halted => Self::Halted,
-        }
-    }
-}
-
-impl From<DBInstrumentStatus> for InstrumentStatus {
-    fn from(status: DBInstrumentStatus) -> Self {
-        match status {
-            DBInstrumentStatus::Trading => Self::Trading,
-            DBInstrumentStatus::Halted => Self::Halted,
-        }
-    }
-}
+use crate::PersistenceError;
 
 #[derive(FromRow)]
-pub struct DBInstrument {
+pub struct InstrumentDTO {
     pub id: Uuid,
     pub venue_id: Uuid,
     pub symbol: String,
     pub venue_symbol: String,
-    pub instrument_type: DBInstrumentType,
-    pub base_asset: String,
-    pub quote_asset: String,
-    pub strike: Option<Price>,
+    pub instrument_type: InstrumentType,
+    pub base_asset_id: Uuid,
+    pub quote_asset_id: Uuid,
+    pub strike: Option<Decimal>,
     pub maturity: Option<OffsetDateTime>,
-    pub option_type: Option<DBOptionType>,
-    pub contract_size: Quantity,
+    pub option_type: Option<InstrumentOptionType>,
+    pub contract_size: Decimal,
     pub price_precision: i32,
     pub quantity_precision: i32,
     pub base_precision: i32,
     pub quote_precision: i32,
-    pub lot_size: Quantity,
+    pub lot_size: Decimal,
     pub tick_size: Price,
-    pub status: DBInstrumentStatus,
+    pub status: InstrumentStatus,
 }
 
-impl From<Instrument> for DBInstrument {
-    fn from(instrument: Instrument) -> Self {
+impl From<Arc<Instrument>> for InstrumentDTO {
+    fn from(instrument: Arc<Instrument>) -> Self {
         Self {
             id: instrument.id,
             venue_id: instrument.venue.id,
-            symbol: instrument.symbol,
-            venue_symbol: instrument.venue_symbol,
-            instrument_type: instrument.instrument_type.into(),
-            base_asset: instrument.base_asset.to_string(),
-            quote_asset: instrument.quote_asset.to_string(),
+            symbol: instrument.symbol.clone(),
+            venue_symbol: instrument.venue_symbol.clone(),
+            instrument_type: instrument.instrument_type.clone(),
+            base_asset_id: instrument.base_asset.id,
+            quote_asset_id: instrument.quote_asset.id,
             strike: instrument.strike,
             maturity: instrument.maturity,
-            option_type: instrument.option_type.map(|v| v.into()),
+            option_type: instrument.option_type.as_ref().map(|v| v.clone()),
             contract_size: instrument.contract_size,
             price_precision: instrument.price_precision as i32,
             quantity_precision: instrument.quantity_precision as i32,
@@ -128,27 +53,24 @@ impl From<Instrument> for DBInstrument {
             quote_precision: instrument.quote_precision as i32,
             lot_size: instrument.lot_size,
             tick_size: instrument.tick_size,
-            status: instrument.status.into(),
+            status: instrument.status.clone(),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct InstrumentRepo {
     pool: PgPool,
 }
 
 impl InstrumentRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn create(&self, instrument: Instrument) -> Result<()> {
-        let instrument = DBInstrument::from(instrument);
+    pub async fn insert(&self, instrument: InstrumentDTO) -> Result<(), PersistenceError> {
+        let instrument = InstrumentDTO::from(instrument);
         sqlx::query!(
             r#"
             INSERT INTO instruments (
-                id, venue_id, symbol, venue_symbol, instrument_type, base_asset, quote_asset, strike, maturity, option_type,
+                id, venue_id, symbol, venue_symbol, instrument_type, base_asset_id, quote_asset_id, strike, maturity, option_type,
                 contract_size, price_precision, quantity_precision, base_precision, quote_precision, lot_size, tick_size, status
             ) VALUES (
                 $1, $2, $3, $4, $5::instrument_type, $6, $7, $8, $9, $10::option_type,
@@ -159,12 +81,12 @@ impl InstrumentRepo {
             instrument.venue_id,
             instrument.symbol,
             instrument.venue_symbol,
-            instrument.instrument_type as DBInstrumentType,
-            instrument.base_asset,
-            instrument.quote_asset,
+            instrument.instrument_type as InstrumentType,
+            instrument.base_asset_id,
+            instrument.quote_asset_id,
             instrument.strike,
             instrument.maturity,
-            instrument.option_type as Option<DBOptionType>,
+            instrument.option_type as Option<InstrumentOptionType>,
             instrument.contract_size,
             instrument.price_precision,
             instrument.quantity_precision,
@@ -172,28 +94,28 @@ impl InstrumentRepo {
             instrument.quote_precision,
             instrument.lot_size,
             instrument.tick_size,
-            instrument.status as DBInstrumentStatus
+            instrument.status as InstrumentStatus
         )
         .execute(&self.pool)
         .await?;
         Ok(())
     }
 
-    pub async fn read_by_id(&self, id: Uuid) -> Result<Option<DBInstrument>> {
+    pub async fn read_by_id(&self, id: &Uuid) -> Result<InstrumentDTO, PersistenceError> {
         let instrument = sqlx::query_as!(
-            DBInstrument,
+            InstrumentDTO,
             r#"
             SELECT
                 id,
                 venue_id,
                 symbol,
                 venue_symbol,
-                instrument_type AS "instrument_type:DBInstrumentType",
-                base_asset,
-                quote_asset,
+                instrument_type AS "instrument_type:InstrumentType",
+                base_asset_id,
+                quote_asset_id,
                 strike,
                 maturity,
-                option_type AS "option_type:DBOptionType",
+                option_type AS "option_type:InstrumentOptionType",
                 contract_size,
                 price_precision,
                 quantity_precision,
@@ -201,7 +123,7 @@ impl InstrumentRepo {
                 quote_precision,
                 lot_size,
                 tick_size,
-                status AS "status:DBInstrumentStatus"
+                status AS "status:InstrumentStatus"
             FROM instruments
             WHERE id = $1
             "#,
@@ -210,25 +132,28 @@ impl InstrumentRepo {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(instrument)
+        match instrument {
+            Some(instrument) => Ok(instrument),
+            None => Err(PersistenceError::NotFound),
+        }
     }
 
-    pub async fn read_by_venue_symbol(&self, symbol: &str) -> Result<Option<DBInstrument>> {
+    pub async fn read_by_venue_symbol(&self, symbol: &str) -> Result<InstrumentDTO, PersistenceError> {
         debug!("Instrument repo reading instrument by venue symbol: {}", symbol);
         let instrument = sqlx::query_as!(
-            DBInstrument,
+            InstrumentDTO,
             r#"
             SELECT
                 id,
                 venue_id,
                 symbol,
                 venue_symbol,
-                instrument_type AS "instrument_type:DBInstrumentType",
-                base_asset,
-                quote_asset,
+                instrument_type AS "instrument_type:InstrumentType",
+                base_asset_id,
+                quote_asset_id,
                 strike,
                 maturity,
-                option_type AS "option_type:DBOptionType",
+                option_type AS "option_type:InstrumentOptionType",
                 contract_size,
                 price_precision,
                 quantity_precision,
@@ -236,7 +161,7 @@ impl InstrumentRepo {
                 quote_precision,
                 lot_size,
                 tick_size,
-                status AS "status:DBInstrumentStatus"
+                status AS "status:InstrumentStatus"
             FROM instruments
             WHERE venue_symbol = $1
             "#,
@@ -245,6 +170,9 @@ impl InstrumentRepo {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(instrument)
+        match instrument {
+            Some(instrument) => Ok(instrument),
+            None => Err(PersistenceError::NotFound),
+        }
     }
 }

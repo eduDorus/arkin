@@ -1,20 +1,83 @@
-use anyhow::Result;
+use std::sync::Arc;
+
+use derive_builder::Builder;
+use rust_decimal::Decimal;
 use sqlx::PgPool;
-use uuid::Uuid;
 
 use arkin_core::prelude::*;
+use time::OffsetDateTime;
+use uuid::Uuid;
 
-#[derive(Debug)]
-pub struct ExecutionOrdersRepo {
+use crate::PersistenceError;
+
+#[derive(Debug, Clone)]
+pub struct ExecutionOrderDTO {
+    pub id: Uuid,
+    pub portfolio_id: Uuid,
+    pub strategy_id: Uuid,
+    pub instrument_id: Uuid,
+    pub order_type: ExecutionOrderType,
+    pub side: MarketSide,
+    pub price: Option<Decimal>,
+    pub quantity: Decimal,
+    pub fill_price: Decimal,
+    pub filled_quantity: Decimal,
+    pub total_commission: Decimal,
+    pub status: ExecutionOrderStatus,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+impl From<ExecutionOrder> for ExecutionOrderDTO {
+    fn from(order: ExecutionOrder) -> Self {
+        Self {
+            id: order.id,
+            portfolio_id: order.portfolio.id,
+            strategy_id: order.strategy.id,
+            instrument_id: order.instrument.id,
+            order_type: order.order_type,
+            side: order.side,
+            price: order.price,
+            quantity: order.quantity,
+            fill_price: order.fill_price,
+            filled_quantity: order.filled_quantity,
+            total_commission: order.total_commission,
+            status: order.status,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+        }
+    }
+}
+
+impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
+    fn from(order: Arc<ExecutionOrder>) -> Self {
+        Self {
+            id: order.id,
+            portfolio_id: order.portfolio.id,
+            strategy_id: order.strategy.id,
+            instrument_id: order.instrument.id,
+            order_type: order.order_type,
+            side: order.side,
+            price: order.price,
+            quantity: order.quantity,
+            fill_price: order.fill_price,
+            filled_quantity: order.filled_quantity,
+            total_commission: order.total_commission,
+            status: order.status,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
+pub struct ExecutionOrderRepo {
     pool: PgPool,
 }
 
-impl ExecutionOrdersRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn insert(&self, order: ExecutionOrder) -> Result<()> {
+impl ExecutionOrderRepo {
+    pub async fn insert(&self, order: ExecutionOrderDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             INSERT INTO execution_orders
@@ -36,9 +99,9 @@ impl ExecutionOrdersRepo {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             order.id,
-            order.instance.id,
-            order.strategy.id,
-            order.instrument.id,
+            order.portfolio_id,
+            order.strategy_id,
+            order.instrument_id,
             order.order_type as ExecutionOrderType,
             order.side as MarketSide,
             order.price,
@@ -55,7 +118,7 @@ impl ExecutionOrdersRepo {
         Ok(())
     }
 
-    pub async fn update(&self, order: ExecutionOrder) -> Result<()> {
+    pub async fn update(&self, order: ExecutionOrderDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             UPDATE execution_orders
@@ -79,7 +142,7 @@ impl ExecutionOrdersRepo {
         Ok(())
     }
 
-    pub async fn delete(&self, id: ExecutionOrderId) -> Result<()> {
+    pub async fn delete(&self, id: &Uuid) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             DELETE FROM execution_orders
@@ -106,24 +169,20 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_execution_order_repo() {
         let pool = connect_database();
-        let repo = ExecutionOrdersRepo::new(pool);
-
-        let instance = test_instance();
-        let strategy = test_strategy();
-        let instrument = test_inst_binance_btc_usdt_perp();
+        let repo = ExecutionOrderRepoBuilder::default().pool(pool).build().unwrap();
 
         let mut order = ExecutionOrderBuilder::default()
             .id(Uuid::new_v4())
-            .instance(instance.clone())
-            .strategy(strategy.clone())
-            .instrument(instrument.clone())
+            .portfolio(test_portfolio())
+            .strategy(test_strategy())
+            .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(ExecutionOrderType::Maker)
             .side(MarketSide::Buy)
             .price(dec!(0))
             .quantity(dec!(1))
             .build()
             .unwrap();
-        repo.insert(order.clone()).await.unwrap();
+        repo.insert(order.clone().into()).await.unwrap();
 
         order.fill_price = dec!(110);
         order.filled_quantity = dec!(1);
@@ -131,7 +190,7 @@ pub mod tests {
         order.status = ExecutionOrderStatus::Filled;
         order.updated_at = OffsetDateTime::now_utc();
 
-        repo.update(order.clone()).await.unwrap();
-        repo.delete(order.id).await.unwrap();
+        repo.update(order.clone().into()).await.unwrap();
+        repo.delete(&order.id).await.unwrap();
     }
 }

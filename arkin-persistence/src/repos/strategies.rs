@@ -1,20 +1,58 @@
-use anyhow::Result;
+use std::sync::Arc;
+
+use derive_builder::Builder;
 use sqlx::PgPool;
 
 use arkin_core::prelude::*;
 use uuid::Uuid;
 
-#[derive(Debug)]
-pub struct StrategiesRepo {
+use crate::PersistenceError;
+
+#[derive(Debug, Clone)]
+pub struct StrategyDTO {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+impl From<Strategy> for StrategyDTO {
+    fn from(strategy: Strategy) -> Self {
+        Self {
+            id: strategy.id,
+            name: strategy.name,
+            description: strategy.description,
+        }
+    }
+}
+
+impl From<Arc<Strategy>> for StrategyDTO {
+    fn from(strategy: Arc<Strategy>) -> Self {
+        Self {
+            id: strategy.id,
+            name: strategy.name.to_owned(),
+            description: strategy.description.to_owned(),
+        }
+    }
+}
+
+impl From<StrategyDTO> for Strategy {
+    fn from(strategy: StrategyDTO) -> Self {
+        Self {
+            id: strategy.id,
+            name: strategy.name,
+            description: strategy.description,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
+pub struct StrategyRepo {
     pool: PgPool,
 }
 
-impl StrategiesRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn insert(&self, strategy: Strategy) -> Result<()> {
+impl StrategyRepo {
+    pub async fn insert(&self, strategy: StrategyDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             INSERT INTO strategies
@@ -33,9 +71,9 @@ impl StrategiesRepo {
         Ok(())
     }
 
-    pub async fn read_by_id(&self, id: Uuid) -> Result<Option<Strategy>> {
+    pub async fn read_by_id(&self, id: &Uuid) -> Result<StrategyDTO, PersistenceError> {
         let strategy = sqlx::query_as!(
-            Strategy,
+            StrategyDTO,
             r#"
             SELECT 
                 id,
@@ -48,12 +86,15 @@ impl StrategiesRepo {
         )
         .fetch_optional(&self.pool) // -> Vec<Country>
         .await?;
-        Ok(strategy)
+        match strategy {
+            Some(strategy) => Ok(strategy),
+            None => Err(PersistenceError::NotFound),
+        }
     }
 
-    pub async fn read_by_name(&self, name: String) -> Result<Option<Strategy>> {
+    pub async fn read_by_name(&self, name: &str) -> Result<StrategyDTO, PersistenceError> {
         let strategy = sqlx::query_as!(
-            Strategy,
+            StrategyDTO,
             r#"
             SELECT 
                 id,
@@ -66,10 +107,13 @@ impl StrategiesRepo {
         )
         .fetch_optional(&self.pool) // -> Vec<Country>
         .await?;
-        Ok(strategy)
+        match strategy {
+            Some(strategy) => Ok(strategy),
+            None => Err(PersistenceError::NotFound),
+        }
     }
 
-    pub async fn update(&self, strategy: Strategy) -> Result<()> {
+    pub async fn update(&self, strategy: StrategyDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             UPDATE strategies
@@ -87,7 +131,7 @@ impl StrategiesRepo {
         Ok(())
     }
 
-    pub async fn delete(&self, id: Uuid) -> Result<()> {
+    pub async fn delete(&self, id: &Uuid) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             DELETE FROM strategies
@@ -111,7 +155,7 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_strategy_repo() {
         let pool = connect_database();
-        let repo = StrategiesRepo::new(pool);
+        let repo = StrategyRepoBuilder::default().pool(pool).build().unwrap();
 
         let mut strategy = StrategyBuilder::default()
             .name("test_strategy")
@@ -119,29 +163,23 @@ pub mod tests {
             .build()
             .unwrap();
 
-        let result = repo.insert(strategy.clone()).await;
+        let result = repo.insert(strategy.clone().into()).await;
         assert!(result.is_ok());
 
-        let res = repo.read_by_name("test_strategy".to_string()).await.unwrap();
-        assert!(res.is_some());
-        let retrieved_instance = res.unwrap();
-        assert_eq!(retrieved_instance, strategy);
+        let res = repo.read_by_name("test_strategy").await.unwrap();
+        assert_eq!(Strategy::from(res), strategy);
 
-        let res = repo.read_by_id(strategy.id).await.unwrap();
-        assert!(res.is_some());
-        let retrieved_instance = res.unwrap();
-        assert_eq!(retrieved_instance, strategy);
+        let res = repo.read_by_id(&strategy.id).await.unwrap();
+        assert_eq!(Strategy::from(res), strategy);
 
         strategy.name = "updated_name".to_string();
-        let result = repo.update(strategy.clone()).await;
+        let result = repo.update(strategy.clone().into()).await;
         assert!(result.is_ok());
 
-        let res = repo.read_by_id(strategy.id).await.unwrap();
-        assert!(res.is_some());
-        let retrieved_instance = res.unwrap();
-        assert_eq!(retrieved_instance.name, "updated_name");
+        let res = repo.read_by_id(&strategy.id).await.unwrap();
+        assert_eq!(res.name, "updated_name");
 
-        let result = repo.delete(strategy.id).await;
+        let result = repo.delete(&strategy.id).await;
         assert!(result.is_ok());
     }
 }

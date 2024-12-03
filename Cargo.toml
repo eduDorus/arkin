@@ -49,7 +49,7 @@ reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "h
 # Data Types
 rust_decimal = { version = "1.36", default-features = false, features = [ "borsh", "maths", "serde" ] }
 rust_decimal_macros = "1.36"
-bytes = "1.8"
+bytes = "1.9"
 
 # Data Structures
 dashmap = { version = "6.1", features = [ "inline", "rayon" ], default-features = false }
@@ -84,6 +84,9 @@ mimalloc = { version = "0.1", default-features = false }
 
 # Graph Library
 petgraph = { version = "0.6", features = [ "graphmap" ], default-features = false }
+
+# Caching
+moka2 = { version = "0.13.0", features = [ "future" ] }
 
 # TA
 # yata = "0.7"

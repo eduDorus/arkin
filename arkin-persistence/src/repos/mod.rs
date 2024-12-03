@@ -1,25 +1,34 @@
+mod allocation;
+mod assets;
 mod execution_orders;
 mod insights;
 mod instances;
 mod instruments;
-mod positions;
+mod pipelines;
+mod portfolio;
 mod signals;
 mod strategies;
 mod ticks;
 mod trades;
-mod venue_order_fills;
+mod transactions;
 mod venue_orders;
 mod venues;
+// Currently beeing replaced by transactions
+// mod positions;
+// mod venue_order_fills;
 
+pub use allocation::*;
+pub use assets::*;
 pub use execution_orders::*;
 pub use insights::*;
 pub use instances::*;
 pub use instruments::*;
-pub use positions::*;
+pub use pipelines::*;
+pub use portfolio::*;
 pub use signals::*;
 pub use strategies::*;
 pub use ticks::*;
 pub use trades::*;
-pub use venue_order_fills::*;
+pub use transactions::*;
 pub use venue_orders::*;
 pub use venues::*;

@@ -11,7 +11,7 @@ use rust_decimal::Decimal;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
-use crate::{Portfolio, PortfolioError};
+use crate::{Accounting, PortfolioError};
 
 #[derive(Debug, Clone, Builder)]
 pub struct SingleStrategyPortfolio {
@@ -19,11 +19,11 @@ pub struct SingleStrategyPortfolio {
     #[builder(default = "DashMap::new()")]
     positions: DashMap<Arc<Instrument>, BTreeSet<Position>>,
     #[builder(default = "DashMap::new()")]
-    holdings: DashMap<AssetId, Holding>,
+    holdings: DashMap<Arc<Asset>, Holding>,
 }
 
 #[async_trait]
-impl Portfolio for SingleStrategyPortfolio {
+impl Accounting for SingleStrategyPortfolio {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError> {
         info!("Starting portfolio...");
         let mut price_updates = self.pubsub.subscribe::<Tick>();
@@ -126,17 +126,17 @@ impl Portfolio for SingleStrategyPortfolio {
         Ok(())
     }
 
-    async fn balance(&self, asset: &AssetId) -> Option<Holding> {
+    async fn balance(&self, asset: &Arc<Asset>) -> Option<Holding> {
         self.holdings.get(asset).map(|v| v.value().clone())
     }
 
-    async fn total_balance(&self) -> HashMap<AssetId, Holding> {
+    async fn total_balance(&self) -> HashMap<Arc<Asset>, Holding> {
         self.holdings.iter().map(|v| (v.key().clone(), v.value().clone())).collect()
     }
 
     async fn list_positions_with_quote_asset(
         &self,
-        quote_asset: &AssetId,
+        quote_asset: &Arc<Asset>,
     ) -> HashMap<Arc<Instrument>, BTreeSet<Position>> {
         self.positions
             .iter()
@@ -179,7 +179,10 @@ impl Portfolio for SingleStrategyPortfolio {
             .collect()
     }
 
-    async fn list_open_positions_with_quote_asset(&self, quote_asset: &AssetId) -> HashMap<Arc<Instrument>, Position> {
+    async fn list_open_positions_with_quote_asset(
+        &self,
+        quote_asset: &Arc<Asset>,
+    ) -> HashMap<Arc<Instrument>, Position> {
         self.positions
             .iter()
             .filter_map(|e| {
@@ -203,7 +206,7 @@ impl Portfolio for SingleStrategyPortfolio {
             .collect()
     }
 
-    async fn capital(&self, asset: &AssetId) -> Notional {
+    async fn capital(&self, asset: &Arc<Asset>) -> Notional {
         let current_balance = self.balance(asset).await;
         let current_positions = self.list_open_positions_with_quote_asset(asset).await;
         let positions_value = current_positions
@@ -216,7 +219,7 @@ impl Portfolio for SingleStrategyPortfolio {
         }
     }
 
-    async fn total_capital(&self) -> HashMap<AssetId, Notional> {
+    async fn total_capital(&self) -> HashMap<Arc<Asset>, Notional> {
         let mut capital = HashMap::new();
         for entry in self.holdings.iter() {
             capital.insert(entry.key().clone(), self.capital(entry.key()).await);
@@ -224,15 +227,15 @@ impl Portfolio for SingleStrategyPortfolio {
         capital
     }
 
-    async fn buying_power(&self, asset: &AssetId) -> Notional {
+    async fn buying_power(&self, asset: &Arc<Asset>) -> Notional {
         self.holdings.get(asset).map(|v| v.value().balance).unwrap_or(Notional::ZERO)
     }
 
-    async fn total_buying_power(&self) -> HashMap<AssetId, Notional> {
+    async fn total_buying_power(&self) -> HashMap<Arc<Asset>, Notional> {
         self.holdings.iter().map(|v| (v.key().clone(), v.value().balance)).collect()
     }
 
-    async fn pnl_asset(&self, asset: &AssetId) -> Notional {
+    async fn pnl_asset(&self, asset: &Arc<Asset>) -> Notional {
         self.list_positions_with_quote_asset(asset)
             .await
             .iter()
@@ -250,7 +253,7 @@ impl Portfolio for SingleStrategyPortfolio {
             })
     }
 
-    async fn total_pnl(&self) -> HashMap<AssetId, Notional> {
+    async fn total_pnl(&self) -> HashMap<Arc<Asset>, Notional> {
         let mut pnl = HashMap::new();
         for entry in self.holdings.iter() {
             pnl.insert(entry.key().clone(), self.pnl_asset(entry.key()).await);
@@ -258,7 +261,7 @@ impl Portfolio for SingleStrategyPortfolio {
         pnl
     }
 
-    async fn commission_asset(&self, asset: &AssetId) -> Notional {
+    async fn commission_asset(&self, asset: &Arc<Asset>) -> Notional {
         self.list_positions_with_quote_asset(asset)
             .await
             .iter()
@@ -276,7 +279,7 @@ impl Portfolio for SingleStrategyPortfolio {
             })
     }
 
-    async fn total_commission(&self) -> HashMap<AssetId, Notional> {
+    async fn total_commission(&self) -> HashMap<Arc<Asset>, Notional> {
         let mut commission = HashMap::new();
         for entry in self.holdings.iter() {
             commission.insert(entry.key().clone(), self.commission_asset(entry.key()).await);

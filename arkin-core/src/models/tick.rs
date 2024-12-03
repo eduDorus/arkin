@@ -10,10 +10,10 @@ use crate::{
         TICK_ASK_PRICE_FEATURE_ID, TICK_ASK_QUANTITY_FEATURE_ID, TICK_BID_PRICE_FEATURE_ID,
         TICK_BID_QUANTITY_FEATURE_ID,
     },
-    Event, EventType, EventTypeOf, Price, Quantity,
+    Event, EventType, EventTypeOf, InsightBuilder, Price, Quantity,
 };
 
-use super::{Insight, Instrument};
+use super::{Insight, Instrument, Pipeline};
 
 #[derive(Debug, Clone, Builder)]
 #[builder(setter(into))]
@@ -49,32 +49,40 @@ impl Tick {
         }
     }
 
-    pub fn to_insights(self) -> Vec<Insight> {
+    pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Insight> {
         vec![
-            Insight::new(
-                self.event_time,
-                Some(self.instrument.clone()),
-                TICK_BID_PRICE_FEATURE_ID.clone(),
-                self.bid_price,
-            ),
-            Insight::new(
-                self.event_time,
-                Some(self.instrument.clone()),
-                TICK_BID_QUANTITY_FEATURE_ID.clone(),
-                self.bid_quantity,
-            ),
-            Insight::new(
-                self.event_time,
-                Some(self.instrument.clone()),
-                TICK_ASK_PRICE_FEATURE_ID.clone(),
-                self.ask_price,
-            ),
-            Insight::new(
-                self.event_time,
-                Some(self.instrument),
-                TICK_ASK_QUANTITY_FEATURE_ID.clone(),
-                self.ask_quantity,
-            ),
+            InsightBuilder::default()
+                .event_time(self.event_time)
+                .pipeline(pipeline.clone())
+                .instrument(Some(self.instrument.clone()))
+                .feature_id(TICK_BID_PRICE_FEATURE_ID.clone())
+                .value(self.bid_price)
+                .build()
+                .unwrap(),
+            InsightBuilder::default()
+                .event_time(self.event_time)
+                .pipeline(pipeline.clone())
+                .instrument(Some(self.instrument.clone()))
+                .feature_id(TICK_BID_QUANTITY_FEATURE_ID.clone())
+                .value(self.bid_quantity)
+                .build()
+                .unwrap(),
+            InsightBuilder::default()
+                .event_time(self.event_time)
+                .pipeline(pipeline.clone())
+                .instrument(Some(self.instrument.clone()))
+                .feature_id(TICK_ASK_PRICE_FEATURE_ID.clone())
+                .value(self.ask_price)
+                .build()
+                .unwrap(),
+            InsightBuilder::default()
+                .event_time(self.event_time)
+                .pipeline(pipeline.clone())
+                .instrument(Some(self.instrument.clone()))
+                .feature_id(TICK_ASK_QUANTITY_FEATURE_ID.clone())
+                .value(self.ask_quantity)
+                .build()
+                .unwrap(),
         ]
     }
 

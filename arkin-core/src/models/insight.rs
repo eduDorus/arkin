@@ -1,43 +1,24 @@
 use std::{fmt, sync::Arc};
 
+use derive_builder::Builder;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::{Event, EventType, EventTypeOf, FeatureId};
 
-use super::Instrument;
+use super::{Instrument, Pipeline};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct Insight {
+    #[builder(default = Uuid::new_v4())]
+    pub id: Uuid,
     pub event_time: OffsetDateTime,
+    pub pipeline: Arc<Pipeline>,
     pub instrument: Option<Arc<Instrument>>,
     pub feature_id: FeatureId,
     pub value: Decimal,
-}
-
-impl Insight {
-    pub fn new(
-        event_time: OffsetDateTime,
-        instrument: Option<Arc<Instrument>>,
-        feature_id: FeatureId,
-        value: Decimal,
-    ) -> Self {
-        Insight {
-            event_time,
-            instrument,
-            feature_id,
-            value,
-        }
-    }
-
-    pub fn new_general(event_time: OffsetDateTime, feature_id: FeatureId, value: Decimal) -> Self {
-        Self {
-            event_time,
-            instrument: None,
-            feature_id,
-            value,
-        }
-    }
 }
 
 impl EventTypeOf for Insight {

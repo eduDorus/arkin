@@ -1,19 +1,17 @@
 use anyhow::Result;
+use derive_builder::Builder;
 use sqlx::PgPool;
-
-use arkin_core::prelude::*;
 use uuid::Uuid;
 
-#[derive(Debug)]
+use arkin_core::prelude::*;
+
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct PositionsRepo {
     pool: PgPool,
 }
 
 impl PositionsRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
     pub async fn insert(&self, position: Position) -> Result<()> {
         sqlx::query!(
             r#"
@@ -112,7 +110,7 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_positions_repo() {
         let pool = connect_database();
-        let repo = PositionsRepo::new(pool);
+        let repo = PositionsRepoBuilder::default().pool(pool).build().unwrap();
 
         let instrument = test_inst_binance_btc_usdt_perp();
         let instance = test_instance();

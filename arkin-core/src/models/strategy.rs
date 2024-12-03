@@ -1,10 +1,9 @@
 use std::fmt;
 
 use derive_builder::Builder;
-use sqlx::prelude::FromRow;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Builder, PartialEq, Eq, Hash, FromRow)]
+#[derive(Debug, Clone, Builder, PartialEq, Eq, Hash)]
 #[builder(setter(into))]
 pub struct Strategy {
     #[builder(default = Uuid::new_v4())]

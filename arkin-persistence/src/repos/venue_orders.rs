@@ -1,25 +1,89 @@
-use anyhow::Result;
+use std::sync::Arc;
+
+use derive_builder::Builder;
+use rust_decimal::Decimal;
 use sqlx::PgPool;
 
 use arkin_core::prelude::*;
+use time::OffsetDateTime;
+use uuid::Uuid;
 
-#[derive(Debug)]
-pub struct VenueOrdersRepo {
+use crate::PersistenceError;
+
+#[derive(Debug, Clone)]
+pub struct VenueOrderDTO {
+    pub id: VenueOrderId,
+    pub portfolio_id: Uuid,
+    pub instrument_id: Uuid,
+    pub side: MarketSide,
+    pub order_type: VenueOrderType,
+    pub time_in_force: VenueOrderTimeInForce,
+    pub price: Option<Decimal>,
+    pub quantity: Decimal,
+    pub fill_price: Decimal,
+    pub filled_quantity: Decimal,
+    pub total_commission: Decimal,
+    pub status: VenueOrderStatus,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+impl From<VenueOrder> for VenueOrderDTO {
+    fn from(order: VenueOrder) -> Self {
+        Self {
+            id: order.id,
+            portfolio_id: order.portfolio.id,
+            instrument_id: order.instrument.id,
+            side: order.side,
+            order_type: order.order_type,
+            time_in_force: order.time_in_force,
+            price: order.price,
+            quantity: order.quantity,
+            fill_price: order.fill_price,
+            filled_quantity: order.filled_quantity,
+            total_commission: order.total_commission,
+            status: order.status,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+        }
+    }
+}
+
+impl From<Arc<VenueOrder>> for VenueOrderDTO {
+    fn from(order: Arc<VenueOrder>) -> Self {
+        Self {
+            id: order.id,
+            portfolio_id: order.portfolio.id,
+            instrument_id: order.instrument.id,
+            side: order.side,
+            order_type: order.order_type,
+            time_in_force: order.time_in_force,
+            price: order.price,
+            quantity: order.quantity,
+            fill_price: order.fill_price,
+            filled_quantity: order.filled_quantity,
+            total_commission: order.total_commission,
+            status: order.status,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
+pub struct VenueOrderRepo {
     pool: PgPool,
 }
 
-impl VenueOrdersRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn insert(&self, order: VenueOrder) -> Result<()> {
+impl VenueOrderRepo {
+    pub async fn insert(&self, order: VenueOrderDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             INSERT INTO venue_orders
             (
                 id, 
-                instance_id, 
+                portfolio_id, 
                 instrument_id, 
                 side, 
                 order_type, 
@@ -35,8 +99,8 @@ impl VenueOrdersRepo {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             order.id,
-            order.instance.id,
-            order.instrument.id,
+            order.portfolio_id,
+            order.instrument_id,
             order.side as MarketSide,
             order.order_type as VenueOrderType,
             order.time_in_force as VenueOrderTimeInForce,
@@ -54,7 +118,7 @@ impl VenueOrdersRepo {
         Ok(())
     }
 
-    pub async fn update(&self, order: VenueOrder) -> Result<()> {
+    pub async fn update(&self, order: VenueOrderDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             UPDATE venue_orders
@@ -78,7 +142,7 @@ impl VenueOrdersRepo {
         Ok(())
     }
 
-    pub async fn delete(&self, id: VenueOrderId) -> Result<()> {
+    pub async fn delete(&self, id: VenueOrderId) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"
             DELETE FROM venue_orders
@@ -105,15 +169,12 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_venue_order_repo() {
         let pool = connect_database();
-        let repo = VenueOrdersRepo::new(pool);
-
-        let instance = test_instance();
-        let instrument = test_inst_binance_btc_usdt_perp();
+        let repo = VenueOrderRepoBuilder::default().pool(pool).build().unwrap();
 
         let mut order = VenueOrderBuilder::default()
             .id(Uuid::new_v4())
-            .instance(instance.clone())
-            .instrument(instrument.clone())
+            .portfolio(test_portfolio())
+            .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Buy)
             .price(None)
@@ -121,18 +182,18 @@ pub mod tests {
             .status(VenueOrderStatus::New)
             .build()
             .unwrap();
-        repo.insert(order.clone()).await.unwrap();
+        repo.insert(order.clone().into()).await.unwrap();
 
         order.status = VenueOrderStatus::Placed;
         order.updated_at = OffsetDateTime::now_utc();
-        repo.update(order.clone()).await.unwrap();
+        repo.update(order.clone().into()).await.unwrap();
 
         order.fill_price = dec!(110);
         order.filled_quantity = dec!(1);
         order.total_commission = dec!(0.2);
         order.status = VenueOrderStatus::Filled;
         order.updated_at = OffsetDateTime::now_utc();
-        repo.update(order.clone()).await.unwrap();
+        repo.update(order.clone().into()).await.unwrap();
 
         // repo.delete(order.id).await.unwrap();
     }

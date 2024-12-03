@@ -13,7 +13,7 @@ impl AllocationFactory {
         config: &AllocationOptimConfig,
         pubsub: Arc<PubSub>,
         persistance: Arc<dyn Persistor>,
-        portfolio: Arc<dyn Portfolio>,
+        portfolio: Arc<dyn Accounting>,
     ) -> Arc<dyn AllocationOptim> {
         let allocation: Arc<dyn AllocationOptim> = match &config.allocation_optim {
             AllocationTypeConfig::Limited(c) => Arc::new(

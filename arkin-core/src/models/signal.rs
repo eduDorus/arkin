@@ -2,16 +2,18 @@ use std::{fmt, sync::Arc};
 
 use derive_builder::Builder;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::{EventType, EventTypeOf, Weight};
 
-use super::{Instance, Instrument, Strategy};
+use super::{Instrument, Strategy};
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Builder)]
 #[builder(setter(into))]
 pub struct Signal {
+    #[builder(default = Uuid::new_v4())]
+    pub id: Uuid,
     pub event_time: OffsetDateTime,
-    pub instance: Arc<Instance>,
     pub instrument: Arc<Instrument>,
     pub strategy: Arc<Strategy>,
     pub weight: Weight,

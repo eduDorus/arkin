@@ -104,20 +104,20 @@ impl From<VenueOrderState> for Event {
 #[strum_discriminants(name(EventType))]
 #[strum_discriminants(derive(Hash))]
 pub enum Event {
-    IntervalTick(IntervalTick),
-    Tick(Tick),
-    Trade(Trade),
-    Book(Book),
-    BalanceUpdate(Holding),
-    PositionUpdate(Position),
-    Insight(Insight),
-    InsightTick(InsightTick),
-    Signal(Signal),
-    SignalTick(SignalTick),
-    ExecutionOrderNew(ExecutionOrder),
-    VenueOrderNew(VenueOrder),
-    VenueOrderState(VenueOrderState),
-    VenueOrderFill(VenueOrderFill),
+    IntervalTick(Arc<IntervalTick>),
+    Tick(Arc<Tick>),
+    Trade(Arc<Trade>),
+    Book(Arc<Book>),
+    BalanceUpdate(Arc<Holding>),
+    PositionUpdate(Arc<Position>),
+    Insight(Arc<Insight>),
+    InsightTick(Arc<InsightTick>),
+    Signal(Arc<Signal>),
+    SignalTick(Arc<SignalTick>),
+    ExecutionOrderNew(Arc<ExecutionOrder>),
+    VenueOrderNew(Arc<VenueOrder>),
+    VenueOrderState(Arc<VenueOrderState>),
+    VenueOrderFill(Arc<VenueOrderFill>),
 }
 
 impl Event {
@@ -148,11 +148,11 @@ impl PubSub {
         sender.subscribe()
     }
 
-    pub fn publish<E: EventTypeOf>(&self, event: E) {
+    pub fn publish<E: EventTypeOf>(&self, event: Arc<E>) {
         let event_type = E::event_type();
         debug!("Publishing event: {:?}", event_type);
         if let Some(sender_any) = self.event_senders.get(&event_type) {
-            let sender = sender_any.downcast_ref::<Sender<E>>().expect("Type mismatch");
+            let sender = sender_any.downcast_ref::<Sender<Arc<E>>>().expect("Type mismatch");
             if let Err(e) = sender.send(event) {
                 error!("Failed to publish event: {:?}", e);
             }

@@ -29,7 +29,7 @@ async fn test_limited_allocation() {
         ))
     });
 
-    let portfolio = MockPortfolio::new();
+    let portfolio = MockAccounting::new();
     // portfolio.expect_capital().returning(|| Decimal::from_f64(10000.0).unwrap());
     // portfolio.expect_positions().returning(|| HashMap::new());
 

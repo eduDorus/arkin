@@ -1,4 +1,5 @@
 use anyhow::Result;
+use derive_builder::Builder;
 use sqlx::PgPool;
 use tracing::debug;
 
@@ -6,16 +7,13 @@ use arkin_core::prelude::*;
 
 use crate::BIND_LIMIT;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct VenueOrderFillsRepo {
     pool: PgPool,
 }
 
 impl VenueOrderFillsRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
     pub async fn insert(&self, order: VenueOrderFill) -> Result<()> {
         sqlx::query!(
             r#"
@@ -99,7 +97,7 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_venue_order_fill_repo() {
         let pool = connect_database();
-        let repo = VenueOrderFillsRepo::new(pool);
+        let repo = VenueOrderFillsRepoBuilder::default().pool(pool).build().unwrap();
 
         let instrument = test_inst_binance_btc_usdt_perp();
         let instance = test_instance();

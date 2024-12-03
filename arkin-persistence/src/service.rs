@@ -1,18 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
 use async_trait::async_trait;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
-use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
-use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::repos::{InsightsRepo, InstrumentRepo, TickRepo, TradeRepo, VenueRepo};
-use crate::services::TradeService;
-use crate::services::{InsightsService, InstrumentService, TickService, VenueService};
+use crate::repos::*;
+use crate::stores::*;
 use crate::traits::Persistor;
 use crate::{PersistenceConfig, PersistenceError};
 
@@ -20,11 +16,21 @@ use crate::{PersistenceConfig, PersistenceError};
 pub struct PersistenceService {
     pub pubsub: Arc<PubSub>,
     pub auto_commit_interval: Duration,
-    // venue_service: Arc<VenueService>,
-    pub instrument_service: Arc<InstrumentService>,
-    pub tick_service: Arc<TickService>,
-    pub trade_service: Arc<TradeService>,
-    pub insights_service: Arc<InsightsService>,
+    pub instance_store: InstanceStore,
+    pub portfolio_store: PortfolioStore,
+    pub transaction_store: TransactionStore,
+    pub venue_store: VenueStore,
+    pub asset_store: AssetStore,
+    pub instrument_store: InstrumentStore,
+    pub pipeline_store: PipelineStore,
+    pub insights_store: InsightsStore,
+    pub strategy_store: StrategyStore,
+    pub signal_store: SignalStore,
+    pub allocation_store: AllocationStore,
+    pub execution_order_store: ExecutionOrderStore,
+    pub venue_order_store: VenueOrderStore,
+    pub tick_store: TickStore,
+    pub trade_store: TradeStore,
 }
 
 impl PersistenceService {
@@ -47,31 +53,151 @@ impl PersistenceService {
             .connect_lazy_with(conn_options);
 
         // Initialize repositories
-        let venue_repo = VenueRepo::new(pool.clone());
-        let instrument_repo = InstrumentRepo::new(pool.clone());
-        let tick_repo = TickRepo::new(pool.clone());
-        let trade_repo = Arc::new(TradeRepo::new(pool.clone()));
-        let insights_repo = Arc::new(InsightsRepo::new(pool.clone()));
+        let instance_repo = InstanceRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build VenueRepo");
+        let portfolio = PortfolioRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build PortfolioRepo");
+        let transactions_repo = TransactionRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build TransactionRepo");
+        let venue_repo = VenueRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build VenueRepo");
+        let asset_repo = AssetRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build AssetRepo");
+        let instrument_repo = InstrumentRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build InstrumentRepo");
+        let pipeline_repo = PipelineRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build PipelineRepo");
+        let insights_repo = InsightsRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build InsightsRepo");
+        let strategy_repo = StrategyRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build InsightsRepo");
+        let signal_repo = SignalRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build SignalRepo");
+        let allocation_repo = AllocationRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build AllocationRepo");
+        let execution_order_repo = ExecutionOrderRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build ExecutionOrderRepo");
+        let venue_order_repo = VenueOrderRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build TransactionsRepo");
+        let tick_repo = TickRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build TickRepo");
+        let trade_repo = TradeRepoBuilder::default()
+            .pool(pool.clone())
+            .build()
+            .expect("Failed to build TradeRepo");
 
-        // Initialize services
-        let venue_service = VenueService::new(venue_repo);
-        let instrument_service = Arc::new(InstrumentService::new(instrument_repo, venue_service));
-        let tick_service = Arc::new(TickService::new(tick_repo, instrument_service.clone(), config.batch_size));
-        let trade_service = Arc::new(TradeService::new(
-            trade_repo.clone(),
-            instrument_service.clone(),
-            config.batch_size,
-        ));
-        let insights_service = Arc::new(InsightsService::new(insights_repo.clone(), config.batch_size));
+        // Initialize stores
+        let instance_store = InstanceStoreBuilder::default()
+            .instance_repo(instance_repo.clone())
+            .build()
+            .expect("Failed to build InstanceStore");
+        let portfolio_store = PortfolioStoreBuilder::default()
+            .portfolio_repo(portfolio.clone())
+            .build()
+            .expect("Failed to build PortfolioStore");
+        let transaction_store = TransactionStoreBuilder::default()
+            .transaction_repo(transactions_repo.clone())
+            .build()
+            .expect("Failed to build TransactionStore");
+        let venue_store = VenueStoreBuilder::default()
+            .venue_repo(venue_repo)
+            .build()
+            .expect("Failed to build VenueStore");
+        let asset_store = AssetStoreBuilder::default()
+            .asset_repo(asset_repo.clone())
+            .build()
+            .expect("Failed to build AssetStore");
+        let instrument_store = InstrumentStoreBuilder::default()
+            .instrument_repo(instrument_repo)
+            .asset_store(asset_store.clone())
+            .venue_store(venue_store.clone())
+            .build()
+            .expect("Failed to build InstrumentStore");
+        let pipeline_store = PipelineStoreBuilder::default()
+            .pipeline_repo(pipeline_repo.clone())
+            .build()
+            .expect("Failed to build PipelineStore");
+        let insights_store = InsightsStoreBuilder::default()
+            .insights_repo(insights_repo.clone())
+            .build()
+            .expect("Failed to build InsightsStore");
+        let strategy_store = StrategyStoreBuilder::default()
+            .strategy_repo(strategy_repo.clone())
+            .build()
+            .expect("Failed to build InsightsStore");
+        let signal_store = SignalStoreBuilder::default()
+            .signal_repo(signal_repo.clone())
+            .build()
+            .expect("Failed to build SignalStore");
+        let allocation_store = AllocationStoreBuilder::default()
+            .allocation_repo(allocation_repo.clone())
+            .build()
+            .expect("Failed to build AllocationStore");
+        let execution_order_store = ExecutionOrderStoreBuilder::default()
+            .execution_order_repo(execution_order_repo.clone())
+            .build()
+            .expect("Failed to build ExecutionOrderStore");
+        let venue_order_store = VenueOrderStoreBuilder::default()
+            .venue_order_repo(venue_order_repo.clone())
+            .build()
+            .expect("Failed to build VenueOrderStore");
+        let tick_store = TickStoreBuilder::default()
+            .tick_repo(tick_repo)
+            .instrument_store(instrument_store.clone())
+            .build()
+            .expect("Failed to build TickStore");
+        let trade_store = TradeStoreBuilder::default()
+            .trade_repo(trade_repo)
+            .instrument_store(instrument_store.clone())
+            .build()
+            .expect("Failed to build TradeStore");
 
         Self {
             pubsub,
             auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
-            // venue_service,
-            instrument_service,
-            tick_service,
-            trade_service,
-            insights_service,
+            instance_store,
+            portfolio_store,
+            transaction_store,
+            venue_store,
+            asset_store,
+            instrument_store,
+            pipeline_store,
+            insights_store,
+            strategy_store,
+            signal_store,
+            allocation_store,
+            execution_order_store,
+            venue_order_store,
+            tick_store,
+            trade_store,
         }
     }
 }
@@ -80,9 +206,6 @@ impl PersistenceService {
 impl Persistor for PersistenceService {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PersistenceError> {
         info!("Starting persistence service...");
-        let tick_service = self.tick_service.clone();
-        let trade_service = self.trade_service.clone();
-        let insights_service = self.insights_service.clone();
 
         let mut interval = tokio::time::interval(self.auto_commit_interval);
 
@@ -94,22 +217,22 @@ impl Persistor for PersistenceService {
         loop {
             tokio::select! {
                     Ok(trade) = trades.recv() => {
-                        if let Err(e) = trade_service.insert_batch(trade).await {
+                        if let Err(e) = self.trade_store.insert_buffered(trade).await {
                             error!("Failed to insert trade: {}", e);
                         }
                     }
                     Ok(tick) = ticks.recv() => {
-                        if let Err(e) = tick_service.insert_batch(tick).await {
+                        if let Err(e) = self.tick_store.insert_buffered(tick).await {
                             error!("Failed to insert tick: {}", e);
                         }
                     }
                     Ok(insight) = insights.recv() => {
-                        if let Err(e) = insights_service.insert_batch(insight).await {
+                        if let Err(e) = self.insights_store.insert_buffered(insight).await {
                             error!("Failed to insert insight: {}", e);
                         }
                     }
                     Ok(insight_tick) = insights_tick.recv() => {
-                        if let Err(e) = insights_service.insert_batch_vec(insight_tick.insights).await {
+                        if let Err(e) = self.insights_store.insert_buffered_vec(insight_tick.insights).await {
                             error!("Failed to insert insight tick: {}", e);
                         }
                     }
@@ -133,97 +256,9 @@ impl Persistor for PersistenceService {
     }
 
     async fn flush(&self) -> Result<(), PersistenceError> {
-        self.tick_service.flush().await?;
-        self.trade_service.flush().await?;
-        self.insights_service.flush().await?;
+        self.tick_store.flush().await?;
+        self.trade_store.flush().await?;
+        self.insights_store.flush().await?;
         Ok(())
-    }
-
-    async fn insert_instrument(&self, instrument: Instrument) -> Result<(), PersistenceError> {
-        self.instrument_service.insert(instrument).await.map_err(|e| e.into())
-    }
-
-    async fn read_instrument_by_id(&self, id: Uuid) -> Result<Arc<Instrument>, PersistenceError> {
-        self.instrument_service.read_by_id(id).await.map_err(|e| e.into())
-    }
-
-    async fn read_instrument_by_venue_symbol(&self, venue_symbol: String) -> Result<Arc<Instrument>, PersistenceError> {
-        let instrument_service = &self.instrument_service;
-
-        instrument_service
-            .read_by_venue_symbol(venue_symbol)
-            .await
-            .map_err(|e| e.into())
-    }
-
-    async fn insert_tick(&self, tick: Tick) -> Result<(), PersistenceError> {
-        self.tick_service.insert(tick).await.map_err(|e| e.into())
-    }
-
-    async fn insert_tick_batch(&self, tick: Tick) -> Result<(), PersistenceError> {
-        let tick_service = &self.tick_service;
-        tick_service.insert_batch(tick).await.map_err(|e| e.into())
-    }
-
-    async fn insert_tick_batch_vec(&self, ticks: Vec<Tick>) -> Result<(), PersistenceError> {
-        self.tick_service.insert_batch_vec(ticks).await.map_err(|e| e.into())
-    }
-
-    async fn last_tick_from_cache(&self, instrument: &Arc<Instrument>) -> Option<Tick> {
-        self.tick_service.last_tick_from_cache(instrument)
-    }
-
-    async fn read_latest_tick(
-        &self,
-        event_time: OffsetDateTime,
-        instrument: &Arc<Instrument>,
-    ) -> Result<Option<Tick>, PersistenceError> {
-        self.tick_service
-            .read_latest_tick(event_time, instrument)
-            .await
-            .map_err(|e| e.into())
-    }
-
-    async fn read_ticks_range(
-        &self,
-        instruments: &[Arc<Instrument>],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
-    ) -> Result<Vec<Tick>, PersistenceError> {
-        self.tick_service.read_range(instruments, from, to).await.map_err(|e| e.into())
-    }
-
-    async fn read_trades_range(
-        &self,
-        instruments: &[Arc<Instrument>],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
-    ) -> Result<Vec<Trade>, PersistenceError> {
-        self.trade_service.read_range(instruments, from, to).await.map_err(|e| e.into())
-    }
-
-    async fn insert_trade(&self, trade: Trade) -> Result<(), PersistenceError> {
-        self.trade_service.insert(trade).await.map_err(|e| e.into())
-    }
-
-    async fn insert_trade_batch(&self, trade: Trade) -> Result<(), PersistenceError> {
-        let trade_service = &self.trade_service;
-        trade_service.insert_batch(trade).await.map_err(|e| e.into())
-    }
-
-    async fn insert_trade_batch_vec(&self, trades: Vec<Trade>) -> Result<(), PersistenceError> {
-        self.trade_service.insert_batch_vec(trades).await.map_err(|e| e.into())
-    }
-
-    async fn insert_insight(&self, insight: Insight) -> Result<(), PersistenceError> {
-        self.insights_service.insert(insight).await.map_err(|e| e.into())
-    }
-
-    async fn insert_insight_batch(&self, insight: Insight) -> Result<(), PersistenceError> {
-        self.insights_service.insert_batch(insight).await.map_err(|e| e.into())
-    }
-
-    async fn insert_insight_batch_vec(&self, insights: Vec<Insight>) -> Result<(), PersistenceError> {
-        self.insights_service.insert_batch_vec(insights).await.map_err(|e| e.into())
     }
 }

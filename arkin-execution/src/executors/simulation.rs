@@ -24,7 +24,7 @@ pub struct SimulationExecutor {
     #[builder(default = dec!(0.0002))]
     maker_commission: Decimal,
     #[builder(default = DashMap::new())]
-    balances: DashMap<AssetId, Holding>,
+    balances: DashMap<Arc<Asset>, Holding>,
 }
 
 impl SimulationExecutor {
@@ -49,7 +49,7 @@ impl SimulationExecutor {
         }
     }
 
-    pub fn update_balance(&self, asset: &AssetId, quantity: Decimal) {
+    pub fn update_balance(&self, asset: &Arc<Asset>, quantity: Decimal) {
         let mut entry = self.balances.entry(asset.clone()).or_insert(
             HoldingBuilder::default()
                 .asset(asset.clone())
@@ -60,7 +60,7 @@ impl SimulationExecutor {
         entry.balance += quantity;
     }
 
-    pub fn get_balance(&self, asset: &AssetId) -> Option<Holding> {
+    pub fn get_balance(&self, asset: &Arc<Asset>) -> Option<Holding> {
         self.balances.get(asset).map(|holding| holding.value().clone())
     }
 }
@@ -71,7 +71,7 @@ impl Executor for SimulationExecutor {
         info!("Starting simulation executor...");
         // TODO: Send current balance
         let holding = HoldingBuilder::default()
-            .asset(AssetId::from("USDT".to_string()))
+            .asset(usdt_asset())
             .balance(dec!(10000))
             .build()
             .expect("Failed to build Holding");

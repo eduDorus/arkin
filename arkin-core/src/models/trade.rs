@@ -1,17 +1,19 @@
 use std::{cmp::Ordering, fmt, sync::Arc};
 
+use derive_builder::Builder;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
 use crate::{
     constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
     models::Insight,
-    Event, EventType, EventTypeOf, Price, Quantity,
+    Event, EventType, EventTypeOf, InsightBuilder, Price, Quantity,
 };
 
-use super::{Instrument, MarketSide};
+use super::{Pipeline, Instrument, MarketSide};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(setter(into))]
 pub struct Trade {
     pub event_time: OffsetDateTime,
     pub instrument: Arc<Instrument>,
@@ -40,20 +42,24 @@ impl Trade {
         }
     }
 
-    pub fn to_insights(self) -> Vec<Insight> {
+    pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Insight> {
         vec![
-            Insight::new(
-                self.event_time,
-                Some(self.instrument.clone()),
-                TRADE_PRICE_FEATURE_ID.clone(),
-                self.price,
-            ),
-            Insight::new(
-                self.event_time,
-                Some(self.instrument),
-                TRADE_QUANTITY_FEATURE_ID.clone(),
-                self.quantity * Decimal::from(self.side),
-            ),
+            InsightBuilder::default()
+                .event_time(self.event_time)
+                .pipeline(pipeline.clone())
+                .instrument(Some(self.instrument.clone()))
+                .feature_id(TRADE_PRICE_FEATURE_ID.clone())
+                .value(self.price)
+                .build()
+                .unwrap(),
+            InsightBuilder::default()
+                .event_time(self.event_time)
+                .pipeline(pipeline.clone())
+                .instrument(Some(self.instrument.clone()))
+                .feature_id(TRADE_QUANTITY_FEATURE_ID.clone())
+                .value(self.quantity * Decimal::from(self.side))
+                .build()
+                .unwrap(),
         ]
     }
 }
