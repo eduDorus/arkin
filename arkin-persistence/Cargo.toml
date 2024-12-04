@@ -21,7 +21,7 @@ uuid = { workspace = true }
 sqlx = { workspace = true }
 dashmap = { workspace = true }
 thiserror = { workspace = true }
-derive_builder = { workspace = true }
+typed-builder = { workspace = true }
 moka2 = { workspace = true }
 
 mockall = { workspace = true }

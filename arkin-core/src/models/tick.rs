@@ -1,22 +1,21 @@
 use std::{cmp::Ordering, fmt, sync::Arc};
 
-use derive_builder::Builder;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 
 use crate::{
     constants::{
         TICK_ASK_PRICE_FEATURE_ID, TICK_ASK_QUANTITY_FEATURE_ID, TICK_BID_PRICE_FEATURE_ID,
         TICK_BID_QUANTITY_FEATURE_ID,
     },
-    Event, EventType, EventTypeOf, InsightBuilder, Price, Quantity,
+    Event, EventType, EventTypeOf, Price, Quantity,
 };
 
 use super::{Insight, Instrument, Pipeline};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct Tick {
     #[builder(default = OffsetDateTime::now_utc())]
     pub event_time: OffsetDateTime,
@@ -51,38 +50,34 @@ impl Tick {
 
     pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Insight> {
         vec![
-            InsightBuilder::default()
+            Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_BID_PRICE_FEATURE_ID.clone())
                 .value(self.bid_price)
-                .build()
-                .unwrap(),
-            InsightBuilder::default()
+                .build(),
+            Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_BID_QUANTITY_FEATURE_ID.clone())
                 .value(self.bid_quantity)
-                .build()
-                .unwrap(),
-            InsightBuilder::default()
+                .build(),
+            Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_ASK_PRICE_FEATURE_ID.clone())
                 .value(self.ask_price)
-                .build()
-                .unwrap(),
-            InsightBuilder::default()
+                .build(),
+            Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_ASK_QUANTITY_FEATURE_ID.clone())
                 .value(self.ask_quantity)
-                .build()
-                .unwrap(),
+                .build(),
         ]
     }
 
@@ -109,8 +104,8 @@ impl EventTypeOf for Tick {
     }
 }
 
-impl From<Tick> for Event {
-    fn from(tick: Tick) -> Self {
+impl From<Arc<Tick>> for Event {
+    fn from(tick: Arc<Tick>) -> Self {
         Event::Tick(tick)
     }
 }

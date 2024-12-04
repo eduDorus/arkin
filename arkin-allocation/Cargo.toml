@@ -12,7 +12,7 @@ arkin-persistence = { path = "../arkin-persistence" }
 
 tokio = { workspace = true }
 tokio-util = { workspace = true }
-derive_builder = { workspace = true }
+typed-builder = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }

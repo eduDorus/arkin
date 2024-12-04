@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use tokio::sync::Mutex;
 use tracing::error;
 
@@ -8,8 +8,8 @@ use arkin_core::prelude::*;
 
 use crate::{repos::InsightsRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct InsightsStore {
     insights_repo: InsightsRepo,
     #[builder(default)]

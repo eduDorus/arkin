@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use arkin_core::Allocation;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 
 use crate::{repos::AllocationRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct AllocationStore {
     allocation_repo: AllocationRepo,
 }

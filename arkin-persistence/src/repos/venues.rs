@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use sqlx::{prelude::*, PgPool};
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_core::Venue;
+use arkin_core::{Venue, VenueType};
 
 use crate::PersistenceError;
 
@@ -12,7 +12,7 @@ use crate::PersistenceError;
 pub struct VenueDTO {
     pub id: Uuid,
     pub name: String,
-    pub venue_type: String,
+    pub venue_type: VenueType,
 }
 
 impl From<Arc<Venue>> for VenueDTO {
@@ -35,8 +35,8 @@ impl From<VenueDTO> for Venue {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct VenueRepo {
     pool: PgPool,
 }
@@ -54,7 +54,7 @@ impl VenueRepo {
             "#,
             venue.id,
             venue.name,
-            venue.venue_type,
+            venue.venue_type as VenueType,
         )
         .execute(&self.pool)
         .await?;
@@ -68,7 +68,7 @@ impl VenueRepo {
             SELECT 
                 id,
                 name,
-                venue_type 
+                venue_type AS "venue_type:VenueType"
             FROM venues
             WHERE id = $1
             "#,

@@ -1,14 +1,14 @@
 use std::{fmt, sync::Arc};
 
-use derive_builder::Builder;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use super::{Instrument, Portfolio, Signal, Strategy};
 
-#[derive(Debug, Clone, PartialEq, Eq, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
+
 pub struct Allocation {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

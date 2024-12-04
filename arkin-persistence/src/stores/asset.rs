@@ -1,19 +1,20 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use moka2::future::Cache;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::Asset;
 
 use crate::{repos::AssetRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct AssetStore {
     asset_repo: AssetRepo,
-    #[builder(default = "Cache::new(1000)")]
+    #[builder(default = Cache::new(1000))]
     asset_cache_id: Cache<Uuid, Arc<Asset>>,
+    #[builder(default = Cache::new(1000))]
     asset_cache_symbol: Cache<String, Arc<Asset>>,
 }
 

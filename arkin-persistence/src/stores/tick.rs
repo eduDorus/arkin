@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
 use tracing::error;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_core::{Tick, TickBuilder};
+use arkin_core::Tick;
 
 use crate::{repos::TickRepo, PersistenceError};
 
 use super::instrument::InstrumentStore;
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct TickStore {
     instrument_store: Arc<InstrumentStore>,
     tick_repo: TickRepo,
@@ -103,7 +103,7 @@ impl TickStore {
         let mut ticks = Vec::with_capacity(db_ticks.len());
         for dto in &db_ticks {
             let instrument = self.instrument_store.read_by_id(&dto.instrument_id).await?;
-            let tick = TickBuilder::default()
+            let tick = Tick::builder()
                 .event_time(dto.event_time)
                 .instrument(instrument)
                 .tick_id(dto.tick_id as u64)
@@ -111,8 +111,7 @@ impl TickStore {
                 .bid_quantity(dto.bid_quantity)
                 .ask_price(dto.ask_price)
                 .ask_quantity(dto.ask_quantity)
-                .build()
-                .expect("Failed to build tick");
+                .build();
             ticks.push(Arc::new(tick));
         }
         Ok(ticks)

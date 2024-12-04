@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use moka2::future::Cache;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::Venue;
 
 use crate::{repos::VenueRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct VenueStore {
     venue_repo: VenueRepo,
-    #[builder(default = "Cache::new(1000)")]
+    #[builder(default = Cache::new(1000))]
     venue_cache: Cache<Uuid, Arc<Venue>>,
 }
 

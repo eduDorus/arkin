@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use rust_decimal::Decimal;
 use sqlx::{FromRow, PgPool};
 use time::OffsetDateTime;
 use tracing::debug;
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 use uuid::Uuid;
@@ -32,8 +32,8 @@ impl From<Arc<Signal>> for SignalDTO {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct SignalRepo {
     pool: PgPool,
 }
@@ -108,16 +108,15 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_signals_repo() {
         let pool = connect_database();
-        let repo = SignalRepoBuilder::default().pool(pool).build().unwrap();
+        let repo = SignalRepo::builder().pool(pool).build();
 
         let signal = Arc::new(
-            SignalBuilder::default()
+            Signal::builder()
                 .event_time(OffsetDateTime::now_utc())
                 .instrument(test_inst_binance_btc_usdt_perp())
                 .strategy(test_strategy())
                 .weight(dec!(0.5))
-                .build()
-                .unwrap(),
+                .build(),
         );
         repo.insert(signal.into()).await.unwrap();
     }

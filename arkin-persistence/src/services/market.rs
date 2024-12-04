@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -11,8 +11,8 @@ use crate::{
     PersistenceError,
 };
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct MarketService {
     pub asset_store: AssetStore,
     pub instrument_store: InstrumentStore,

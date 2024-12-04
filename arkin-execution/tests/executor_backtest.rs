@@ -7,11 +7,11 @@ use arkin_execution::prelude::*;
 #[test(tokio::test)]
 async fn test_place_order() {
     // Build the SimulationExecutor with the mock OrderManager
-    let executor = SimulationExecutorBuilder::default().build().unwrap();
+    let executor = SimulationExecutor::builder().build().unwrap();
 
     // // Create a sample VenueOrder
     let instrument = test_inst_binance_btc_usdt_perp();
-    let order = VenueOrderBuilder::default()
+    let order = VenueOrder::builder()
         .instrument(instrument)
         .order_type(VenueOrderType::Limit)
         .side(MarketSide::Buy)

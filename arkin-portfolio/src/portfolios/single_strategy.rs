@@ -6,19 +6,19 @@ use std::{
 use arkin_core::prelude::*;
 use async_trait::async_trait;
 use dashmap::DashMap;
-use derive_builder::Builder;
 use rust_decimal::Decimal;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
+use typed_builder::TypedBuilder;
 
 use crate::{Accounting, PortfolioError};
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct SingleStrategyPortfolio {
     pubsub: Arc<PubSub>,
-    #[builder(default = "DashMap::new()")]
+    #[builder(default = DashMap::new())]
     positions: DashMap<Arc<Instrument>, BTreeSet<Position>>,
-    #[builder(default = "DashMap::new()")]
+    #[builder(default = DashMap::new())]
     holdings: DashMap<Arc<Asset>, Holding>,
 }
 

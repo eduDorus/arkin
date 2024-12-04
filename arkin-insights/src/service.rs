@@ -117,12 +117,12 @@ impl Insights for InsightsService {
     ) -> Result<Vec<Insight>, InsightsError> {
         info!("Running insights pipeline at event time: {}", event_time);
         let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
-        let insights_tick = InsightTickBuilder::default()
+        let insights_tick = InsightTick::builder()
             .event_time(event_time)
             .instruments(instruments.to_vec())
             .insights(insights.clone())
-            .build()
-            .unwrap();
+            .build();
+        let insights_tick = Arc::new(insights_tick);
 
         if publish {
             info!(

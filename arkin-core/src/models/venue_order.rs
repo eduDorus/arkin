@@ -1,15 +1,15 @@
 use std::{fmt, sync::Arc};
 
-use derive_builder::Builder;
 use sqlx::Type;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::error;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity, VenueOrderFill};
+use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity};
 
-use super::{ExecutionOrderType, Instrument, MarketSide, Portfolio};
+use super::{ExecutionOrderType, Instrument, MarketSide, Portfolio, VenueOrderFill};
 
 pub type VenueOrderId = Uuid;
 
@@ -64,7 +64,7 @@ pub enum VenueOrderStatus {
     Expired,
 }
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
@@ -175,8 +175,8 @@ impl EventTypeOf for VenueOrder {
     }
 }
 
-impl From<VenueOrder> for Event {
-    fn from(order: VenueOrder) -> Self {
+impl From<Arc<VenueOrder>> for Event {
+    fn from(order: Arc<VenueOrder>) -> Self {
         Event::VenueOrderNew(order)
     }
 }

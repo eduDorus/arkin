@@ -1,6 +1,6 @@
 use std::{fmt, sync::Arc};
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use rust_decimal::prelude::Decimal;
 use sqlx::Type;
 use strum::Display;
@@ -33,8 +33,8 @@ pub enum InstrumentStatus {
     Halted,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]
+
 pub struct Instrument {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

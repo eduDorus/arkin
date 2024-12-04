@@ -1,14 +1,14 @@
 use std::{fmt, sync::Arc};
 
-use derive_builder::Builder;
 use rust_decimal::Decimal;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{Event, EventType, EventTypeOf};
 
 use super::{Asset, Instance};
 
-#[derive(Debug, Clone, Builder, PartialEq)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq)]
 pub struct Holding {
     pub id: Uuid,
     pub instance: Arc<Instance>,
@@ -22,8 +22,8 @@ impl EventTypeOf for Holding {
     }
 }
 
-impl From<Holding> for Event {
-    fn from(holding: Holding) -> Self {
+impl From<Arc<Holding>> for Event {
+    fn from(holding: Arc<Holding>) -> Self {
         Event::BalanceUpdate(holding)
     }
 }

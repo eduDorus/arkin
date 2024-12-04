@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use rust_decimal::Decimal;
 use sqlx::{FromRow, PgPool};
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -41,8 +41,8 @@ impl From<Arc<Transaction>> for TransactionDTO {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct TransactionRepo {
     pool: PgPool,
 }
@@ -136,20 +136,19 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_transaction_repo() {
         let pool = connect_database();
-        let repo = TransactionRepoBuilder::default().pool(pool).build().unwrap();
+        let repo = TransactionRepo::builder().pool(pool).build();
 
-        let transaction = TransactionBuilder::default()
+        let transaction = Transaction::builder()
             .event_time(OffsetDateTime::now_utc())
             .transaction_group_id(Uuid::new_v4())
             .portfolio(test_portfolio())
-            .asset(usdt_asset())
+            .asset(Some(usdt_asset()))
             .instrument(None)
             .transaction_type(TransactionType::Collateral)
-            .price(dec!(1))
-            .quantity(100)
-            .total_value(100)
-            .build()
-            .unwrap();
+            .price(Some(dec!(1)))
+            .quantity(dec!(100))
+            .total_value(dec!(100))
+            .build();
         let transaction = Arc::new(transaction);
         repo.insert(transaction.clone().into()).await.unwrap();
     }

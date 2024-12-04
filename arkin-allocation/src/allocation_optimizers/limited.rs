@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use time::OffsetDateTime;
@@ -17,7 +17,7 @@ use arkin_portfolio::prelude::*;
 
 use crate::{AllocationOptim, AllocationOptimError};
 
-#[derive(Debug, Builder)]
+#[derive(Debug, TypedBuilder)]
 pub struct LimitedAllocationOptim {
     pubsub: Arc<PubSub>,
     persistence: Arc<dyn Persistor>,
@@ -189,7 +189,7 @@ impl AllocationOptim for LimitedAllocationOptim {
             };
 
             // Create execution order
-            let order = ExecutionOrderBuilder::default()
+            let order = ExecutionOrder::builder()
                 .instrument(instrument.clone())
                 .order_type(ExecutionOrderType::Maker)
                 .side(order_side)

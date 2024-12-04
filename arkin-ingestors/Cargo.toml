@@ -27,7 +27,7 @@ backoff = { workspace = true }
 reqwest = { workspace = true }
 rust_decimal = { workspace = true }
 thiserror = { workspace = true }
-derive_builder = { workspace = true }
+typed-builder = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }

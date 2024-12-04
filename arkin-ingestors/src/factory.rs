@@ -4,10 +4,9 @@ use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
 use crate::{
-    binance::BinanceIngestorBuilder,
     config::{IngestorConfig, IngestorsConfig},
     traits::Ingestor,
-    TardisIngestor,
+    BinanceIngestor, TardisIngestor,
 };
 
 pub struct IngestorFactory {}
@@ -24,7 +23,7 @@ impl IngestorFactory {
             .map(|config| {
                 let ingestor: Arc<dyn Ingestor> = match config {
                     IngestorConfig::Binance(c) => Arc::new(
-                        BinanceIngestorBuilder::default()
+                        BinanceIngestor::builder()
                             .pubsub(pubsub.clone())
                             .persistence(persistence.clone())
                             .url(c.ws_url.parse().expect("Failed to parse ws binance URL"))
@@ -33,10 +32,11 @@ impl IngestorFactory {
                             .api_secret(c.api_secret.to_owned())
                             .connections_per_manager(c.connections_per_manager)
                             .duplicate_lookback(c.duplicate_lookback)
-                            .build()
-                            .expect("Failed to build BinanceIngestor"),
+                            .build(),
                     ),
-                    IngestorConfig::Tardis(c) => Arc::new(TardisIngestor::from_config(c, persistence.clone())),
+                    IngestorConfig::Tardis(c) => {
+                        Arc::new(TardisIngestor::from_config(c, pubsub.clone(), persistence.clone()))
+                    }
                 };
                 ingestor
             })

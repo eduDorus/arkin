@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use tokio::select;
@@ -13,8 +13,8 @@ use arkin_core::prelude::*;
 
 use crate::{Executor, ExecutorError};
 
-#[derive(Debug, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, TypedBuilder)]
+
 pub struct SimulationExecutor {
     pubsub: Arc<PubSub>,
     #[builder(default)]
@@ -51,7 +51,7 @@ impl SimulationExecutor {
 
     pub fn update_balance(&self, asset: &Arc<Asset>, quantity: Decimal) {
         let mut entry = self.balances.entry(asset.clone()).or_insert(
-            HoldingBuilder::default()
+            Holding::builder()
                 .asset(asset.clone())
                 .balance(dec!(0))
                 .build()
@@ -70,7 +70,7 @@ impl Executor for SimulationExecutor {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError> {
         info!("Starting simulation executor...");
         // TODO: Send current balance
-        let holding = HoldingBuilder::default()
+        let holding = Holding::builder()
             .asset(usdt_asset())
             .balance(dec!(10000))
             .build()
@@ -90,7 +90,7 @@ impl Executor for SimulationExecutor {
 
                     // Notify the order has been received
                     self.orders.insert(order.id.clone(), order.clone());
-                    let update = VenueOrderStateBuilder::default()
+                    let update = VenueOrderState::builder()
                         .id(order.id.clone())
                         .status(VenueOrderStatus::Placed)
                         .build()
@@ -123,7 +123,7 @@ impl Executor for SimulationExecutor {
                             commission = commission.round_dp(order.instrument.price_precision);
 
                             // Create the fill
-                            let fill = VenueOrderFillBuilder::default()
+                            let fill = VenueOrderFill::builder()
                                 .venue_order(order.clone())
                                 .instrument(order.instrument.clone())
                                 .side(order.side.clone())
@@ -213,7 +213,7 @@ mod tests {
     async fn test_backtest_executor_place_order() {
         // Create executor
         let pubsub = Arc::new(PubSub::new());
-        let executor = Arc::new(SimulationExecutorBuilder::default().pubsub(pubsub.clone()).build().unwrap());
+        let executor = Arc::new(SimulationExecutor::builder().pubsub(pubsub.clone()).build().unwrap());
 
         // Start executor
         let tracker = TaskTracker::new();
@@ -227,7 +227,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Create a sample VenueOrder
-        let order = VenueOrderBuilder::default()
+        let order = VenueOrder::builder()
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Buy)
@@ -249,7 +249,7 @@ mod tests {
         assert_eq!(ack.status, VenueOrderStatus::Placed);
 
         // Send price update
-        let tick = TickBuilder::default()
+        let tick = Tick::builder()
             .instrument(test_inst_binance_btc_usdt_perp())
             .tick_id(0 as u64)
             .bid_price(dec!(50000))

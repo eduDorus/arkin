@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use arkin_core::VenueOrder;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 
 use crate::{repos::VenueOrderRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct VenueOrderStore {
     venue_order_repo: VenueOrderRepo,
 }

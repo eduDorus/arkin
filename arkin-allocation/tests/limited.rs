@@ -16,7 +16,7 @@ async fn test_limited_allocation() {
     let mut persistence = MockPersistor::new();
     persistence.expect_read_latest_tick().returning(|_, _| {
         Ok(Some(
-            TickBuilder::default()
+            Tick::builder()
                 .event_time(OffsetDateTime::now_utc())
                 .instrument(test_inst_binance_btc_usdt_perp())
                 .tick_id(1234 as u64)
@@ -34,7 +34,7 @@ async fn test_limited_allocation() {
     // portfolio.expect_positions().returning(|| HashMap::new());
 
     // Setup allocation
-    let allocation_optim = LimitedAllocationOptimBuilder::default()
+    let allocation_optim = LimitedAllocationOptim::builder()
         .persistence(Arc::new(persistence))
         .portfolio(Arc::new(portfolio))
         .max_allocation(Decimal::from_f64(0.8).unwrap())
@@ -44,7 +44,7 @@ async fn test_limited_allocation() {
 
     // Create signal
     let event_time = OffsetDateTime::now_utc();
-    let signal = SignalBuilder::default()
+    let signal = Signal::builder()
         .event_time(event_time)
         .instrument(test_inst_binance_btc_usdt_perp())
         .strategy(test_strategy())

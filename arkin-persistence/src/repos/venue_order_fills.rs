@@ -1,5 +1,5 @@
 use anyhow::Result;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use sqlx::PgPool;
 use tracing::debug;
 
@@ -7,8 +7,8 @@ use arkin_core::prelude::*;
 
 use crate::BIND_LIMIT;
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct VenueOrderFillsRepo {
     pool: PgPool,
 }
@@ -97,13 +97,13 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_venue_order_fill_repo() {
         let pool = connect_database();
-        let repo = VenueOrderFillsRepoBuilder::default().pool(pool).build().unwrap();
+        let repo = VenueOrderFillsRepo::builder().pool(pool).build().unwrap();
 
         let instrument = test_inst_binance_btc_usdt_perp();
         let instance = test_instance();
         let order = test_venue_order();
 
-        let fill = VenueOrderFillBuilder::default()
+        let fill = VenueOrderFill::builder()
             .event_time(OffsetDateTime::now_utc())
             .instance(instance.clone())
             .venue_order(order.clone())

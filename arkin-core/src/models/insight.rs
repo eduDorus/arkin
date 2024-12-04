@@ -1,16 +1,16 @@
 use std::{fmt, sync::Arc};
 
-use derive_builder::Builder;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{Event, EventType, EventTypeOf, FeatureId};
 
 use super::{Instrument, Pipeline};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct Insight {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
@@ -27,8 +27,8 @@ impl EventTypeOf for Insight {
     }
 }
 
-impl From<Insight> for Event {
-    fn from(insight: Insight) -> Self {
+impl From<Arc<Insight>> for Event {
+    fn from(insight: Arc<Insight>) -> Self {
         Event::Insight(insight)
     }
 }

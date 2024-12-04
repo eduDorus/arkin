@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use derive_builder::Builder;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
 use crate::{Algorithm, StrategyError};
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, TypedBuilder)]
 #[allow(unused)]
 pub struct CrossoverStrategy {
     pubsub: Arc<PubSub>,
@@ -45,7 +45,7 @@ impl Algorithm for CrossoverStrategy {
         instruments: &[Arc<Instrument>],
         event_time: OffsetDateTime,
         insights: &[Insight],
-    ) -> Result<Vec<Signal>, StrategyError> {
+    ) -> Result<Vec<Arc<Signal>>, StrategyError> {
         info!("Processing insights for Crossover Strategy...");
         let signals = instruments
             .iter()
@@ -66,51 +66,37 @@ impl Algorithm for CrossoverStrategy {
                     }
                 });
 
-                match (fast_ma, slow_ma) {
+                let weight = match (fast_ma, slow_ma) {
                     (Some(f), Some(s)) => match f.value > s.value {
-                        true => {
-                            return Some(
-                                SignalBuilder::default()
-                                    .event_time(event_time)
-                                    .instrument(i.clone())
-                                    .strategy(self.id.clone())
-                                    .weight(Decimal::ONE)
-                                    .build()
-                                    .expect("Failed to create signal"),
-                            )
-                        }
-                        false => {
-                            let mut weight = Decimal::ONE;
-                            weight.set_sign_negative(true);
-                            return Some(
-                                SignalBuilder::default()
-                                    .event_time(event_time)
-                                    .instrument(i.clone())
-                                    .strategy(self.id.clone())
-                                    .weight(weight)
-                                    .build()
-                                    .expect("Failed to create signal"),
-                            );
-                        }
+                        true => Decimal::ONE,
+                        false => Decimal::NEGATIVE_ONE,
                     },
-                    _ => return None,
-                }
+                    _ => Decimal::ZERO,
+                };
+                let signal = Signal::builder()
+                    .event_time(event_time)
+                    .instrument(i.clone())
+                    .strategy(self.id.clone())
+                    .weight(weight)
+                    .build();
+                let signal = Arc::new(signal);
+                return Some(signal);
             })
             .collect::<Vec<_>>();
         Ok(signals)
     }
 
-    async fn insight_tick(&self, tick: InsightTick) -> Result<(), StrategyError> {
+    async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError> {
         info!("Processing insight tick for Crossover Strategy...");
         let signals = self
             .insight_update(&tick.instruments, tick.event_time, tick.insights.as_slice())
             .await?;
-        let signal_tick = SignalTickBuilder::default()
+        let signal_tick = SignalTick::builder()
             .event_time(tick.event_time)
-            .instruments(tick.instruments)
+            .instruments(tick.instruments.clone())
             .signals(signals)
-            .build()
-            .expect("Failed to create signal tick");
+            .build();
+        let signal_tick = Arc::new(signal_tick);
 
         info!(
             "Publishing signal tick: {} with {} signals",

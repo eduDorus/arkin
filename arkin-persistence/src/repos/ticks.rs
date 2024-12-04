@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use sqlx::{FromRow, PgPool};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -36,8 +36,8 @@ impl From<Arc<Tick>> for TickDTO {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct TickRepo {
     pool: PgPool,
 }

@@ -11,19 +11,17 @@ use reqwest::{
 use serde::Serialize;
 use time::OffsetDateTime;
 use tracing::{debug, error};
+use typed_builder::TypedBuilder;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct TardisHttpClient {
     pub base_url: String,
     pub api_secret: Option<String>,
+    #[builder(default = get_client().expect("Failed to create http client"))]
     pub client: Client,
 }
 
 impl TardisHttpClient {
-    pub fn builder() -> TardisHttpClientBuilder {
-        TardisHttpClientBuilder::default()
-    }
-
     pub async fn request(
         &self,
         exchange: String,
@@ -57,33 +55,6 @@ impl TardisHttpClient {
         })
         .await?;
         Ok(res)
-    }
-}
-
-#[derive(Default)]
-pub struct TardisHttpClientBuilder {
-    pub base_url: String,
-    pub api_secret: Option<String>,
-}
-
-impl TardisHttpClientBuilder {
-    pub fn base_url(mut self, base_url: String) -> Self {
-        self.base_url = base_url;
-        self
-    }
-
-    pub fn api_secret(mut self, api_secret: Option<String>) -> Self {
-        self.api_secret = api_secret;
-        self
-    }
-
-    pub fn build(self) -> TardisHttpClient {
-        let client = get_client().expect("Failed to create tardis http client");
-        TardisHttpClient {
-            base_url: self.base_url,
-            api_secret: self.api_secret,
-            client,
-        }
     }
 }
 

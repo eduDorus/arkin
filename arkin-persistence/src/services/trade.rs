@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 use uuid::Uuid;
@@ -10,8 +10,8 @@ use crate::{
     PersistenceError,
 };
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct TradeService {
     pub portfolio_store: PortfolioStore,
     pub transaction_store: TransactionStore,

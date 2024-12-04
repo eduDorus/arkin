@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use tokio::sync::Mutex;
 
 use arkin_core::Transaction;
@@ -8,8 +8,8 @@ use tracing::error;
 
 use crate::{repos::TransactionRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct TransactionStore {
     transaction_repo: TransactionRepo,
     #[builder(default)]

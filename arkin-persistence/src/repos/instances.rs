@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use arkin_core::{Instance, InstanceStatus, InstanceType};
-use derive_builder::Builder;
 use sqlx::PgPool;
+use typed_builder::TypedBuilder;
 
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -59,8 +59,8 @@ impl From<InstanceDTO> for Arc<Instance> {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct InstanceRepo {
     pool: PgPool,
 }
@@ -182,23 +182,21 @@ pub mod tests {
     use crate::test_utils::connect_database;
 
     use super::*;
-    use arkin_core::InstanceBuilder;
     use test_log::test;
     use time::OffsetDateTime;
 
     #[test(tokio::test)]
     async fn test_instance_repo() {
         let pool = connect_database();
-        let repo = InstanceRepoBuilder::default().pool(pool).build().unwrap();
+        let repo = InstanceRepo::builder().pool(pool).build();
 
-        let mut instance = InstanceBuilder::default()
+        let mut instance = Instance::builder()
             .id(Uuid::new_v4())
-            .name("test_instance")
+            .name("test_instance".into())
             .start_time(OffsetDateTime::now_utc())
             .instance_type(InstanceType::Live)
             .status(InstanceStatus::Running)
-            .build()
-            .unwrap();
+            .build();
 
         let wrapped_instance = Arc::new(instance.clone());
 

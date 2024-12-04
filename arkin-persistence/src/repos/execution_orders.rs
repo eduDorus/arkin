@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use rust_decimal::Decimal;
 use sqlx::PgPool;
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 use time::OffsetDateTime;
@@ -70,8 +70,8 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct ExecutionOrderRepo {
     pool: PgPool,
 }
@@ -169,19 +169,18 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_execution_order_repo() {
         let pool = connect_database();
-        let repo = ExecutionOrderRepoBuilder::default().pool(pool).build().unwrap();
+        let repo = ExecutionOrderRepo::builder().pool(pool).build();
 
-        let mut order = ExecutionOrderBuilder::default()
+        let mut order = ExecutionOrder::builder()
             .id(Uuid::new_v4())
             .portfolio(test_portfolio())
             .strategy(test_strategy())
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(ExecutionOrderType::Maker)
             .side(MarketSide::Buy)
-            .price(dec!(0))
+            .price(Some(dec!(0)))
             .quantity(dec!(1))
-            .build()
-            .unwrap();
+            .build();
         repo.insert(order.clone().into()).await.unwrap();
 
         order.fill_price = dec!(110);

@@ -12,7 +12,7 @@ async fn test_single_strategy_long_position() {
 
     // Create Portfolio
     let portfolio = Arc::new(
-        SingleStrategyPortfolioBuilder::default()
+        SingleStrategyPortfolio::builder()
             .pubsub(pubsub.clone())
             .build()
             .expect("Failed to build SimplePortfolio"),
@@ -24,7 +24,7 @@ async fn test_single_strategy_long_position() {
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
-    let balance = HoldingBuilder::default()
+    let balance = Holding::builder()
         .asset(instrument.quote_asset.clone())
         .balance(dec!(10000))
         .build()
@@ -38,7 +38,7 @@ async fn test_single_strategy_long_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())
@@ -60,7 +60,7 @@ async fn test_single_strategy_long_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())
@@ -79,7 +79,7 @@ async fn test_single_strategy_long_position() {
     assert_eq!(asset_capital, dec!(10006));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())
@@ -113,7 +113,7 @@ async fn test_single_strategy_short_position() {
 
     // Create Portfolio
     let portfolio = Arc::new(
-        SingleStrategyPortfolioBuilder::default()
+        SingleStrategyPortfolio::builder()
             .pubsub(pubsub.clone())
             .build()
             .expect("Failed to build SimplePortfolio"),
@@ -125,7 +125,7 @@ async fn test_single_strategy_short_position() {
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
-    let balance = HoldingBuilder::default()
+    let balance = Holding::builder()
         .asset(instrument.quote_asset.clone())
         .balance(dec!(10000))
         .build()
@@ -139,7 +139,7 @@ async fn test_single_strategy_short_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())
@@ -161,7 +161,7 @@ async fn test_single_strategy_short_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())
@@ -180,7 +180,7 @@ async fn test_single_strategy_short_position() {
     assert_eq!(asset_capital, dec!(10006));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())
@@ -214,7 +214,7 @@ async fn test_single_strategy_swap_position() {
 
     // Create Portfolio
     let portfolio = Arc::new(
-        SingleStrategyPortfolioBuilder::default()
+        SingleStrategyPortfolio::builder()
             .pubsub(pubsub.clone())
             .build()
             .expect("Failed to build SimplePortfolio"),
@@ -226,7 +226,7 @@ async fn test_single_strategy_swap_position() {
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
-    let balance = HoldingBuilder::default()
+    let balance = Holding::builder()
         .asset(instrument.quote_asset.clone())
         .balance(dec!(10000))
         .build()
@@ -240,7 +240,7 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())
@@ -262,7 +262,7 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())
@@ -282,7 +282,7 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(asset_capital, dec!(10016));
 
     // Create fill
-    let fill = VenueOrderFillBuilder::default()
+    let fill = VenueOrderFill::builder()
         .instance(instance.clone())
         .venue_order(order.clone())
         .instrument(instrument.clone())

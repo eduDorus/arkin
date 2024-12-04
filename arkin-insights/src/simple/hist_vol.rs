@@ -5,6 +5,7 @@ use arkin_core::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::debug;
+use uuid::Uuid;
 
 use crate::{config::HistVolConfig, state::InsightsState, Computation};
 
@@ -65,12 +66,16 @@ impl Computation for HistVolFeature {
                 let annualized_vol = v * self.annualized_multi;
 
                 // Create the insight
-                Some(Insight::new(
-                    timestamp,
-                    Some(instrument.clone()),
-                    self.output.clone(),
-                    annualized_vol,
-                ))
+                Some(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .pipeline(pipeline)
+                        .event_time(timestamp)
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output.clone())
+                        .value(annualized_vol)
+                        .build(),
+                )
             })
             .collect::<Vec<_>>();
 

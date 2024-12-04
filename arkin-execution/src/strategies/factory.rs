@@ -15,7 +15,7 @@ impl ExecutionStrategyFactory {
             ExecutionOrderStrategy::Market(_s) => unimplemented!(),
             ExecutionOrderStrategy::Limit(_s) => unimplemented!(),
             ExecutionOrderStrategy::WideQuoting(s) => Arc::new(
-                WideQuoterBuilder::default()
+                WideQuoter::builder()
                     .execution_order_id(order.id)
                     .order_manager(order_manager)
                     .executor(executor)

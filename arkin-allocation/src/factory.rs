@@ -17,7 +17,7 @@ impl AllocationFactory {
     ) -> Arc<dyn AllocationOptim> {
         let allocation: Arc<dyn AllocationOptim> = match &config.allocation_optim {
             AllocationTypeConfig::Limited(c) => Arc::new(
-                LimitedAllocationOptimBuilder::default()
+                LimitedAllocationOptim::builder()
                     .pubsub(pubsub.clone())
                     .persistence(persistance)
                     .portfolio(portfolio)

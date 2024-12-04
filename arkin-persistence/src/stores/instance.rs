@@ -1,19 +1,20 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use moka2::future::Cache;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::Instance;
 
 use crate::{repos::InstanceRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct InstanceStore {
     instance_repo: InstanceRepo,
-    #[builder(default = "Cache::new(1000)")]
+    #[builder(default = Cache::new(1000))]
     instance_cache_id: Cache<Uuid, Arc<Instance>>,
+    #[builder(default = Cache::new(1000))]
     instance_cache_name: Cache<String, Arc<Instance>>,
 }
 

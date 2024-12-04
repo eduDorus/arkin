@@ -3,11 +3,11 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use async_tungstenite::tungstenite::Message;
-use derive_builder::Builder;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tracing::{debug, error, info, warn};
+use typed_builder::TypedBuilder;
 use url::Url;
 
 use arkin_core::prelude::*;
@@ -18,11 +18,11 @@ use crate::traits::Ingestor;
 use crate::ws::WebSocketManager;
 use crate::IngestorError;
 
-#[derive(Debug, Builder, Clone)]
-// #[builder(setter(into))]
+#[derive(Debug, TypedBuilder, Clone)]
+//
 pub struct BinanceIngestor {
     pubsub: Arc<PubSub>,
-    persistence: Arc<dyn Persistor>,
+    persistence: Arc<PersistenceService>,
     url: Url,
     channels: Vec<String>,
     #[builder(default)]
@@ -34,11 +34,11 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    async fn process_event(pubsub: Arc<PubSub>, persistence: Arc<dyn Persistor>, data: String) {
+    async fn process_event(pubsub: Arc<PubSub>, persistence: Arc<PersistenceService>, data: String) {
         match serde_json::from_str::<BinanceSwapEvent>(&data) {
             Ok(e) => {
                 debug!("BinanceSwapEvent: {}", e);
-                if let Ok(instrument) = persistence.read_instrument_by_venue_symbol(e.venue_symbol()).await {
+                if let Ok(instrument) = persistence.instrument_store.read_by_venue_symbol(&e.venue_symbol()).await {
                     debug!("Instrument found: {}", instrument.symbol);
                     match e {
                         BinanceSwapEvent::AggTrade(trade) => {
@@ -61,6 +61,7 @@ impl BinanceIngestor {
                                 trade.price,
                                 trade.quantity,
                             );
+                            let trade = Arc::new(trade);
                             pubsub.publish::<Trade>(trade);
                         }
                         BinanceSwapEvent::Tick(tick) => {
@@ -73,6 +74,7 @@ impl BinanceIngestor {
                                 tick.ask_price,
                                 tick.ask_quantity,
                             );
+                            let tick = Arc::new(tick);
                             pubsub.publish::<Tick>(tick);
                         }
                     }

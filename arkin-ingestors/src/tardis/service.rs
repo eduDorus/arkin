@@ -202,6 +202,7 @@ impl TardisRequest {
 
 #[derive(Debug)]
 pub struct TardisIngestor {
+    pub pubsub: Arc<PubSub>,
     pub persistence_service: Arc<PersistenceService>,
     pub client: TardisHttpClient,
     pub max_concurrent_requests: usize,
@@ -213,7 +214,11 @@ pub struct TardisIngestor {
 }
 
 impl TardisIngestor {
-    pub fn from_config(config: &TardisIngestorConfig, persistence_service: Arc<PersistenceService>) -> Self {
+    pub fn from_config(
+        config: &TardisIngestorConfig,
+        pubsub: Arc<PubSub>,
+        persistence_service: Arc<PersistenceService>,
+    ) -> Self {
         let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
         let start = PrimitiveDateTime::parse(&config.start, &format)
             .expect("Failed to parse start date")
@@ -227,6 +232,7 @@ impl TardisIngestor {
 
         info!("Starting: {} Ending: {}", start_fmt, end_fmt);
         Self {
+            pubsub,
             persistence_service,
             client: TardisHttpClient::builder()
                 .api_secret(config.api_secret.clone())
@@ -381,7 +387,8 @@ impl Ingestor for TardisIngestor {
             };
 
             let instrument = persistence_service
-                .read_instrument_by_venue_symbol(event.venue_symbol())
+                .instrument_store
+                .read_by_venue_symbol(&event.venue_symbol())
                 .await?;
 
             match event {
@@ -400,10 +407,8 @@ impl Ingestor for TardisIngestor {
                         trade.price,
                         trade.quantity,
                     );
-
-                    if let Err(e) = persistence_service.insert_trade_batch(trade).await {
-                        error!("Failed to insert trade: {}", e);
-                    }
+                    let trade = Arc::new(trade);
+                    self.pubsub.publish::<Trade>(trade);
                 }
                 BinanceSwapsEvent::TickStream(stream) => {
                     let tick = stream.data;
@@ -416,9 +421,8 @@ impl Ingestor for TardisIngestor {
                         tick.ask_price,
                         tick.ask_quantity,
                     );
-                    if let Err(e) = persistence_service.insert_tick_batch(tick).await {
-                        error!("Failed to insert tick: {}", e);
-                    }
+                    let tick = Arc::new(tick);
+                    self.pubsub.publish::<Tick>(tick);
                 }
             }
         }

@@ -28,7 +28,7 @@ sha2 = { version = "0.10", default-features = false, features = [ "oid" ] }
 signature = "2.2"
 base64 = "0.22"
 ed25519-dalek = { version = "2.1", features = [ "serde", "zeroize", "rand_core", "digest", "pkcs8", "pem" ] }
-derive_builder = "0.20"
+typed-builder = "0.20"
 
 # Multi-threading
 parking_lot = { version = "0.12", features = [ "hardware-lock-elision" ], default-features = false }

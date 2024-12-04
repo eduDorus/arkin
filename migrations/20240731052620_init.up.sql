@@ -24,10 +24,11 @@ CREATE TABLE IF NOT EXISTS strategies (
     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 
+CREATE TYPE venue_type AS ENUM ('cex', 'dex', 'otc');
 CREATE TABLE IF NOT EXISTS venues (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
-    venue_type TEXT NOT NULL,
+    venue_type venue_type NOT NULL,
     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );

@@ -15,7 +15,7 @@ impl ExecutionFactory {
     ) -> Arc<dyn OrderManager> {
         let order_manager: Arc<dyn OrderManager> = match &config.order_manager {
             OrderManagerType::SimpleExecutor => Arc::new(
-                SimpleOrderManagerBuilder::default()
+                SimpleOrderManager::builder()
                     .pubsub(pubsub)
                     .portfolio(portfolio)
                     .build()

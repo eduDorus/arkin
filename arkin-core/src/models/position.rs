@@ -1,16 +1,16 @@
 use std::{fmt, sync::Arc};
 
-use derive_builder::Builder;
 use rust_decimal::Decimal;
 use sqlx::prelude::Type;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::info;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
+use crate::{types::Commission, Notional, Price, Quantity, VenueOrderFill};
 
-use super::{Instance, Instrument, MarketSide, Strategy};
+use super::{Instrument, MarketSide, Strategy};
 
 #[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type)]
 #[strum(serialize_all = "snake_case")]
@@ -37,12 +37,12 @@ pub enum PositionStatus {
     Closed,
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct Position {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
-    pub instance: Arc<Instance>,
+    // pub portfolio: Arc<Portfolio>,
     pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub side: PositionSide,
@@ -193,28 +193,6 @@ impl Position {
 
     pub fn is_profitable(&self) -> bool {
         self.realized_pnl > Decimal::ZERO
-    }
-}
-
-impl EventTypeOf for Position {
-    fn event_type() -> EventType {
-        EventType::PositionUpdate
-    }
-}
-
-impl From<VenueOrderFill> for Position {
-    fn from(fill: VenueOrderFill) -> Self {
-        let postition = PositionBuilder::default()
-            .instrument(fill.instrument)
-            .side(fill.side)
-            .open_price(fill.price)
-            .last_price(fill.price)
-            .open_quantity(fill.quantity)
-            .total_commission(fill.commission)
-            .build()
-            .expect("Failed to build position from fill");
-        info!("Created new position: {}", postition);
-        postition
     }
 }
 

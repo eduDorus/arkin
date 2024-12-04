@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use sqlx::PgPool;
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 use uuid::Uuid;
@@ -45,8 +45,8 @@ impl From<StrategyDTO> for Strategy {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct StrategyRepo {
     pool: PgPool,
 }
@@ -155,13 +155,12 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_strategy_repo() {
         let pool = connect_database();
-        let repo = StrategyRepoBuilder::default().pool(pool).build().unwrap();
+        let repo = StrategyRepo::builder().pool(pool).build();
 
-        let mut strategy = StrategyBuilder::default()
-            .name("test_strategy")
+        let mut strategy = Strategy::builder()
+            .name("test_strategy".into())
             .description(Some("test_description".to_string()))
-            .build()
-            .unwrap();
+            .build();
 
         let result = repo.insert(strategy.clone().into()).await;
         assert!(result.is_ok());

@@ -65,7 +65,7 @@ async fn main() {
         }
     }
 
-    let engine = SingleStrategyEngineBuilder::default()
+    let engine = SingleStrategyEngine::builder()
         .pubsub(pubsub)
         .instruments(instruments)
         .persistor(persistence)

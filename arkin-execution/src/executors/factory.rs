@@ -12,7 +12,7 @@ impl ExecutorFactory {
     pub fn from_config(config: &ExecutorConfig, pubsub: Arc<PubSub>) -> Arc<dyn Executor> {
         let executor: Arc<dyn Executor> = match &config.executor {
             ExecutorTypeConfig::Simulation(_c) => Arc::new(
-                SimulationExecutorBuilder::default()
+                SimulationExecutor::builder()
                     .pubsub(pubsub)
                     .build()
                     .expect("Failed to build BacktestExecutor"),

@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
 use tracing::error;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_core::{Trade, TradeBuilder};
+use arkin_core::Trade;
 
 use crate::{repos::TradeRepo, PersistenceError};
 
 use super::instrument::InstrumentStore;
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct TradeStore {
     instrument_store: Arc<InstrumentStore>,
     trade_repo: TradeRepo,
@@ -104,15 +104,14 @@ impl TradeStore {
         let mut trades = Vec::with_capacity(dto.len());
         for trade in &dto {
             let instrument = self.instrument_store.read_by_id(&trade.instrument_id).await?;
-            let trade = TradeBuilder::default()
+            let trade = Trade::builder()
                 .event_time(trade.event_time)
                 .instrument(instrument)
                 .trade_id(trade.trade_id as u64)
                 .side(trade.side)
                 .price(trade.price)
                 .quantity(trade.quantity)
-                .build()
-                .expect("Failed to build trade");
+                .build();
             trades.push(Arc::new(trade));
         }
         Ok(trades)

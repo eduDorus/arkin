@@ -16,21 +16,21 @@ use crate::{PersistenceConfig, PersistenceError};
 pub struct PersistenceService {
     pub pubsub: Arc<PubSub>,
     pub auto_commit_interval: Duration,
-    pub instance_store: InstanceStore,
-    pub portfolio_store: PortfolioStore,
-    pub transaction_store: TransactionStore,
-    pub venue_store: VenueStore,
-    pub asset_store: AssetStore,
-    pub instrument_store: InstrumentStore,
-    pub pipeline_store: PipelineStore,
-    pub insights_store: InsightsStore,
-    pub strategy_store: StrategyStore,
-    pub signal_store: SignalStore,
-    pub allocation_store: AllocationStore,
-    pub execution_order_store: ExecutionOrderStore,
-    pub venue_order_store: VenueOrderStore,
-    pub tick_store: TickStore,
-    pub trade_store: TradeStore,
+    pub instance_store: Arc<InstanceStore>,
+    pub portfolio_store: Arc<PortfolioStore>,
+    pub transaction_store: Arc<TransactionStore>,
+    pub venue_store: Arc<VenueStore>,
+    pub asset_store: Arc<AssetStore>,
+    pub instrument_store: Arc<InstrumentStore>,
+    pub pipeline_store: Arc<PipelineStore>,
+    pub insights_store: Arc<InsightsStore>,
+    pub strategy_store: Arc<StrategyStore>,
+    pub signal_store: Arc<SignalStore>,
+    pub allocation_store: Arc<AllocationStore>,
+    pub execution_order_store: Arc<ExecutionOrderStore>,
+    pub venue_order_store: Arc<VenueOrderStore>,
+    pub tick_store: Arc<TickStore>,
+    pub trade_store: Arc<TradeStore>,
 }
 
 impl PersistenceService {
@@ -53,132 +53,71 @@ impl PersistenceService {
             .connect_lazy_with(conn_options);
 
         // Initialize repositories
-        let instance_repo = InstanceRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build VenueRepo");
-        let portfolio = PortfolioRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build PortfolioRepo");
-        let transactions_repo = TransactionRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build TransactionRepo");
-        let venue_repo = VenueRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build VenueRepo");
-        let asset_repo = AssetRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build AssetRepo");
-        let instrument_repo = InstrumentRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build InstrumentRepo");
-        let pipeline_repo = PipelineRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build PipelineRepo");
-        let insights_repo = InsightsRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build InsightsRepo");
-        let strategy_repo = StrategyRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build InsightsRepo");
-        let signal_repo = SignalRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build SignalRepo");
-        let allocation_repo = AllocationRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build AllocationRepo");
-        let execution_order_repo = ExecutionOrderRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build ExecutionOrderRepo");
-        let venue_order_repo = VenueOrderRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build TransactionsRepo");
-        let tick_repo = TickRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build TickRepo");
-        let trade_repo = TradeRepoBuilder::default()
-            .pool(pool.clone())
-            .build()
-            .expect("Failed to build TradeRepo");
+        let instance_repo = InstanceRepo::builder().pool(pool.clone()).build();
+        let portfolio = PortfolioRepo::builder().pool(pool.clone()).build();
+        let transactions_repo = TransactionRepo::builder().pool(pool.clone()).build();
+        let venue_repo = VenueRepo::builder().pool(pool.clone()).build();
+        let asset_repo = AssetRepo::builder().pool(pool.clone()).build();
+        let instrument_repo = InstrumentRepo::builder().pool(pool.clone()).build();
+        let pipeline_repo = PipelineRepo::builder().pool(pool.clone()).build();
+        let insights_repo = InsightsRepo::builder().pool(pool.clone()).build();
+        let strategy_repo = StrategyRepo::builder().pool(pool.clone()).build();
+        let signal_repo = SignalRepo::builder().pool(pool.clone()).build();
+        let allocation_repo = AllocationRepo::builder().pool(pool.clone()).build();
+        let execution_order_repo = ExecutionOrderRepo::builder().pool(pool.clone()).build();
+        let venue_order_repo = VenueOrderRepo::builder().pool(pool.clone()).build();
+        let tick_repo = TickRepo::builder().pool(pool.clone()).build();
+        let trade_repo = TradeRepo::builder().pool(pool.clone()).build();
 
         // Initialize stores
-        let instance_store = InstanceStoreBuilder::default()
-            .instance_repo(instance_repo.clone())
-            .build()
-            .expect("Failed to build InstanceStore");
-        let portfolio_store = PortfolioStoreBuilder::default()
-            .portfolio_repo(portfolio.clone())
-            .build()
-            .expect("Failed to build PortfolioStore");
-        let transaction_store = TransactionStoreBuilder::default()
-            .transaction_repo(transactions_repo.clone())
-            .build()
-            .expect("Failed to build TransactionStore");
-        let venue_store = VenueStoreBuilder::default()
-            .venue_repo(venue_repo)
-            .build()
-            .expect("Failed to build VenueStore");
-        let asset_store = AssetStoreBuilder::default()
-            .asset_repo(asset_repo.clone())
-            .build()
-            .expect("Failed to build AssetStore");
-        let instrument_store = InstrumentStoreBuilder::default()
-            .instrument_repo(instrument_repo)
-            .asset_store(asset_store.clone())
-            .venue_store(venue_store.clone())
-            .build()
-            .expect("Failed to build InstrumentStore");
-        let pipeline_store = PipelineStoreBuilder::default()
-            .pipeline_repo(pipeline_repo.clone())
-            .build()
-            .expect("Failed to build PipelineStore");
-        let insights_store = InsightsStoreBuilder::default()
-            .insights_repo(insights_repo.clone())
-            .build()
-            .expect("Failed to build InsightsStore");
-        let strategy_store = StrategyStoreBuilder::default()
-            .strategy_repo(strategy_repo.clone())
-            .build()
-            .expect("Failed to build InsightsStore");
-        let signal_store = SignalStoreBuilder::default()
-            .signal_repo(signal_repo.clone())
-            .build()
-            .expect("Failed to build SignalStore");
-        let allocation_store = AllocationStoreBuilder::default()
-            .allocation_repo(allocation_repo.clone())
-            .build()
-            .expect("Failed to build AllocationStore");
-        let execution_order_store = ExecutionOrderStoreBuilder::default()
-            .execution_order_repo(execution_order_repo.clone())
-            .build()
-            .expect("Failed to build ExecutionOrderStore");
-        let venue_order_store = VenueOrderStoreBuilder::default()
-            .venue_order_repo(venue_order_repo.clone())
-            .build()
-            .expect("Failed to build VenueOrderStore");
-        let tick_store = TickStoreBuilder::default()
-            .tick_repo(tick_repo)
-            .instrument_store(instrument_store.clone())
-            .build()
-            .expect("Failed to build TickStore");
-        let trade_store = TradeStoreBuilder::default()
-            .trade_repo(trade_repo)
-            .instrument_store(instrument_store.clone())
-            .build()
-            .expect("Failed to build TradeStore");
+        let instance_store = Arc::new(InstanceStore::builder().instance_repo(instance_repo.to_owned()).build());
+        let portfolio_store = Arc::new(PortfolioStore::builder().portfolio_repo(portfolio.to_owned()).build());
+        let transaction_store = Arc::new(
+            TransactionStore::builder()
+                .transaction_repo(transactions_repo.to_owned())
+                .buffer_size(config.batch_size)
+                .build(),
+        );
+        let venue_store = Arc::new(VenueStore::builder().venue_repo(venue_repo).build());
+        let asset_store = Arc::new(AssetStore::builder().asset_repo(asset_repo.to_owned()).build());
+        let instrument_store = Arc::new(
+            InstrumentStore::builder()
+                .instrument_repo(instrument_repo)
+                .asset_store(asset_store.to_owned())
+                .venue_store(venue_store.to_owned())
+                .build(),
+        );
+        let pipeline_store = Arc::new(PipelineStore::builder().pipeline_repo(pipeline_repo.to_owned()).build());
+        let insights_store = Arc::new(
+            InsightsStore::builder()
+                .insights_repo(insights_repo.to_owned())
+                .buffer_size(config.batch_size)
+                .build(),
+        );
+        let strategy_store = Arc::new(StrategyStore::builder().strategy_repo(strategy_repo.to_owned()).build());
+        let signal_store = Arc::new(SignalStore::builder().signal_repo(signal_repo.to_owned()).build());
+        let allocation_store = Arc::new(AllocationStore::builder().allocation_repo(allocation_repo.to_owned()).build());
+        let execution_order_store = Arc::new(
+            ExecutionOrderStore::builder()
+                .execution_order_repo(execution_order_repo.to_owned())
+                .build(),
+        );
+        let venue_order_store =
+            Arc::new(VenueOrderStore::builder().venue_order_repo(venue_order_repo.to_owned()).build());
+        let tick_store = Arc::new(
+            TickStore::builder()
+                .tick_repo(tick_repo)
+                .instrument_store(instrument_store.to_owned())
+                .buffer_size(config.batch_size)
+                .build(),
+        );
+        let trade_store = Arc::new(
+            TradeStore::builder()
+                .trade_repo(trade_repo)
+                .instrument_store(instrument_store.to_owned())
+                .buffer_size(config.batch_size)
+                .build(),
+        );
 
         Self {
             pubsub,
@@ -212,7 +151,6 @@ impl Persistor for PersistenceService {
         let mut trades = self.pubsub.subscribe::<Trade>();
         let mut ticks = self.pubsub.subscribe::<Tick>();
         let mut insights = self.pubsub.subscribe::<Insight>();
-        let mut insights_tick = self.pubsub.subscribe::<InsightTick>();
 
         loop {
             tokio::select! {
@@ -229,11 +167,6 @@ impl Persistor for PersistenceService {
                     Ok(insight) = insights.recv() => {
                         if let Err(e) = self.insights_store.insert_buffered(insight).await {
                             error!("Failed to insert insight: {}", e);
-                        }
-                    }
-                    Ok(insight_tick) = insights_tick.recv() => {
-                        if let Err(e) = self.insights_store.insert_buffered_vec(insight_tick.insights).await {
-                            error!("Failed to insert insight tick: {}", e);
                         }
                     }
                     _ = interval.tick() => {

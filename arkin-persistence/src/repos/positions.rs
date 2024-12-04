@@ -1,12 +1,12 @@
 use anyhow::Result;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct PositionsRepo {
     pool: PgPool,
 }
@@ -110,13 +110,13 @@ pub mod tests {
     #[test(tokio::test)]
     async fn test_positions_repo() {
         let pool = connect_database();
-        let repo = PositionsRepoBuilder::default().pool(pool).build().unwrap();
+        let repo = PositionsRepo::builder().pool(pool).build().unwrap();
 
         let instrument = test_inst_binance_btc_usdt_perp();
         let instance = test_instance();
         let strategy = test_strategy();
 
-        let mut position = PositionBuilder::default()
+        let mut position = Position::builder()
             .id(Uuid::new_v4())
             .instance(instance.clone())
             .strategy(strategy.clone())

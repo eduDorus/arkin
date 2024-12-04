@@ -1,15 +1,15 @@
 use std::{fmt, sync::Arc};
 
-use derive_builder::Builder;
 use sqlx::{FromRow, Type};
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::warn;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
+use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity};
 
-use super::{Instrument, MarketSide, Portfolio, Strategy};
+use super::{Instrument, MarketSide, Portfolio, Strategy, VenueOrderFill};
 
 pub type ExecutionOrderId = Uuid;
 
@@ -38,8 +38,8 @@ pub enum ExecutionOrderStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Builder, FromRow)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder, FromRow)]
+
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,

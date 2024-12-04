@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use arkin_core::{Insight, Pipeline, Strategy, Venue};
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{
@@ -9,8 +9,8 @@ use crate::{
     PersistenceError,
 };
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct SystemService {
     pub pipeline_store: PipelineStore,
     pub venue_store: VenueStore,

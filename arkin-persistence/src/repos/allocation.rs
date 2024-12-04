@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
@@ -38,8 +38,8 @@ impl From<Arc<Allocation>> for AllocationDTO {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct AllocationRepo {
     pool: PgPool,
 }

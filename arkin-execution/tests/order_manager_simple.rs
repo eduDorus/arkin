@@ -10,10 +10,10 @@
 // async fn test_place_execution_order() {
 //     // Create mock Executor and Portfolio
 //     // let pubsub = PubSub::new();
-//     // let portfolio = SingleStrategyPortfolioBuilder::default().build().unwrap();
+//     // let portfolio = SingleStrategyPortfolio::builder().build().unwrap();
 
 //     // Build the SingleExecutorOrderManager with mocks
-//     // let order_manager = SimpleOrderManagerBuilder::default()
+//     // let order_manager = SimpleOrderManager::builder()
 //     //     .pubsub(Arc::new(pubsub))
 //     //     .portfolio(Arc::new(portfolio))
 //     //     .build()
@@ -21,10 +21,10 @@
 
 //     // Create a test ExecutionOrder
 //     // let instrument = test_inst_binance_btc_usdt_perp();
-//     // let first_order = ExecutionOrderBuilder::default()
+//     // let first_order = ExecutionOrder::builder()
 //     //     .instrument(instrument.clone())
 //     //     .execution_type(ExecutionOrderStrategy::WideQuoting(
-//     //         WideQuotingBuilder::default()
+//     //         WideQuoting::builder()
 //     //             .spread_from_mid(dec!(0.025))
 //     //             .requote_price_move_pct(dec!(0.005))
 //     //             .build()

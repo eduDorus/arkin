@@ -21,7 +21,7 @@ flume = { workspace = true }
 uuid = { workspace = true }
 strum = { workspace = true }
 tracing = { workspace = true }
-derive_builder = { workspace = true }
+typed-builder = { workspace = true }
 dashmap = { workspace = true }
 rand = { workspace = true }
 

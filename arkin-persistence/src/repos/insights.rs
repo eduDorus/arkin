@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
@@ -36,8 +36,8 @@ impl From<Arc<Insight>> for InsightDTO {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct InsightsRepo {
     pool: PgPool,
 }

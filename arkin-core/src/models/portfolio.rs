@@ -1,11 +1,11 @@
 use std::fmt;
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]
+
 pub struct Portfolio {
     pub id: Uuid,
     pub name: String,

@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use rust_decimal::prelude::*;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -10,7 +10,7 @@ use arkin_core::prelude::*;
 
 use crate::{ExecutionStrategy, OrderManager, StrategyError};
 
-#[derive(Debug, Clone, Builder)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct WideQuoter {
     pubsub: PubSub,
     execution_order_id: ExecutionOrderId,
@@ -24,7 +24,7 @@ pub struct WideQuoter {
 impl ExecutionStrategy for WideQuoter {
     async fn start(&self) -> Result<(), StrategyError> {
         info!("Starting WideQuoter for order {}", self.execution_order_id);
-        // let order = VenueOrderBuilder::default().execution_order_id(self.execution_order_id)..build().unwrap();
+        // let order = VenueOrder::builder().execution_order_id(self.execution_order_id)..build().unwrap();
         // TODO: Place the order
         tokio::select! {
             _ = self.shutdown.cancelled() => {
@@ -33,7 +33,7 @@ impl ExecutionStrategy for WideQuoter {
             _ = tokio::time::sleep(Duration::from_secs(5)) => {
                 info!("Order {} is done", self.execution_order_id);
                 let order = self.order_manager.order_by_id(self.execution_order_id).await.unwrap();
-                let fill = FillBuilder::default()
+                let fill = Fill::builder()
                     .instrument(order.instrument.clone())
                     .venue_order_id(VenueOrderId::new_v4())
                     .execution_order_id(order.id)
@@ -66,7 +66,7 @@ mod tests {
         // let mut mock_order_manager = MockOrderManager::new();
         // // Create a test ExecutionOrder
         // let instrument = binance_btc_usdt_perp();
-        // let first_order = ExecutionOrderBuilder::default()
+        // let first_order = ExecutionOrder::builder()
         //     .instrument(instrument.clone())
         //     .execution_type(ExecutionOrderStrategy::Market {
         //         side: MarketSide::Buy,
@@ -84,7 +84,7 @@ mod tests {
         //     .returning(move |_id| Some(first_order.clone()));
 
         // // Create a WideQuoter
-        // let wide_quoter = WideQuoterBuilder::default()
+        // let wide_quoter = WideQuoter::builder()
         //     .execution_order_id(id)
         //     .executor(Arc::new(mock_executor))
         //     .order_manager(Arc::new(mock_order_manager))

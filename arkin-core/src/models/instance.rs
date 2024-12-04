@@ -1,9 +1,9 @@
 use std::fmt;
 
-use derive_builder::Builder;
 use sqlx::{prelude::FromRow, Type};
 use strum::Display;
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::constants;
@@ -28,8 +28,8 @@ pub enum InstanceStatus {
     Failed,
 }
 
-#[derive(Debug, Clone, Builder, PartialEq, Eq, FromRow)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq, FromRow)]
+
 pub struct Instance {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

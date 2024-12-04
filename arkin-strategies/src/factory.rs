@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 
-use crate::{config::StrategyAlgorithmConfig, Algorithm, CrossoverStrategyBuilder, StrategyConfig};
+use crate::{config::StrategyAlgorithmConfig, Algorithm, CrossoverStrategy, StrategyConfig};
 
 pub struct StrategyFactory {}
 
@@ -14,13 +14,12 @@ impl StrategyFactory {
             .map(|c| {
                 let algo: Arc<dyn Algorithm> = match c {
                     StrategyAlgorithmConfig::Crossover(c) => Arc::new(
-                        CrossoverStrategyBuilder::default()
+                        CrossoverStrategy::builder()
                             .pubsub(pubsub.clone())
-                            // .id(c.id.clone())
+                            .id(test_strategy())
                             .fast_ma(c.fast_ma.clone())
                             .slow_ma(c.slow_ma.clone())
-                            .build()
-                            .expect("Failed to build CrossoverStrategy"),
+                            .build(),
                     ),
                     StrategyAlgorithmConfig::Spreader(_c) => unimplemented!(),
                 };

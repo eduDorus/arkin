@@ -1,6 +1,6 @@
 use std::{fmt, sync::Arc};
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -8,8 +8,8 @@ use crate::{EventType, EventTypeOf, Weight};
 
 use super::{Instrument, Strategy};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]
+
 pub struct Signal {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

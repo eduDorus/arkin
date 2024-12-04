@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use arkin_core::ExecutionOrder;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{repos::ExecutionOrderRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct ExecutionOrderStore {
     execution_order_repo: ExecutionOrderRepo,
 }

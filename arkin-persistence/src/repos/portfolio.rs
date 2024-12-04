@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -42,8 +42,8 @@ impl From<PortfolioDTO> for Arc<Portfolio> {
     }
 }
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct PortfolioRepo {
     pool: PgPool,
 }

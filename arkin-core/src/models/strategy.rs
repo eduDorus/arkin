@@ -1,10 +1,10 @@
 use std::fmt;
 
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Builder, PartialEq, Eq, Hash)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq, Hash)]
+
 pub struct Strategy {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

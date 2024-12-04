@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use moka2::future::Cache;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::Portfolio;
 
 use crate::{repos::PortfolioRepo, PersistenceError};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct PortfolioStore {
     portfolio_repo: PortfolioRepo,
-    #[builder(default = "Cache::new(1000)")]
+    #[builder(default = Cache::new(1000))]
     portfolio_cache_id: Cache<Uuid, Arc<Portfolio>>,
+    #[builder(default = Cache::new(1000))]
     portfolio_cache_name: Cache<String, Arc<Portfolio>>,
 }
 

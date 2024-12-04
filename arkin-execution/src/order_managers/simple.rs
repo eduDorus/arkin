@@ -3,7 +3,7 @@ use std::sync::Arc;
 use arkin_portfolio::Accounting;
 use async_trait::async_trait;
 use dashmap::DashMap;
-use derive_builder::Builder;
+use typed_builder::TypedBuilder;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
@@ -11,7 +11,7 @@ use arkin_core::prelude::*;
 
 use crate::{OrderManager, OrderManagerError};
 
-#[derive(Debug, Builder)]
+#[derive(Debug, TypedBuilder)]
 pub struct SimpleOrderManager {
     pubsub: Arc<PubSub>,
     portfolio: Arc<dyn Accounting>,
@@ -139,7 +139,7 @@ impl OrderManager for SimpleOrderManager {
                     if let Err(e) = self.place_order(order.clone()).await {
                         error!("Failed to process order: {}", e);
                     }
-                    let venue_order = VenueOrderBuilder::default()
+                    let venue_order = VenueOrder::builder()
                         .instrument(order.instrument.to_owned())
                         .side(order.side)
                         .order_type(order.order_type.into())

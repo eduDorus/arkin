@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use derive_builder::Builder;
 use moka2::future::Cache;
 use tracing::debug;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::Instrument;
@@ -11,11 +11,11 @@ use crate::{repos::InstrumentRepo, PersistenceError};
 
 use super::{asset::AssetStore, venue::VenueStore};
 
-#[derive(Debug, Clone, Builder)]
-#[builder(setter(into))]
+#[derive(Debug, Clone, TypedBuilder)]
+
 pub struct InstrumentStore {
-    venue_store: VenueStore,
-    asset_store: AssetStore,
+    venue_store: Arc<VenueStore>,
+    asset_store: Arc<AssetStore>,
     instrument_repo: InstrumentRepo,
     #[builder(default = Cache::new(1000))]
     instrument_id_cache: Cache<Uuid, Arc<Instrument>>,
