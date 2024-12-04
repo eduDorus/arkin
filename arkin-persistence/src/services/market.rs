@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use typed_builder::TypedBuilder;
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -81,10 +81,10 @@ impl MarketService {
 
     pub async fn read_trades_range(
         &self,
-        instrument_id: &[Uuid],
+        instruments: &[Arc<Instrument>],
         start: OffsetDateTime,
         end: OffsetDateTime,
     ) -> Result<Vec<Arc<Trade>>, PersistenceError> {
-        self.trade_store.read_range(instrument_id, start, end).await
+        self.trade_store.read_range(instruments, start, end).await
     }
 }

@@ -1,9 +1,9 @@
 use std::{fmt, sync::Arc};
 
-use typed_builder::TypedBuilder;
 use rust_decimal::prelude::Decimal;
 use sqlx::Type;
 use strum::Display;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{Maturity, Price};

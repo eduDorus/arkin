@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc};
 
-use typed_builder::TypedBuilder;
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{EventType, EventTypeOf, Weight};

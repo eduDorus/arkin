@@ -3,7 +3,7 @@ use std::sync::Arc;
 use arkin_core::PubSub;
 use arkin_portfolio::Accounting;
 
-use crate::{OrderManager, OrderManagerConfig, OrderManagerType, SimpleOrderManagerBuilder};
+use crate::{OrderManager, OrderManagerConfig, OrderManagerType, SimpleOrderManager};
 
 pub struct ExecutionFactory {}
 
@@ -14,13 +14,9 @@ impl ExecutionFactory {
         portfolio: Arc<dyn Accounting>,
     ) -> Arc<dyn OrderManager> {
         let order_manager: Arc<dyn OrderManager> = match &config.order_manager {
-            OrderManagerType::SimpleExecutor => Arc::new(
-                SimpleOrderManager::builder()
-                    .pubsub(pubsub)
-                    .portfolio(portfolio)
-                    .build()
-                    .expect("Failed to build SimpleOrderManager"),
-            ),
+            OrderManagerType::SimpleExecutor => {
+                Arc::new(SimpleOrderManager::builder().pubsub(pubsub).portfolio(portfolio).build())
+            }
         };
 
         order_manager

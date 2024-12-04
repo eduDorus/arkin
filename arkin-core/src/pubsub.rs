@@ -11,8 +11,8 @@ use typed_builder::TypedBuilder;
 use strum::EnumDiscriminants;
 
 use crate::{
-    Book, ExecutionOrder, Holding, Insight, Instrument, Signal, Tick, Trade, VenueOrder, VenueOrderFill, VenueOrderId,
-    VenueOrderStatus,
+    Book, ExecutionOrder, Holding, Insight, Instrument, Position, Signal, Tick, Trade, VenueOrder, VenueOrderFill,
+    VenueOrderId, VenueOrderStatus,
 };
 
 pub trait EventTypeOf: fmt::Debug + Send + Sync + Clone + 'static {
@@ -109,6 +109,7 @@ pub enum Event {
     Trade(Arc<Trade>),
     Book(Arc<Book>),
     BalanceUpdate(Arc<Holding>),
+    PositionUpdate(Arc<Position>),
     Insight(Arc<Insight>),
     InsightTick(Arc<InsightTick>),
     Signal(Arc<Signal>),

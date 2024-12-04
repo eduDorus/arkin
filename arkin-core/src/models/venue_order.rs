@@ -92,7 +92,7 @@ pub struct VenueOrder {
 }
 
 impl VenueOrder {
-    pub fn add_fill(&mut self, fill: VenueOrderFill) {
+    pub fn add_fill(&mut self, fill: Arc<VenueOrderFill>) {
         self.fill_price = (self.fill_price * self.filled_quantity + fill.price * fill.quantity)
             / (self.filled_quantity + fill.quantity);
         self.filled_quantity += fill.quantity;

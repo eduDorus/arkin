@@ -44,7 +44,7 @@ impl Algorithm for CrossoverStrategy {
         &self,
         instruments: &[Arc<Instrument>],
         event_time: OffsetDateTime,
-        insights: &[Insight],
+        insights: &[Arc<Insight>],
     ) -> Result<Vec<Arc<Signal>>, StrategyError> {
         info!("Processing insights for Crossover Strategy...");
         let signals = instruments

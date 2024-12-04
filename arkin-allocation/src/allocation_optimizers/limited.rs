@@ -3,32 +3,33 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use typed_builder::TypedBuilder;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 use arkin_portfolio::prelude::*;
+use uuid::Uuid;
 
 use crate::{AllocationOptim, AllocationOptimError};
 
 #[derive(Debug, TypedBuilder)]
 pub struct LimitedAllocationOptim {
     pubsub: Arc<PubSub>,
-    persistence: Arc<dyn Persistor>,
+    persistence: Arc<PersistenceService>,
     portfolio: Arc<dyn Accounting>,
-    #[builder(default = "DashMap::new()")]
-    signals: DashMap<(Arc<Strategy>, Arc<Instrument>), Signal>,
-    #[builder(default = "Decimal::from_f32(0.8).unwrap()")]
+    #[builder(default = DashMap::new())]
+    signals: DashMap<(Arc<Strategy>, Arc<Instrument>), Arc<Signal>>,
+    #[builder(default = dec!(0.8))]
     max_allocation: Decimal,
-    #[builder(default = "Decimal::from_f32(1.0).unwrap()")]
+    #[builder(default = dec!(1.0))]
     max_allocation_per_signal: Decimal,
-    #[builder(default = "dec!(100)")]
+    #[builder(default = dec!(100))]
     min_trade_value: Decimal,
     reference_currency: Arc<Asset>,
 }
@@ -55,7 +56,7 @@ impl AllocationOptim for LimitedAllocationOptim {
             select! {
                 Ok(tick) = signal_tick.recv() => {
                     info!("LimitedAllocationOptim received signal tick: {}", tick.event_time);
-                    self.new_signals(tick.signals).await?;
+                    self.new_signals(tick.signals.clone()).await?;
                     self.optimize(tick.event_time).await?;
                 }
                 _ = shutdown.cancelled() => {
@@ -66,25 +67,25 @@ impl AllocationOptim for LimitedAllocationOptim {
         Ok(())
     }
 
-    async fn list_signals(&self) -> Result<Vec<Signal>, AllocationOptimError> {
+    async fn list_signals(&self) -> Result<Vec<Arc<Signal>>, AllocationOptimError> {
         Ok(self.signals.iter().map(|entry| entry.value().clone()).collect())
     }
 
-    async fn new_signal(&self, signal: Signal) -> Result<(), AllocationOptimError> {
+    async fn new_signal(&self, signal: Arc<Signal>) -> Result<(), AllocationOptimError> {
         info!("Received new signal: {}", signal);
         let key = (signal.strategy.clone(), signal.instrument.clone());
         self.signals.insert(key, signal);
         Ok(())
     }
 
-    async fn new_signals(&self, signals: Vec<Signal>) -> Result<(), AllocationOptimError> {
+    async fn new_signals(&self, signals: Vec<Arc<Signal>>) -> Result<(), AllocationOptimError> {
         for signal in signals {
             self.new_signal(signal).await?;
         }
         Ok(())
     }
 
-    async fn optimize(&self, event_time: OffsetDateTime) -> Result<Vec<ExecutionOrder>, AllocationOptimError> {
+    async fn optimize(&self, event_time: OffsetDateTime) -> Result<Vec<Arc<ExecutionOrder>>, AllocationOptimError> {
         // Check if we have any signals
         if self.signals.is_empty() {
             warn!("No signals found for optimization");
@@ -111,7 +112,7 @@ impl AllocationOptim for LimitedAllocationOptim {
         for entry in self.signals.iter() {
             let signal = entry.value();
             let signal_allocation = max_allocation_per_signal * signal.weight;
-            if let Some(tick) = self.persistence.last_tick_from_cache(&signal.instrument).await {
+            if let Some(tick) = self.persistence.tick_store.get_last_tick(&signal.instrument).await {
                 let quantity = signal_allocation / tick.mid_price();
                 let optimal_position = OptimalPosition {
                     instrument: signal.instrument.clone(),
@@ -169,7 +170,7 @@ impl AllocationOptim for LimitedAllocationOptim {
         }
 
         // Create execution orders
-        let mut execution_orders = Vec::with_capacity(position_diff.len());
+        let mut execution_orders: Vec<Arc<ExecutionOrder>> = Vec::with_capacity(position_diff.len());
         for (instrument, position) in position_diff.into_iter() {
             // Skip if quantity is zero
             let value = position.price * position.diff.abs();
@@ -190,15 +191,17 @@ impl AllocationOptim for LimitedAllocationOptim {
 
             // Create execution order
             let order = ExecutionOrder::builder()
+                .id(Uuid::new_v4())
+                .portfolio(test_portfolio())
+                .strategy(test_strategy())
                 .instrument(instrument.clone())
                 .order_type(ExecutionOrderType::Maker)
                 .side(order_side)
+                .quantity(position.diff.abs())
                 .created_at(event_time)
                 .updated_at(event_time)
-                .build()
-                .expect("Failed to build ExecutionOrder");
-
-            execution_orders.push(order);
+                .build();
+            execution_orders.push(order.into());
         }
 
         for order in execution_orders.iter() {

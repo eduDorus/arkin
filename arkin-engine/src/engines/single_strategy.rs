@@ -20,7 +20,7 @@ use arkin_strategies::prelude::*;
 
 use crate::{TradingEngine, TradingEngineError};
 
-#[derive(Builder, Debug)]
+#[derive(Debug, TypedBuilder)]
 pub struct SingleStrategyEngine {
     pubsub: Arc<PubSub>,
     instruments: Vec<Arc<Instrument>>,
@@ -35,7 +35,7 @@ pub struct SingleStrategyEngine {
     portfolio_task_tracker: TaskTracker,
     #[builder(default)]
     portfolio_shutdown: CancellationToken,
-    portfolio: Arc<dyn Portfolio>,
+    portfolio: Arc<dyn Accounting>,
 
     #[builder(default)]
     ingestor_task_tracker: TaskTracker,
@@ -118,9 +118,8 @@ impl SingleStrategyEngine {
                         .event_time(event_time)
                         .instruments(self.instruments.clone())
                         .frequency(frequency)
-                        .build()
-                        .expect("Failed to build interval tick");
-                   self.pubsub.publish::<IntervalTick>(interval_tick);
+                        .build();
+                   self.pubsub.publish::<IntervalTick>(interval_tick.into());
                 }
                 _ = tokio::signal::ctrl_c() => {
                     info!("Received Ctrl-C, shutting down...");

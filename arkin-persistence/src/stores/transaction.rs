@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use typed_builder::TypedBuilder;
 use tokio::sync::Mutex;
+use typed_builder::TypedBuilder;
 
 use arkin_core::Transaction;
 use tracing::error;

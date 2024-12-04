@@ -1,7 +1,7 @@
 use std::fmt;
 
-use typed_builder::TypedBuilder;
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
-use typed_builder::TypedBuilder;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::PersistenceError;

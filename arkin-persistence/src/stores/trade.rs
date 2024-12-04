@@ -7,7 +7,7 @@ use tracing::error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_core::Trade;
+use arkin_core::{Instrument, Trade};
 
 use crate::{repos::TradeRepo, PersistenceError};
 
@@ -95,11 +95,12 @@ impl TradeStore {
 
     pub async fn read_range(
         &self,
-        instrument_ids: &[Uuid],
+        instruments: &[Arc<Instrument>],
         from: OffsetDateTime,
         to: OffsetDateTime,
     ) -> Result<Vec<Arc<Trade>>, PersistenceError> {
-        let dto = self.trade_repo.read_range(&instrument_ids, from, to).await?;
+        let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
+        let dto = self.trade_repo.read_range(&ids, from, to).await?;
 
         let mut trades = Vec::with_capacity(dto.len());
         for trade in &dto {

@@ -3,9 +3,9 @@ use std::sync::Arc;
 use arkin_portfolio::Accounting;
 use async_trait::async_trait;
 use dashmap::DashMap;
-use typed_builder::TypedBuilder;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
@@ -21,15 +21,15 @@ pub struct SimpleOrderManager {
 
 #[derive(Debug, Clone, Default)]
 pub struct OrderQueue {
-    orders: DashMap<ExecutionOrderId, ExecutionOrder>,
+    orders: DashMap<ExecutionOrderId, Arc<ExecutionOrder>>,
 }
 
 impl OrderQueue {
-    pub fn get_order_by_id(&self, id: ExecutionOrderId) -> Option<ExecutionOrder> {
+    pub fn get_order_by_id(&self, id: ExecutionOrderId) -> Option<Arc<ExecutionOrder>> {
         self.orders.get(&id).map(|e| e.value().clone())
     }
 
-    pub fn list_new_orders(&self) -> Vec<ExecutionOrder> {
+    pub fn list_new_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.orders
             .iter()
             .filter(|e| e.value().is_new())
@@ -37,7 +37,7 @@ impl OrderQueue {
             .collect()
     }
 
-    pub fn list_open_orders(&self) -> Vec<ExecutionOrder> {
+    pub fn list_open_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.orders
             .iter()
             .filter(|e| !e.value().is_closed())
@@ -45,7 +45,7 @@ impl OrderQueue {
             .collect()
     }
 
-    pub fn list_cancelling_orders(&self) -> Vec<ExecutionOrder> {
+    pub fn list_cancelling_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.orders
             .iter()
             .filter(|e| e.value().is_cancelling())
@@ -53,7 +53,7 @@ impl OrderQueue {
             .collect()
     }
 
-    pub fn list_cancelled_orders(&self) -> Vec<ExecutionOrder> {
+    pub fn list_cancelled_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.orders
             .iter()
             .filter(|e| e.value().is_cancelled())
@@ -61,7 +61,7 @@ impl OrderQueue {
             .collect()
     }
 
-    pub fn list_closed_orders(&self) -> Vec<ExecutionOrder> {
+    pub fn list_closed_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.orders
             .iter()
             .filter(|e| e.value().is_closed())
@@ -69,11 +69,11 @@ impl OrderQueue {
             .collect()
     }
 
-    pub fn add_order(&self, order: ExecutionOrder) {
+    pub fn add_order(&self, order: Arc<ExecutionOrder>) {
         self.orders.insert(order.id.clone(), order);
     }
 
-    pub fn add_fill(&self, fill: VenueOrderFill) {
+    pub fn add_fill(&self, _fill: Arc<VenueOrderFill>) {
         // TODO
         // self.orders.alter(&fill.execution_order_id, |_, mut v| {
         //     if !v.is_closed() {
@@ -85,21 +85,23 @@ impl OrderQueue {
         // });
     }
 
-    pub fn update_order_status(&self, id: ExecutionOrderId, status: ExecutionOrderStatus) {
-        if let Some(mut order) = self.orders.get_mut(&id) {
-            if !order.is_closed() {
-                order.update_status(status);
-            }
-        }
+    pub fn update_order_status(&self, _id: ExecutionOrderId, _status: ExecutionOrderStatus) {
+        unimplemented!("Implement update_order_status");
+        // if let Some(mut order) = self.orders.get_mut(&id) {
+        //     if !order.is_closed() {
+        //         order.update_status(status);
+        //     }
+        // }
     }
 
-    pub fn cancel_order_by_id(&self, id: ExecutionOrderId) {
-        if let Some(mut entry) = self.orders.get_mut(&id) {
-            let order = entry.value_mut();
-            order.cancel();
-        } else {
-            warn!("No order found for id {}", id);
-        }
+    pub fn cancel_order_by_id(&self, _id: ExecutionOrderId) {
+        unimplemented!("Implement cancel_order_by_id");
+        // if let Some(mut entry) = self.orders.get_mut(&id) {
+        //     let order = entry.value_mut();
+        //     order.cancel();
+        // } else {
+        //     warn!("No order found for id {}", id);
+        // }
     }
 
     pub fn cancel_orders_by_instrument(&self, instrument: &Arc<Instrument>) {
@@ -116,12 +118,13 @@ impl OrderQueue {
     }
 
     pub fn cancel_all_orders(&self) {
-        self.orders.alter_all(|_, mut v| {
-            if !v.is_closed() {
-                v.cancel();
-            }
-            v
-        });
+        unimplemented!("Implement cancel_all_orders");
+        // self.orders.alter_all(|_, mut v| {
+        //     if !v.is_closed() {
+        //         v.cancel();
+        //     }
+        //     v
+        // });
     }
 }
 
@@ -133,23 +136,24 @@ impl OrderManager for SimpleOrderManager {
         let mut fills = self.pubsub.subscribe::<VenueOrderFill>();
         loop {
             tokio::select! {
-                Ok(mut order) = execution_orders.recv() => {
+                Ok(order) = execution_orders.recv() => {
                     info!("SimpleOrderManager received execution order: {}", order);
-                    order.update_status(ExecutionOrderStatus::InProgress);
+                    // order.update_status(ExecutionOrderStatus::InProgress);
                     if let Err(e) = self.place_order(order.clone()).await {
                         error!("Failed to process order: {}", e);
                     }
                     let venue_order = VenueOrder::builder()
+                        .id(order.id)
+                        .portfolio(test_portfolio())
                         .instrument(order.instrument.to_owned())
                         .side(order.side)
                         .order_type(order.order_type.into())
                         .price(None)
                         .quantity(order.quantity)
-                        .build()
-                        .expect("Failed to create order");
+                        .build();
 
                     info!("SimpleOrderManager publishing venue order: {}", venue_order);
-                    self.pubsub.publish::<VenueOrder>(venue_order);
+                    self.pubsub.publish::<VenueOrder>(venue_order.into());
                 }
                 Ok(fill) = fills.recv() => {
                     info!("SimpleOrderManager received fill: {}", fill);
@@ -165,43 +169,47 @@ impl OrderManager for SimpleOrderManager {
         Ok(())
     }
 
-    async fn order_by_id(&self, id: ExecutionOrderId) -> Option<ExecutionOrder> {
+    async fn order_by_id(&self, id: ExecutionOrderId) -> Option<Arc<ExecutionOrder>> {
         self.execution_orders.get_order_by_id(id)
     }
 
-    async fn list_new_orders(&self) -> Vec<ExecutionOrder> {
+    async fn list_new_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.execution_orders.list_new_orders()
     }
 
-    async fn list_open_orders(&self) -> Vec<ExecutionOrder> {
+    async fn list_open_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.execution_orders.list_open_orders()
     }
 
-    async fn list_cancelling_orders(&self) -> Vec<ExecutionOrder> {
+    async fn list_cancelling_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.execution_orders.list_cancelling_orders()
     }
 
-    async fn list_cancelled_orders(&self) -> Vec<ExecutionOrder> {
+    async fn list_cancelled_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.execution_orders.list_cancelled_orders()
     }
 
-    async fn list_closed_orders(&self) -> Vec<ExecutionOrder> {
+    async fn list_closed_orders(&self) -> Vec<Arc<ExecutionOrder>> {
         self.execution_orders.list_closed_orders()
     }
 
-    async fn place_order(&self, order: ExecutionOrder) -> Result<(), OrderManagerError> {
+    async fn place_order(&self, order: Arc<ExecutionOrder>) -> Result<(), OrderManagerError> {
         self.execution_orders.add_order(order.clone());
         Ok(())
     }
 
-    async fn place_orders(&self, orders: Vec<ExecutionOrder>) -> Result<(), OrderManagerError> {
+    async fn place_orders(&self, orders: Vec<Arc<ExecutionOrder>>) -> Result<(), OrderManagerError> {
         for order in orders {
             self.place_order(order).await?;
         }
         Ok(())
     }
 
-    async fn replace_order_by_id(&self, id: ExecutionOrderId, order: ExecutionOrder) -> Result<(), OrderManagerError> {
+    async fn replace_order_by_id(
+        &self,
+        id: ExecutionOrderId,
+        order: Arc<ExecutionOrder>,
+    ) -> Result<(), OrderManagerError> {
         self.execution_orders.cancel_order_by_id(id);
         self.execution_orders.add_order(order);
         Ok(())
@@ -210,7 +218,7 @@ impl OrderManager for SimpleOrderManager {
     async fn replace_orders_by_instrument(
         &self,
         instrument: &Arc<Instrument>,
-        order: ExecutionOrder,
+        order: Arc<ExecutionOrder>,
     ) -> Result<(), OrderManagerError> {
         self.execution_orders.cancel_orders_by_instrument(instrument);
         self.execution_orders.add_order(order);
@@ -232,7 +240,7 @@ impl OrderManager for SimpleOrderManager {
         Ok(())
     }
 
-    async fn order_update(&self, fill: VenueOrderFill) -> Result<(), OrderManagerError> {
+    async fn order_update(&self, fill: Arc<VenueOrderFill>) -> Result<(), OrderManagerError> {
         self.execution_orders.add_fill(fill);
         Ok(())
     }
@@ -246,12 +254,12 @@ impl OrderManager for SimpleOrderManager {
         Ok(())
     }
 
-    async fn position_update(&self, position: Position) -> Result<(), OrderManagerError> {
+    async fn position_update(&self, position: Arc<Position>) -> Result<(), OrderManagerError> {
         self.portfolio.position_update(position).await?;
         Ok(())
     }
 
-    async fn balance_update(&self, holding: Holding) -> Result<(), OrderManagerError> {
+    async fn balance_update(&self, holding: Arc<Holding>) -> Result<(), OrderManagerError> {
         self.portfolio.balance_update(holding).await?;
         Ok(())
     }

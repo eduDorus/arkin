@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use typed_builder::TypedBuilder;
 use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
 use tracing::debug;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::{Instrument, InstrumentOptionType, InstrumentStatus, InstrumentType, Price};

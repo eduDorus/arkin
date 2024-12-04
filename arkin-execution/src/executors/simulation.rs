@@ -2,14 +2,15 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use typed_builder::TypedBuilder;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
+use uuid::Uuid;
 
 use crate::{Executor, ExecutorError};
 
@@ -18,7 +19,7 @@ use crate::{Executor, ExecutorError};
 pub struct SimulationExecutor {
     pubsub: Arc<PubSub>,
     #[builder(default)]
-    orders: DashMap<VenueOrderId, VenueOrder>,
+    orders: DashMap<VenueOrderId, Arc<VenueOrder>>,
     #[builder(default = dec!(0.0005))]
     taker_commission: Decimal,
     #[builder(default = dec!(0.0002))]
@@ -28,7 +29,7 @@ pub struct SimulationExecutor {
 }
 
 impl SimulationExecutor {
-    pub fn list_open_orders(&self) -> Vec<VenueOrder> {
+    pub fn list_open_orders(&self) -> Vec<Arc<VenueOrder>> {
         self.orders
             .iter()
             .filter(|order| !order.value().is_active())
@@ -36,26 +37,27 @@ impl SimulationExecutor {
             .collect()
     }
 
-    pub fn fill_order(&self, id: VenueOrderId, fill: VenueOrderFill) {
-        if let Some(mut order) = self.orders.get_mut(&id) {
-            order.add_fill(fill.clone());
-            info!("SimulationExecutor filled order: {}", fill);
-        }
+    pub fn fill_order(&self, _id: VenueOrderId, _fill: Arc<VenueOrderFill>) {
+        unimplemented!("SimulationExecutor::fill_order")
+        // if let Some(mut order) = self.orders.get_mut(&id) {
+        //     order.add_fill(fill.clone());
+        //     info!("SimulationExecutor filled order: {}", fill);
+        // }
 
-        // Remove the order if it is filled
-        let is_finalized = self.orders.get(&id).map(|order| order.is_finalized()).unwrap_or(false);
-        if is_finalized {
-            self.orders.remove(&id);
-        }
+        // // Remove the order if it is filled
+        // let is_finalized = self.orders.get(&id).map(|order| order.is_finalized()).unwrap_or(false);
+        // if is_finalized {
+        //     self.orders.remove(&id);
+        // }
     }
 
     pub fn update_balance(&self, asset: &Arc<Asset>, quantity: Decimal) {
         let mut entry = self.balances.entry(asset.clone()).or_insert(
             Holding::builder()
+                .id(Uuid::new_v4())
                 .asset(asset.clone())
                 .balance(dec!(0))
-                .build()
-                .expect("Failed to build Holding"),
+                .build(),
         );
         entry.balance += quantity;
     }
@@ -70,11 +72,13 @@ impl Executor for SimulationExecutor {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError> {
         info!("Starting simulation executor...");
         // TODO: Send current balance
-        let holding = Holding::builder()
-            .asset(usdt_asset())
-            .balance(dec!(10000))
-            .build()
-            .expect("Failed to build Holding");
+        let holding = Arc::new(
+            Holding::builder()
+                .id(Uuid::new_v4())
+                .asset(test_usdt_asset())
+                .balance(dec!(10000))
+                .build(),
+        );
         self.update_balance(&holding.asset, holding.balance);
         info!("Sending initial balance: {}", holding);
         self.pubsub.publish::<Holding>(holding);
@@ -93,10 +97,9 @@ impl Executor for SimulationExecutor {
                     let update = VenueOrderState::builder()
                         .id(order.id.clone())
                         .status(VenueOrderStatus::Placed)
-                        .build()
-                        .unwrap();
+                        .build();
                     info!("SimulationExecutor placed order: {}", order);
-                    self.pubsub.publish::<VenueOrderState>(update);
+                    self.pubsub.publish::<VenueOrderState>(update.into());
 
                 }
                 Ok(tick) = tick_updates.recv() => {
@@ -130,8 +133,8 @@ impl Executor for SimulationExecutor {
                                 .price(price)
                                 .quantity(order.quantity)
                                 .commission(commission)
-                                .build()
-                                .expect("Failed to build VenueOrderFill");
+                                .build();
+                            let fill = Arc::new(fill);
 
 
                             // Subtract the value from the balance
@@ -154,35 +157,36 @@ impl Executor for SimulationExecutor {
         Ok(())
     }
 
-    async fn place_order(&self, order: VenueOrder) -> Result<(), ExecutorError> {
+    async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError> {
         self.orders.insert(order.id, order.clone());
         info!("SimulationExecution placed order: {}", order);
         Ok(())
     }
 
-    async fn place_orders(&self, orders: Vec<VenueOrder>) -> Result<(), ExecutorError> {
+    async fn place_orders(&self, orders: Vec<Arc<VenueOrder>>) -> Result<(), ExecutorError> {
         for order in orders {
             self.orders.insert(order.id, order);
         }
         Ok(())
     }
 
-    async fn modify_order(&self, _order: VenueOrder) -> Result<(), ExecutorError> {
+    async fn modify_order(&self, _order: Arc<VenueOrder>) -> Result<(), ExecutorError> {
         unimplemented!("SimulationExecutor::modify_order")
     }
 
-    async fn modify_orders(&self, _orders: Vec<VenueOrder>) -> Result<(), ExecutorError> {
+    async fn modify_orders(&self, _orders: Vec<Arc<VenueOrder>>) -> Result<(), ExecutorError> {
         unimplemented!("SimulationExecutor::modify_orders")
     }
 
-    async fn cancel_order(&self, id: VenueOrderId) -> Result<(), ExecutorError> {
-        if let Some(mut order) = self.orders.get_mut(&id) {
-            order.cancel();
-            info!("SimulationExecution cancelled order: {}", *order);
-            Ok(())
-        } else {
-            return Err(ExecutorError::InvalidOrder(id.to_string()));
-        }
+    async fn cancel_order(&self, _id: VenueOrderId) -> Result<(), ExecutorError> {
+        unimplemented!("SimulationExecutor::cancel_order")
+        // if let Some(mut order) = self.orders.get_mut(&id) {
+        //     order.cancel();
+        //     info!("SimulationExecution cancelled order: {}", *order);
+        //     Ok(())
+        // } else {
+        //     return Err(ExecutorError::InvalidOrder(id.to_string()));
+        // }
     }
 
     async fn cancel_orders(&self, ids: Vec<VenueOrderId>) -> Result<(), ExecutorError> {
@@ -193,11 +197,12 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_all_orders(&self) -> Result<(), ExecutorError> {
-        for mut order in self.orders.iter_mut() {
-            order.cancel();
-            info!("SimulationExecution cancelled order: {}", *order);
-        }
-        Ok(())
+        unimplemented!("SimulationExecutor::cancel_all_orders")
+        // for mut order in self.orders.iter_mut() {
+        //     order.cancel();
+        //     info!("SimulationExecution cancelled order: {}", *order);
+        // }
+        // Ok(())
     }
 }
 
@@ -213,7 +218,7 @@ mod tests {
     async fn test_backtest_executor_place_order() {
         // Create executor
         let pubsub = Arc::new(PubSub::new());
-        let executor = Arc::new(SimulationExecutor::builder().pubsub(pubsub.clone()).build().unwrap());
+        let executor = Arc::new(SimulationExecutor::builder().pubsub(pubsub.clone()).build());
 
         // Start executor
         let tracker = TaskTracker::new();
@@ -227,14 +232,16 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Create a sample VenueOrder
-        let order = VenueOrder::builder()
+        let order: Arc<VenueOrder> = VenueOrder::builder()
+            .id(Uuid::new_v4())
+            .portfolio(test_portfolio())
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Buy)
             .price(None)
-            .quantity(Decimal::from_f64(0.1).unwrap())
+            .quantity(dec!(0.1))
             .build()
-            .unwrap();
+            .into();
 
         // Subscribe to fill and updates
         let mut updates = pubsub.subscribe::<VenueOrderState>();
@@ -249,15 +256,16 @@ mod tests {
         assert_eq!(ack.status, VenueOrderStatus::Placed);
 
         // Send price update
-        let tick = Tick::builder()
-            .instrument(test_inst_binance_btc_usdt_perp())
-            .tick_id(0 as u64)
-            .bid_price(dec!(50000))
-            .bid_quantity(dec!(1))
-            .ask_price(dec!(50001))
-            .ask_quantity(dec!(1))
-            .build()
-            .expect("Failed to build Tick");
+        let tick = Arc::new(
+            Tick::builder()
+                .instrument(test_inst_binance_btc_usdt_perp())
+                .tick_id(0 as u64)
+                .bid_price(dec!(50000))
+                .bid_quantity(dec!(1))
+                .ask_price(dec!(50001))
+                .ask_quantity(dec!(1))
+                .build(),
+        );
         pubsub.publish::<Tick>(tick);
 
         // Check for fill

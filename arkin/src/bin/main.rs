@@ -35,11 +35,8 @@ async fn main() {
     let ingestors = IngestorFactory::from_config(&config, pubsub.clone(), persistence.clone());
 
     let config = load::<InsightsConfig>();
-    let insights = Arc::new(InsightsService::from_config(
-        &config.insights_service,
-        pubsub.clone(),
-        persistence.clone(),
-    ));
+    let insights =
+        Arc::new(InsightsService::from_config(&config.insights_service, pubsub.clone(), persistence.clone()).await);
 
     let config = load::<StrategyConfig>();
     let strategy = StrategyFactory::from_config(&config, pubsub.clone())
@@ -59,7 +56,7 @@ async fn main() {
     let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
     let mut instruments = vec![];
     for symbol in venue_symbols {
-        match persistence.read_instrument_by_venue_symbol(symbol.to_string()).await {
+        match persistence.instrument_store.read_by_venue_symbol(symbol).await {
             Ok(instr) => instruments.push(instr),
             Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
         }
@@ -76,8 +73,7 @@ async fn main() {
         .allocation_optim(allocation)
         .order_manager(order_manager)
         .executor(executor)
-        .build()
-        .expect("Failed to build DefaultEngine");
+        .build();
 
     engine.start().await.expect("Failed to start engine");
 

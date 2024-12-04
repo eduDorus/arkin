@@ -95,11 +95,10 @@ impl Insights for InsightsService {
         info!("Loading insights from {} to {}", start, event_time);
 
         // let ticks = self.persistence_service.read_ticks_range(instruments, from, to).await?;
-        let instrument_ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
         let trades = self
             .persistence_service
             .trade_store
-            .read_range(&instrument_ids, start, event_time)
+            .read_range(&instruments, start, event_time)
             .await?;
 
         let insights = trades

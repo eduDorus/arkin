@@ -6,12 +6,11 @@ use uuid::Uuid;
 
 use crate::{Event, EventType, EventTypeOf};
 
-use super::{Asset, Instance};
+use super::Asset;
 
 #[derive(Debug, Clone, TypedBuilder, PartialEq)]
 pub struct Holding {
     pub id: Uuid,
-    pub instance: Arc<Instance>,
     pub asset: Arc<Asset>,
     pub balance: Decimal,
 }

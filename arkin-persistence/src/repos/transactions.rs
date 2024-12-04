@@ -142,7 +142,7 @@ pub mod tests {
             .event_time(OffsetDateTime::now_utc())
             .transaction_group_id(Uuid::new_v4())
             .portfolio(test_portfolio())
-            .asset(Some(usdt_asset()))
+            .asset(Some(test_usdt_asset()))
             .instrument(None)
             .transaction_type(TransactionType::Collateral)
             .price(Some(dec!(1)))

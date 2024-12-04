@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
-use typed_builder::TypedBuilder;
 use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{PersistenceError, BIND_LIMIT};

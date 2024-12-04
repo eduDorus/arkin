@@ -8,7 +8,7 @@ use tracing::info;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Notional, Price, Quantity, VenueOrderFill};
+use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
 
 use super::{Instrument, MarketSide, Strategy};
 
@@ -213,6 +213,18 @@ impl PartialOrd for Position {
 impl Ord for Position {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.created_at.cmp(&other.created_at)
+    }
+}
+
+impl EventTypeOf for Position {
+    fn event_type() -> EventType {
+        EventType::PositionUpdate
+    }
+}
+
+impl From<Arc<Position>> for Event {
+    fn from(position: Arc<Position>) -> Self {
+        Event::PositionUpdate(position)
     }
 }
 

@@ -10,7 +10,7 @@ use crate::{
     VenueOrder, VenueOrderStatus, VenueOrderTimeInForce, VenueOrderType, VenueType,
 };
 
-pub fn btc_asset() -> Arc<Asset> {
+pub fn test_btc_asset() -> Arc<Asset> {
     let asset = Asset::builder()
         .id(Uuid::parse_str("894ff9df-e76e-4b2e-aaec-49988de26a84").expect("Invalid UUID"))
         .symbol("BTC".into())
@@ -20,7 +20,7 @@ pub fn btc_asset() -> Arc<Asset> {
     Arc::new(asset)
 }
 
-pub fn eth_asset() -> Arc<Asset> {
+pub fn test_eth_asset() -> Arc<Asset> {
     let asset = Asset::builder()
         .id(Uuid::parse_str("3091ac12-64a7-4824-9ea5-e1c27e10af6f").expect("Invalid UUID"))
         .symbol("ETH".into())
@@ -30,7 +30,7 @@ pub fn eth_asset() -> Arc<Asset> {
     Arc::new(asset)
 }
 
-pub fn usdt_asset() -> Arc<Asset> {
+pub fn test_usdt_asset() -> Arc<Asset> {
     let asset = Asset::builder()
         .id(Uuid::parse_str("5ba12a78-1f89-41b6-87c5-020afb7f680d").expect("Invalid UUID"))
         .symbol("USDT".into())
@@ -40,7 +40,7 @@ pub fn usdt_asset() -> Arc<Asset> {
     Arc::new(asset)
 }
 
-pub fn binance_venue() -> Arc<Venue> {
+pub fn test_binance_venue() -> Arc<Venue> {
     let venue = Venue::builder()
         .id(Uuid::parse_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID"))
         .name("Binance".into())
@@ -52,12 +52,12 @@ pub fn binance_venue() -> Arc<Venue> {
 pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
     let instrument = Instrument::builder()
         .id(Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"))
-        .venue(binance_venue())
+        .venue(test_binance_venue())
         .symbol("perp-btc-usdt@binance".into())
         .venue_symbol("BTCUSDT".into())
         .instrument_type(InstrumentType::Perpetual)
-        .base_asset(btc_asset())
-        .quote_asset(usdt_asset())
+        .base_asset(test_btc_asset())
+        .quote_asset(test_usdt_asset())
         .maturity(None)
         .strike(None)
         .option_type(None)
@@ -76,12 +76,12 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
 pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
     let instrument = Instrument::builder()
         .id(Uuid::from_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").expect("Invalid UUID"))
-        .venue(binance_venue())
+        .venue(test_binance_venue())
         .symbol("perp-eth-usdt@binance".into())
         .venue_symbol("ETHUSDT".into())
         .instrument_type(InstrumentType::Perpetual)
-        .base_asset(eth_asset())
-        .quote_asset(usdt_asset())
+        .base_asset(test_eth_asset())
+        .quote_asset(test_usdt_asset())
         .maturity(None)
         .strike(None)
         .option_type(None)

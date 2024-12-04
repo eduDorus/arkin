@@ -1,10 +1,10 @@
 use std::{fmt, sync::Arc};
 
-use typed_builder::TypedBuilder;
 use rust_decimal::Decimal;
 use sqlx::Type;
 use strum::Display;
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use super::{Asset, Instrument, Portfolio};

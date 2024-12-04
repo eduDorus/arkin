@@ -21,34 +21,8 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
 use arkin_core::prelude::*;
-use uuid::Uuid;
 
-pub static INSTRUMENT: LazyLock<Arc<Instrument>> = LazyLock::new(|| {
-    Arc::new(Instrument {
-        id: Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"),
-        venue: Venue {
-            id: Uuid::parse_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID"),
-            name: "Binance".into(),
-            venue_type: "exchange".into(),
-        },
-        symbol: "perp-btc-usdt@binance".into(),
-        venue_symbol: "BTCUSDT".into(),
-        instrument_type: InstrumentType::Perpetual,
-        base_asset: Arc::new("btc".into()),
-        quote_asset: Arc::new("usdt".into()),
-        maturity: None,
-        strike: None,
-        option_type: None,
-        contract_size: Decimal::from_f64(1.0).expect("Invalid decimal"),
-        price_precision: 2,
-        quantity_precision: 3,
-        base_precision: 8,
-        quote_precision: 8,
-        tick_size: Decimal::from_f64(0.10).expect("Invalid decimal"),
-        lot_size: Decimal::from_f64(0.001).expect("Invalid decimal"),
-        status: InstrumentStatus::Trading,
-    })
-});
+pub static INSTRUMENT: LazyLock<Arc<Instrument>> = LazyLock::new(|| test_inst_binance_btc_usdt_perp());
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;

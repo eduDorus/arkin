@@ -5,30 +5,27 @@ use test_log::test;
 
 use arkin_core::prelude::*;
 use arkin_portfolio::prelude::*;
+use uuid::Uuid;
 
 #[test(tokio::test)]
 async fn test_single_strategy_long_position() {
     let pubsub = Arc::new(PubSub::new());
 
     // Create Portfolio
-    let portfolio = Arc::new(
-        SingleStrategyPortfolio::builder()
-            .pubsub(pubsub.clone())
-            .build()
-            .expect("Failed to build SimplePortfolio"),
-    );
+    let portfolio = Arc::new(SingleStrategyPortfolio::builder().pubsub(pubsub.clone()).build());
 
     // Create instrument
-    let instance = test_instance();
     let order = test_venue_order();
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
-    let balance = Holding::builder()
-        .asset(instrument.quote_asset.clone())
-        .balance(dec!(10000))
-        .build()
-        .unwrap();
+    let balance = Arc::new(
+        Holding::builder()
+            .id(Uuid::new_v4())
+            .asset(instrument.quote_asset.clone())
+            .balance(dec!(10000))
+            .build(),
+    );
     portfolio
         .balance_update(balance.clone())
         .await
@@ -38,16 +35,16 @@ async fn test_single_strategy_long_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Buy)
-        .price(dec!(100.0))
-        .quantity(dec!(1.0))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Buy)
+            .price(dec!(100.0))
+            .quantity(dec!(1.0))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let positions = portfolio.list_open_positions().await;
@@ -60,16 +57,16 @@ async fn test_single_strategy_long_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Sell)
-        .price(dec!(120.0))
-        .quantity(dec!(0.5))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Sell)
+            .price(dec!(120.0))
+            .quantity(dec!(0.5))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
@@ -79,16 +76,16 @@ async fn test_single_strategy_long_position() {
     assert_eq!(asset_capital, dec!(10006));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Sell)
-        .price(dec!(110.0))
-        .quantity(dec!(0.5))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Sell)
+            .price(dec!(110.0))
+            .quantity(dec!(0.5))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
@@ -112,24 +109,21 @@ async fn test_single_strategy_short_position() {
     let pubsub = Arc::new(PubSub::new());
 
     // Create Portfolio
-    let portfolio = Arc::new(
-        SingleStrategyPortfolio::builder()
-            .pubsub(pubsub.clone())
-            .build()
-            .expect("Failed to build SimplePortfolio"),
-    );
+    let portfolio = Arc::new(SingleStrategyPortfolio::builder().pubsub(pubsub.clone()).build());
 
     // Create instrument
-    let instance = test_instance();
     let order = test_venue_order();
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
-    let balance = Holding::builder()
-        .asset(instrument.quote_asset.clone())
-        .balance(dec!(10000))
-        .build()
-        .unwrap();
+    let balance = Arc::new(
+        Holding::builder()
+            .id(Uuid::new_v4())
+            .asset(instrument.quote_asset.clone())
+            .balance(dec!(10000))
+            .build(),
+    );
+
     portfolio
         .balance_update(balance.clone())
         .await
@@ -139,16 +133,16 @@ async fn test_single_strategy_short_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Sell)
-        .price(dec!(100.0))
-        .quantity(dec!(1.0))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Sell)
+            .price(dec!(100.0))
+            .quantity(dec!(1.0))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let positions = portfolio.list_open_positions().await;
@@ -161,16 +155,16 @@ async fn test_single_strategy_short_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Buy)
-        .price(dec!(80.0))
-        .quantity(dec!(0.5))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Buy)
+            .price(dec!(80.0))
+            .quantity(dec!(0.5))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
@@ -180,16 +174,16 @@ async fn test_single_strategy_short_position() {
     assert_eq!(asset_capital, dec!(10006));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Buy)
-        .price(dec!(90.0))
-        .quantity(dec!(0.5))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Buy)
+            .price(dec!(90.0))
+            .quantity(dec!(0.5))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();
@@ -213,24 +207,21 @@ async fn test_single_strategy_swap_position() {
     let pubsub = Arc::new(PubSub::new());
 
     // Create Portfolio
-    let portfolio = Arc::new(
-        SingleStrategyPortfolio::builder()
-            .pubsub(pubsub.clone())
-            .build()
-            .expect("Failed to build SimplePortfolio"),
-    );
+    let portfolio = Arc::new(SingleStrategyPortfolio::builder().pubsub(pubsub.clone()).build());
 
     // Create instrument
-    let instance = test_instance();
     let order = test_venue_order();
     let instrument = test_inst_binance_btc_usdt_perp();
 
     // Create balance
-    let balance = Holding::builder()
-        .asset(instrument.quote_asset.clone())
-        .balance(dec!(10000))
-        .build()
-        .unwrap();
+    let balance = Arc::new(
+        Holding::builder()
+            .id(Uuid::new_v4())
+            .asset(instrument.quote_asset.clone())
+            .balance(dec!(10000))
+            .build(),
+    );
+
     portfolio
         .balance_update(balance.clone())
         .await
@@ -240,16 +231,16 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(portfolio_balance.balance, dec!(10000));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Buy)
-        .price(dec!(100.0))
-        .quantity(dec!(1.0))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Buy)
+            .price(dec!(100.0))
+            .quantity(dec!(1.0))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let positions = portfolio.list_open_positions().await;
@@ -262,16 +253,16 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(asset_capital, dec!(9998));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Sell)
-        .price(dec!(120.0))
-        .quantity(dec!(2.0))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Sell)
+            .price(dec!(120.0))
+            .quantity(dec!(2.0))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
 
@@ -282,16 +273,16 @@ async fn test_single_strategy_swap_position() {
     assert_eq!(asset_capital, dec!(10016));
 
     // Create fill
-    let fill = VenueOrderFill::builder()
-        .instance(instance.clone())
-        .venue_order(order.clone())
-        .instrument(instrument.clone())
-        .side(MarketSide::Buy)
-        .price(dec!(100.0))
-        .quantity(dec!(1.0))
-        .commission(dec!(2.0))
-        .build()
-        .unwrap();
+    let fill = Arc::new(
+        VenueOrderFill::builder()
+            .venue_order(order.clone())
+            .instrument(instrument.clone())
+            .side(MarketSide::Buy)
+            .price(dec!(100.0))
+            .quantity(dec!(1.0))
+            .commission(dec!(2.0))
+            .build(),
+    );
 
     portfolio.fill_update(fill.clone()).await.expect("Failed to update fill");
     let portfolio_balance = portfolio.balance(&instrument.quote_asset).await.unwrap();

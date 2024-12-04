@@ -7,7 +7,7 @@ use tracing::error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_core::Tick;
+use arkin_core::{Instrument, Tick};
 
 use crate::{repos::TickRepo, PersistenceError};
 
@@ -21,7 +21,7 @@ pub struct TickStore {
     #[builder(default)]
     tick_buffer: Arc<Mutex<Vec<Arc<Tick>>>>,
     #[builder(default = Cache::new(1000))]
-    last_tick_cache: Cache<Uuid, Arc<Tick>>,
+    last_tick_cache: Cache<Arc<Instrument>, Arc<Tick>>,
     buffer_size: usize,
 }
 
@@ -55,9 +55,9 @@ impl TickStore {
     }
 
     async fn update_tick_cache(&self, tick: Arc<Tick>) {
-        if let Some(tick) = self.last_tick_cache.get(&tick.instrument.id).await {
+        if let Some(tick) = self.last_tick_cache.get(&tick.instrument).await {
             if tick.event_time < tick.event_time {
-                self.last_tick_cache.insert(tick.instrument.id, tick.clone()).await;
+                self.last_tick_cache.insert(tick.instrument.clone(), tick.clone()).await;
             }
         }
     }
@@ -89,7 +89,7 @@ impl TickStore {
         Ok(())
     }
 
-    pub async fn get_last_tick(&self, instrument: &Uuid) -> Option<Arc<Tick>> {
+    pub async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Option<Arc<Tick>> {
         self.last_tick_cache.get(instrument).await
     }
 

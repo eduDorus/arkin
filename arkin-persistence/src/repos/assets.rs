@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
-use typed_builder::TypedBuilder;
 use sqlx::{prelude::*, PgPool};
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::PersistenceError;

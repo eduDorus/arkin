@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use typed_builder::TypedBuilder;
 use sqlx::{FromRow, PgPool};
 use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;

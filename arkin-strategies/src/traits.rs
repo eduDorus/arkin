@@ -16,7 +16,7 @@ pub trait Algorithm: std::fmt::Debug + Send + Sync {
         &self,
         instruments: &[Arc<Instrument>],
         event_time: OffsetDateTime,
-        insights: &[Insight],
+        insights: &[Arc<Insight>],
     ) -> Result<Vec<Arc<Signal>>, StrategyError>;
     async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError>;
     // async fn on_tick(&self, tick: Tick) -> Result<(), StrategyError>;
