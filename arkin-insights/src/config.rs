@@ -15,33 +15,34 @@ pub struct InsightsServiceConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PipelineConfig {
+    pub name: String,
     pub features: Vec<FeatureConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FeatureConfig {
-    #[serde(rename = "ohlcv")]
-    OHLCV(OHLCVConfig),
-    #[serde(rename = "vwap")]
-    VWAP(VWAPConfig),
-    #[serde(rename = "pct_change")]
-    PctChange(PctChangeConfig),
-    #[serde(rename = "trade_count")]
-    TradeCount(TradeCountConfig),
-    #[serde(rename = "std_dev")]
-    StdDev(StdDevConfig),
-    #[serde(rename = "hist_vol")]
-    HistVol(HistVolConfig),
+    // #[serde(rename = "ohlcv")]
+    // OHLCV(OHLCVConfig),
+    // #[serde(rename = "vwap")]
+    // VWAP(VWAPConfig),
+    // #[serde(rename = "pct_change")]
+    // PctChange(PctChangeConfig),
+    // #[serde(rename = "trade_count")]
+    // TradeCount(TradeCountConfig),
+    // #[serde(rename = "std_dev")]
+    // StdDev(StdDevConfig),
+    // #[serde(rename = "hist_vol")]
+    // HistVol(HistVolConfig),
     #[serde(rename = "sma")]
     SMA(SMAConfig),
-    #[serde(rename = "ema")]
-    EMA(EMAConfig),
-    #[serde(rename = "macd")]
-    MACD(MACDConfig),
-    #[serde(rename = "bb")]
-    BB(BollingerBandsConfig),
-    #[serde(rename = "rsi")]
-    RSI(RelativeStrengthIndexConfig),
+    // #[serde(rename = "ema")]
+    // EMA(EMAConfig),
+    // #[serde(rename = "macd")]
+    // MACD(MACDConfig),
+    // #[serde(rename = "bb")]
+    // BB(BollingerBandsConfig),
+    // #[serde(rename = "rsi")]
+    // RSI(RelativeStrengthIndexConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

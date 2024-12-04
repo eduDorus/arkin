@@ -44,7 +44,7 @@ impl From<Arc<IntervalTick>> for Event {
 pub struct InsightTick {
     pub event_time: OffsetDateTime,
     pub instruments: Vec<Arc<Instrument>>,
-    pub insights: Vec<Insight>,
+    pub insights: Vec<Arc<Insight>>,
 }
 
 impl EventTypeOf for InsightTick {

@@ -24,9 +24,10 @@ rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 uuid = { workspace = true }
 itertools = { workspace = true }
-# yata = { workspace = true }
+yata = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
+typed-builder = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }

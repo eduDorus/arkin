@@ -48,8 +48,8 @@ impl Tick {
         }
     }
 
-    pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Insight> {
-        vec![
+    pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Arc<Insight>> {
+        let insights = vec![
             Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
@@ -78,7 +78,8 @@ impl Tick {
                 .feature_id(TICK_ASK_QUANTITY_FEATURE_ID.clone())
                 .value(self.ask_quantity)
                 .build(),
-        ]
+        ];
+        insights.into_iter().map(Arc::new).collect::<Vec<_>>()
     }
 
     pub fn spread(&self) -> Decimal {

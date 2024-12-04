@@ -13,23 +13,17 @@ use rayon::ThreadPoolBuilder;
 use time::OffsetDateTime;
 use tracing::{debug, info};
 
-use crate::config::PipelineConfig;
-use crate::factory::FeatureFactory;
-use crate::state::InsightsState;
 use crate::Computation;
 
 #[derive(Debug)]
-pub struct ComputationGraph {
+pub struct PipelineGraph {
     graph: Arc<DiGraph<Box<dyn Computation>, ()>>,
     order: Vec<NodeIndex>,
 }
 
-impl ComputationGraph {
-    pub fn from_config(config: &PipelineConfig) -> Self {
+impl PipelineGraph {
+    pub fn from_config(features: Vec<Box<dyn Computation>>) -> Self {
         let mut graph = DiGraph::new();
-
-        // Create features
-        let features = FeatureFactory::from_config(&config.features);
 
         // Create a mapping from Node IDs to Node Indices
         let mut id_to_index = HashMap::new();
@@ -73,19 +67,14 @@ impl ComputationGraph {
 
         info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
 
-        ComputationGraph {
+        PipelineGraph {
             graph: Arc::new(graph),
             order,
         }
     }
 
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
-    pub fn calculate(
-        &self,
-        state: Arc<InsightsState>,
-        instruments: &[Arc<Instrument>],
-        timestamp: OffsetDateTime,
-    ) -> Vec<Insight> {
+    pub fn calculate(&self, instruments: &[Arc<Instrument>], timestamp: OffsetDateTime) -> Vec<Arc<Insight>> {
         // Step 1: Calculate in-degrees
         let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
         for edge in self.graph.edge_indices() {
@@ -108,8 +97,6 @@ impl ComputationGraph {
         let pool = ThreadPoolBuilder::default().build().expect("Failed to create thread pool");
         pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
-                let state = state.clone();
-                // let instrument = instruments.clone();
                 let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);
                 let queue_tx = queue_tx.clone();
@@ -120,18 +107,10 @@ impl ComputationGraph {
                     let feature = &graph[node];
 
                     // Calculate the feature
-                    let res = feature.calculate(instruments, timestamp, state.clone());
+                    let res = feature.calculate(instruments, timestamp);
                     match res {
-                        Ok(data) => {
-                            // debug!("Calculated: {:?}", data);
-                            data.into_iter().for_each(|insight| {
-                                debug!("Pipeline got: {}", insight);
-                                pipeline_result.lock().push(insight);
-                            });
-                        }
-                        Err(e) => {
-                            info!("Failed to calculate: {:?}", e);
-                        }
+                        Ok(data) => pipeline_result.lock().extend(data),
+                        Err(e) => info!("Failed to calculate: {:?}", e),
                     }
 
                     // Update in-degrees of neighbors and enqueue new zero in-degree nodes
@@ -152,7 +131,8 @@ impl ComputationGraph {
             }
         });
         debug!("Finished graph calculation");
-        let res = pipeline_result.lock().iter().cloned().collect();
+        let mut lock = pipeline_result.lock();
+        let res = std::mem::take(&mut *lock);
         res
     }
 }

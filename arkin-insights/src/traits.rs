@@ -7,14 +7,14 @@ use tokio_util::sync::CancellationToken;
 
 use arkin_core::prelude::*;
 
-use crate::{state::InsightsState, InsightsError};
+use crate::InsightsError;
 
 #[async_trait]
 pub trait Insights: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), InsightsError>;
 
-    async fn insert(&self, insight: Insight) -> Result<(), InsightsError>;
-    async fn insert_batch(&self, insights: Vec<Insight>) -> Result<(), InsightsError>;
+    async fn insert(&self, insight: Arc<Insight>) -> Result<(), InsightsError>;
+    async fn insert_batch(&self, insights: &[Arc<Insight>]) -> Result<(), InsightsError>;
 
     /// Remove all insights with event_time <= provided event_time
     async fn remove(&self, event_time: OffsetDateTime) -> Result<(), InsightsError>;
@@ -31,16 +31,11 @@ pub trait Insights: std::fmt::Debug + Send + Sync {
         event_time: OffsetDateTime,
         instruments: &[Arc<Instrument>],
         publish: bool,
-    ) -> Result<Vec<Insight>, InsightsError>;
+    ) -> Result<Vec<Arc<Insight>>, InsightsError>;
 }
 
 pub trait Computation: std::fmt::Debug + Send + Sync {
     fn inputs(&self) -> Vec<FeatureId>;
     fn outputs(&self) -> Vec<FeatureId>;
-    fn calculate(
-        &self,
-        instruments: &[Arc<Instrument>],
-        event_time: OffsetDateTime,
-        state: Arc<InsightsState>,
-    ) -> Result<Vec<Insight>>;
+    fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>>;
 }

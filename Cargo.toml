@@ -89,7 +89,7 @@ petgraph = { version = "0.6", features = [ "graphmap" ], default-features = fals
 moka2 = { version = "0.13.0", features = [ "future" ] }
 
 # TA
-# yata = "0.7"
+yata = "0.7"
 
 # Testing
 mockall = "0.13"

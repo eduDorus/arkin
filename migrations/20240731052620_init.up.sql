@@ -7,12 +7,12 @@ CREATE TYPE instance_status AS ENUM ('new', 'running', 'stopped', 'completed', '
 CREATE TABLE IF NOT EXISTS instances (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
-    start_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    start_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     end_time TIMESTAMP(3) WITH TIME ZONE,
     instance_type instance_type NOT NULL,
     status instance_status NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 
@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS strategies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 CREATE TYPE venue_type AS ENUM ('cex', 'dex', 'otc');
@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS venues (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
     venue_type venue_type NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 
@@ -40,16 +40,16 @@ CREATE TABLE IF NOT EXISTS assets (
     symbol TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     asset_type asset_type NOT NULL
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 CREATE TABLE IF NOT EXISTS pipelines (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 
@@ -75,16 +75,16 @@ CREATE TABLE IF NOT EXISTS instruments (
     lot_size DECIMAL NOT NULL,
     tick_size DECIMAL NOT NULL,
     status instrument_status NOT NULL
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 CREATE TABLE IF NOT EXISTS portfolios (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 CREATE TYPE transaction_type AS ENUM (
@@ -107,7 +107,7 @@ CREATE TYPE transaction_type AS ENUM (
 -- Transactions Table (Enhanced)
 CREATE TABLE IF NOT EXISTS transactions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     group_id uuid NOT NULL,
     portfolio_id uuid NOT NULL REFERENCES portfolios(id),
     asset_id uuid REFERENCES assets(id),
@@ -123,8 +123,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 --     instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
 --     asset_id uuid NOT NULL REFERENCES assets(id),
 --     quantity NUMERIC NOT NULL,
---     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
---     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+--     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+--     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 -- );
 
 -- CREATE TYPE position_side AS ENUM ('long', 'short');
@@ -142,12 +142,12 @@ CREATE TABLE IF NOT EXISTS transactions (
 --     realized_pnl DECIMAL NOT NULL,
 --     total_commission DECIMAL NOT NULL,
 --     status position_status NOT NULL,
---     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
---     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+--     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+--     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 -- );
 
 -- CREATE TABLE IF NOT EXISTS venue_order_fills (
---     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+--     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 --     instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
 --     venue_order_id uuid NOT NULL REFERENCES venue_orders(id),
 --     instrument_id uuid NOT NULL REFERENCES instruments(id),
@@ -184,8 +184,8 @@ CREATE TABLE IF NOT EXISTS execution_orders (
     filled_quantity NUMERIC NOT NULL,
     total_commission NUMERIC NOT NULL,
     status execution_order_status NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 
@@ -229,14 +229,14 @@ CREATE TABLE IF NOT EXISTS venue_orders (
     filled_quantity NUMERIC NOT NULL,
     total_commission NUMERIC NOT NULL,
     status venue_order_status NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 
 CREATE TABLE IF NOT EXISTS insights (
     id uuid DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     pipeline_id uuid NOT NULL REFERENCES pipelines(id),
     instrument_id uuid REFERENCES instruments(id),
     feature_id TEXT NOT NULL,
@@ -250,7 +250,7 @@ SELECT add_dimension('insights', by_hash('pipeline_id', 4));
 
 CREATE TABLE IF NOT EXISTS signals (
     id uuid DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     strategy_id uuid NOT NULL REFERENCES strategies(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     weight NUMERIC NOT NULL,
@@ -261,7 +261,7 @@ SELECT add_dimension('signals', by_hash('instrument_id', 4));
 
 CREATE TABLE IF NOT EXISTS allocations (
     id uuid DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     group_id uuid NOT NULL,
     portfolio_id uuid NOT NULL REFERENCES portfolios(id),
     strategy_id uuid NOT NULL REFERENCES strategies(id), 
@@ -275,7 +275,7 @@ SELECT create_hypertable('allocations', by_range('event_time', interval '1 day')
 
 
 CREATE TABLE IF NOT EXISTS ticks (
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     tick_id BIGINT NOT NULL,
     bid_price NUMERIC NOT NULL,
@@ -290,7 +290,7 @@ SELECT add_dimension('ticks', by_hash('instrument_id', 4));
 
 
 CREATE TABLE IF NOT EXISTS trade (
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     trade_id BIGINT NOT NULL,
     side market_side NOT NULL,

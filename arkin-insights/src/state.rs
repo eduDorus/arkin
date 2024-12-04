@@ -9,37 +9,32 @@ use arkin_core::prelude::*;
 
 #[derive(Debug, Default)]
 pub struct InsightsState {
-    features: DashMap<(Option<Arc<Instrument>>, FeatureId), BTreeMap<CompositeIndex, Decimal>>,
+    features: DashMap<(Option<Arc<Instrument>>, FeatureId), BTreeMap<OffsetDateTime, Decimal>>,
 }
 
 impl InsightsState {
-    pub fn insert(&self, event: Insight) {
-        let key = (event.instrument, event.feature_id);
-        let mut composit_key = CompositeIndex::new(event.event_time);
+    pub fn insert(&self, event: Arc<Insight>) {
+        let key = (event.instrument.clone(), event.feature_id.clone());
+        // let mut composit_key = CompositeIndex::new(event.event_time);
 
         let mut entry = self.features.entry(key).or_default();
-        while entry.get(&composit_key).is_some() {
-            composit_key.increment();
-        }
-        entry.insert(composit_key, event.value);
+        // while entry.get(&composit_key).is_some() {
+        //     composit_key.increment();
+        // }
+        entry.insert(event.event_time, event.value);
     }
 
-    pub fn insert_batch(&self, events: Vec<Insight>) {
+    pub fn insert_batch(&self, events: &[Arc<Insight>]) {
         events.into_par_iter().for_each(|event| {
-            let key = (event.instrument, event.feature_id);
-            let mut composit_key = CompositeIndex::new(event.event_time);
-
+            let key = (event.instrument.clone(), event.feature_id.clone());
             let mut entry = self.features.entry(key).or_default();
-            while entry.get(&composit_key).is_some() {
-                composit_key.increment();
-            }
-            entry.insert(composit_key, event.value);
+            entry.insert(event.event_time, event.value);
         });
     }
 
     pub fn remove(&self, event_time: OffsetDateTime) {
         self.features.retain(|_, v| {
-            v.retain(|i, _| i.timestamp >= event_time);
+            v.retain(|i, _| i >= &event_time);
             !v.is_empty()
         });
     }
@@ -50,10 +45,8 @@ impl InsightsState {
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
     ) -> Option<Decimal> {
-        let index = CompositeIndex::new_max(timestamp);
-
         if let Some(tree) = self.features.get(&(instrument, feature_id)) {
-            if let Some((_, v)) = tree.range(..=index).rev().take(1).next() {
+            if let Some((_, v)) = tree.range(..=timestamp).rev().take(1).next() {
                 return Some(v.clone());
             }
         }
@@ -67,11 +60,10 @@ impl InsightsState {
         timestamp: OffsetDateTime,
         window: Duration,
     ) -> Vec<Decimal> {
-        let index = CompositeIndex::new_max(timestamp);
-        let end_index = CompositeIndex::new(timestamp - window);
+        let end_time = timestamp - window;
 
         if let Some(tree) = self.features.get(&(instrument, feature_id)) {
-            tree.range(end_index..=index).map(|(_, v)| *v).collect()
+            tree.range(end_time..=timestamp).map(|(_, v)| *v).collect()
         } else {
             Vec::new()
         }
@@ -84,10 +76,13 @@ impl InsightsState {
         timestamp: OffsetDateTime,
         periods: usize,
     ) -> Vec<Decimal> {
-        let index = CompositeIndex::new_max(timestamp);
-
         if let Some(tree) = self.features.get(&(instrument, feature_id)) {
-            let mut res = tree.range(..=index).rev().take(periods).map(|(_, v)| *v).collect::<Vec<_>>();
+            let mut res = tree
+                .range(..=timestamp)
+                .rev()
+                .take(periods)
+                .map(|(_, v)| *v)
+                .collect::<Vec<_>>();
             res.reverse();
             res
         } else {

@@ -28,7 +28,7 @@ impl Accounting for SingleStrategyPortfolio {
         info!("Starting portfolio...");
         let mut price_updates = self.pubsub.subscribe::<Tick>();
         let mut balance_updates = self.pubsub.subscribe::<Holding>();
-        let mut position_updates = self.pubsub.subscribe::<Position>();
+        // let mut position_updates = self.pubsub.subscribe::<Position>();
         let mut fill_updates = self.pubsub.subscribe::<VenueOrderFill>();
         loop {
             tokio::select! {
@@ -42,11 +42,11 @@ impl Accounting for SingleStrategyPortfolio {
                         error!("Failed to process balance update: {}", e);
                     }
                 }
-                Ok(position) = position_updates.recv() => {
-                    if let Err(e) = self.position_update(position).await {
-                        error!("Failed to process position update: {}", e);
-                    }
-                }
+                // Ok(position) = position_updates.recv() => {
+                //     if let Err(e) = self.position_update(position).await {
+                //         error!("Failed to process position update: {}", e);
+                //     }
+                // }
                 Ok(fill) = fill_updates.recv() => {
                     if let Err(e) = self.fill_update(fill).await {
                         error!("Failed to process fill update: {}", e);
@@ -60,7 +60,7 @@ impl Accounting for SingleStrategyPortfolio {
         Ok(())
     }
 
-    async fn price_update(&self, tick: Tick) -> Result<(), PortfolioError> {
+    async fn price_update(&self, tick: Arc<Tick>) -> Result<(), PortfolioError> {
         debug!("Portfolio processing price update: {}", tick);
 
         // Update the price of the instrument in the position
@@ -74,7 +74,7 @@ impl Accounting for SingleStrategyPortfolio {
         Ok(())
     }
 
-    async fn balance_update(&self, holding: Holding) -> Result<(), PortfolioError> {
+    async fn balance_update(&self, holding: Arc<Holding>) -> Result<(), PortfolioError> {
         info!("Portfolio processing balance update: {}", holding);
         // Check if we have the asset in the holdings else create
         if self.holdings.contains_key(&holding.asset) {
@@ -92,7 +92,7 @@ impl Accounting for SingleStrategyPortfolio {
         unimplemented!("Position update not implemented");
     }
 
-    async fn fill_update(&self, fill: VenueOrderFill) -> Result<(), PortfolioError> {
+    async fn fill_update(&self, fill: Arc<VenueOrderFill>) -> Result<(), PortfolioError> {
         info!("Portfolio processing fill update: {}", fill);
         // Reduce the balance of the quote asset
         let cost = fill.total_cost();

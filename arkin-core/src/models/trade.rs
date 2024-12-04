@@ -42,8 +42,8 @@ impl Trade {
         }
     }
 
-    pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Insight> {
-        vec![
+    pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Arc<Insight>> {
+        let insights = vec![
             Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
@@ -58,7 +58,8 @@ impl Trade {
                 .feature_id(TRADE_QUANTITY_FEATURE_ID.clone())
                 .value(self.quantity * Decimal::from(self.side))
                 .build(),
-        ]
+        ];
+        insights.into_iter().map(Arc::new).collect()
     }
 }
 

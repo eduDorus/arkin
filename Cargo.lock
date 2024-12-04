@@ -347,7 +347,9 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "typed-builder",
  "uuid",
+ "yata",
 ]
 
 [[package]]
@@ -4376,6 +4378,15 @@ dependencies = [
  "arraydeque",
  "encoding_rs",
  "hashlink 0.8.4",
+]
+
+[[package]]
+name = "yata"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b4ef8ddfa3ccd93454262c0e60a43a2bbf403d404174e1815f7581d5028229f"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

@@ -13,7 +13,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
 use crate::errors::InsightsError;
-use crate::pipeline::ComputationGraph;
+use crate::factory::FeatureFactory;
+use crate::pipeline::PipelineGraph;
 use crate::traits::Insights;
 use crate::{config::InsightsServiceConfig, state::InsightsState};
 
@@ -22,21 +23,31 @@ pub struct InsightsService {
     state: Arc<InsightsState>,
     pubsub: Arc<PubSub>,
     persistence_service: Arc<PersistenceService>,
-    pipeline: ComputationGraph,
+    pipeline: Arc<Pipeline>,
+    graph: PipelineGraph,
     state_lookback: Duration,
 }
 
 impl InsightsService {
-    pub fn from_config(
+    pub async fn from_config(
         config: &InsightsServiceConfig,
         pubsub: Arc<PubSub>,
         persistence_service: Arc<PersistenceService>,
     ) -> Self {
+        let pipeline = persistence_service
+            .pipeline_store
+            .read_by_name(&config.pipeline.name)
+            .await
+            .expect("Could not find pipeline");
+        let state = Arc::new(InsightsState::default());
+        let features = FeatureFactory::from_config(&config.pipeline.features, pipeline.clone(), state.clone());
+
         Self {
-            state: Arc::new(InsightsState::default()),
+            state,
             pubsub,
             persistence_service,
-            pipeline: ComputationGraph::from_config(&config.pipeline),
+            pipeline,
+            graph: PipelineGraph::from_config(features),
             state_lookback: Duration::from_secs(config.state_lookback),
         }
     }
@@ -44,7 +55,7 @@ impl InsightsService {
 
 #[async_trait]
 impl Insights for InsightsService {
-    async fn start(&self, _shutdown: CancellationToken) -> Result<(), InsightsError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), InsightsError> {
         info!("Starting insights service...");
         let mut interval_tick = self.pubsub.subscribe::<IntervalTick>();
         let mut trades = self.pubsub.subscribe::<Trade>();
@@ -61,11 +72,12 @@ impl Insights for InsightsService {
                 }
                 Ok(trade) = trades.recv() => {
                     debug!("InsightsService received trade: {}", trade.event_time);
-                    if let Err(e) = self.insert_batch(trade.to_insights()).await {
+                    let insights = trade.as_ref().clone().to_insights(self.pipeline.clone());
+                    if let Err(e) = self.insert_batch(insights.as_slice()).await {
                         error!("Error inserting trade: {}", e);
                     }
                 }
-                _ = _shutdown.cancelled() => {
+                _ = shutdown.cancelled() => {
                     break;
                 }
             }
@@ -83,23 +95,29 @@ impl Insights for InsightsService {
         info!("Loading insights from {} to {}", start, event_time);
 
         // let ticks = self.persistence_service.read_ticks_range(instruments, from, to).await?;
+        let instrument_ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
         let trades = self
             .persistence_service
-            .read_trades_range(instruments, start, event_time)
+            .trade_store
+            .read_range(&instrument_ids, start, event_time)
             .await?;
 
-        let insights = trades.into_iter().map(|t| t.to_insights()).flatten().collect::<Vec<_>>();
+        let insights = trades
+            .into_iter()
+            .map(|t| t.as_ref().clone().to_insights(self.pipeline.clone()))
+            .flatten()
+            .collect::<Vec<_>>();
         info!("Adding {} insights to state", insights.len());
-        self.state.insert_batch(insights);
+        self.state.insert_batch(insights.as_slice());
         Ok(())
     }
 
-    async fn insert(&self, insight: Insight) -> Result<(), InsightsError> {
+    async fn insert(&self, insight: Arc<Insight>) -> Result<(), InsightsError> {
         self.state.insert(insight);
         Ok(())
     }
 
-    async fn insert_batch(&self, insights: Vec<Insight>) -> Result<(), InsightsError> {
+    async fn insert_batch(&self, insights: &[Arc<Insight>]) -> Result<(), InsightsError> {
         self.state.insert_batch(insights);
         Ok(())
     }
@@ -114,9 +132,9 @@ impl Insights for InsightsService {
         event_time: OffsetDateTime,
         instruments: &[Arc<Instrument>],
         publish: bool,
-    ) -> Result<Vec<Insight>, InsightsError> {
+    ) -> Result<Vec<Arc<Insight>>, InsightsError> {
         info!("Running insights pipeline at event time: {}", event_time);
-        let insights = self.pipeline.calculate(self.state.clone(), instruments, event_time);
+        let insights = self.graph.calculate(instruments, event_time);
         let insights_tick = InsightTick::builder()
             .event_time(event_time)
             .instruments(instruments.to_vec())
