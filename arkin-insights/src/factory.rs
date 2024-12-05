@@ -1,8 +1,10 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use arkin_core::Pipeline;
 
-use crate::{config::FeatureConfig, state::InsightsState, ta::SimpleMovingAverageFeature, Computation};
+use crate::{
+    config::FeatureConfig, simple::OHLCVFeature, state::InsightsState, ta::SimpleMovingAverageFeature, Computation,
+};
 
 pub struct FeatureFactory {}
 
@@ -17,7 +19,30 @@ impl FeatureFactory {
             .iter()
             .map(|config| {
                 let feature: Box<dyn Computation> = match config {
-                    // FeatureConfig::OHLCV(c) => Box::new(OHLCVFeature::from_config(c)),
+                    FeatureConfig::OHLCV(c) => Box::new(
+                        OHLCVFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input_price(c.input_price.to_owned())
+                            .input_quantity(c.input_quantity.to_owned())
+                            .output_open(c.output_open.to_owned())
+                            .output_high(c.output_high.to_owned())
+                            .output_low(c.output_low.to_owned())
+                            .output_close(c.output_close.to_owned())
+                            .output_typical_price(c.output_typical_price.to_owned())
+                            .output_vwap(c.output_vwap.to_owned())
+                            .output_volume(c.output_volume.to_owned())
+                            .output_buy_volume(c.output_buy_volume.to_owned())
+                            .output_sell_volume(c.output_sell_volume.to_owned())
+                            .output_notional_volume(c.output_notional_volume.to_owned())
+                            .output_buy_notional_volume(c.output_buy_notional_volume.to_owned())
+                            .output_sell_notional_volume(c.output_sell_notional_volume.to_owned())
+                            .output_trade_count(c.output_trade_count.to_owned())
+                            .output_buy_trade_count(c.output_buy_trade_count.to_owned())
+                            .output_sell_trade_count(c.output_sell_trade_count.to_owned())
+                            .window(Duration::from_secs(c.window))
+                            .build(),
+                    ),
                     // FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
                     // FeatureConfig::PctChange(c) => Box::new(PctChangeFeature::from_config(c)),
                     // FeatureConfig::HistVol(c) => Box::new(HistVolFeature::from_config(c)),

@@ -66,9 +66,6 @@ impl Insights for InsightsService {
                     if let Err(e) = self.process(time_tick.event_time, &time_tick.instruments, true).await {
                         error!("Error processing interval tick: {}", e);
                     }
-                    if let Err(e) = self.remove(time_tick.event_time).await {
-                        error!("Error removing insights: {}", e);
-                    }
                 }
                 Ok(trade) = trades.recv() => {
                     debug!("InsightsService received trade: {}", trade.event_time);
@@ -122,7 +119,9 @@ impl Insights for InsightsService {
     }
 
     async fn remove(&self, event_time: OffsetDateTime) -> Result<(), InsightsError> {
-        self.state.remove(event_time - self.state_lookback);
+        let last_time = event_time - self.state_lookback;
+        self.state.remove(last_time);
+        info!("Removed insights before {}", last_time);
         Ok(())
     }
 
@@ -148,6 +147,10 @@ impl Insights for InsightsService {
                 insights.len()
             );
             self.pubsub.publish::<InsightTick>(insights_tick);
+        }
+
+        if let Err(e) = self.remove(event_time).await {
+            error!("Error removing insights: {}", e);
         }
         Ok(insights)
     }

@@ -31,6 +31,17 @@ async fn main() {
     let config = load::<IngestorsConfig>();
     let ingestors = IngestorFactory::from_config(&config, pubsub.clone(), persistence_service.clone());
 
+    // Start the persistence service
+    let persistence_task_tracker = TaskTracker::new();
+    let persistence_shutdown = CancellationToken::new();
+    let shutdown = persistence_shutdown.clone();
+    persistence_task_tracker.spawn(async move {
+        if let Err(e) = persistence_service.start(shutdown).await {
+            error!("Failed to start persistence service: {}", e);
+        }
+    });
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
     // Start the ingestors
     let ingestor_task_tracker = TaskTracker::new();
     let ingestor_shutdown = CancellationToken::new();
@@ -42,16 +53,6 @@ async fn main() {
             }
         });
     }
-
-    // Start the persistence service
-    let persistence_task_tracker = TaskTracker::new();
-    let persistence_shutdown = CancellationToken::new();
-    let shutdown = persistence_shutdown.clone();
-    persistence_task_tracker.spawn(async move {
-        if let Err(e) = persistence_service.start(shutdown).await {
-            error!("Failed to start persistence service: {}", e);
-        }
-    });
 
     match tokio::signal::ctrl_c().await {
         Ok(_) => {

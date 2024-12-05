@@ -5,7 +5,7 @@ use std::{any::Any, time::Duration};
 use dashmap::DashMap;
 use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 
 use strum::EnumDiscriminants;
@@ -141,7 +141,8 @@ impl PubSub {
     pub fn subscribe<E: EventTypeOf>(&self) -> Receiver<Arc<E>> {
         let event_type = E::event_type();
         let sender_any = self.event_senders.entry(event_type).or_insert_with(|| {
-            let (tx, _) = broadcast::channel::<Arc<E>>(1024);
+            let (tx, _) = broadcast::channel::<Arc<E>>(1000000);
+            info!("New subscriber to event: {:?}", event_type);
             Box::new(tx)
         });
         let sender = sender_any.downcast_ref::<Sender<Arc<E>>>().expect("Type mismatch");

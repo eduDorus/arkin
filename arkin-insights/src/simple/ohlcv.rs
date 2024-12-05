@@ -6,11 +6,15 @@ use time::OffsetDateTime;
 use tracing::{debug, warn};
 
 use arkin_core::prelude::*;
+use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
-use crate::{config::OHLCVConfig, state::InsightsState, Computation};
+use crate::{state::InsightsState, Computation};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct OHLCVFeature {
+    pipeline: Arc<Pipeline>,
+    insight_state: Arc<InsightsState>,
     input_price: FeatureId,
     input_quantity: FeatureId,
     output_open: FeatureId,
@@ -29,31 +33,6 @@ pub struct OHLCVFeature {
     output_buy_trade_count: FeatureId,
     output_sell_trade_count: FeatureId,
     window: Duration,
-}
-
-impl OHLCVFeature {
-    pub fn from_config(config: &OHLCVConfig) -> Self {
-        OHLCVFeature {
-            input_price: config.input_price.to_owned(),
-            input_quantity: config.input_quantity.to_owned(),
-            output_open: config.output_open.to_owned(),
-            output_high: config.output_high.to_owned(),
-            output_low: config.output_low.to_owned(),
-            output_close: config.output_close.to_owned(),
-            output_typical_price: config.output_typical_price.to_owned(),
-            output_vwap: config.output_vwap.to_owned(),
-            output_volume: config.output_volume.to_owned(),
-            output_buy_volume: config.output_buy_volume.to_owned(),
-            output_sell_volume: config.output_sell_volume.to_owned(),
-            output_notional_volume: config.output_notional_volume.to_owned(),
-            output_buy_notional_volume: config.output_buy_notional_volume.to_owned(),
-            output_sell_notional_volume: config.output_sell_notional_volume.to_owned(),
-            output_trade_count: config.output_trade_count.to_owned(),
-            output_buy_trade_count: config.output_buy_trade_count.to_owned(),
-            output_sell_trade_count: config.output_sell_trade_count.to_owned(),
-            window: Duration::from_secs(config.window),
-        }
-    }
 }
 
 impl Computation for OHLCVFeature {
@@ -81,12 +60,7 @@ impl Computation for OHLCVFeature {
         ]
     }
 
-    fn calculate(
-        &self,
-        instruments: &[Arc<Instrument>],
-        event_time: OffsetDateTime,
-        state: Arc<InsightsState>,
-    ) -> Result<Vec<Insight>> {
+    fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
         debug!("Calculating OHLCV");
 
         // Get data from state
@@ -96,9 +70,18 @@ impl Computation for OHLCVFeature {
             .iter()
             .filter_map(|instrument| {
                 // Get data
-                let prices = state.window(Some(instrument.clone()), self.input_price.clone(), event_time, self.window);
-                let quantities =
-                    state.window(Some(instrument.clone()), self.input_quantity.clone(), event_time, self.window);
+                let prices = self.insight_state.window(
+                    Some(instrument.clone()),
+                    self.input_price.clone(),
+                    event_time,
+                    self.window,
+                );
+                let quantities = self.insight_state.window(
+                    Some(instrument.clone()),
+                    self.input_quantity.clone(),
+                    event_time,
+                    self.window,
+                );
 
                 // Check if we have enough data
                 if prices.is_empty() || quantities.is_empty() || prices.len() != quantities.len() {
@@ -164,97 +147,177 @@ impl Computation for OHLCVFeature {
                 // Create insights
                 let mut insights = Vec::with_capacity(self.outputs().len());
 
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_open.clone(),
-                    open,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_high.clone(),
-                    high,
-                ));
-                insights.push(Insight::new(event_time, Some(instrument.clone()), self.output_low.clone(), low));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_close.clone(),
-                    close,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_typical_price.clone(),
-                    typical_price,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_vwap.clone(),
-                    vwap,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_volume.clone(),
-                    volume,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_buy_volume.clone(),
-                    buy_volume,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_sell_volume.clone(),
-                    sell_volume,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_notional_volume.clone(),
-                    notional_volume,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_buy_notional_volume.clone(),
-                    buy_notional_volume,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_sell_notional_volume.clone(),
-                    sell_notional_volume,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_trade_count.clone(),
-                    trade_count,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_buy_trade_count.clone(),
-                    buy_trade_count,
-                ));
-                insights.push(Insight::new(
-                    event_time,
-                    Some(instrument.clone()),
-                    self.output_sell_trade_count.clone(),
-                    sell_trade_count,
-                ));
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_open.clone())
+                        .value(open)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_high.clone())
+                        .value(high)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_low.clone())
+                        .value(low)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_close.clone())
+                        .value(close)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_typical_price.clone())
+                        .value(typical_price)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_vwap.clone())
+                        .value(vwap)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_volume.clone())
+                        .value(volume)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_buy_volume.clone())
+                        .value(buy_volume)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_sell_volume.clone())
+                        .value(sell_volume)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_notional_volume.clone())
+                        .value(notional_volume)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_buy_notional_volume.clone())
+                        .value(buy_notional_volume)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_sell_notional_volume.clone())
+                        .value(sell_notional_volume)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_trade_count.clone())
+                        .value(trade_count)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_buy_trade_count.clone())
+                        .value(buy_trade_count)
+                        .build()
+                        .into(),
+                );
+                insights.push(
+                    Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output_sell_trade_count.clone())
+                        .value(sell_trade_count)
+                        .build()
+                        .into(),
+                );
                 Some(insights)
             })
             .flatten()
             .collect::<Vec<_>>();
 
-        state.insert_batch(insights.clone());
+        self.insight_state.insert_batch(&insights);
         Ok(insights)
     }
 }

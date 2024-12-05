@@ -21,8 +21,8 @@ pub struct PipelineConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FeatureConfig {
-    // #[serde(rename = "ohlcv")]
-    // OHLCV(OHLCVConfig),
+    #[serde(rename = "ohlcv")]
+    OHLCV(OHLCVConfig),
     // #[serde(rename = "vwap")]
     // VWAP(VWAPConfig),
     // #[serde(rename = "pct_change")]

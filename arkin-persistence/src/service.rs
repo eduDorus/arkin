@@ -150,7 +150,8 @@ impl Persistor for PersistenceService {
 
         let mut trades = self.pubsub.subscribe::<Trade>();
         let mut ticks = self.pubsub.subscribe::<Tick>();
-        let mut insights = self.pubsub.subscribe::<Insight>();
+        let mut insight = self.pubsub.subscribe::<Insight>();
+        let mut insight_tick = self.pubsub.subscribe::<InsightTick>();
 
         loop {
             tokio::select! {
@@ -164,9 +165,14 @@ impl Persistor for PersistenceService {
                             error!("Failed to insert tick: {}", e);
                         }
                     }
-                    Ok(insight) = insights.recv() => {
+                    Ok(insight) = insight.recv() => {
                         if let Err(e) = self.insights_store.insert_buffered(insight).await {
                             error!("Failed to insert insight: {}", e);
+                        }
+                    }
+                    Ok(tick) = insight_tick.recv() => {
+                        if let Err(e) = self.insights_store.insert_buffered_vec(tick.insights.clone()).await {
+                            error!("Failed to insert insight tick: {}", e);
                         }
                     }
                     _ = interval.tick() => {

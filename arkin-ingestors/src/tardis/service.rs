@@ -352,7 +352,7 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 
 #[async_trait]
 impl Ingestor for TardisIngestor {
-    async fn start(&self, _shutdown: CancellationToken) -> Result<(), IngestorError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting tardis ingestor...");
         let persistence_service = Arc::clone(&self.persistence_service);
 
@@ -368,61 +368,73 @@ impl Ingestor for TardisIngestor {
         pin!(stream);
 
         // No need to clone persistence_service for each iteration
-        while let Some((_ts, json)) = stream.next().await {
-            let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
-                Ok(e) => Some(e),
-                Err(e) => {
-                    error!("Failed to parse Binance event: {}", e);
-                    error!("Data: {}", json);
-                    None
-                }
-            };
-
-            let event = match event {
-                Some(e) => {
-                    debug!("{}", e);
-                    e
-                }
-                None => continue,
-            };
-
-            let instrument = persistence_service
-                .instrument_store
-                .read_by_venue_symbol(&event.venue_symbol())
-                .await?;
-
-            match event {
-                BinanceSwapsEvent::AggTradeStream(stream) => {
-                    let trade = stream.data;
-                    let side = if trade.maker {
-                        MarketSide::Sell
-                    } else {
-                        MarketSide::Buy
+        loop {
+            tokio::select! {
+                    Some((_ts, json)) = stream.next() => {
+                        debug!("Received data: {}", json);
+                    let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
+                        Ok(e) => Some(e),
+                        Err(e) => {
+                            error!("Failed to parse Binance event: {}", e);
+                            error!("Data: {}", json);
+                            None
+                        }
                     };
-                    let trade = Trade::new(
-                        trade.event_time,
-                        instrument,
-                        trade.agg_trade_id,
-                        side,
-                        trade.price,
-                        trade.quantity,
-                    );
-                    let trade = Arc::new(trade);
-                    self.pubsub.publish::<Trade>(trade);
-                }
-                BinanceSwapsEvent::TickStream(stream) => {
-                    let tick = stream.data;
-                    let tick = Tick::new(
-                        tick.event_time,
-                        instrument,
-                        tick.update_id,
-                        tick.bid_price,
-                        tick.bid_quantity,
-                        tick.ask_price,
-                        tick.ask_quantity,
-                    );
-                    let tick = Arc::new(tick);
-                    self.pubsub.publish::<Tick>(tick);
+
+                    let event = match event {
+                        Some(e) => {
+                            debug!("{}", e);
+                            e
+                        }
+                        None => {
+                            error!("Failed to parse event, skipping...");
+                            continue
+                        },
+                    };
+
+                    let instrument = persistence_service
+                        .instrument_store
+                        .read_by_venue_symbol(&event.venue_symbol())
+                        .await?;
+
+                    match event {
+                        BinanceSwapsEvent::AggTradeStream(stream) => {
+                            let trade = stream.data;
+                            let side = if trade.maker {
+                                MarketSide::Sell
+                            } else {
+                                MarketSide::Buy
+                            };
+                            let trade = Trade::new(
+                                trade.event_time,
+                                instrument,
+                                trade.agg_trade_id,
+                                side,
+                                trade.price,
+                                trade.quantity,
+                            );
+                            let trade = Arc::new(trade);
+                            self.pubsub.publish::<Trade>(trade);
+                        }
+                        BinanceSwapsEvent::TickStream(stream) => {
+                            let tick = stream.data;
+                            let tick = Tick::new(
+                                tick.event_time,
+                                instrument,
+                                tick.update_id,
+                                tick.bid_price,
+                                tick.bid_quantity,
+                                tick.ask_price,
+                                tick.ask_quantity,
+                            );
+                            let tick = Arc::new(tick);
+                            self.pubsub.publish::<Tick>(tick);
+                        }
+                    }
+                },
+                _ = shutdown.cancelled() => {
+                    info!("Shutting down");
+                    break;
                 }
             }
         }
