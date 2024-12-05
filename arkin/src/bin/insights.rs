@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
             error!("Failed to start persistence service: {}", e);
         }
     });
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
     let config = load::<InsightsConfig>();
     let insights_service =

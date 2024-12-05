@@ -7,24 +7,28 @@ use time::OffsetDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
-use yata::{methods::SMA, prelude::*};
+use yata::{
+    helpers::MA,
+    indicators::{AverageDirectionalIndex, AverageDirectionalIndexInstance},
+    prelude::*,
+};
 
 use arkin_core::prelude::*;
 
 use crate::{state::InsightsState, Computation};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct SimpleMovingAverageFeature {
+pub struct AverageDirectionalIndexFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
     #[builder(default)]
-    store: DashMap<Arc<Instrument>, SMA>,
+    store: DashMap<Arc<Instrument>, AverageDirectionalIndexInstance>,
     input: FeatureId,
     output: FeatureId,
     periods: usize,
 }
 
-impl Computation for SimpleMovingAverageFeature {
+impl Computation for AverageDirectionalIndexFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
@@ -34,33 +38,41 @@ impl Computation for SimpleMovingAverageFeature {
     }
 
     fn calculate(&self, instruments: &[Arc<Instrument>], timestamp: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
-        debug!("Calculating SMA");
+        debug!("Calculating ADX...");
 
         // Calculate the mean (SMA)
         let insights = instruments
             .iter()
             .filter_map(|instrument| {
                 // Get data from state
-                let value = self
-                    .insight_state
-                    .last(Some(instrument.clone()), self.input.clone(), timestamp)?;
-                let value_f64 = value.to_f64()?;
+                let ohlcv = self.insight_state.last_candle(instrument.clone(), timestamp)?;
 
-                if let Some(mut sma) = self.store.get_mut(instrument) {
-                    let sma_value = sma.next(&value_f64);
-                    let sma_value = Decimal::from_f64(sma_value)?;
+                if let Some(mut rsi) = self.store.get_mut(instrument) {
+                    let res = rsi.next(&ohlcv);
+                    let values = res.values();
+                    if values.is_empty() {
+                        return None;
+                    }
+                    let value = Decimal::from_f64(values[0])?;
                     let insight = Insight::builder()
                         .id(Uuid::new_v4())
                         .event_time(timestamp)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
-                        .value(sma_value)
+                        .value(value)
                         .build();
                     Some(Arc::new(insight))
                 } else {
-                    let sma = SMA::new(self.periods as u8, &value_f64).ok()?;
-                    self.store.insert(instrument.clone(), sma);
+                    let rsi = AverageDirectionalIndex {
+                        method1: MA::TMA(self.periods as u8),
+                        method2: MA::TMA(self.periods as u8),
+                        period1: 1,
+                        zone: 0.2,
+                    }
+                    .init(&ohlcv)
+                    .ok()?;
+                    self.store.insert(instrument.clone(), rsi);
                     None
                 }
             })

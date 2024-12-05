@@ -8,9 +8,7 @@ use tracing::debug;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 use yata::{
-    core::Source,
-    helpers::MA,
-    indicators::{RelativeStrengthIndexInstance, RSI},
+    indicators::{ChaikinMoneyFlow, ChaikinMoneyFlowInstance},
     prelude::*,
 };
 
@@ -19,17 +17,17 @@ use arkin_core::prelude::*;
 use crate::{state::InsightsState, Computation};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct RelativeStrengthIndexFeature {
+pub struct ChaikinMoneyFlowFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
     #[builder(default)]
-    store: DashMap<Arc<Instrument>, RelativeStrengthIndexInstance>,
+    store: DashMap<Arc<Instrument>, ChaikinMoneyFlowInstance>,
     input: FeatureId,
     output: FeatureId,
     periods: usize,
 }
 
-impl Computation for RelativeStrengthIndexFeature {
+impl Computation for ChaikinMoneyFlowFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
@@ -39,8 +37,9 @@ impl Computation for RelativeStrengthIndexFeature {
     }
 
     fn calculate(&self, instruments: &[Arc<Instrument>], timestamp: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
-        debug!("Calculating RSI...");
+        debug!("Calculating ADX...");
 
+        // Calculate the mean (SMA)
         let insights = instruments
             .iter()
             .filter_map(|instrument| {
@@ -53,25 +52,23 @@ impl Computation for RelativeStrengthIndexFeature {
                     if values.is_empty() {
                         return None;
                     }
-                    let rsi_value = Decimal::from_f64(values[0])?;
+                    let value = Decimal::from_f64(values[0])?;
                     let insight = Insight::builder()
                         .id(Uuid::new_v4())
                         .event_time(timestamp)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
-                        .value(rsi_value)
+                        .value(value)
                         .build();
                     Some(Arc::new(insight))
                 } else {
-                    let rsi = RSI {
-                        ma: MA::DMA(self.periods as u8),
-                        zone: 0.2,
-                        source: Source::TP,
+                    let cmf = ChaikinMoneyFlow {
+                        size: self.periods as u8,
                     }
                     .init(&ohlcv)
                     .ok()?;
-                    self.store.insert(instrument.clone(), rsi);
+                    self.store.insert(instrument.clone(), cmf);
                     None
                 }
             })

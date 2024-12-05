@@ -6,7 +6,7 @@ use crate::{
     config::FeatureConfig,
     simple::OHLCVFeature,
     state::InsightsState,
-    ta::{RelativeStrengthIndexFeature, SimpleMovingAverageFeature},
+    ta::{AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, MovingAverageFeature, RelativeStrengthIndexFeature},
     Computation,
 };
 
@@ -52,10 +52,11 @@ impl FeatureFactory {
                     // FeatureConfig::HistVol(c) => Box::new(HistVolFeature::from_config(c)),
                     // FeatureConfig::TradeCount(c) => Box::new(TradeCountFeature::from_config(c)),
                     // FeatureConfig::StdDev(c) => Box::new(StdDevFeature::from_config(c)),
-                    FeatureConfig::SMA(c) => Box::new(
-                        SimpleMovingAverageFeature::builder()
+                    FeatureConfig::MA(c) => Box::new(
+                        MovingAverageFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
+                            .ma_type(c.ma_type.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods)
@@ -66,6 +67,24 @@ impl FeatureFactory {
                     // FeatureConfig::BB(c) => Box::new(BollingerBandsFeature::from_config(c)),
                     FeatureConfig::RSI(c) => Box::new(
                         RelativeStrengthIndexFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output(c.output.clone())
+                            .periods(c.periods)
+                            .build(),
+                    ),
+                    FeatureConfig::ADX(c) => Box::new(
+                        AverageDirectionalIndexFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output(c.output.clone())
+                            .periods(c.periods)
+                            .build(),
+                    ),
+                    FeatureConfig::CMF(c) => Box::new(
+                        ChaikinMoneyFlowFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
                             .input(c.input.clone())

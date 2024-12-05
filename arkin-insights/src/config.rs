@@ -33,16 +33,18 @@ pub enum FeatureConfig {
     // StdDev(StdDevConfig),
     // #[serde(rename = "hist_vol")]
     // HistVol(HistVolConfig),
-    #[serde(rename = "sma")]
-    SMA(SMAConfig),
-    // #[serde(rename = "ema")]
-    // EMA(EMAConfig),
+    #[serde(rename = "ma")]
+    MA(MovingAverageConfig),
     // #[serde(rename = "macd")]
     // MACD(MACDConfig),
     // #[serde(rename = "bb")]
     // BB(BollingerBandsConfig),
     #[serde(rename = "rsi")]
     RSI(RelativeStrengthIndexConfig),
+    #[serde(rename = "adx")]
+    ADX(AverageDirectionalIndexConfig),
+    #[serde(rename = "cmf")]
+    CMF(ChaikinMoneyFlowConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -108,7 +110,8 @@ pub struct HistVolConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SMAConfig {
+pub struct MovingAverageConfig {
+    pub ma_type: String,
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
@@ -152,9 +155,15 @@ pub struct RelativeStrengthIndexConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MoneyFlowIndexConfig {
-    pub input_price: FeatureId,
-    pub input_quantity: FeatureId,
+pub struct AverageDirectionalIndexConfig {
+    pub input: FeatureId,
+    pub output: FeatureId,
+    pub periods: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChaikinMoneyFlowConfig {
+    pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
 }
