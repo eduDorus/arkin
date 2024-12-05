@@ -3,7 +3,11 @@ use std::{sync::Arc, time::Duration};
 use arkin_core::Pipeline;
 
 use crate::{
-    config::FeatureConfig, simple::OHLCVFeature, state::InsightsState, ta::SimpleMovingAverageFeature, Computation,
+    config::FeatureConfig,
+    simple::OHLCVFeature,
+    state::InsightsState,
+    ta::{RelativeStrengthIndexFeature, SimpleMovingAverageFeature},
+    Computation,
 };
 
 pub struct FeatureFactory {}
@@ -60,7 +64,15 @@ impl FeatureFactory {
                     // FeatureConfig::EMA(c) => Box::new(ExponentialMovingAverageFeature::from_config(c)),
                     // FeatureConfig::MACD(c) => Box::new(MACDFeature::from_config(c)),
                     // FeatureConfig::BB(c) => Box::new(BollingerBandsFeature::from_config(c)),
-                    // FeatureConfig::RSI(c) => Box::new(RelativeStrengthIndexFeature::from_config(c)),
+                    FeatureConfig::RSI(c) => Box::new(
+                        RelativeStrengthIndexFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output(c.output.clone())
+                            .periods(c.periods)
+                            .build(),
+                    ),
                 };
                 feature
             })

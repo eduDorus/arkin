@@ -1,101 +1,84 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use dashmap::DashMap;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
-use tracing::{debug, warn};
+use tracing::debug;
+use typed_builder::TypedBuilder;
+use uuid::Uuid;
+use yata::{
+    core::Source,
+    helpers::MA,
+    indicators::{RelativeStrengthIndexInstance, RSI},
+    prelude::*,
+};
 
 use arkin_core::prelude::*;
 
-use crate::{config::RelativeStrengthIndexConfig, state::InsightsState, Computation};
+use crate::{state::InsightsState, Computation};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct RelativeStrengthIndexFeature {
-    input_return: FeatureId,
+    pipeline: Arc<Pipeline>,
+    insight_state: Arc<InsightsState>,
+    #[builder(default)]
+    store: DashMap<Arc<Instrument>, RelativeStrengthIndexInstance>,
+    input: FeatureId,
     output: FeatureId,
     periods: usize,
 }
 
-impl RelativeStrengthIndexFeature {
-    pub fn from_config(config: &RelativeStrengthIndexConfig) -> Self {
-        RelativeStrengthIndexFeature {
-            input_return: config.input_return.to_owned(),
-            output: config.output.to_owned(),
-            periods: config.periods,
-        }
-    }
-}
-
 impl Computation for RelativeStrengthIndexFeature {
     fn inputs(&self) -> Vec<FeatureId> {
-        vec![self.input_return.clone()]
+        vec![self.input.clone()]
     }
 
     fn outputs(&self) -> Vec<FeatureId> {
         vec![self.output.clone()]
     }
 
-    fn calculate(
-        &self,
-        instruments: &[Arc<Instrument>],
-        timestamp: OffsetDateTime,
-        state: Arc<InsightsState>,
-    ) -> Result<Vec<Insight>> {
-        debug!("Calculating RSI");
+    fn calculate(&self, instruments: &[Arc<Instrument>], timestamp: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
+        debug!("Calculating SMA");
 
-        // Calculate the mean (RSI)
+        // Calculate the mean (SMA)
         let insights = instruments
             .iter()
-            .cloned()
             .filter_map(|instrument| {
-                // Get data
-                let returns =
-                    state.periods(Some(instrument.clone()), self.input_return.clone(), timestamp, self.periods + 1);
+                // Get data from state
+                let ohlcv = self.insight_state.last_candle(instrument.clone(), timestamp)?;
 
-                // Check if we have enough data
-                if returns.len() < self.periods + 1 {
-                    warn!("Not enough data for RSI calculation");
-                    return None;
-                }
-
-                // Separate gains and losses
-                let (mut gains, mut losses) =
-                    returns
-                        .into_iter()
-                        .fold((Vec::new(), Vec::new()), |(mut gains, mut losses), r| {
-                            if r > Decimal::ZERO {
-                                gains.push(r);
-                            } else {
-                                losses.push(r.abs());
-                            }
-                            (gains, losses)
-                        });
-                let last_gain = gains.pop().unwrap_or(Decimal::ZERO);
-                let last_loss = losses.pop().unwrap_or(Decimal::ZERO);
-                let prev_avg_gain = gains.iter().sum::<Decimal>() / Decimal::from(self.periods);
-                let prev_avg_loss = losses.iter().sum::<Decimal>() / Decimal::from(self.periods);
-
-                // Calculate the RSI
-                let rsi_gain = prev_avg_gain * Decimal::from(self.periods - 1) + last_gain;
-                let rsi_loss = prev_avg_loss * Decimal::from(self.periods - 1) + last_loss;
-
-                // Zero loss edge case
-                if rsi_loss.is_zero() {
-                    return Some(Insight::new(
-                        timestamp,
-                        Some(instrument),
-                        self.output.clone(),
-                        Decimal::from(100),
-                    ));
+                if let Some(mut rsi) = self.store.get_mut(instrument) {
+                    let rsi_res = rsi.next(&ohlcv);
+                    let values = rsi_res.values();
+                    if values.is_empty() {
+                        return None;
+                    }
+                    let rsi_value = Decimal::from_f64(values[0])?;
+                    let insight = Insight::builder()
+                        .id(Uuid::new_v4())
+                        .event_time(timestamp)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output.clone())
+                        .value(rsi_value)
+                        .build();
+                    Some(Arc::new(insight))
                 } else {
-                    let ratio = rsi_gain / rsi_loss;
-                    let rsi = Decimal::from(100) - (Decimal::from(100) / (Decimal::from(1) + ratio));
-                    return Some(Insight::new(timestamp, Some(instrument), self.output.clone(), rsi));
+                    let rsi = RSI {
+                        ma: MA::TMA(self.periods as u8),
+                        zone: 0.2,
+                        source: Source::TP,
+                    }
+                    .init(&ohlcv)
+                    .ok()?;
+                    self.store.insert(instrument.clone(), rsi);
+                    None
                 }
             })
             .collect::<Vec<_>>();
 
-        state.insert_batch(insights.clone());
+        self.insight_state.insert_batch(&insights);
         Ok(insights)
     }
 }

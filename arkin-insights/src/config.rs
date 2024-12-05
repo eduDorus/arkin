@@ -41,8 +41,8 @@ pub enum FeatureConfig {
     // MACD(MACDConfig),
     // #[serde(rename = "bb")]
     // BB(BollingerBandsConfig),
-    // #[serde(rename = "rsi")]
-    // RSI(RelativeStrengthIndexConfig),
+    #[serde(rename = "rsi")]
+    RSI(RelativeStrengthIndexConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -146,7 +146,7 @@ pub struct BollingerBandsConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RelativeStrengthIndexConfig {
-    pub input_return: FeatureId,
+    pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
 }

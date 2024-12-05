@@ -7,6 +7,7 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
 use arkin_core::prelude::*;
+use yata::core::Candle;
 
 #[derive(Debug, Default)]
 pub struct InsightsState {
@@ -38,6 +39,32 @@ impl InsightsState {
             v.retain(|i, _| i >= &event_time);
             !v.is_empty()
         });
+    }
+
+    pub fn last_candle(&self, instrument: Arc<Instrument>, timestamp: OffsetDateTime) -> Option<Candle> {
+        let open = self
+            .last(Some(instrument.clone()), FeatureId::new("open".into()), timestamp)?
+            .to_f64()?;
+        let high = self
+            .last(Some(instrument.clone()), FeatureId::new("high".into()), timestamp)?
+            .to_f64()?;
+        let low = self
+            .last(Some(instrument.clone()), FeatureId::new("low".into()), timestamp)?
+            .to_f64()?;
+        let close = self
+            .last(Some(instrument.clone()), FeatureId::new("close".into()), timestamp)?
+            .to_f64()?;
+        let volume = self
+            .last(Some(instrument.clone()), FeatureId::new("volume".into()), timestamp)?
+            .to_f64()?;
+
+        Some(Candle {
+            open,
+            high,
+            low,
+            close,
+            volume,
+        })
     }
 
     pub fn last(

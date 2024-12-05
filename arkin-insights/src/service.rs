@@ -89,7 +89,7 @@ impl Insights for InsightsService {
         lookback: Duration,
     ) -> Result<(), InsightsError> {
         let start = event_time - lookback;
-        info!("Loading insights from {} to {}", start, event_time);
+        debug!("Loading insights from {} to {}", start, event_time);
 
         // let ticks = self.persistence_service.read_ticks_range(instruments, from, to).await?;
         let trades = self
@@ -103,7 +103,7 @@ impl Insights for InsightsService {
             .map(|t| t.as_ref().clone().to_insights(self.pipeline.clone()))
             .flatten()
             .collect::<Vec<_>>();
-        info!("Adding {} insights to state", insights.len());
+        debug!("Adding {} insights to state", insights.len());
         self.state.insert_batch(insights.as_slice());
         Ok(())
     }
@@ -121,7 +121,7 @@ impl Insights for InsightsService {
     async fn remove(&self, event_time: OffsetDateTime) -> Result<(), InsightsError> {
         let last_time = event_time - self.state_lookback;
         self.state.remove(last_time);
-        info!("Removed insights before {}", last_time);
+        debug!("Removed insights before {}", last_time);
         Ok(())
     }
 
@@ -141,7 +141,7 @@ impl Insights for InsightsService {
         let insights_tick = Arc::new(insights_tick);
 
         if publish {
-            info!(
+            debug!(
                 "Publishing insights tick: {} with {} insights",
                 insights_tick.event_time,
                 insights.len()
