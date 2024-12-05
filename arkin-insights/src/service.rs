@@ -149,9 +149,6 @@ impl Insights for InsightsService {
             self.pubsub.publish::<InsightTick>(insights_tick);
         }
 
-        if let Err(e) = self.remove(event_time).await {
-            error!("Error removing insights: {}", e);
-        }
         Ok(insights)
     }
 }

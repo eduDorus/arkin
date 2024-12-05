@@ -61,12 +61,20 @@ async fn main() -> Result<()> {
 
     let start = datetime!(2024-10-01 00:00).assume_utc();
     let end = datetime!(2024-11-01 00:00).assume_utc();
+    let mut current_day = start.date() - Duration::from_secs(86400);
     let frequency_secs = Duration::from_secs(60);
 
     let mut clock = Clock::new(start, end, frequency_secs);
 
     while let Some((_tick_start, tick_end)) = clock.next() {
-        insights_service.load(tick_end, &instruments, frequency_secs).await?;
+        if tick_end.date() != current_day {
+            current_day = tick_end.date();
+            let lookback = Duration::from_secs(86400);
+            let next_day = tick_end.replace_time(time::macros::time!(00:00:00)) + lookback;
+            insights_service.remove(next_day - lookback).await?;
+            info!("Loading insights from {} till {}", next_day - lookback, next_day);
+            insights_service.load(next_day, &instruments, lookback).await?;
+        }
         insights_service.process(tick_end, &instruments, true).await?;
     }
 

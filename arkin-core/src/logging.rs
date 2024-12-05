@@ -5,7 +5,7 @@ pub fn init_tracing() {
     tracing_subscriber::fmt::Subscriber::builder()
         .with_span_events(FmtSpan::CLOSE)
         .with_env_filter(EnvFilter::from_default_env())
-        .with_thread_ids(false)
+        .with_thread_ids(true)
         .with_target(false)
         .with_span_events(FmtSpan::NONE)
         .with_line_number(false)

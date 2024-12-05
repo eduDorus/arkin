@@ -1,5 +1,9 @@
 #![allow(dead_code)]
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use dashmap::DashMap;
 use rayon::prelude::*;
@@ -7,15 +11,18 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
 use arkin_core::prelude::*;
+use tracing::debug;
+use typed_builder::TypedBuilder;
 use yata::core::Candle;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, TypedBuilder)]
 pub struct InsightsState {
-    features: DashMap<(Option<Arc<Instrument>>, FeatureId), BTreeMap<OffsetDateTime, Decimal>>,
+    features: DashMap<(Option<Arc<Instrument>>, FeatureId), BTreeMap<i64, Decimal>>,
 }
 
 impl InsightsState {
     pub fn insert(&self, event: Arc<Insight>) {
+        let start = Instant::now();
         let key = (event.instrument.clone(), event.feature_id.clone());
         // let mut composit_key = CompositeIndex::new(event.event_time);
 
@@ -23,25 +30,29 @@ impl InsightsState {
         // while entry.get(&composit_key).is_some() {
         //     composit_key.increment();
         // }
-        entry.insert(event.event_time, event.value);
+        entry.insert(event.event_time.unix_timestamp(), event.value);
+        debug!("Insert into insight state took {:?}", start.elapsed());
     }
 
     pub fn insert_batch(&self, events: &[Arc<Insight>]) {
+        let start = Instant::now();
         events.into_par_iter().for_each(|event| {
-            let key = (event.instrument.clone(), event.feature_id.clone());
-            let mut entry = self.features.entry(key).or_default();
-            entry.insert(event.event_time, event.value);
+            self.insert(event.clone());
         });
+        debug!("Insert batch into insight state took {:?}", start.elapsed());
     }
 
     pub fn remove(&self, event_time: OffsetDateTime) {
+        let start = Instant::now();
         self.features.retain(|_, v| {
-            v.retain(|i, _| i >= &event_time);
+            v.retain(|i, _| OffsetDateTime::from_unix_timestamp(*i).expect("") >= event_time);
             !v.is_empty()
         });
+        debug!("Remove from insight state took {:?}", start.elapsed());
     }
 
     pub fn last_candle(&self, instrument: Arc<Instrument>, timestamp: OffsetDateTime) -> Option<Candle> {
+        let start = Instant::now();
         let open = self
             .last(Some(instrument.clone()), FeatureId::new("open".into()), timestamp)?
             .to_f64()?;
@@ -58,6 +69,7 @@ impl InsightsState {
             .last(Some(instrument.clone()), FeatureId::new("volume".into()), timestamp)?
             .to_f64()?;
 
+        debug!("Last candle took {:?}", start.elapsed());
         Some(Candle {
             open,
             high,
@@ -73,11 +85,14 @@ impl InsightsState {
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
     ) -> Option<Decimal> {
+        let start = Instant::now();
         if let Some(tree) = self.features.get(&(instrument, feature_id)) {
-            if let Some((_, v)) = tree.range(..=timestamp).rev().take(1).next() {
+            if let Some((_, v)) = tree.range(..=timestamp.unix_timestamp()).rev().take(1).next() {
+                debug!("Last took {:?}", start.elapsed());
                 return Some(v.clone());
             }
         }
+        debug!("Last took {:?}", start.elapsed());
         None
     }
 
@@ -91,7 +106,9 @@ impl InsightsState {
         let end_time = timestamp - window;
 
         if let Some(tree) = self.features.get(&(instrument, feature_id)) {
-            tree.range(end_time..=timestamp).map(|(_, v)| *v).collect()
+            tree.range(end_time.unix_timestamp()..=timestamp.unix_timestamp())
+                .map(|(_, v)| *v)
+                .collect()
         } else {
             Vec::new()
         }
@@ -106,7 +123,7 @@ impl InsightsState {
     ) -> Vec<Decimal> {
         if let Some(tree) = self.features.get(&(instrument, feature_id)) {
             let mut res = tree
-                .range(..=timestamp)
+                .range(..=timestamp.unix_timestamp())
                 .rev()
                 .take(periods)
                 .map(|(_, v)| *v)

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use dashmap::DashMap;
+use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::debug;
@@ -41,7 +42,7 @@ impl Computation for ChaikinMoneyFlowFeature {
 
         // Calculate the mean (SMA)
         let insights = instruments
-            .iter()
+            .par_iter()
             .filter_map(|instrument| {
                 // Get data from state
                 let ohlcv = self.insight_state.last_candle(instrument.clone(), timestamp)?;

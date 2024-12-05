@@ -81,13 +81,13 @@ impl PipelineGraph {
             let target = self.graph.edge_endpoints(edge).unwrap().1;
             in_degrees.lock()[target.index()] += 1;
         }
-        debug!("In-Degree count: {:?}", in_degrees);
+        debug!("In-Degree count: {}", in_degrees.lock().iter().fold(0, |acc, x| acc + x));
 
         // Step 2: Enqueue nodes with zero in-degree
         let (queue_tx, queue_rx) = flume::unbounded();
         for node in &self.order {
             if in_degrees.lock()[node.index()] == 0 {
-                debug!("Ready node: {:?}", self.graph[*node]);
+                debug!("Ready node: {}", node.index());
                 queue_tx.send(Some(*node)).expect("Failed to send ready node");
             }
         }
@@ -118,7 +118,7 @@ impl PipelineGraph {
                         let mut in_degrees = in_degrees.lock();
                         in_degrees[neighbor.index()] -= 1;
                         if in_degrees[neighbor.index()] == 0 {
-                            debug!("Ready node: {:?}", graph[neighbor]);
+                            debug!("Ready node: {}", neighbor.index());
                             queue_tx.send(Some(neighbor)).expect("Failed to send ready node");
                         }
                     }

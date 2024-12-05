@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use dashmap::DashMap;
+use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
@@ -47,7 +48,7 @@ impl Computation for MovingAverageFeature {
         debug!("Calculating {}...", self.ma_type);
 
         let insights = instruments
-            .iter()
+            .par_iter()
             .filter_map(|instrument| {
                 // Get data from state
                 let value = self
