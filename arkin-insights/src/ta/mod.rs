@@ -4,8 +4,9 @@
 // mod rsi;
 mod adx;
 mod cmf;
-mod rsi;
+mod co;
 mod ma;
+mod rsi;
 
 // pub use bb::BollingerBandsFeature;
 // pub use ema::ExponentialMovingAverageFeature;
@@ -13,5 +14,6 @@ mod ma;
 // pub use rsi::RelativeStrengthIndexFeature;
 pub use adx::*;
 pub use cmf::*;
-pub use rsi::*;
+pub use co::*;
 pub use ma::*;
+pub use rsi::*;

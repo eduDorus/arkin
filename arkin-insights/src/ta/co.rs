@@ -8,7 +8,8 @@ use tracing::debug;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 use yata::{
-    indicators::{ChaikinMoneyFlow, ChaikinMoneyFlowInstance},
+    helpers::MA,
+    indicators::{ChaikinOscillator, ChaikinOscillatorInstance},
     prelude::*,
 };
 
@@ -17,17 +18,18 @@ use arkin_core::prelude::*;
 use crate::{state::InsightsState, Computation};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct ChaikinMoneyFlowFeature {
+pub struct ChaikinOscillatorFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
     #[builder(default)]
-    store: DashMap<Arc<Instrument>, ChaikinMoneyFlowInstance>,
+    store: DashMap<Arc<Instrument>, ChaikinOscillatorInstance>,
     input: FeatureId,
     output: FeatureId,
-    periods: usize,
+    periods_fast: usize,
+    periods_slow: usize,
 }
 
-impl Computation for ChaikinMoneyFlowFeature {
+impl Computation for ChaikinOscillatorFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
@@ -37,17 +39,16 @@ impl Computation for ChaikinMoneyFlowFeature {
     }
 
     fn calculate(&self, instruments: &[Arc<Instrument>], timestamp: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
-        debug!("Calculating Chaikin Money Flow...");
+        debug!("Calculating Chaikin Oscillator...");
 
-        // Calculate the mean (SMA)
         let insights = instruments
             .iter()
             .filter_map(|instrument| {
                 // Get data from state
                 let ohlcv = self.insight_state.last_candle(instrument.clone(), timestamp)?;
 
-                if let Some(mut rsi) = self.store.get_mut(instrument) {
-                    let res = rsi.next(&ohlcv);
+                if let Some(mut co) = self.store.get_mut(instrument) {
+                    let res = co.next(&ohlcv);
                     let values = res.values();
                     if values.is_empty() {
                         return None;
@@ -63,12 +64,14 @@ impl Computation for ChaikinMoneyFlowFeature {
                         .build();
                     Some(Arc::new(insight))
                 } else {
-                    let cmf = ChaikinMoneyFlow {
-                        size: self.periods as u8,
+                    let co = ChaikinOscillator {
+                        ma1: MA::DMA(self.periods_fast as u8),
+                        ma2: MA::DMA(self.periods_slow as u8),
+                        window: 0,
                     }
                     .init(&ohlcv)
-                    .ok()?;
-                    self.store.insert(instrument.clone(), cmf);
+                    .expect("Failed to initialize Chaikin Oscillator");
+                    self.store.insert(instrument.clone(), co);
                     None
                 }
             })

@@ -45,6 +45,8 @@ pub enum FeatureConfig {
     ADX(AverageDirectionalIndexConfig),
     #[serde(rename = "cmf")]
     CMF(ChaikinMoneyFlowConfig),
+    #[serde(rename = "co")]
+    CO(ChaikinOscillatorConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -166,4 +168,12 @@ pub struct ChaikinMoneyFlowConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChaikinOscillatorConfig {
+    pub input: FeatureId,
+    pub output: FeatureId,
+    pub periods_fast: usize,
+    pub periods_slow: usize,
 }

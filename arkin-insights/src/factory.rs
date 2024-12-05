@@ -6,7 +6,10 @@ use crate::{
     config::FeatureConfig,
     simple::OHLCVFeature,
     state::InsightsState,
-    ta::{AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, MovingAverageFeature, RelativeStrengthIndexFeature},
+    ta::{
+        AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
+        RelativeStrengthIndexFeature,
+    },
     Computation,
 };
 
@@ -90,6 +93,16 @@ impl FeatureFactory {
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods)
+                            .build(),
+                    ),
+                    FeatureConfig::CO(c) => Box::new(
+                        ChaikinOscillatorFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output(c.output.clone())
+                            .periods_fast(c.periods_fast)
+                            .periods_slow(c.periods_slow)
                             .build(),
                     ),
                 };
