@@ -1,29 +1,24 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
+use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::{config::StdDevConfig, state::InsightsState, Computation};
+use crate::{state::InsightsState, Computation};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct StdDevFeature {
+    pipeline: Arc<Pipeline>,
+    insight_state: Arc<InsightsState>,
     input: FeatureId,
     output: FeatureId,
     periods: usize,
-}
-
-impl StdDevFeature {
-    pub fn from_config(config: &StdDevConfig) -> Self {
-        StdDevFeature {
-            input: config.input.to_owned(),
-            output: config.output.to_owned(),
-            periods: config.periods,
-        }
-    }
 }
 
 impl Computation for StdDevFeature {
@@ -35,24 +30,20 @@ impl Computation for StdDevFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(
-        &self,
-        instruments: &[Arc<Instrument>],
-        timestamp: OffsetDateTime,
-        state: Arc<InsightsState>,
-    ) -> Result<Vec<Insight>> {
-        debug!("Calculating StdDev");
+    fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
+        debug!("Calculating StdDev...");
 
         // Calculate the mean (StdDev)
         let insights = instruments
-            .iter()
-            .cloned()
+            .par_iter()
             .filter_map(|instrument| {
                 // Get data from state
-                let data = state.periods(Some(instrument.clone()), self.input.clone(), timestamp, self.periods);
+                let data =
+                    self.insight_state
+                        .periods(Some(instrument.clone()), self.input.clone(), event_time, self.periods);
 
                 // Check if we have enough data
-                if data.is_empty() {
+                if data.len() < self.periods {
                     warn!("Not enough data for StdDev calculation");
                     return None;
                 }
@@ -60,10 +51,27 @@ impl Computation for StdDevFeature {
                 // Calculate StdDev
                 let sum = data.iter().sum::<Decimal>();
                 let count = Decimal::from(data.len());
-                let mean = sum / count;
-                let variance = data.iter().map(|v| (v - mean).powi(2)).sum::<Decimal>() / count;
+                let mean = match count.is_zero() {
+                    true => {
+                        warn!("Count should not be zero!");
+                        return None;
+                    }
+                    false => sum / count,
+                };
+                let variance =
+                    (Decimal::ONE / (count - Decimal::ONE)) * data.iter().map(|v| (v - mean).powi(2)).sum::<Decimal>();
                 if let Some(std_dev) = variance.sqrt() {
-                    Some(Insight::new(timestamp, Some(instrument.clone()), self.output.clone(), std_dev))
+                    Some(
+                        Insight::builder()
+                            .id(Uuid::new_v4())
+                            .event_time(event_time)
+                            .pipeline(self.pipeline.clone())
+                            .instrument(Some(instrument.clone()))
+                            .feature_id(self.output.clone())
+                            .value(std_dev)
+                            .build()
+                            .into(),
+                    )
                 } else {
                     warn!("Failed to calculate StdDev: mean: {}, variance: {}", mean, variance);
                     None
@@ -71,7 +79,7 @@ impl Computation for StdDevFeature {
             })
             .collect::<Vec<_>>();
 
-        state.insert_batch(insights.clone());
+        self.insight_state.insert_batch(&insights);
         Ok(insights)
     }
 }

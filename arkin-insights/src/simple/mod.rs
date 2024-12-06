@@ -1,13 +1,13 @@
-// mod hist_vol;
+mod log_return;
 mod ohlcv;
-// mod pct_change;
-// mod std_dev;
-// mod trade_count;
-// mod vwap;
+mod signal_strength;
+mod std_dev;
+mod sum;
+mod time;
 
-// pub use hist_vol::HistVolFeature;
+pub use log_return::LogReturnFeature;
 pub use ohlcv::OHLCVFeature;
-// pub use pct_change::PctChangeFeature;
-// pub use std_dev::StdDevFeature;
-// pub use trade_count::TradeCountFeature;
-// pub use vwap::VWAPFeature;
+pub use signal_strength::SignalStrengthFeature;
+pub use std_dev::StdDevFeature;
+pub use sum::SumFeature;
+pub use time::TimeFeature;

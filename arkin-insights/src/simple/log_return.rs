@@ -13,7 +13,7 @@ use arkin_core::prelude::*;
 use crate::{state::InsightsState, Computation};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct SumFeature {
+pub struct LogReturnFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
     input: FeatureId,
@@ -21,7 +21,7 @@ pub struct SumFeature {
     periods: usize,
 }
 
-impl Computation for SumFeature {
+impl Computation for LogReturnFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
@@ -31,26 +31,41 @@ impl Computation for SumFeature {
     }
 
     fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
-        debug!("Calculating Sum...");
+        debug!("Calculating Log Returns...");
 
-        // Calculate the mean (StdDev)
+        // Retrieve the values for the feature over the window period
         let insights = instruments
             .par_iter()
             .filter_map(|instrument| {
-                // Get data from state
-                let data =
-                    self.insight_state
-                        .periods(Some(instrument.clone()), self.input.clone(), event_time, self.periods);
+                //  Get data
+                let data = self.insight_state.periods(
+                    Some(instrument.clone()),
+                    self.input.clone(),
+                    event_time,
+                    self.periods + 1,
+                );
 
                 // Check if we have enough data
-                if data.len() < self.periods {
-                    warn!("Not enough data for Sum calculation");
+                if data.len() < self.periods + 1 {
+                    warn!("Not enough data to calculate percent change");
                     return None;
                 }
 
-                // Calculate StdDev
-                let sum = data.iter().sum::<Decimal>();
+                // Get values change
+                let prev_value = data
+                    .first()
+                    .expect("Could not get first value, unexpected empty vector, should have been caught earlier");
+                let last_value = data
+                    .last()
+                    .expect("Could not get last value, unexpected empty vector, should have been caught earlier");
 
+                let log_return = if prev_value.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    (last_value / prev_value).ln()
+                };
+
+                // Return insight
                 Some(
                     Insight::builder()
                         .id(Uuid::new_v4())
@@ -58,7 +73,7 @@ impl Computation for SumFeature {
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
-                        .value(sum)
+                        .value(log_return)
                         .build()
                         .into(),
                 )

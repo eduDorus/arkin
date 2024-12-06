@@ -1,6 +1,7 @@
-use arkin_core::prelude::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+
+use arkin_core::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InsightsConfig {
@@ -23,16 +24,16 @@ pub struct PipelineConfig {
 pub enum FeatureConfig {
     #[serde(rename = "ohlcv")]
     OHLCV(OHLCVConfig),
-    // #[serde(rename = "vwap")]
-    // VWAP(VWAPConfig),
-    // #[serde(rename = "pct_change")]
-    // PctChange(PctChangeConfig),
-    // #[serde(rename = "trade_count")]
-    // TradeCount(TradeCountConfig),
-    // #[serde(rename = "std_dev")]
-    // StdDev(StdDevConfig),
-    // #[serde(rename = "hist_vol")]
-    // HistVol(HistVolConfig),
+    #[serde(rename = "time")]
+    Time(TimeConfig),
+    #[serde(rename = "log_return")]
+    LogReturn(LogReturnConfig),
+    #[serde(rename = "std_dev")]
+    StdDev(StdDevConfig),
+    #[serde(rename = "sum")]
+    Sum(SumConfig),
+    #[serde(rename = "signal_strength")]
+    SignalStrength(SignalStrengthConfig),
     #[serde(rename = "ma")]
     MA(MovingAverageConfig),
     // #[serde(rename = "macd")]
@@ -72,6 +73,15 @@ pub struct OHLCVConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TimeConfig {
+    pub input: FeatureId,
+    pub output_day_of_week: FeatureId,
+    pub output_hour_of_day: FeatureId,
+    pub output_minute_of_day: FeatureId,
+    pub output_minute_of_hour: FeatureId,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VWAPConfig {
     pub input_price: FeatureId,
     pub input_quantity: FeatureId,
@@ -90,7 +100,7 @@ pub struct TradeCountConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PctChangeConfig {
+pub struct LogReturnConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
@@ -104,11 +114,10 @@ pub struct StdDevConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HistVolConfig {
+pub struct SumConfig {
     pub input: FeatureId,
     pub output: FeatureId,
-    pub trading_days_per_year: Decimal,
-    pub timeframe_in_secs: Decimal,
+    pub periods: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -120,11 +129,10 @@ pub struct MovingAverageConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct EMAConfig {
-    pub input: FeatureId,
+pub struct SignalStrengthConfig {
+    pub input_first: FeatureId,
+    pub input_second: FeatureId,
     pub output: FeatureId,
-    pub periods: usize,
-    pub smoothing: Decimal,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

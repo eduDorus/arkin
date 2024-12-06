@@ -13,17 +13,17 @@ use arkin_core::prelude::*;
 use crate::{state::InsightsState, Computation};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct SumFeature {
+pub struct SignalStrengthFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
-    input: FeatureId,
+    input_first: FeatureId,
+    input_second: FeatureId,
     output: FeatureId,
-    periods: usize,
 }
 
-impl Computation for SumFeature {
+impl Computation for SignalStrengthFeature {
     fn inputs(&self) -> Vec<FeatureId> {
-        vec![self.input.clone()]
+        vec![self.input_first.clone(), self.input_second.clone()]
     }
 
     fn outputs(&self) -> Vec<FeatureId> {
@@ -31,25 +31,34 @@ impl Computation for SumFeature {
     }
 
     fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
-        debug!("Calculating Sum...");
+        debug!("Calculating Signal Strength...");
 
         // Calculate the mean (StdDev)
         let insights = instruments
             .par_iter()
             .filter_map(|instrument| {
                 // Get data from state
-                let data =
-                    self.insight_state
-                        .periods(Some(instrument.clone()), self.input.clone(), event_time, self.periods);
+                let first = self
+                    .insight_state
+                    .last(Some(instrument.clone()), self.input_first.clone(), event_time)?;
 
-                // Check if we have enough data
-                if data.len() < self.periods {
-                    warn!("Not enough data for Sum calculation");
+                let second =
+                    self.insight_state
+                        .last(Some(instrument.clone()), self.input_second.clone(), event_time)?;
+
+                // Check if we don't have a total of 0
+                if first + second == Decimal::zero() {
+                    warn!("Total of 0 for Signal Strength calculation");
                     return None;
                 }
 
-                // Calculate StdDev
-                let sum = data.iter().sum::<Decimal>();
+                // Check that they are positive values
+                if first < Decimal::zero() || second < Decimal::zero() {
+                    warn!("Negative values for Signal Strength calculation");
+                    return None;
+                }
+
+                let signal_strength = (first - second) / (first + second);
 
                 Some(
                     Insight::builder()
@@ -58,7 +67,7 @@ impl Computation for SumFeature {
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
-                        .value(sum)
+                        .value(signal_strength)
                         .build()
                         .into(),
                 )

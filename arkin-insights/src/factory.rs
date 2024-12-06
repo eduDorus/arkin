@@ -1,10 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
-use arkin_core::Pipeline;
+use arkin_core::prelude::*;
 
 use crate::{
     config::FeatureConfig,
-    simple::OHLCVFeature,
+    simple::{LogReturnFeature, OHLCVFeature, SignalStrengthFeature, StdDevFeature, SumFeature, TimeFeature},
     state::InsightsState,
     ta::{
         AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
@@ -50,11 +50,53 @@ impl FeatureFactory {
                             .window(Duration::from_secs(c.window))
                             .build(),
                     ),
-                    // FeatureConfig::VWAP(c) => Box::new(VWAPFeature::from_config(c)),
-                    // FeatureConfig::PctChange(c) => Box::new(PctChangeFeature::from_config(c)),
-                    // FeatureConfig::HistVol(c) => Box::new(HistVolFeature::from_config(c)),
-                    // FeatureConfig::TradeCount(c) => Box::new(TradeCountFeature::from_config(c)),
-                    // FeatureConfig::StdDev(c) => Box::new(StdDevFeature::from_config(c)),
+                    FeatureConfig::Time(c) => Box::new(
+                        TimeFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output_day_of_week(c.output_day_of_week.clone())
+                            .output_hour_of_day(c.output_hour_of_day.clone())
+                            .output_minute_of_day(c.output_minute_of_day.clone())
+                            .output_minute_of_hour(c.output_minute_of_hour.clone())
+                            .build(),
+                    ),
+                    FeatureConfig::LogReturn(c) => Box::new(
+                        LogReturnFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output(c.output.clone())
+                            .periods(c.periods)
+                            .build(),
+                    ),
+                    FeatureConfig::StdDev(c) => Box::new(
+                        StdDevFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output(c.output.clone())
+                            .periods(c.periods)
+                            .build(),
+                    ),
+                    FeatureConfig::Sum(c) => Box::new(
+                        SumFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output(c.output.clone())
+                            .periods(c.periods)
+                            .build(),
+                    ),
+                    FeatureConfig::SignalStrength(c) => Box::new(
+                        SignalStrengthFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input_first(c.input_first.clone())
+                            .input_second(c.input_second.clone())
+                            .output(c.output.clone())
+                            .build(),
+                    ),
                     FeatureConfig::MA(c) => Box::new(
                         MovingAverageFeature::builder()
                             .pipeline(pipeline.clone())
@@ -65,9 +107,6 @@ impl FeatureFactory {
                             .periods(c.periods)
                             .build(),
                     ),
-                    // FeatureConfig::EMA(c) => Box::new(ExponentialMovingAverageFeature::from_config(c)),
-                    // FeatureConfig::MACD(c) => Box::new(MACDFeature::from_config(c)),
-                    // FeatureConfig::BB(c) => Box::new(BollingerBandsFeature::from_config(c)),
                     FeatureConfig::RSI(c) => Box::new(
                         RelativeStrengthIndexFeature::builder()
                             .pipeline(pipeline.clone())

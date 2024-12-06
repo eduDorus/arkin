@@ -1,13 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
+use rayon::prelude::*;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
-
-use arkin_core::prelude::*;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
+
+use arkin_core::prelude::*;
 
 use crate::{state::InsightsState, Computation};
 
@@ -63,11 +64,9 @@ impl Computation for OHLCVFeature {
     fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
         debug!("Calculating OHLCV");
 
-        // Get data from state
-
         // Calculate the mean (OHLC)
         let insights = instruments
-            .iter()
+            .par_iter()
             .filter_map(|instrument| {
                 // Get data
                 let prices = self.insight_state.window(
