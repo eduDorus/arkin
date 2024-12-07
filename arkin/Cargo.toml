@@ -45,7 +45,7 @@ dashmap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-
+catboost-rs = { workspace = true }
 
 
 # Test DL

@@ -28,6 +28,7 @@ yata = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 typed-builder = { workspace = true }
+catboost-rs = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }

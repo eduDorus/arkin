@@ -8,3 +8,6 @@ configs
 .env
 
 data
+
+# Models
+models

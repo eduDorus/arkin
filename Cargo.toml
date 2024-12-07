@@ -91,6 +91,9 @@ moka2 = { version = "0.13.0", features = [ "future" ] }
 # TA
 yata = "0.7"
 
+# Models
+catboost-rs = "0.1.8"
+
 # Testing
 mockall = "0.13"
 test-case = "3.3"

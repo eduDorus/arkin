@@ -4,6 +4,7 @@ use arkin_core::prelude::*;
 
 use crate::{
     config::FeatureConfig,
+    forecast::CatBoostFeature,
     simple::{LogReturnFeature, OHLCVFeature, SignalStrengthFeature, StdDevFeature, SumFeature, TimeFeature},
     state::InsightsState,
     ta::{
@@ -142,6 +143,16 @@ impl FeatureFactory {
                             .output(c.output.clone())
                             .periods_fast(c.periods_fast)
                             .periods_slow(c.periods_slow)
+                            .build(),
+                    ),
+                    FeatureConfig::CatBoost(c) => Box::new(
+                        CatBoostFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .model_file(c.model_file.clone())
+                            .input_numerical(c.input_numerical.clone())
+                            .input_categorical(c.input_categorical.clone())
+                            .output(c.output.clone())
                             .build(),
                     ),
                 };

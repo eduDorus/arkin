@@ -48,6 +48,9 @@ pub enum FeatureConfig {
     CMF(ChaikinMoneyFlowConfig),
     #[serde(rename = "co")]
     CO(ChaikinOscillatorConfig),
+
+    #[serde(rename = "catboost")]
+    CatBoost(CatBoostConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -184,4 +187,12 @@ pub struct ChaikinOscillatorConfig {
     pub output: FeatureId,
     pub periods_fast: usize,
     pub periods_slow: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CatBoostConfig {
+    pub model_file: String,
+    pub input_numerical: Vec<FeatureId>,
+    pub input_categorical: Vec<FeatureId>,
+    pub output: FeatureId,
 }
