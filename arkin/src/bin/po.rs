@@ -125,32 +125,32 @@ fn main() {
     println!("Sum of weights: {:?}", solver.solution.x.iter().sum::<f64>());
 }
 
-fn mean(series: &Vec<f64>) -> f64 {
-    let sum: f64 = series.iter().sum();
-    sum / series.len() as f64
-}
+// fn mean(series: &Vec<f64>) -> f64 {
+//     let sum: f64 = series.iter().sum();
+//     sum / series.len() as f64
+// }
 
-fn standard_deviation(series: &Vec<f64>, mean: f64) -> f64 {
-    let variance = series
-        .iter()
-        .map(|value| {
-            let diff = value - mean;
-            diff * diff
-        })
-        .sum::<f64>()
-        / (series.len() as f64 - 1.0);
-    variance.sqrt()
-}
+// fn standard_deviation(series: &Vec<f64>, mean: f64) -> f64 {
+//     let variance = series
+//         .iter()
+//         .map(|value| {
+//             let diff = value - mean;
+//             diff * diff
+//         })
+//         .sum::<f64>()
+//         / (series.len() as f64 - 1.0);
+//     variance.sqrt()
+// }
 
-fn covariance(series1: &Vec<f64>, mean1: f64, series2: &Vec<f64>, mean2: f64) -> f64 {
-    let cov = series1
-        .iter()
-        .zip(series2.iter())
-        .map(|(x, y)| (x - mean1) * (y - mean2))
-        .sum::<f64>()
-        / (series1.len() as f64 - 1.0);
-    cov
-}
+// fn covariance(series1: &Vec<f64>, mean1: f64, series2: &Vec<f64>, mean2: f64) -> f64 {
+//     let cov = series1
+//         .iter()
+//         .zip(series2.iter())
+//         .map(|(x, y)| (x - mean1) * (y - mean2))
+//         .sum::<f64>()
+//         / (series1.len() as f64 - 1.0);
+//     cov
+// }
 
 fn create_constraints(n: usize) -> (CscMatrix<f64>, Vec<f64>, [SupportedConeT<f64>; 2]) {
     let m = 1 + 2 * n;

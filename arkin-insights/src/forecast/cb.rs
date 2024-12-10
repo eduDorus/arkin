@@ -2,6 +2,7 @@ use std::{fmt, sync::Arc};
 
 use anyhow::Result;
 use catboost_rs::Model;
+use dashmap::DashMap;
 use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
@@ -17,7 +18,10 @@ use crate::{state::InsightsState, Computation};
 pub struct CatBoostFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
-    model: Arc<Model>,
+    model_location: String,
+    model_file_name: String,
+    #[builder(default)]
+    models: DashMap<Arc<Instrument>, Arc<Model>>,
     input_numerical: Vec<FeatureId>,
     input_categorical: Vec<FeatureId>,
     output: FeatureId,
@@ -54,6 +58,22 @@ impl Computation for CatBoostFeature {
         let insights = instruments
             .par_iter()
             .filter_map(|instrument| {
+                // Get the model
+                // Check if we have a model for the instrument
+                // If not, check if we have a model file
+                // If we have a model file, load the model
+                // If we don't have a model file, log a warning and return None
+                if !self.models.contains_key(instrument) {
+                    let filename = format!(
+                        "{}/{}_{}.cbm",
+                        self.model_location, instrument.secondary_id, self.model_file_name
+                    );
+
+                    let model = Model::load(&filename).expect("Failed to load model");
+                    self.models.insert(instrument.clone(), Arc::new(model));
+                }
+                let model = self.models.get(instrument).expect("Model not found").value().clone();
+
                 //  Get data
                 let numerical_data = self
                     .input_numerical
@@ -86,8 +106,7 @@ impl Computation for CatBoostFeature {
                 categorical_data.push(instrument.secondary_id.to_string());
 
                 // Apply the model
-                let prediction = self
-                    .model
+                let prediction = model
                     .calc_model_prediction(vec![numerical_data], vec![categorical_data])
                     .expect("Failed to calculate model prediction");
 

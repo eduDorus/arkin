@@ -1,7 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
-use catboost_rs::Model;
 
 use crate::{
     allocation::MeanVarianceFeature,
@@ -151,7 +150,8 @@ impl FeatureFactory {
                         CatBoostFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
-                            .model(Arc::new(Model::load(&c.model_file).expect("Failed to load model")))
+                            .model_location(c.model_location.clone())
+                            .model_file_name(c.model_filename.clone())
                             .input_numerical(c.input_numerical.clone())
                             .input_categorical(c.input_categorical.clone())
                             .output(c.output.clone())

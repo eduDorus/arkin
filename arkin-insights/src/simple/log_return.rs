@@ -60,7 +60,7 @@ impl Computation for LogReturnFeature {
                     .expect("Could not get last value, unexpected empty vector, should have been caught earlier");
 
                 let log_return = if prev_value.is_zero() {
-                    Decimal::ZERO
+                    return None;
                 } else {
                     (last_value / prev_value).ln()
                 };
