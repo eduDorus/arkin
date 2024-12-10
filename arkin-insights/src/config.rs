@@ -26,6 +26,8 @@ pub enum FeatureConfig {
     OHLCV(OHLCVConfig),
     #[serde(rename = "time")]
     Time(TimeConfig),
+
+    // Mathematical
     #[serde(rename = "log_return")]
     LogReturn(LogReturnConfig),
     #[serde(rename = "std_dev")]
@@ -34,12 +36,10 @@ pub enum FeatureConfig {
     Sum(SumConfig),
     #[serde(rename = "signal_strength")]
     SignalStrength(SignalStrengthConfig),
+
+    // Technical Analysis
     #[serde(rename = "ma")]
     MA(MovingAverageConfig),
-    // #[serde(rename = "macd")]
-    // MACD(MACDConfig),
-    // #[serde(rename = "bb")]
-    // BB(BollingerBandsConfig),
     #[serde(rename = "rsi")]
     RSI(RelativeStrengthIndexConfig),
     #[serde(rename = "adx")]
@@ -49,8 +49,13 @@ pub enum FeatureConfig {
     #[serde(rename = "co")]
     CO(ChaikinOscillatorConfig),
 
+    // Forecasting
     #[serde(rename = "catboost")]
     CatBoost(CatBoostConfig),
+
+    // Portfolio Optimization
+    #[serde(rename = "mean_variance")]
+    MeanVariance(MeanVarianceConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -195,4 +200,18 @@ pub struct CatBoostConfig {
     pub input_numerical: Vec<FeatureId>,
     pub input_categorical: Vec<FeatureId>,
     pub output: FeatureId,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MeanVarianceConfig {
+    pub input_expected_returns: FeatureId,
+    pub input_returns: FeatureId,
+    pub output: FeatureId,
+    pub periods_returns: usize,
+    pub risk_aversion: f64, // Lambda: larger values mean more risk
+    pub risk_free_rate: f64,
+    pub max_exposure_long: f64,
+    pub max_exposure_long_per_asset: f64,
+    pub max_exposure_short: f64,
+    pub max_exposure_short_per_asset: f64,
 }

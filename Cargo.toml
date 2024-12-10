@@ -29,6 +29,7 @@ signature = "2.2"
 base64 = "0.22"
 ed25519-dalek = { version = "2.1", features = [ "serde", "zeroize", "rand_core", "digest", "pkcs8", "pem" ] }
 typed-builder = "0.20"
+statrs = "0.18"
 
 # Multi-threading
 parking_lot = { version = "0.12", features = [ "hardware-lock-elision" ], default-features = false }
@@ -91,8 +92,9 @@ moka2 = { version = "0.13.0", features = [ "future" ] }
 # TA
 yata = "0.7"
 
-# Models
+# Models & Optimisation
 catboost-rs = "0.1.8"
+clarabel = "0"
 
 # Testing
 mockall = "0.13"

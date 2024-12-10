@@ -58,6 +58,7 @@ impl InstrumentStore {
 
                 let instrument = Instrument {
                     id: instrument_dto.id,
+                    secondary_id: instrument_dto.secondary_id,
                     symbol: instrument_dto.symbol,
                     venue_symbol: instrument_dto.venue_symbol,
                     venue,
@@ -99,6 +100,7 @@ impl InstrumentStore {
 
                 let instrument = Instrument {
                     id: instrument_dto.id,
+                    secondary_id: instrument_dto.secondary_id,
                     symbol: instrument_dto.symbol,
                     venue_symbol: instrument_dto.venue_symbol,
                     venue,

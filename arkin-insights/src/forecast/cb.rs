@@ -2,15 +2,14 @@ use std::{fmt, sync::Arc};
 
 use anyhow::Result;
 use catboost_rs::Model;
-use dashmap::DashMap;
 use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 
 use arkin_core::prelude::*;
+use uuid::Uuid;
 
 use crate::{state::InsightsState, Computation};
 
@@ -18,9 +17,7 @@ use crate::{state::InsightsState, Computation};
 pub struct CatBoostFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
-    #[builder(default)]
-    models: DashMap<Arc<Instrument>, Arc<Model>>,
-    model_file: String,
+    model: Arc<Model>,
     input_numerical: Vec<FeatureId>,
     input_categorical: Vec<FeatureId>,
     output: FeatureId,
@@ -57,23 +54,6 @@ impl Computation for CatBoostFeature {
         let insights = instruments
             .par_iter()
             .filter_map(|instrument| {
-                // Get the model
-                // Check if we have a model for the instrument
-                // If not, check if we have a model file
-                // If we have a model file, load the model
-                // If we don't have a model file, log a warning and return None
-                if !self.models.contains_key(instrument) {
-                    if self.model_file.is_empty() {
-                        warn!("No model file provided for instrument {}", instrument);
-                        return None;
-                    }
-
-                    let model = Model::load(&self.model_file).expect("Failed to load model");
-                    self.models.insert(instrument.clone(), Arc::new(model));
-                }
-
-                let model = self.models.get(instrument).expect("Model not found").value().clone();
-
                 //  Get data
                 let numerical_data = self
                     .input_numerical
@@ -84,7 +64,7 @@ impl Computation for CatBoostFeature {
                     })
                     .collect::<Vec<_>>();
 
-                let categorical_data = self
+                let mut categorical_data = self
                     .input_categorical
                     .iter()
                     .filter_map(|id| {
@@ -98,17 +78,23 @@ impl Computation for CatBoostFeature {
                 if numerical_data.len() != self.input_numerical.len()
                     || categorical_data.len() != self.input_categorical.len()
                 {
-                    warn!("Not enough data to calculate percent change");
+                    warn!("Not enough data to calculate forecast");
                     return None;
                 }
 
-                // Apply the model
-                let prediction = model
-                    .calc_model_prediction(vec![numerical_data], vec![categorical_data])
-                    .expect("Failed to calculate model prediction")[0];
+                // Add the instrument ID
+                categorical_data.push(instrument.secondary_id.to_string());
 
+                // Apply the model
+                let prediction = self
+                    .model
+                    .calc_model_prediction(vec![numerical_data], vec![categorical_data])
+                    .expect("Failed to calculate model prediction");
+
+                // info!("Prediction: {:?}", prediction);
+                // None
                 // Convert to decimal
-                let prediction = Decimal::from_f64(prediction).expect("Failed to convert prediction to decimal");
+                let prediction = Decimal::from_f64(prediction[0]).expect("Failed to convert prediction to decimal");
 
                 // Return insight
                 Some(

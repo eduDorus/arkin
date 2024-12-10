@@ -49,8 +49,11 @@ impl PipelineGraph {
                 if RAW_FEATURE_IDS.contains(&source_id) {
                     continue;
                 }
-                let source_node = id_to_index.get(&source_id).expect("Failed to find source node from config");
-                edges_to_add.push((*source_node, target_node));
+                let source_node = match id_to_index.get(&source_id) {
+                    Some(node) => *node,
+                    None => panic!("Node not found: {:?}", source_id),
+                };
+                edges_to_add.push((source_node, target_node));
             }
         }
         for (source, target) in &edges_to_add {

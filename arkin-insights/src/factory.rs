@@ -1,8 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
+use catboost_rs::Model;
 
 use crate::{
+    allocation::MeanVarianceFeature,
     config::FeatureConfig,
     forecast::CatBoostFeature,
     simple::{LogReturnFeature, OHLCVFeature, SignalStrengthFeature, StdDevFeature, SumFeature, TimeFeature},
@@ -149,10 +151,26 @@ impl FeatureFactory {
                         CatBoostFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
-                            .model_file(c.model_file.clone())
+                            .model(Arc::new(Model::load(&c.model_file).expect("Failed to load model")))
                             .input_numerical(c.input_numerical.clone())
                             .input_categorical(c.input_categorical.clone())
                             .output(c.output.clone())
+                            .build(),
+                    ),
+                    FeatureConfig::MeanVariance(c) => Box::new(
+                        MeanVarianceFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input_expected_returns(c.input_expected_returns.clone())
+                            .input_returns(c.input_returns.clone())
+                            .output(c.output.clone())
+                            .periods_returns(c.periods_returns)
+                            .risk_aversion(c.risk_aversion)
+                            .risk_free_rate(c.risk_free_rate)
+                            .max_exposure_long(c.max_exposure_long)
+                            .max_exposure_short(c.max_exposure_short)
+                            .max_exposure_long_per_asset(c.max_exposure_long_per_asset)
+                            .max_exposure_short_per_asset(c.max_exposure_short_per_asset)
                             .build(),
                     ),
                 };

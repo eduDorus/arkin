@@ -38,6 +38,7 @@ pub enum InstrumentStatus {
 pub struct Instrument {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
+    pub secondary_id: i64,
     pub venue: Arc<Venue>,
     pub symbol: String,
     pub venue_symbol: String,

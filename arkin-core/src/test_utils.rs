@@ -52,6 +52,7 @@ pub fn test_binance_venue() -> Arc<Venue> {
 pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
     let instrument = Instrument::builder()
         .id(Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"))
+        .secondary_id(1)
         .venue(test_binance_venue())
         .symbol("perp-btc-usdt@binance".into())
         .venue_symbol("BTCUSDT".into())
@@ -76,6 +77,7 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
 pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
     let instrument = Instrument::builder()
         .id(Uuid::from_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").expect("Invalid UUID"))
+        .secondary_id(2)
         .venue(test_binance_venue())
         .symbol("perp-eth-usdt@binance".into())
         .venue_symbol("ETHUSDT".into())
