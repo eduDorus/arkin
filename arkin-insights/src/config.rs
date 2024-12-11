@@ -197,7 +197,8 @@ pub struct ChaikinOscillatorConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CatBoostConfig {
     pub model_location: String,
-    pub model_filename: String,
+    pub model_name: String,
+    pub model_version: String,
     pub input_numerical: Vec<FeatureId>,
     pub input_categorical: Vec<FeatureId>,
     pub output: FeatureId,

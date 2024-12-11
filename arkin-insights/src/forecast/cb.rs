@@ -19,7 +19,8 @@ pub struct CatBoostFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
     model_location: String,
-    model_file_name: String,
+    model_name: String,
+    model_version: String,
     #[builder(default)]
     models: DashMap<Arc<Instrument>, Arc<Model>>,
     input_numerical: Vec<FeatureId>,
@@ -65,8 +66,8 @@ impl Computation for CatBoostFeature {
                 // If we don't have a model file, log a warning and return None
                 if !self.models.contains_key(instrument) {
                     let filename = format!(
-                        "{}/{}_{}.cbm",
-                        self.model_location, instrument.secondary_id, self.model_file_name
+                        "{}/{}_{}_{}.cbm",
+                        self.model_location, instrument.secondary_id, self.model_name, self.model_version
                     );
 
                     let model = Model::load(&filename).expect("Failed to load model");
