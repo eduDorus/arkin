@@ -34,7 +34,7 @@ pub enum FeatureConfig {
     StdDev(StdDevConfig),
     #[serde(rename = "sum")]
     Sum(SumConfig),
-    #[serde(rename = "signal_strength")]
+    #[serde(rename = "signal")]
     SignalStrength(SignalStrengthConfig),
 
     // Technical Analysis

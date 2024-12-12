@@ -54,7 +54,10 @@ impl Computation for SignalStrengthFeature {
 
                 // Check that they are positive values
                 if first < Decimal::zero() || second < Decimal::zero() {
-                    warn!("Negative values for Signal Strength calculation");
+                    warn!(
+                        "Negative values for Signal Strength calculation: {} with values {} and {}",
+                        self.output, first, second
+                    );
                     return None;
                 }
 

@@ -24,33 +24,42 @@ async fn main() {
     info!("Starting Arkin Order Manager 🚀");
 
     let pubsub = Arc::new(PubSub::new());
+    info!("PubSub created");
 
     let config = load::<PersistenceConfig>();
     let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()));
+    info!("Persistence created");
 
     let config = load::<PortfolioConfig>();
     let portfolio = PortfolioFactory::from_config(&config, pubsub.clone());
+    info!("Portfolio created");
 
     let config = load::<IngestorsConfig>();
     let ingestors = IngestorFactory::from_config(&config, pubsub.clone(), persistence.clone());
+    info!("Ingestors created");
 
     let config = load::<InsightsConfig>();
     let insights =
         Arc::new(InsightsService::from_config(&config.insights_service, pubsub.clone(), persistence.clone()).await);
+    info!("Insights created");
 
     let config = load::<StrategyConfig>();
     let strategy = StrategyFactory::from_config(&config, pubsub.clone())
         .pop()
         .expect("No strategy found");
+    info!("Strategy created");
 
     let config = load::<AllocationOptimConfig>();
     let allocation = AllocationFactory::from_config(&config, pubsub.clone(), persistence.clone(), portfolio.clone());
+    info!("Allocation created");
 
     let config = load::<OrderManagerConfig>();
     let order_manager = ExecutionFactory::from_config(&config, pubsub.clone(), portfolio.clone());
+    info!("Order Manager created");
 
     let config = load::<ExecutorConfig>();
     let executor = ExecutorFactory::from_config(&config, pubsub.clone());
+    info!("Executor created");
 
     // Work around for fetching instruments
     let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
@@ -61,6 +70,7 @@ async fn main() {
             Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
         }
     }
+    info!("Loaded {} instruments.", instruments.len());
 
     let engine = SingleStrategyEngine::builder()
         .pubsub(pubsub)

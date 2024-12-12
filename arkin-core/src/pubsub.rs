@@ -154,6 +154,10 @@ impl PubSub {
         debug!("Publishing event: {:?}", event_type);
         if let Some(sender_any) = self.event_senders.get(&event_type) {
             let sender = sender_any.downcast_ref::<Sender<Arc<E>>>().expect("Type mismatch");
+            // Check if we have any subscribers
+            if sender.receiver_count() == 0 {
+                return;
+            }
             if let Err(e) = sender.send(event) {
                 error!("Failed to publish event: {:?}", e);
             }
