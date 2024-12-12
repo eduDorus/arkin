@@ -1,10 +1,158 @@
-#![allow(dead_code)]
 use rust_decimal::Decimal;
 
 use arkin_core::prelude::*;
 
 use serde::Deserialize;
 use time::OffsetDateTime;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BinancePositionSide {
+    Long,
+    Short,
+    Both,
+}
+
+// impl From<BinancePositionSide> for PositionSide {
+//     fn from(side: BinancePositionSide) -> Self {
+//         match side {
+//             BinancePositionSide::Long => PositionSide::Long,
+//             BinancePositionSide::Short => PositionSide::Short,
+//             BinancePositionSide::Both => ,
+//         }
+//     }
+// }
+
+// All uppercase
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AccountUpdateReason {
+    Deposit,
+    Withdraw,
+    Order,
+    FundingFee,
+    WithdrawReject,
+    Adjustment,
+    InsuranceClear,
+    AdminDeposit,
+    AdminWithdraw,
+    MarginTransfer,
+    MarginTypeChange,
+    AssetTransfer,
+    OptionsPremiumFee,
+    OptionsSettleProfit,
+    AutoExchange,
+    CoinSwapDeposit,
+    CoinSwapWithdraw,
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BinanceOrderSide {
+    Buy,
+    Sell,
+}
+
+impl From<BinanceOrderSide> for MarketSide {
+    fn from(side: BinanceOrderSide) -> Self {
+        match side {
+            BinanceOrderSide::Buy => MarketSide::Buy,
+            BinanceOrderSide::Sell => MarketSide::Sell,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BinanceOrderType {
+    Limit,
+    Market,
+    Stop,
+    StopMarket,
+    TakeProfit,
+    TakeProfitMarket,
+    TrailingStopMarket,
+    Liquidation,
+}
+
+impl From<BinanceOrderType> for VenueOrderType {
+    fn from(order_type: BinanceOrderType) -> Self {
+        match order_type {
+            BinanceOrderType::Limit => VenueOrderType::Limit,
+            BinanceOrderType::Market => VenueOrderType::Market,
+            BinanceOrderType::Stop => VenueOrderType::Stop,
+            BinanceOrderType::StopMarket => VenueOrderType::StopMarket,
+            BinanceOrderType::TakeProfit => VenueOrderType::TakeProfit,
+            BinanceOrderType::TakeProfitMarket => VenueOrderType::TakeProfitMarket,
+            BinanceOrderType::TrailingStopMarket => VenueOrderType::TrailingStopMarket,
+            BinanceOrderType::Liquidation => VenueOrderType::Liquidation,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BinanceExecutionType {
+    New,
+    Canceled,
+    Calculated, // The order is being calculated liquidation execution
+    Expired,
+    Trade,
+    Amendment, // The order is being amended/modified
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BinanceOrderStatus {
+    New,
+    PartiallyFilled,
+    Filled,
+    Canceled,
+    Rejected,
+    Expired,
+    ExpiredInMatch,
+}
+
+impl From<BinanceOrderStatus> for VenueOrderStatus {
+    fn from(status: BinanceOrderStatus) -> Self {
+        match status {
+            BinanceOrderStatus::New => VenueOrderStatus::New,
+            BinanceOrderStatus::PartiallyFilled => VenueOrderStatus::PartiallyFilled,
+            BinanceOrderStatus::Filled => VenueOrderStatus::Filled,
+            BinanceOrderStatus::Canceled => VenueOrderStatus::Canceled,
+            BinanceOrderStatus::Rejected => VenueOrderStatus::Rejected,
+            BinanceOrderStatus::Expired => VenueOrderStatus::Expired,
+            BinanceOrderStatus::ExpiredInMatch => VenueOrderStatus::Expired,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BinanceTimeInForce {
+    Gtc,
+    Ioc,
+    Fok,
+    Gtx,
+}
+
+impl From<BinanceTimeInForce> for VenueOrderTimeInForce {
+    fn from(time_in_force: BinanceTimeInForce) -> Self {
+        match time_in_force {
+            BinanceTimeInForce::Gtc => VenueOrderTimeInForce::Gtc,
+            BinanceTimeInForce::Ioc => VenueOrderTimeInForce::Ioc,
+            BinanceTimeInForce::Fok => VenueOrderTimeInForce::Fok,
+            BinanceTimeInForce::Gtx => VenueOrderTimeInForce::Gtx,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BinanceWorkingType {
+    MarkPrice,
+    ContractPrice,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "e")]
@@ -36,19 +184,19 @@ pub enum BinanceUSDMUserStreamEvent {
         #[serde(rename = "s")]
         symbol: String,
         #[serde(rename = "q")]
-        original_quantity: String,
+        original_quantity: Decimal,
         #[serde(rename = "p")]
-        original_price: String,
+        original_price: Decimal,
         #[serde(rename = "m")]
         is_maker_side: bool,
         #[serde(rename = "c")]
         client_order_id: String,
         #[serde(rename = "S")]
-        side: String,
+        side: BinanceOrderSide,
         #[serde(rename = "L")]
-        last_filled_price: String,
+        last_filled_price: Decimal,
         #[serde(rename = "l")]
-        last_filled_quantity: String,
+        last_filled_quantity: Decimal,
         #[serde(rename = "t")]
         trade_id: i64,
         #[serde(rename = "i")]
@@ -68,147 +216,149 @@ pub enum BinanceUSDMUserStreamEvent {
 #[derive(Debug, Deserialize)]
 pub struct OrderData {
     #[serde(rename = "s")]
-    symbol: String,
+    pub symbol: String,
     #[serde(rename = "c")]
-    client_order_id: String,
+    pub client_order_id: String,
     #[serde(rename = "S")]
-    side: String,
+    pub side: BinanceOrderSide,
     #[serde(rename = "o")]
-    order_type: String,
+    pub order_type: BinanceOrderType,
     #[serde(rename = "f")]
-    time_in_force: String,
+    pub time_in_force: BinanceTimeInForce,
     #[serde(rename = "q")]
-    original_quantity: Decimal,
+    pub original_quantity: Decimal,
     #[serde(rename = "p")]
-    original_price: Decimal,
+    pub original_price: Decimal,
     #[serde(rename = "ap")]
-    average_price: Decimal,
+    pub average_price: Decimal,
     #[serde(rename = "sp")]
-    stop_price: Decimal,
+    pub stop_price: Decimal,
     #[serde(rename = "x")]
-    execution_type: String,
+    pub execution_type: BinanceExecutionType,
     #[serde(rename = "X")]
-    order_status: String,
+    pub order_status: BinanceOrderStatus,
     #[serde(rename = "i")]
-    order_id: i64,
+    pub order_id: i64,
     #[serde(rename = "l")]
-    last_filled_quantity: Decimal,
+    pub last_filled_quantity: Decimal,
     #[serde(rename = "z")]
-    filled_accumulated_quantity: Decimal,
+    pub filled_accumulated_quantity: Decimal,
     #[serde(rename = "L")]
-    last_filled_price: Decimal,
+    pub last_filled_price: Decimal,
     #[serde(rename = "N")]
-    commission_asset: Option<String>,
+    pub commission_asset: Option<String>,
     #[serde(rename = "n")]
-    commission: Option<Decimal>,
+    pub commission: Option<Decimal>,
     #[serde(rename = "T", with = "custom_serde::timestamp")]
-    order_trade_time: OffsetDateTime,
+    pub order_trade_time: OffsetDateTime,
     #[serde(rename = "t")]
-    trade_id: i64,
+    pub trade_id: i64,
     #[serde(rename = "b")]
-    bids_notional: Decimal,
+    pub bids_notional: Decimal,
     #[serde(rename = "a")]
-    asks_notional: Decimal,
+    pub asks_notional: Decimal,
     #[serde(rename = "m")]
-    is_maker_side: bool,
+    pub is_maker_side: bool,
     #[serde(rename = "R")]
-    is_reduce_only: bool,
+    pub is_reduce_only: bool,
     #[serde(rename = "wt")]
-    stop_price_working_type: String,
+    pub stop_price_working_type: BinanceWorkingType,
     #[serde(rename = "ot")]
-    original_order_type: String,
+    pub original_order_type: BinanceOrderType,
     #[serde(rename = "ps")]
-    position_side: String,
+    pub position_side: BinancePositionSide,
     #[serde(rename = "cp")]
-    close_all: bool,
+    pub close_all: bool,
     #[serde(rename = "AP")]
-    activation_price: Option<Decimal>,
+    pub activation_price: Option<Decimal>,
     #[serde(rename = "cr")]
-    callback_rate: Option<Decimal>,
+    pub callback_rate: Option<Decimal>,
     #[serde(rename = "pP")]
-    price_protect: bool,
+    pub price_protect: bool,
     #[serde(rename = "si")]
     #[serde(skip)]
-    ignore_si: i64,
+    pub ignore_si: i64,
     #[serde(rename = "ss")]
     #[serde(skip)]
-    ignore_ss: i64,
+    pub ignore_ss: i64,
     #[serde(rename = "rp")]
-    realized_profit: Decimal,
+    pub realized_profit: Decimal,
     #[serde(rename = "V")]
-    stp_mode: String,
+    pub stp_mode: String,
     #[serde(rename = "pm")]
-    price_match_mode: String,
+    pub price_match_mode: String,
     #[serde(rename = "gtd")]
-    gtd_time: i64,
+    pub gtd_time: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AccountUpdateData {
     #[serde(rename = "m")]
-    event_reason_type: String,
+    pub event_reason_type: AccountUpdateReason,
     #[serde(rename = "B")]
-    balances: Vec<Balance>,
+    pub balances: Vec<Balance>,
     #[serde(rename = "P")]
-    positions: Vec<Position>,
+    pub positions: Vec<Position>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Balance {
     #[serde(rename = "a")]
-    asset: String,
+    pub asset: String,
     #[serde(rename = "wb")]
-    wallet_balance: Decimal,
+    pub wallet_balance: Decimal,
     #[serde(rename = "cw")]
-    cross_wallet_balance: Decimal,
+    pub cross_wallet_balance: Decimal,
     #[serde(rename = "bc")]
-    balance_change: Decimal,
+    pub balance_change: Decimal,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Position {
     #[serde(rename = "s")]
-    symbol: String,
+    pub symbol: String,
     #[serde(rename = "pa")]
-    position_amount: Decimal,
+    pub position_amount: Decimal,
     #[serde(rename = "ep")]
-    entry_price: Decimal,
+    pub entry_price: Decimal,
     #[serde(rename = "bep")]
-    breakeven_price: Decimal,
+    pub breakeven_price: Decimal,
     #[serde(rename = "cr")]
-    accumulated_realized: Decimal,
+    pub accumulated_realized: Decimal,
     #[serde(rename = "up")]
-    unrealized_pnl: Decimal,
+    pub unrealized_pnl: Decimal,
     #[serde(rename = "mt")]
-    margin_type: String,
+    pub margin_type: String,
     #[serde(rename = "iw")]
-    isolated_wallet: Decimal,
+    pub isolated_wallet: Decimal,
     #[serde(rename = "ps")]
-    position_side: String,
+    pub position_side: BinancePositionSide,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MarginCallPosition {
     #[serde(rename = "s")]
-    symbol: String,
+    pub symbol: String,
     #[serde(rename = "ps")]
-    position_side: String,
+    pub position_side: String,
     #[serde(rename = "pa")]
-    position_amount: Decimal,
+    pub position_amount: Decimal,
     #[serde(rename = "mt")]
-    margin_type: String,
+    pub margin_type: String,
     #[serde(rename = "iw")]
-    isolated_wallet: Decimal,
+    pub isolated_wallet: Decimal,
     #[serde(rename = "mp")]
-    mark_price: Decimal,
+    pub mark_price: Decimal,
     #[serde(rename = "up")]
-    unrealized_pnl: Decimal,
+    pub unrealized_pnl: Decimal,
     #[serde(rename = "mm")]
-    maintenance_margin_required: Decimal,
+    pub maintenance_margin_required: Decimal,
 }
 
 #[cfg(test)]
 mod tests {
+    use rust_decimal_macros::dec;
+
     use super::*;
 
     #[test]
@@ -272,7 +422,7 @@ mod tests {
                 OffsetDateTime::from_unix_timestamp_nanos(1733989303533 * 1_000_000).unwrap()
             );
             assert_eq!(order.symbol, "ETHUSDT");
-            assert_eq!(order.side, "SELL");
+            assert_eq!(order.side, BinanceOrderSide::Sell);
             assert!(order.is_reduce_only);
         } else {
             panic!("Not an OrderTradeUpdate event");
@@ -328,7 +478,7 @@ mod tests {
                 transaction_time,
                 OffsetDateTime::from_unix_timestamp_nanos(1733988745973 * 1_000_000).unwrap()
             );
-            assert_eq!(account.event_reason_type, "ORDER");
+            assert_eq!(account.event_reason_type, AccountUpdateReason::Order);
             assert_eq!(account.balances.len(), 1);
             assert_eq!(account.balances[0].asset, "USDT");
             assert_eq!(account.positions.len(), 1);
@@ -383,13 +533,13 @@ mod tests {
                 OffsetDateTime::from_unix_timestamp_nanos(1733988745973 * 1_000_000).unwrap()
             );
             assert_eq!(symbol, "ETHUSDT");
-            assert_eq!(original_quantity, "0.006");
-            assert_eq!(original_price, "0.00");
+            assert_eq!(original_quantity, dec!(0.006));
+            assert_eq!(original_price, dec!(0.00));
             assert!(!is_maker_side);
             assert_eq!(client_order_id, "29d41430-9b98-4310-a471-8769b5dfb512");
-            assert_eq!(side, "BUY");
-            assert_eq!(last_filled_price, "3925.56");
-            assert_eq!(last_filled_quantity, "0.006");
+            assert_eq!(side, BinanceOrderSide::Buy);
+            assert_eq!(last_filled_price, dec!(3925.56));
+            assert_eq!(last_filled_quantity, dec!(0.006));
             assert_eq!(trade_id, 4830037678);
             assert_eq!(order_id, 8389765792662662763);
         } else {

@@ -44,6 +44,6 @@ pub enum ExecutorError {
     #[error("Invalid order: {0}")]
     InvalidOrder(String),
 
-    #[error("Unknown error")]
-    Unknown,
+    #[error("Unknown error: {0}")]
+    Unknown(String),
 }

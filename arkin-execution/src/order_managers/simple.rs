@@ -131,7 +131,7 @@ impl OrderManager for SimpleOrderManager {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
         info!("Starting order manager...");
         let mut execution_orders = self.pubsub.subscribe::<ExecutionOrder>();
-        let mut fills = self.pubsub.subscribe::<VenueOrderFill>();
+        let mut venue_order_updates = self.pubsub.subscribe::<VenueOrderUpdate>();
         loop {
             tokio::select! {
                 Ok(order) = execution_orders.recv() => {
@@ -151,11 +151,11 @@ impl OrderManager for SimpleOrderManager {
 
                     self.pubsub.publish::<VenueOrder>(venue_order.into());
                 }
-                Ok(fill) = fills.recv() => {
-                    info!("SimpleOrderManager received fill: {}", fill);
-                    if let Err(e) = self.order_update(fill.clone()).await {
-                        error!("Failed to process fill: {}", e);
-                    }
+                Ok(order) = venue_order_updates.recv() => {
+                    info!("SimpleOrderManager received order update: {}", order);
+                    // if let Err(e) = self.order_update(fill.clone()).await {
+                    //     error!("Failed to process fill: {}", e);
+                    // }
                 }
                 _ = shutdown.cancelled() => {
                     break;

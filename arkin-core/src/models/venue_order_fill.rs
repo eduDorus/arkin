@@ -7,7 +7,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     types::{Commission, MarketValue},
-    Event, EventType, EventTypeOf, Notional, Price, Quantity,
+    Notional, Price, Quantity,
 };
 
 use super::{Instrument, MarketSide, VenueOrder};
@@ -45,18 +45,6 @@ impl VenueOrderFill {
             MarketSide::Buy => self.quantity,
             MarketSide::Sell => -self.quantity,
         }
-    }
-}
-
-impl EventTypeOf for VenueOrderFill {
-    fn event_type() -> EventType {
-        EventType::VenueOrderFill
-    }
-}
-
-impl From<Arc<VenueOrderFill>> for Event {
-    fn from(update: Arc<VenueOrderFill>) -> Self {
-        Event::VenueOrderFill(update)
     }
 }
 

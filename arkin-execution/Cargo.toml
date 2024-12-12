@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
+arkin-persistence = { path = "../arkin-persistence" }
 arkin-binance = { path = "../arkin-binance" }
 
 
@@ -30,6 +31,7 @@ dashmap = { workspace = true }
 rand = { workspace = true }
 url = { workspace = true }
 tokio-rustls = { workspace = true }
+reqwest = { workspace = true }
 
 mockall = { workspace = true }
 test-case = { workspace = true }

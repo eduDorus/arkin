@@ -25,7 +25,7 @@ pub struct SimulationExecutor {
     #[builder(default = dec!(0.0002))]
     maker_commission: Decimal,
     #[builder(default = DashMap::new())]
-    balances: DashMap<Arc<Asset>, Holding>,
+    balances: DashMap<Arc<Asset>, Balance>,
 }
 
 impl SimulationExecutor {
@@ -53,16 +53,16 @@ impl SimulationExecutor {
 
     pub fn update_balance(&self, asset: &Arc<Asset>, quantity: Decimal) {
         let mut entry = self.balances.entry(asset.clone()).or_insert(
-            Holding::builder()
+            Balance::builder()
                 .id(Uuid::new_v4())
                 .asset(asset.clone())
                 .balance(dec!(0))
                 .build(),
         );
-        entry.balance += quantity;
+        entry.quantity += quantity;
     }
 
-    pub fn get_balance(&self, asset: &Arc<Asset>) -> Option<Holding> {
+    pub fn get_balance(&self, asset: &Arc<Asset>) -> Option<Balance> {
         self.balances.get(asset).map(|holding| holding.value().clone())
     }
 }
@@ -73,15 +73,15 @@ impl Executor for SimulationExecutor {
         info!("Starting simulation executor...");
         // TODO: Send current balance
         let holding = Arc::new(
-            Holding::builder()
+            Balance::builder()
                 .id(Uuid::new_v4())
                 .asset(test_usdt_asset())
                 .balance(dec!(10000))
                 .build(),
         );
-        self.update_balance(&holding.asset, holding.balance);
+        self.update_balance(&holding.asset, holding.quantity);
         info!("Sending initial balance: {}", holding);
-        self.pubsub.publish::<Holding>(holding);
+        self.pubsub.publish::<Balance>(holding);
 
         let mut tick_updates = self.pubsub.subscribe::<Tick>();
         let mut venue_orders = self.pubsub.subscribe::<VenueOrder>();

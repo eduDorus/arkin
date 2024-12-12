@@ -232,6 +232,7 @@ dependencies = [
  "mockall",
  "reqwest",
  "rust_decimal",
+ "rust_decimal_macros",
  "serde",
  "serde_json",
  "sha2",
@@ -308,6 +309,7 @@ version = "0.1.0"
 dependencies = [
  "arkin-binance",
  "arkin-core",
+ "arkin-persistence",
  "async-trait",
  "async-tungstenite",
  "dashmap",
@@ -315,6 +317,7 @@ dependencies = [
  "futures-util",
  "mockall",
  "rand",
+ "reqwest",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",

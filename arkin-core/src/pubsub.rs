@@ -12,8 +12,8 @@ use typed_builder::TypedBuilder;
 use strum::EnumDiscriminants;
 
 use crate::{
-    Book, ExecutionOrder, Holding, Insight, Instrument, Position, Signal, Tick, Trade, VenueOrder, VenueOrderFill,
-    VenueOrderId, VenueOrderStatus,
+    Balance, BalanceUpdate, Book, ExecutionOrder, Insight, Instrument, Position, PositionUpdate, Signal, Tick, Trade,
+    VenueOrder, VenueOrderUpdate,
 };
 
 pub trait EventTypeOf: fmt::Debug + Send + Sync + Clone + 'static {
@@ -86,27 +86,6 @@ impl From<Arc<AllocationTick>> for Event {
     }
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-
-pub struct VenueOrderState {
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub event_time: OffsetDateTime,
-    pub id: VenueOrderId,
-    pub status: VenueOrderStatus,
-}
-
-impl EventTypeOf for VenueOrderState {
-    fn event_type() -> EventType {
-        EventType::VenueOrderState
-    }
-}
-
-impl From<Arc<VenueOrderState>> for Event {
-    fn from(update: Arc<VenueOrderState>) -> Self {
-        Event::VenueOrderState(update)
-    }
-}
-
 #[derive(Debug, Clone, EnumDiscriminants)]
 #[strum_discriminants(name(EventType))]
 #[strum_discriminants(derive(Hash))]
@@ -115,16 +94,17 @@ pub enum Event {
     Tick(Arc<Tick>),
     Trade(Arc<Trade>),
     Book(Arc<Book>),
-    BalanceUpdate(Arc<Holding>),
-    PositionUpdate(Arc<Position>),
+    Balance(Arc<Balance>),
+    BalanceUpdate(Arc<BalanceUpdate>),
+    Position(Arc<Position>),
+    PositionUpdate(Arc<PositionUpdate>),
     Insight(Arc<Insight>),
     InsightTick(Arc<InsightTick>),
     Signal(Arc<Signal>),
     AllocationTick(Arc<AllocationTick>),
     ExecutionOrderNew(Arc<ExecutionOrder>),
-    VenueOrderNew(Arc<VenueOrder>),
-    VenueOrderState(Arc<VenueOrderState>),
-    VenueOrderFill(Arc<VenueOrderFill>),
+    VenueOrder(Arc<VenueOrder>),
+    VenueOrderUpdate(Arc<VenueOrderUpdate>),
 }
 
 impl Event {

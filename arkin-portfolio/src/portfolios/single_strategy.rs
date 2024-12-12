@@ -19,16 +19,16 @@ pub struct SingleStrategyPortfolio {
     #[builder(default = DashMap::new())]
     positions: DashMap<Arc<Instrument>, BTreeSet<Arc<Position>>>,
     #[builder(default = DashMap::new())]
-    holdings: DashMap<Arc<Asset>, Arc<Holding>>,
+    holdings: DashMap<Arc<Asset>, Arc<Balance>>,
 }
 
 #[async_trait]
 impl Accounting for SingleStrategyPortfolio {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError> {
         info!("Starting portfolio...");
-        let mut _balance_updates = self.pubsub.subscribe::<Holding>();
-        let mut _position_updates = self.pubsub.subscribe::<Position>();
-        let mut _fill_updates = self.pubsub.subscribe::<VenueOrderFill>();
+        let mut _balance_updates = self.pubsub.subscribe::<BalanceUpdate>();
+        let mut _position_updates = self.pubsub.subscribe::<PositionUpdate>();
+        let mut _venue_order_updates = self.pubsub.subscribe::<VenueOrderUpdate>();
         loop {
             tokio::select! {
                 // Ok(balance) = balance_updates.recv() => {
@@ -68,13 +68,13 @@ impl Accounting for SingleStrategyPortfolio {
         // Ok(())
     }
 
-    async fn balance_update(&self, holding: Arc<Holding>) -> Result<(), PortfolioError> {
+    async fn balance_update(&self, holding: Arc<Balance>) -> Result<(), PortfolioError> {
         info!("Portfolio processing balance update: {}", holding);
         // Check if we have the asset in the holdings else create
         if self.holdings.contains_key(&holding.asset) {
             self.holdings.alter(&holding.asset, |_, h| {
                 let mut new_holding = h.as_ref().clone();
-                new_holding.balance = holding.balance;
+                new_holding.quantity = holding.quantity;
                 Arc::new(new_holding)
             });
         } else {
@@ -122,12 +122,12 @@ impl Accounting for SingleStrategyPortfolio {
         // Ok(())
     }
 
-    async fn balance(&self, _asset: &Arc<Asset>) -> Option<Holding> {
+    async fn balance(&self, _asset: &Arc<Asset>) -> Option<Balance> {
         unimplemented!("Balance not implemented");
         // self.holdings.get(asset).map(|v| v.value().clone())
     }
 
-    async fn total_balance(&self) -> HashMap<Arc<Asset>, Arc<Holding>> {
+    async fn total_balance(&self) -> HashMap<Arc<Asset>, Arc<Balance>> {
         self.holdings.iter().map(|v| (v.key().clone(), v.value().clone())).collect()
     }
 
@@ -226,11 +226,11 @@ impl Accounting for SingleStrategyPortfolio {
     }
 
     async fn buying_power(&self, asset: &Arc<Asset>) -> Decimal {
-        self.holdings.get(asset).map(|v| v.value().balance).unwrap_or(Decimal::ZERO)
+        self.holdings.get(asset).map(|v| v.value().quantity).unwrap_or(Decimal::ZERO)
     }
 
     async fn total_buying_power(&self) -> HashMap<Arc<Asset>, Decimal> {
-        self.holdings.iter().map(|v| (v.key().clone(), v.value().balance)).collect()
+        self.holdings.iter().map(|v| (v.key().clone(), v.value().quantity)).collect()
     }
 
     async fn pnl_asset(&self, asset: &Arc<Asset>) -> Decimal {

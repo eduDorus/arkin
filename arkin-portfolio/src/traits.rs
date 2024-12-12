@@ -20,7 +20,7 @@ pub trait Accounting: std::fmt::Debug + Send + Sync {
 
     /// Update the current balance of a given asset
     /// This comes from the exchange and should be reconciled with the portfolio
-    async fn balance_update(&self, holding: Arc<Holding>) -> Result<(), PortfolioError>;
+    async fn balance_update(&self, holding: Arc<Balance>) -> Result<(), PortfolioError>;
 
     /// Update the current position of a given instrument
     /// This comes from the exchange and should be reconciled with the portfolio
@@ -31,10 +31,10 @@ pub trait Accounting: std::fmt::Debug + Send + Sync {
     async fn fill_update(&self, fill: Arc<VenueOrderFill>) -> Result<(), PortfolioError>;
 
     /// Provides the current price of a specific assets in the portfolio
-    async fn balance(&self, asset: &Arc<Asset>) -> Option<Holding>;
+    async fn balance(&self, asset: &Arc<Asset>) -> Option<Balance>;
 
     /// Provides the current price of all assets in the portfolio
-    async fn total_balance(&self) -> HashMap<Arc<Asset>, Arc<Holding>>;
+    async fn total_balance(&self) -> HashMap<Arc<Asset>, Arc<Balance>>;
 
     /// Provides a list off all positions with a given quote asset
     async fn list_positions_with_quote_asset(

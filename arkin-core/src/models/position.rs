@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
 
-use super::{Instrument, MarketSide, Strategy};
+use super::{Instrument, MarketSide, Portfolio, Strategy};
 
 #[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type)]
 #[strum(serialize_all = "snake_case")]
@@ -18,6 +18,7 @@ use super::{Instrument, MarketSide, Strategy};
 pub enum PositionSide {
     Long,
     Short,
+    // Both, // Quantity decides so the position can be both long and short
 }
 
 impl From<MarketSide> for PositionSide {
@@ -218,13 +219,13 @@ impl Ord for Position {
 
 impl EventTypeOf for Position {
     fn event_type() -> EventType {
-        EventType::PositionUpdate
+        EventType::Position
     }
 }
 
 impl From<Arc<Position>> for Event {
     fn from(position: Arc<Position>) -> Self {
-        Event::PositionUpdate(position)
+        Event::Position(position)
     }
 }
 
@@ -241,6 +242,45 @@ impl fmt::Display for Position {
             self.realized_pnl,
             self.unrealized_pnl(),
             self.total_commission,
+        )
+    }
+}
+
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct PositionUpdate {
+    pub event_time: OffsetDateTime,
+    pub portfolio: Arc<Portfolio>,
+    pub instrument: Arc<Instrument>,
+    pub entry_price: Price,
+    pub quantity: Quantity,
+    pub realized_pnl: Decimal,
+    pub unrealized_pnl: Decimal,
+    pub position_side: PositionSide,
+}
+
+impl EventTypeOf for PositionUpdate {
+    fn event_type() -> EventType {
+        EventType::PositionUpdate
+    }
+}
+
+impl From<Arc<PositionUpdate>> for Event {
+    fn from(update: Arc<PositionUpdate>) -> Self {
+        Event::PositionUpdate(update)
+    }
+}
+
+impl fmt::Display for PositionUpdate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "instrument={} side={} entry_price={} quantity={} realized_pnl={} unrealized_pnl={}",
+            self.instrument,
+            self.position_side,
+            self.entry_price,
+            self.quantity,
+            self.realized_pnl,
+            self.unrealized_pnl,
         )
     }
 }

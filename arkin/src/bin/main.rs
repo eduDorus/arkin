@@ -51,7 +51,7 @@ async fn main() {
     info!("Order Manager created");
 
     let config = load::<ExecutorConfig>();
-    let executor = ExecutorFactory::from_config(&config, pubsub.clone());
+    let executor = ExecutorFactory::from_config(&config, pubsub.clone(), persistence.clone());
     info!("Executor created");
 
     // Work around for fetching instruments
