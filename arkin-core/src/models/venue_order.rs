@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity};
 
-use super::{ExecutionOrderType, Instrument, MarketSide, Portfolio, VenueOrderFill};
+use super::{ExecutionOrder, ExecutionOrderType, Instrument, MarketSide, Portfolio, VenueOrderFill};
 
 pub type VenueOrderId = Uuid;
 
@@ -166,6 +166,27 @@ impl VenueOrder {
 
     pub fn has_fill(&self) -> bool {
         self.filled_quantity > Quantity::ZERO
+    }
+}
+
+impl From<ExecutionOrder> for VenueOrder {
+    fn from(order: ExecutionOrder) -> Self {
+        Self {
+            id: order.id,
+            portfolio: order.portfolio,
+            instrument: order.instrument,
+            side: order.side,
+            order_type: order.order_type.into(),
+            time_in_force: VenueOrderTimeInForce::Gtc,
+            price: order.price,
+            quantity: order.quantity,
+            fill_price: Price::ZERO,
+            filled_quantity: Quantity::ZERO,
+            total_commission: Commission::ZERO,
+            status: VenueOrderStatus::New,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+        }
     }
 }
 

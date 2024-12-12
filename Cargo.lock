@@ -223,6 +223,7 @@ name = "arkin-binance"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arkin-core",
  "async-tungstenite",
  "base64 0.22.1",
  "ed25519-dalek",
@@ -243,6 +244,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tracing",
+ "typed-builder",
  "url",
  "uuid",
 ]
@@ -304,25 +306,30 @@ dependencies = [
 name = "arkin-execution"
 version = "0.1.0"
 dependencies = [
+ "arkin-binance",
  "arkin-core",
- "arkin-portfolio",
  "async-trait",
+ "async-tungstenite",
  "dashmap",
  "flume",
+ "futures-util",
  "mockall",
  "rand",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
+ "serde_json",
  "strum",
  "test-case",
  "test-log",
  "thiserror 2.0.6",
  "time",
  "tokio",
+ "tokio-rustls",
  "tokio-util",
  "tracing",
  "typed-builder",
+ "url",
  "uuid",
 ]
 

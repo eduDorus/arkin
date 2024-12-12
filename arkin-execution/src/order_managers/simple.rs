@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use arkin_portfolio::Accounting;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
@@ -14,7 +13,6 @@ use crate::{OrderManager, OrderManagerError};
 #[derive(Debug, TypedBuilder)]
 pub struct SimpleOrderManager {
     pubsub: Arc<PubSub>,
-    portfolio: Arc<dyn Accounting>,
     #[builder(default = OrderQueue::default())]
     execution_orders: OrderQueue,
 }
@@ -137,8 +135,7 @@ impl OrderManager for SimpleOrderManager {
         loop {
             tokio::select! {
                 Ok(order) = execution_orders.recv() => {
-                    info!("SimpleOrderManager received execution order: {}", order);
-                    // order.update_status(ExecutionOrderStatus::InProgress);
+                    info!("SimpleOrderManager received order: {}", order.instrument);
                     if let Err(e) = self.place_order(order.clone()).await {
                         error!("Failed to process order: {}", e);
                     }
@@ -152,7 +149,6 @@ impl OrderManager for SimpleOrderManager {
                         .quantity(order.quantity)
                         .build();
 
-                    info!("SimpleOrderManager publishing venue order: {}", venue_order);
                     self.pubsub.publish::<VenueOrder>(venue_order.into());
                 }
                 Ok(fill) = fills.recv() => {
@@ -251,16 +247,6 @@ impl OrderManager for SimpleOrderManager {
         status: ExecutionOrderStatus,
     ) -> Result<(), OrderManagerError> {
         self.execution_orders.update_order_status(id, status);
-        Ok(())
-    }
-
-    async fn position_update(&self, position: Arc<Position>) -> Result<(), OrderManagerError> {
-        self.portfolio.position_update(position).await?;
-        Ok(())
-    }
-
-    async fn balance_update(&self, holding: Arc<Holding>) -> Result<(), OrderManagerError> {
-        self.portfolio.balance_update(holding).await?;
         Ok(())
     }
 }

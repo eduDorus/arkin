@@ -12,7 +12,6 @@ use arkin_execution::prelude::*;
 use arkin_ingestors::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_persistence::prelude::*;
-use arkin_strategies::prelude::*;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -43,18 +42,12 @@ async fn main() {
         Arc::new(InsightsService::from_config(&config.insights_service, pubsub.clone(), persistence.clone()).await);
     info!("Insights created");
 
-    let config = load::<StrategyConfig>();
-    let strategy = StrategyFactory::from_config(&config, pubsub.clone())
-        .pop()
-        .expect("No strategy found");
-    info!("Strategy created");
-
     let config = load::<AllocationOptimConfig>();
     let allocation = AllocationFactory::from_config(&config, pubsub.clone(), persistence.clone(), portfolio.clone());
     info!("Allocation created");
 
     let config = load::<OrderManagerConfig>();
-    let order_manager = ExecutionFactory::from_config(&config, pubsub.clone(), portfolio.clone());
+    let order_manager = ExecutionFactory::from_config(&config, pubsub.clone());
     info!("Order Manager created");
 
     let config = load::<ExecutorConfig>();
@@ -79,7 +72,6 @@ async fn main() {
         .portfolio(portfolio)
         .ingestors(ingestors)
         .insights(insights)
-        .strategy(strategy)
         .allocation_optim(allocation)
         .order_manager(order_manager)
         .executor(executor)

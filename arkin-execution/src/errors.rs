@@ -6,9 +6,6 @@ pub enum OrderManagerError {
     OrderAlreadyExists(String),
 
     #[error(transparent)]
-    PortfolioError(#[from] arkin_portfolio::PortfolioError),
-
-    #[error(transparent)]
     ExecutorError(#[from] ExecutorError),
 
     #[error("ExecutionOrder not found: {0}")]

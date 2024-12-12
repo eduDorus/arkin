@@ -21,8 +21,8 @@ impl AllocationFactory {
                     .pubsub(pubsub.clone())
                     .persistence(persistance)
                     .portfolio(portfolio)
-                    .max_allocation(c.max_allocation)
-                    .max_allocation_per_signal(c.max_allocation_per_signal)
+                    .min_trade_value(c.min_trade_value)
+                    .allocation_feature_id(c.allocation_feature_id.clone())
                     .reference_currency(test_usdt_asset())
                     .build(),
             ),

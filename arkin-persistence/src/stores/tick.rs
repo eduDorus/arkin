@@ -3,7 +3,7 @@ use std::sync::Arc;
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::{debug, error};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -35,7 +35,7 @@ impl TickStore {
 
         // Convert to DTOs and insert into the database
         let ticks = ticks.into_iter().map(|t| t.into()).collect::<Vec<_>>();
-        info!("Flushing {} ticks", ticks.len());
+        debug!("Flushing {} ticks", ticks.len());
         if let Err(e) = self.tick_repo.insert_batch(ticks).await {
             error!("Failed to flush ticks: {}", e);
             return Err(e);

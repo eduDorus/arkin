@@ -2,6 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use reqwest::Client;
 use tracing::debug;
+use typed_builder::TypedBuilder;
 use url::Url;
 
 use crate::http::error::BinanceHttpClientError;
@@ -9,10 +10,13 @@ use crate::http::error::BinanceHttpClientError;
 use super::{credentials::Credentials, method::Method, request::Request, response::Response, sign::sign_payload};
 
 // Client Implementatino
-#[derive(Clone)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct BinanceHttpClient {
+    #[builder(default)]
     client: Client,
+    #[builder(default = Url::parse("https://fapi.binance.com").expect("Default url for binance http client is invalid"))]
     base_url: Url,
+    #[builder(default)]
     timestamp_delta: i64,
     credentials: Option<Credentials>,
 }

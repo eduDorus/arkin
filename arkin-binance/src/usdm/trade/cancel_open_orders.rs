@@ -1,3 +1,5 @@
+use typed_builder::TypedBuilder;
+
 use crate::http::{Credentials, Method, Request};
 
 /// `DELETE /fapi/v1/allOpenOrders`
@@ -14,9 +16,12 @@ use crate::http::{Credentials, Method, Request};
 ///
 /// let request = trade::cancel_open_orders("BNBUSDT");
 /// ```
+#[derive(TypedBuilder)]
 pub struct CancelOpenOrders {
     symbol: String,
+    #[builder(default)]
     recv_window: Option<u64>,
+    #[builder(default)]
     credentials: Option<Credentials>,
 }
 

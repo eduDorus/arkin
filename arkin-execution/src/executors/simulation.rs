@@ -196,6 +196,10 @@ impl Executor for SimulationExecutor {
         Ok(())
     }
 
+    async fn cancel_orders_by_instrument(&self, _instrument: Arc<Instrument>) -> Result<(), ExecutorError> {
+        unimplemented!("SimulationExecutor::cancel_orders_by_instrument")
+    }
+
     async fn cancel_all_orders(&self) -> Result<(), ExecutorError> {
         unimplemented!("SimulationExecutor::cancel_all_orders")
         // for mut order in self.orders.iter_mut() {

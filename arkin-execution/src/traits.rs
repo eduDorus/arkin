@@ -45,8 +45,6 @@ pub trait OrderManager: std::fmt::Debug + Send + Sync {
         id: ExecutionOrderId,
         status: ExecutionOrderStatus,
     ) -> Result<(), OrderManagerError>;
-    async fn position_update(&self, position: Arc<Position>) -> Result<(), OrderManagerError>;
-    async fn balance_update(&self, holding: Arc<Holding>) -> Result<(), OrderManagerError>;
 }
 
 #[automock]
@@ -70,5 +68,6 @@ pub trait Executor: std::fmt::Debug + Send + Sync {
 
     async fn cancel_order(&self, id: VenueOrderId) -> Result<(), ExecutorError>;
     async fn cancel_orders(&self, ids: Vec<VenueOrderId>) -> Result<(), ExecutorError>;
+    async fn cancel_orders_by_instrument(&self, instrument: Arc<Instrument>) -> Result<(), ExecutorError>;
     async fn cancel_all_orders(&self) -> Result<(), ExecutorError>;
 }

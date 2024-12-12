@@ -1,8 +1,9 @@
 use rust_decimal::prelude::*;
+use typed_builder::TypedBuilder;
 
 use crate::http::{Credentials, Method, Request};
 
-use super::order::{NewOrderResponseType, Side, TimeInForce};
+use super::order::{NewOrderResponseType, OrderType, Side, TimeInForce};
 
 /// `POST /api/v3/order`
 ///
@@ -34,43 +35,36 @@ use super::order::{NewOrderResponseType, Side, TimeInForce};
 /// let request = trade::new_order("BNBUSDT", Side::Sell, "MARKET")
 ///     .quantity(dec!(0.1));
 /// ```
+#[derive(TypedBuilder)]
 pub struct NewOrder {
     symbol: String,
     side: Side,
-    r#type: String,
+    order_type: OrderType,
+    #[builder(default)]
     time_in_force: Option<TimeInForce>,
+    #[builder(default)]
     quantity: Option<Decimal>,
+    #[builder(default)]
     quote_order_qty: Option<Decimal>,
+    #[builder(default)]
     price: Option<Decimal>,
+    #[builder(default)]
     new_client_order_id: Option<String>,
+    #[builder(default)]
     stop_price: Option<Decimal>,
+    #[builder(default)]
     trailing_delta: Option<u64>,
+    #[builder(default)]
     iceberg_qty: Option<Decimal>,
+    #[builder(default)]
     new_order_resp_type: Option<NewOrderResponseType>,
+    #[builder(default)]
     recv_window: Option<u64>,
+    #[builder(default)]
     credentials: Option<Credentials>,
 }
 
 impl NewOrder {
-    pub fn new(symbol: &str, side: Side, r#type: &str) -> Self {
-        Self {
-            symbol: symbol.to_owned(),
-            side,
-            r#type: r#type.to_owned(),
-            time_in_force: None,
-            quantity: None,
-            quote_order_qty: None,
-            price: None,
-            new_client_order_id: None,
-            stop_price: None,
-            trailing_delta: None,
-            iceberg_qty: None,
-            new_order_resp_type: None,
-            recv_window: None,
-            credentials: None,
-        }
-    }
-
     pub fn time_in_force(mut self, time_in_force: TimeInForce) -> Self {
         self.time_in_force = Some(time_in_force);
         self
@@ -132,7 +126,7 @@ impl From<NewOrder> for Request {
         let mut params = vec![
             ("symbol".to_owned(), request.symbol),
             ("side".to_owned(), request.side.to_string()),
-            ("type".to_owned(), request.r#type),
+            ("type".to_owned(), request.order_type.to_string()),
         ];
 
         if let Some(time_in_force) = request.time_in_force {

@@ -141,7 +141,7 @@ impl Insights for InsightsService {
         let insights_tick = Arc::new(insights_tick);
 
         if publish {
-            debug!(
+            info!(
                 "Publishing insights tick: {} with {} insights",
                 insights_tick.event_time,
                 insights.len()

@@ -12,7 +12,7 @@ use super::Stream;
 pub struct BinanceWebSocketClient;
 
 impl BinanceWebSocketClient {
-    pub async fn connect_async(url: &str) -> Result<(WebSocketState<ConnectStream>, Response), Error> {
+    pub async fn connect(url: &str) -> Result<(WebSocketState<ConnectStream>, Response), Error> {
         let (socket, response) = connect_async(url).await?;
 
         info!("Connected to {}", url);
@@ -25,13 +25,18 @@ impl BinanceWebSocketClient {
         Ok((WebSocketState::new(socket), response))
     }
 
-    pub async fn connect_async_default() -> Result<(WebSocketState<ConnectStream>, Response), Error> {
-        BinanceWebSocketClient::connect_async("wss://fstream.binance.com/ws").await
+    pub async fn connect_default() -> Result<(WebSocketState<ConnectStream>, Response), Error> {
+        BinanceWebSocketClient::connect("wss://fstream.binance.com/ws").await
+    }
+
+    pub async fn connect_with_listen_key(listen_key: &str) -> Result<(WebSocketState<ConnectStream>, Response), Error> {
+        let url = format!("wss://fstream.binance.com/ws/{}", listen_key);
+        BinanceWebSocketClient::connect(&url).await
     }
 }
 
 pub struct WebSocketState<T> {
-    socket: WebSocketStream<T>,
+    pub socket: WebSocketStream<T>,
     id: u64,
 }
 

@@ -1,4 +1,5 @@
-use rust_decimal::prelude::*;
+use arkin_core::FeatureId;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -14,6 +15,6 @@ pub enum AllocationTypeConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LimitedConfig {
-    pub max_allocation: Decimal,
-    pub max_allocation_per_signal: Decimal,
+    pub min_trade_value: Decimal,
+    pub allocation_feature_id: FeatureId,
 }

@@ -1,6 +1,7 @@
+mod binance;
 mod factory;
 mod simulation;
 
+pub use binance::*;
 pub use factory::ExecutorFactory;
-pub use simulation::SimulationExecutor;
-pub use simulation::SimulationExecutorBuilder;
+pub use simulation::*;

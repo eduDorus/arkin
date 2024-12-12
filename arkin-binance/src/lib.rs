@@ -11,9 +11,10 @@ pub use usdm::market_stream::*;
 pub use usdm::trade::*;
 
 pub mod prelude {
+    pub use crate::usdm::market_models::*;
     pub use crate::usdm::market_stream::*;
-    pub use crate::usdm::models::*;
     pub use crate::usdm::trade::*;
+    pub use crate::usdm::*;
     pub use crate::ws::{BinanceWebSocketClient, Stream, WebSocketState};
     pub use crate::{BinanceHttpClient, BinanceHttpClientError, Credentials, Method, Request, Response};
 }

@@ -37,7 +37,7 @@ pub struct SimulationConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BinanceExecutionConfig {
-    pub max_orders_per_minute: u64,
-    pub max_order_size_notional: Decimal,
-    pub min_order_size_notional: Decimal,
+    pub api_key: String,
+    pub api_secret: String,
+    pub base_url: String,
 }

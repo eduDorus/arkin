@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use rust_decimal::Decimal;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::info;
 use typed_builder::TypedBuilder;
 
 use crate::{Accounting, PortfolioError};
@@ -26,32 +26,26 @@ pub struct SingleStrategyPortfolio {
 impl Accounting for SingleStrategyPortfolio {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError> {
         info!("Starting portfolio...");
-        let mut price_updates = self.pubsub.subscribe::<Tick>();
-        let mut balance_updates = self.pubsub.subscribe::<Holding>();
-        let mut position_updates = self.pubsub.subscribe::<Position>();
-        let mut fill_updates = self.pubsub.subscribe::<VenueOrderFill>();
+        let mut _balance_updates = self.pubsub.subscribe::<Holding>();
+        let mut _position_updates = self.pubsub.subscribe::<Position>();
+        let mut _fill_updates = self.pubsub.subscribe::<VenueOrderFill>();
         loop {
             tokio::select! {
-                Ok(tick) = price_updates.recv() => {
-                    if let Err(e) = self.price_update(tick).await {
-                        error!("Failed to process price update: {}", e);
-                    }
-                }
-                Ok(balance) = balance_updates.recv() => {
-                    if let Err(e) = self.balance_update(balance).await {
-                        error!("Failed to process balance update: {}", e);
-                    }
-                }
-                Ok(position) = position_updates.recv() => {
-                    if let Err(e) = self.position_update(position).await {
-                        error!("Failed to process position update: {}", e);
-                    }
-                }
-                Ok(fill) = fill_updates.recv() => {
-                    if let Err(e) = self.fill_update(fill).await {
-                        error!("Failed to process fill update: {}", e);
-                    }
-                }
+                // Ok(balance) = balance_updates.recv() => {
+                //     if let Err(e) = self.balance_update(balance).await {
+                //         error!("Failed to process balance update: {}", e);
+                //     }
+                // }
+                // Ok(position) = position_updates.recv() => {
+                //     if let Err(e) = self.position_update(position).await {
+                //         error!("Failed to process position update: {}", e);
+                //     }
+                // }
+                // Ok(fill) = fill_updates.recv() => {
+                //     if let Err(e) = self.fill_update(fill).await {
+                //         error!("Failed to process fill update: {}", e);
+                //     }
+                // }
                 _ = shutdown.cancelled() => {
                     break;
                 }
@@ -209,17 +203,18 @@ impl Accounting for SingleStrategyPortfolio {
             .collect()
     }
 
-    async fn capital(&self, asset: &Arc<Asset>) -> Decimal {
-        let current_balance = self.balance(asset).await;
-        let current_positions = self.list_open_positions_with_quote_asset(asset).await;
-        let positions_value = current_positions
-            .iter()
-            .fold(Decimal::ZERO, |acc, (_, s)| acc + s.market_value());
+    async fn capital(&self, _asset: &Arc<Asset>) -> Decimal {
+        // let _current_balance = self.balance(asset).await;
+        // let current_positions = self.list_open_positions_with_quote_asset(asset).await;
+        // let _positions_value = current_positions
+        //     .iter()
+        //     .fold(Decimal::ZERO, |acc, (_, s)| acc + s.market_value());
 
-        match current_balance {
-            Some(b) => b.balance + positions_value,
-            None => positions_value,
-        }
+        // match current_balance {
+        //     Some(b) => b.balance + positions_value,
+        //     None => positions_value,
+        // }
+        Decimal::new(200, 0)
     }
 
     async fn total_capital(&self) -> HashMap<Arc<Asset>, Decimal> {

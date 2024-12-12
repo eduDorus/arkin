@@ -393,7 +393,7 @@ impl Ingestor for BinanceIngestor {
         let state = self.state.clone();
 
         tracker.spawn(async move {
-            let (mut conn, _) = BinanceWebSocketClient::connect_async(&url).await.unwrap();
+            let (mut conn, _) = BinanceWebSocketClient::connect(&url).await.unwrap();
 
             conn.subscribe(streams.iter()).await;
 
@@ -409,11 +409,11 @@ impl Ingestor for BinanceIngestor {
                         match message {
                             Some(Ok(message)) => {
                                 let data = message.into_data();
-                                let res = serde_json::from_slice::<BinanceSwapEvent>(&data);
+                                let res = serde_json::from_slice::<BinanceUSDMMarketEvent>(&data);
                                 match res {
                                     Ok(e) => {
                                         match e {
-                                            BinanceSwapEvent::AggTrade(e) => {
+                                            BinanceUSDMMarketEvent::AggTrade(e) => {
                                                 let side = if e.maker {
                                                     MarketSide::Sell
                                                 } else {
@@ -423,7 +423,7 @@ impl Ingestor for BinanceIngestor {
                                                 let trade = Trade::new(e.event_time, instrument, e.agg_trade_id, side, e.price, e.quantity, );
                                                 state.insert_trade(trade).await;
                                             }
-                                            BinanceSwapEvent::Tick(e) => {
+                                            BinanceUSDMMarketEvent::Tick(e) => {
                                                 let instrument = INSTRUMENT.clone();
                                                 let tick = Tick::new(e.event_time, instrument, e.update_id, e.bid_price, e.bid_quantity, e.ask_price, e.ask_quantity);
                                                 state.insert_tick(tick).await;
@@ -442,7 +442,7 @@ impl Ingestor for BinanceIngestor {
                             },
                             None => {
                                 info!("Connection closed... reconnecting...");
-                                let (new_conn, _) = BinanceWebSocketClient::connect_async(&url).await.unwrap();
+                                let (new_conn, _) = BinanceWebSocketClient::connect(&url).await.unwrap();
                                 conn = new_conn;
                                 conn.subscribe(streams.iter()).await;
                             },
@@ -885,35 +885,35 @@ impl Executor for BinanceExecutor {
         info!("Placing order on binance exchange: {}", order);
 
         // Send request
-        let req: Request = NewOrder::new(
-            &order.instrument,
-            match order.side {
-                MarketSide::Buy => Side::Buy,
-                MarketSide::Sell => Side::Sell,
-            },
-            "LIMIT",
-        )
-        .new_client_order_id(&order.id.to_string())
-        .price(order.price)
-        .quantity(order.quantity)
-        .time_in_force(TimeInForce::Gtc)
-        .into();
+        // let req: Request = NewOrder::builder()
+        // .symbol(&order.instrument.ve,
+        //     match order.side {
+        //         MarketSide::Buy => Side::Buy,
+        //         MarketSide::Sell => Side::Sell,
+        //     },
+        //     "LIMIT",
+        // )
+        // .new_client_order_id(&order.id.to_string())
+        // .price(order.price)
+        // .quantity(order.quantity)
+        // .time_in_force(TimeInForce::Gtc)
+        // .into();
 
-        let res = self.client.send(req).await;
-        match res {
-            Ok(res) => {
-                info!("Response: {:?}", res);
-                self.insert_order(order.clone()).await;
-                self.response_tx
-                    .send_async(ExecutorMessage::OrderPlaced(order.id))
-                    .await
-                    .unwrap();
-            }
-            Err(e) => {
-                error!("Error: {:?}", e);
-                self.response_tx.send_async(ExecutorMessage::Error(order.id)).await.unwrap();
-            }
-        }
+        // let res = self.client.send(req).await;
+        // match res {
+        //     Ok(res) => {
+        //         info!("Response: {:?}", res);
+        //         self.insert_order(order.clone()).await;
+        //         self.response_tx
+        //             .send_async(ExecutorMessage::OrderPlaced(order.id))
+        //             .await
+        //             .unwrap();
+        //     }
+        //     Err(e) => {
+        //         error!("Error: {:?}", e);
+        //         self.response_tx.send_async(ExecutorMessage::Error(order.id)).await.unwrap();
+        //     }
+        // }
         // Implement the place_order method for BinanceExecutor
     }
 

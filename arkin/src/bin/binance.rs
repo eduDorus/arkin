@@ -3,7 +3,6 @@ use std::time::Duration;
 use anyhow::Result;
 use futures_util::StreamExt;
 use mimalloc::MiMalloc;
-use rust_decimal::prelude::*;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 
@@ -21,7 +20,7 @@ async fn main() -> Result<()> {
     // Install the default CryptoProvider
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
 
-    let (mut conn, _) = BinanceWebSocketClient::connect_async_default().await?;
+    let (mut conn, _) = BinanceWebSocketClient::connect_default().await?;
     let agg_trade_stream: Vec<Stream> = vec![
         AggTradeStream::new("btcusdt").into(),
         // AggTradeStream::new("ethusdt").into(),
@@ -59,20 +58,20 @@ async fn main() -> Result<()> {
     let client = BinanceHttpClient::with_url(url).credentials(credentials);
 
     // Send order
-    let req: Request = NewOrder::new("SOLUSDT", Side::Buy, "LIMIT")
-        .time_in_force(TimeInForce::Gtc)
-        .quantity(Decimal::new(1, 0))
-        .price(Decimal::new(2150000, 4))
-        .into();
-    let res = client.send(req).await;
-    match res {
-        Ok(res) => {
-            info!("Response: {:?}", res);
-        }
-        Err(e) => {
-            error!("Error: {:?}", e);
-        }
-    }
+    // let req: Request = NewOrder::new("SOLUSDT", Side::Buy, "LIMIT")
+    //     .time_in_force(TimeInForce::Gtc)
+    //     .quantity(Decimal::new(1, 0))
+    //     .price(Decimal::new(2150000, 4))
+    //     .into();
+    // let res = client.send(req).await;
+    // match res {
+    //     Ok(res) => {
+    //         info!("Response: {:?}", res);
+    //     }
+    //     Err(e) => {
+    //         error!("Error: {:?}", e);
+    //     }
+    // }
     // sleep for 30 seconds
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 

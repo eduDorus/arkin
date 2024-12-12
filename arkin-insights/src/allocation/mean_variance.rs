@@ -144,6 +144,7 @@ impl Computation for MeanVarianceFeature {
                     .into()
             })
             .collect::<Vec<_>>();
+
         self.insight_state.insert_batch(&insights);
         Ok(insights)
     }
