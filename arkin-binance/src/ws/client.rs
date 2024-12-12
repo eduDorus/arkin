@@ -3,7 +3,7 @@ use async_tungstenite::{
     tungstenite::{handshake::client::Response, protocol::Message, Error},
     WebSocketStream,
 };
-use futures_util::{AsyncRead, AsyncWrite, SinkExt};
+use futures_util::{AsyncRead, AsyncWrite};
 use tracing::{debug, info};
 
 use super::Stream;

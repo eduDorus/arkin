@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity};
 
-use super::{Instrument, MarketSide, Portfolio, Strategy, VenueOrderFill};
+use super::{Instrument, MarketSide, Portfolio, VenueOrderFill};
 
 pub type ExecutionOrderId = Uuid;
 
@@ -44,7 +44,6 @@ pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
     pub portfolio: Arc<Portfolio>,
-    pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub order_type: ExecutionOrderType,
     pub side: MarketSide,

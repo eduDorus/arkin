@@ -14,9 +14,6 @@ use crate::AllocationOptimError;
 pub trait AllocationOptim: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), AllocationOptimError>;
 
-    async fn list_signals(&self) -> Result<Vec<Arc<Signal>>, AllocationOptimError>;
-
-    async fn new_signal(&self, signal: Arc<Signal>) -> Result<(), AllocationOptimError>;
-    async fn new_signals(&self, signals: Vec<Arc<Signal>>) -> Result<(), AllocationOptimError>;
+    async fn new_weights(&self, tick: Arc<AllocationTick>) -> Result<(), AllocationOptimError>;
     async fn optimize(&self, event_time: OffsetDateTime) -> Result<Vec<Arc<ExecutionOrder>>, AllocationOptimError>;
 }

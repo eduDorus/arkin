@@ -86,24 +86,24 @@ impl Algorithm for CrossoverStrategy {
         Ok(signals)
     }
 
-    async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError> {
+    async fn insight_tick(&self, _tick: Arc<InsightTick>) -> Result<(), StrategyError> {
         info!("Processing insight tick for Crossover Strategy...");
-        let signals = self
-            .insight_update(&tick.instruments, tick.event_time, tick.insights.as_slice())
-            .await?;
-        let signal_tick = SignalTick::builder()
-            .event_time(tick.event_time)
-            .instruments(tick.instruments.clone())
-            .signals(signals)
-            .build();
-        let signal_tick = Arc::new(signal_tick);
+        // let signals = self
+        //     .insight_update(&tick.instruments, tick.event_time, tick.insights.as_slice())
+        //     .await?;
+        // let signal_tick = AllocationTick::builder()
+        //     .event_time(tick.event_time)
+        //     .instruments(tick.instruments.clone())
+        //     .signals(signals)
+        //     .build();
+        // let signal_tick = Arc::new(signal_tick);
 
-        info!(
-            "Publishing signal tick: {} with {} signals",
-            signal_tick.event_time,
-            signal_tick.signals.len()
-        );
-        self.pubsub.publish::<SignalTick>(signal_tick);
+        // info!(
+        //     "Publishing signal tick: {} with {} signals",
+        //     signal_tick.event_time,
+        //     signal_tick.weight.len()
+        // );
+        // self.pubsub.publish::<AllocationTick>(signal_tick);
         Ok(())
     }
 }

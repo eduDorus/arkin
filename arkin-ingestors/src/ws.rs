@@ -8,7 +8,7 @@ use async_tungstenite::{
     WebSocketStream,
 };
 use flume::Sender;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 use tokio::{net::TcpStream, select, sync::Semaphore};
 use tokio_rustls::client::TlsStream;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};

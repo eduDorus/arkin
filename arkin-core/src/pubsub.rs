@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::{any::Any, time::Duration};
 
 use dashmap::DashMap;
+use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{debug, error, info};
@@ -60,22 +61,28 @@ impl From<Arc<InsightTick>> for Event {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
-pub struct SignalTick {
+pub struct AllocationWeight {
     pub event_time: OffsetDateTime,
-    pub instruments: Vec<Arc<Instrument>>,
-    pub signals: Vec<Arc<Signal>>,
+    pub instrument: Arc<Instrument>,
+    pub weight: Decimal,
 }
 
-impl EventTypeOf for SignalTick {
+#[derive(Debug, Clone, TypedBuilder)]
+
+pub struct AllocationTick {
+    pub event_time: OffsetDateTime,
+    pub allocations: Vec<Arc<AllocationWeight>>,
+}
+
+impl EventTypeOf for AllocationTick {
     fn event_type() -> EventType {
-        EventType::SignalTick
+        EventType::AllocationTick
     }
 }
 
-impl From<Arc<SignalTick>> for Event {
-    fn from(tick: Arc<SignalTick>) -> Self {
-        Event::SignalTick(tick)
+impl From<Arc<AllocationTick>> for Event {
+    fn from(tick: Arc<AllocationTick>) -> Self {
+        Event::AllocationTick(tick)
     }
 }
 
@@ -113,7 +120,7 @@ pub enum Event {
     Insight(Arc<Insight>),
     InsightTick(Arc<InsightTick>),
     Signal(Arc<Signal>),
-    SignalTick(Arc<SignalTick>),
+    AllocationTick(Arc<AllocationTick>),
     ExecutionOrderNew(Arc<ExecutionOrder>),
     VenueOrderNew(Arc<VenueOrder>),
     VenueOrderState(Arc<VenueOrderState>),

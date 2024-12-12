@@ -14,7 +14,6 @@ use crate::PersistenceError;
 pub struct ExecutionOrderDTO {
     pub id: Uuid,
     pub portfolio_id: Uuid,
-    pub strategy_id: Uuid,
     pub instrument_id: Uuid,
     pub order_type: ExecutionOrderType,
     pub side: MarketSide,
@@ -33,7 +32,6 @@ impl From<ExecutionOrder> for ExecutionOrderDTO {
         Self {
             id: order.id,
             portfolio_id: order.portfolio.id,
-            strategy_id: order.strategy.id,
             instrument_id: order.instrument.id,
             order_type: order.order_type,
             side: order.side,
@@ -54,7 +52,6 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
         Self {
             id: order.id,
             portfolio_id: order.portfolio.id,
-            strategy_id: order.strategy.id,
             instrument_id: order.instrument.id,
             order_type: order.order_type,
             side: order.side,
@@ -84,7 +81,6 @@ impl ExecutionOrderRepo {
             (
                 id, 
                 instance_id, 
-                strategy_id, 
                 instrument_id, 
                 order_type, 
                 side, 
@@ -96,11 +92,10 @@ impl ExecutionOrderRepo {
                 status, 
                 created_at, 
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             "#,
             order.id,
             order.portfolio_id,
-            order.strategy_id,
             order.instrument_id,
             order.order_type as ExecutionOrderType,
             order.side as MarketSide,
@@ -174,7 +169,6 @@ pub mod tests {
         let mut order = ExecutionOrder::builder()
             .id(Uuid::new_v4())
             .portfolio(test_portfolio())
-            .strategy(test_strategy())
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(ExecutionOrderType::Maker)
             .side(MarketSide::Buy)
