@@ -44,3 +44,6 @@ mkdir data
 
 # start grafana with your user id and using the data directory
 docker run -d -p 3000:3000 --user ${UID}:${GID} -v "$(pwd)/grafana:/var/lib/grafana" --name=grafana grafana/grafana-oss
+
+
+https://fapi.binance.com/fapi/v1/exchangeInfo

@@ -37,7 +37,8 @@ pub struct SimulationConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BinanceExecutionConfig {
+    pub base_url: String,
     pub api_key: String,
     pub api_secret: String,
-    pub base_url: String,
+    pub no_trade: bool,
 }

@@ -23,6 +23,7 @@ pub struct LimitedAllocationOptim {
     portfolio: Arc<dyn Accounting>,
     #[builder(default = DashMap::new())]
     optimal_allocation: DashMap<Arc<Instrument>, Arc<Insight>>,
+    leverage: Decimal,
     min_trade_value: Decimal,
     allocation_feature_id: FeatureId,
     reference_currency: Arc<Asset>,
@@ -77,10 +78,19 @@ impl AllocationOptim for LimitedAllocationOptim {
         }
 
         // Calculate money allocated to each signal
-        let capital = self.portfolio.capital(&self.reference_currency).await;
+        let capital = self.portfolio.available_balance(&self.reference_currency).await;
+        if capital.is_zero() {
+            warn!("No capital available for allocation");
+            return Ok(Vec::new());
+        }
+        let leveraged_capital = capital * self.leverage;
+        info!(
+            "Available capital for allocation: {} with {} times leverage becomes {}",
+            capital, self.leverage, leveraged_capital
+        );
 
         // Get current positions
-        let current_positions = self.portfolio.list_open_positions().await;
+        let current_positions = self.portfolio.get_positions().await;
         for (_, position) in current_positions.iter() {
             info!("Current position {}", position);
         }
@@ -88,7 +98,7 @@ impl AllocationOptim for LimitedAllocationOptim {
         // Calculate current weights
         let mut current_weights = HashMap::new();
         for (instrument, position) in current_positions.iter() {
-            let weight = position.market_value() / capital;
+            let weight = position.market_value() / leveraged_capital;
             current_weights.insert(instrument.clone(), weight);
         }
         for (instrument, weight) in current_weights.iter() {
@@ -116,7 +126,7 @@ impl AllocationOptim for LimitedAllocationOptim {
             }
         }
         for (instrument, weight) in allocation_change.iter() {
-            info!("Change to optimal allocation for {} would be {}", instrument, weight);
+            info!("Change weight for {} with {}", instrument, weight);
         }
 
         // Create execution orders
@@ -130,8 +140,36 @@ impl AllocationOptim for LimitedAllocationOptim {
                 continue;
             };
 
-            // Skip if quantity is zero
-            let value = diff.abs() * tick.mid_price();
+            // Determine order side
+            let order_side = if diff.is_sign_positive() {
+                MarketSide::Buy
+            } else {
+                MarketSide::Sell
+            };
+
+            // We need to round the price to the tick_size and then scale it to the price_precision
+            // Calculate the scaling factor: 1 / tick_size
+            let price = match MarketSide::Buy {
+                MarketSide::Buy => tick.ask_price(),
+                MarketSide::Sell => tick.bid_price(),
+            };
+            let scaling_factor = Decimal::ONE / instrument.tick_size;
+            let scaled_price = price * scaling_factor;
+            let rounded_scaled_price = scaled_price.round();
+            let rounded_price = rounded_scaled_price * instrument.tick_size;
+            let final_price = rounded_price.round_dp(instrument.price_precision);
+
+            // Calculate the quantity to trade
+            let trade_amount = leveraged_capital * diff.abs();
+            let quantity = trade_amount / final_price;
+            let scaling_factor = Decimal::ONE / instrument.lot_size;
+            let scaled_quantity = quantity * scaling_factor;
+            let rounded_scaled_quantity = scaled_quantity.round();
+            let round_quantity = rounded_scaled_quantity * instrument.lot_size;
+            let final_quantity = round_quantity.round_dp(instrument.quantity_precision);
+
+            // Skip if quantity is below minimum trade size
+            let value = final_price * final_quantity.abs();
             if value < self.min_trade_value {
                 info!(
                     "Skipping trade for {} as value of {} is below minimum trade size of {}",
@@ -140,22 +178,14 @@ impl AllocationOptim for LimitedAllocationOptim {
                 continue;
             }
 
-            // Determine order side
-            let order_side = if diff.is_sign_positive() {
-                MarketSide::Buy
-            } else {
-                MarketSide::Sell
-            };
-
-            // Create execution order
             let order = ExecutionOrder::builder()
                 .id(Uuid::new_v4())
                 .portfolio(test_portfolio())
                 .instrument(instrument.clone())
                 .order_type(ExecutionOrderType::Maker)
                 .side(order_side)
-                .quantity(diff.abs().round_dp(instrument.quantity_precision))
-                .price(Some(tick.mid_price().round_dp(instrument.price_precision)))
+                .quantity(final_quantity)
+                .price(final_price)
                 .created_at(tick.event_time)
                 .updated_at(tick.event_time)
                 .build();

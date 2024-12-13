@@ -156,7 +156,7 @@ pub fn test_venue_order() -> Arc<VenueOrder> {
         .order_type(VenueOrderType::Market)
         .time_in_force(VenueOrderTimeInForce::Gtc)
         .side(MarketSide::Buy)
-        .price(None)
+        .price(dec!(100))
         .quantity(dec!(1))
         .status(VenueOrderStatus::Placed)
         .build();
@@ -170,7 +170,7 @@ pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
         .instrument(test_inst_binance_btc_usdt_perp())
         .order_type(ExecutionOrderType::Maker)
         .side(MarketSide::Buy)
-        .price(Some(dec!(0)))
+        .price(dec!(0))
         .quantity(dec!(1))
         .status(ExecutionOrderStatus::New)
         .created_at(OffsetDateTime::now_utc())

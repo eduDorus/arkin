@@ -17,7 +17,7 @@ pub struct ExecutionOrderDTO {
     pub instrument_id: Uuid,
     pub order_type: ExecutionOrderType,
     pub side: MarketSide,
-    pub price: Option<Decimal>,
+    pub price: Decimal,
     pub quantity: Decimal,
     pub fill_price: Decimal,
     pub filled_quantity: Decimal,
@@ -172,7 +172,7 @@ pub mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(ExecutionOrderType::Maker)
             .side(MarketSide::Buy)
-            .price(Some(dec!(0)))
+            .price(dec!(0))
             .quantity(dec!(1))
             .build();
         repo.insert(order.clone().into()).await.unwrap();

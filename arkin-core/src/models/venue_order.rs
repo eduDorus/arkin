@@ -75,8 +75,7 @@ pub struct VenueOrder {
     pub order_type: VenueOrderType,
     #[builder(default = VenueOrderTimeInForce::Gtc)]
     pub time_in_force: VenueOrderTimeInForce,
-    #[builder(default = None)]
-    pub price: Option<Price>,
+    pub price: Price,
     pub quantity: Quantity,
     #[builder(default = Price::ZERO)]
     pub fill_price: Price,
@@ -168,6 +167,10 @@ impl VenueOrder {
     pub fn has_fill(&self) -> bool {
         self.filled_quantity > Quantity::ZERO
     }
+
+    pub fn total_value(&self) -> Price {
+        self.price * self.quantity * self.instrument.contract_size
+    }
 }
 
 impl From<ExecutionOrder> for VenueOrder {
@@ -207,12 +210,13 @@ impl fmt::Display for VenueOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "instrument={} side={} order_type={} price={} quantity={} status={}",
+            "instrument={} side={} order_type={} price={} quantity={} total_value={} status={}",
             self.instrument,
             self.side,
             self.order_type,
-            self.price.unwrap_or(Price::ZERO),
+            self.price,
             self.quantity,
+            self.total_value(),
             self.status
         )
     }
@@ -239,6 +243,12 @@ pub struct VenueOrderUpdate {
     pub commission: Commission,
 }
 
+impl VenueOrderUpdate {
+    pub fn total_value(&self) -> Price {
+        self.price * self.quantity * self.instrument.contract_size
+    }
+}
+
 impl EventTypeOf for VenueOrderUpdate {
     fn event_type() -> EventType {
         EventType::VenueOrderUpdate
@@ -255,8 +265,14 @@ impl fmt::Display for VenueOrderUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "instrument={} side={} order_type={} price={} quantity={} status={}",
-            self.instrument, self.side, self.order_type, self.price, self.quantity, self.status
+            "instrument={} side={} order_type={} price={} quantity={} total_value={} status={}",
+            self.instrument,
+            self.side,
+            self.order_type,
+            self.price,
+            self.quantity,
+            self.total_value(),
+            self.status
         )
     }
 }

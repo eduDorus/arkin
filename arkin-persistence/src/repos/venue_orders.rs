@@ -18,7 +18,7 @@ pub struct VenueOrderDTO {
     pub side: MarketSide,
     pub order_type: VenueOrderType,
     pub time_in_force: VenueOrderTimeInForce,
-    pub price: Option<Decimal>,
+    pub price: Decimal,
     pub quantity: Decimal,
     pub fill_price: Decimal,
     pub filled_quantity: Decimal,
@@ -177,7 +177,7 @@ pub mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Buy)
-            .price(None)
+            .price(dec!(100))
             .quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .build();

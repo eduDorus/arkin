@@ -3,7 +3,7 @@ use std::sync::Arc;
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::{debug, error};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -35,7 +35,7 @@ impl TickStore {
 
         // Convert to DTOs and insert into the database
         let ticks = ticks.into_iter().map(|t| t.into()).collect::<Vec<_>>();
-        info!("Flushing {} ticks", ticks.len());
+        debug!("Flushing {} ticks", ticks.len());
         if let Err(e) = self.tick_repo.insert_batch(ticks).await {
             error!("Failed to flush ticks: {}", e);
             return Err(e);
@@ -56,10 +56,12 @@ impl TickStore {
     }
 
     async fn update_tick_cache(&self, tick: Arc<Tick>) {
-        if let Some(tick) = self.last_tick_cache.get(&tick.instrument).await {
-            if tick.event_time < tick.event_time {
+        if let Some(cached_tick) = self.last_tick_cache.get(&tick.instrument).await {
+            if cached_tick.event_time < tick.event_time {
                 self.last_tick_cache.insert(tick.instrument.clone(), tick.clone()).await;
             }
+        } else {
+            self.last_tick_cache.insert(tick.instrument.clone(), tick.clone()).await;
         }
     }
 

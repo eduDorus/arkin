@@ -6,7 +6,7 @@ use std::{
 use async_trait::async_trait;
 use time::OffsetDateTime;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 
 use arkin_allocation::prelude::*;
@@ -111,7 +111,7 @@ impl SingleStrategyEngine {
         loop {
             tokio::select! {
                 (event_time, frequency) = time_helper.tick() => {
-                    info!("Interval tick: {}", event_time);
+                    debug!("Interval tick: {}", event_time);
                     let interval_tick = IntervalTick::builder()
                         .event_time(event_time)
                         .instruments(self.instruments.clone())

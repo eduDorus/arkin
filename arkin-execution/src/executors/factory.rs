@@ -30,6 +30,7 @@ impl ExecutorFactory {
                             .build(),
                     ))
                     .api_key(c.api_key.clone())
+                    .no_trade(c.no_trade)
                     .build(),
             ),
             _ => unimplemented!(),

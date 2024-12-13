@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc};
 
-use sqlx::{FromRow, Type};
+use rust_decimal::Decimal;
+use sqlx::Type;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::warn;
@@ -13,7 +14,7 @@ use super::{Instrument, MarketSide, Portfolio, VenueOrderFill};
 
 pub type ExecutionOrderId = Uuid;
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "execution_order_type", rename_all = "snake_case")]
 pub enum ExecutionOrderType {
@@ -24,7 +25,7 @@ pub enum ExecutionOrderType {
     ALGO,
 }
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "execution_order_status", rename_all = "snake_case")]
 pub enum ExecutionOrderStatus {
@@ -38,7 +39,7 @@ pub enum ExecutionOrderStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder, FromRow)]
+#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder, Hash)]
 
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
@@ -47,8 +48,7 @@ pub struct ExecutionOrder {
     pub instrument: Arc<Instrument>,
     pub order_type: ExecutionOrderType,
     pub side: MarketSide,
-    #[builder(default = None)]
-    pub price: Option<Price>,
+    pub price: Price,
     pub quantity: Quantity,
     #[builder(default = Price::ZERO)]
     pub fill_price: Price,
@@ -159,6 +159,10 @@ impl ExecutionOrder {
     pub fn notional(&self) -> Notional {
         self.fill_price * self.filled_quantity
     }
+
+    pub fn total_value(&self) -> Decimal {
+        self.price * self.quantity * self.instrument.contract_size
+    }
 }
 
 impl EventTypeOf for ExecutionOrder {
@@ -177,8 +181,14 @@ impl fmt::Display for ExecutionOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "ExecutionOrder: instrument={} order_type={} filled_quantity={} status={}",
-            self.instrument, self.order_type, self.filled_quantity, self.status
+            "instrument={} side={} order_type={} price={} quantity={} total_value={} status={}",
+            self.instrument,
+            self.side,
+            self.order_type,
+            self.price,
+            self.quantity,
+            self.total_value(),
+            self.status
         )
     }
 }

@@ -2,7 +2,7 @@ use rust_decimal::Decimal;
 use sqlx::Type;
 use strum::Display;
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "market_side", rename_all = "snake_case")]
 pub enum MarketSide {

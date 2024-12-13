@@ -21,6 +21,7 @@ impl AllocationFactory {
                     .pubsub(pubsub.clone())
                     .persistence(persistance)
                     .portfolio(portfolio)
+                    .leverage(c.leverage)
                     .min_trade_value(c.min_trade_value)
                     .allocation_feature_id(c.allocation_feature_id.clone())
                     .reference_currency(test_usdt_asset())

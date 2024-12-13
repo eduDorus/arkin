@@ -15,6 +15,7 @@ pub enum AllocationTypeConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LimitedConfig {
+    pub leverage: Decimal,
     pub min_trade_value: Decimal,
     pub allocation_feature_id: FeatureId,
 }

@@ -258,6 +258,17 @@ pub struct PositionUpdate {
     pub position_side: PositionSide,
 }
 
+impl PositionUpdate {
+    // TODO: This is only for perpetual swaps (For short you still post collateral)
+    pub fn market_value(&self) -> Decimal {
+        self.entry_price * self.quantity * self.instrument.contract_size
+    }
+
+    pub fn notional_value(&self) -> Decimal {
+        self.entry_price * self.quantity.abs() * self.instrument.contract_size
+    }
+}
+
 impl EventTypeOf for PositionUpdate {
     fn event_type() -> EventType {
         EventType::PositionUpdate

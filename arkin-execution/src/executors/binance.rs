@@ -32,6 +32,7 @@ pub struct BinanceExecutor {
     pub persistence: Arc<PersistenceService>,
     pub client: Arc<BinanceHttpClient>,
     pub api_key: String,
+    pub no_trade: bool,
     #[builder(default)]
     pub open_orders: DashMap<Arc<Instrument>, Uuid>,
 }
@@ -42,7 +43,7 @@ impl BinanceExecutor {
         let listen_key = match self.client.send(req).await {
             Ok(res) => {
                 // deserialize json response
-                info!("Response: {:?}", res.body);
+                debug!("Response: {:?}", res.body);
                 match serde_json::from_str::<BinanceSwapsListenKeyResponse>(&res.body) {
                     Ok(res) => res,
                     Err(e) => {
@@ -210,13 +211,14 @@ impl Executor for BinanceExecutor {
 
         let mut orders = self.pubsub.subscribe::<VenueOrder>();
 
-        // Get account balances and postitions
-        if let Err(e) = self.get_account().await {
-            error!("Failed to get account: {}", e);
-        }
-
+        // Get balances
         if let Err(e) = self.get_balances().await {
             error!("Failed to get balances: {}", e);
+        }
+
+        // Get positions
+        if let Err(e) = self.get_positions().await {
+            error!("Failed to get positions: {}", e);
         }
 
         // Get listen key
@@ -296,18 +298,23 @@ impl Executor for BinanceExecutor {
                             };
                         }
                     }
-
                 }
                 Ok(order) = orders.recv() => {
-                    info!("BinanceExecutor received order: {}", order.instrument);
+                    info!("BinanceExecutor received order: {}", order);
 
+                    if self.no_trade {
+                        info!("No trade mode enabled, skipping order");
+                        continue;
+                    }
                     // First cancel all open orders for the instrument
-                    if let Err(e) = self.cancel_orders_by_instrument(order.instrument.clone()).await {
-                        error!("Failed to cancel open orders: {}", e);
+                    match self.cancel_orders_by_instrument(order.instrument.clone()).await {
+                        Ok(_) => info!("Cancelled all open orders for instrument: {}", order.instrument),
+                        Err(e) => error!("Failed to cancel open orders: {}", e),
                     }
 
-                    if let Err(e) = self.place_order(order.clone()).await {
-                        error!("Failed to process order: {}", e);
+                    match self.place_order(order.clone()).await {
+                        Ok(_) => info!("Order placed: {}", order),
+                        Err(e) => error!("Failed to place order: {}", e),
                     }
                 }
                 _ = shutdown.cancelled() => {
@@ -470,26 +477,43 @@ impl Executor for BinanceExecutor {
     async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError> {
         self.open_orders.insert(order.instrument.clone(), order.id);
 
-        let req: Request = NewOrderRequest::builder()
-            .symbol(order.instrument.venue_symbol.clone())
-            .order_type(order.order_type.into())
-            .side(order.side.into())
-            .price(order.price)
-            .quantity(order.quantity.into())
-            .time_in_force(if order.order_type == VenueOrderType::Market {
-                None
-            } else {
-                Some(order.time_in_force.into())
-            })
-            .new_client_order_id(order.id.to_string().into())
-            .build()
-            .into();
+        let req: Request = match order.order_type {
+            VenueOrderType::Market => NewOrderRequest::builder()
+                .symbol(order.instrument.venue_symbol.clone())
+                .order_type(order.order_type.into())
+                .side(order.side.into())
+                .quantity(order.quantity.into())
+                .new_client_order_id(order.id.to_string().into())
+                .build()
+                .into(),
 
-        if let Err(e) = self.client.send(req).await {
-            error!("Error: {:?}", e);
-            return Err(ExecutorError::NetworkError(e.to_string()));
+            VenueOrderType::Limit => NewOrderRequest::builder()
+                .symbol(order.instrument.venue_symbol.clone())
+                .order_type(order.order_type.into())
+                .side(order.side.into())
+                .price(Some(order.price))
+                .quantity(order.quantity.into())
+                .new_client_order_id(order.id.to_string().into())
+                .time_in_force(Some(order.time_in_force.into()))
+                .build()
+                .into(),
+            _ => {
+                warn!("Order type not supported");
+                return Ok(());
+            }
+        };
+
+        match self.client.send(req).await {
+            Ok(res) => {
+                debug!("Response: {:?}", res.body);
+                Ok(())
+            }
+            Err(e) => {
+                self.open_orders.remove(&order.instrument);
+                error!("Error: {:?}", e);
+                return Err(ExecutorError::NetworkError(e.to_string()));
+            }
         }
-        Ok(())
     }
     async fn place_orders(&self, _orders: Vec<Arc<VenueOrder>>) -> Result<(), ExecutorError> {
         unimplemented!()
@@ -561,6 +585,7 @@ mod tests {
                         .build(),
                 ))
                 .api_key("ppCYOYKlKLRVwGCzmcbXNf2Qn34aeDEN36A4I0Fwdj8WmpvfkxO9cmNIx5PwhmOd".to_string())
+                .no_trade(true)
                 .build(),
         );
 
@@ -605,9 +630,9 @@ mod tests {
             .portfolio(test_portfolio())
             .instrument(test_inst_binance_eth_usdt_perp())
             .order_type(VenueOrderType::Limit)
-            .side(MarketSide::Buy)
-            .price(Some(dec!(3800.00)))
-            .quantity(dec!(0.01))
+            .side(MarketSide::Sell)
+            .price(dec!(3800.00))
+            .quantity(dec!(0.006))
             .build()
             .into();
 
@@ -652,7 +677,7 @@ mod tests {
             .instrument(test_inst_binance_eth_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Buy)
-            .price(None)
+            .price(dec!(0))
             .quantity(dec!(0.006))
             .build()
             .into();

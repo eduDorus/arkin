@@ -1,4 +1,3 @@
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -13,7 +12,4 @@ pub enum PortfolioType {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SingleStrategyPortfolioConfig {
-    pub initial_capital: Decimal,
-    pub leverage: Decimal,
-}
+pub struct SingleStrategyPortfolioConfig {}
