@@ -6,8 +6,9 @@ use mimalloc::MiMalloc;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 
-use arkin_binance::prelude::*;
+use arkin_binance::{prelude::*, AggTradeStream, PartialDepthStream};
 use arkin_core::prelude::*;
+use trade::CancelOpenOrdersRequest;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -76,7 +77,7 @@ async fn main() -> Result<()> {
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
     // Cancel order
-    let req: Request = CancelOpenOrders::new("SOLUSDT").into();
+    let req: Request = CancelOpenOrdersRequest::new("SOLUSDT").into();
     let res = client.send(req).await;
     match res {
         Ok(res) => {

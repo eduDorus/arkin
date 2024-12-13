@@ -1,14 +1,6 @@
 #![allow(unused)]
 use std::sync::Arc;
 
-use arkin_binance::{
-    prelude::{
-        listen_key::NewListenKey,
-        user_models::{BinancePositionSide, BinanceUSDMUserStreamEvent},
-        BinanceSwapsListenKeyResponse,
-    },
-    BinanceHttpClient, BinanceWebSocketClient, CancelOpenOrders, NewOrder, Request,
-};
 use async_trait::async_trait;
 use async_tungstenite::tungstenite::Message;
 use dashmap::DashMap;
@@ -20,6 +12,15 @@ use tracing::{debug, error, info, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
+use arkin_binance::listen_key::NewListenKey;
+use arkin_binance::models::{
+    AccountSnapshot, BalanceDetails, BinancePositionSide, BinanceSwapsListenKeyResponse, BinanceUSDMUserStreamEvent,
+    PositionDetail,
+};
+use arkin_binance::trade::{
+    AccountRequest, BalanceRequest, CancelOpenOrdersRequest, NewOrderRequest, PositionInfoRequest,
+};
+use arkin_binance::{BinanceHttpClient, BinanceWebSocketClient, Request};
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
@@ -153,7 +154,7 @@ impl BinanceExecutor {
                             .portfolio(test_portfolio())
                             .asset(asset)
                             .quantity(balance.wallet_balance)
-                            .balance_change(balance.balance_change)
+                            // .balance_change(balance.balance_change)
                             .build()
                             .into();
                         self.pubsub.publish::<BalanceUpdate>(update);
@@ -208,6 +209,15 @@ impl Executor for BinanceExecutor {
         info!("Starting Binance executor...");
 
         let mut orders = self.pubsub.subscribe::<VenueOrder>();
+
+        // Get account balances and postitions
+        if let Err(e) = self.get_account().await {
+            error!("Failed to get account: {}", e);
+        }
+
+        if let Err(e) = self.get_balances().await {
+            error!("Failed to get balances: {}", e);
+        }
 
         // Get listen key
         let mut listen_key_renewal_interval = tokio::time::interval(tokio::time::Duration::from_secs(1800));
@@ -314,10 +324,153 @@ impl Executor for BinanceExecutor {
         Ok(())
     }
 
+    async fn get_account(&self) -> Result<(), ExecutorError> {
+        let req: Request = AccountRequest::builder().build().into();
+
+        match self.client.send(req).await {
+            Ok(res) => {
+                match serde_json::from_str::<AccountSnapshot>(&res.body) {
+                    Ok(snapshot) => {
+                        for balance in &snapshot.assets {
+                            if let Ok(asset) = self.persistence.asset_store.read_by_symbol(&balance.asset).await {
+                                let update = BalanceUpdate::builder()
+                                    .event_time(balance.update_time)
+                                    .portfolio(test_portfolio())
+                                    .asset(asset)
+                                    .quantity(balance.wallet_balance)
+                                    // .balance_change(balance.balance_change)
+                                    .build()
+                                    .into();
+                                self.pubsub.publish::<BalanceUpdate>(update);
+                            }
+                        }
+                        for position in &snapshot.positions {
+                            if let Ok(instrument) =
+                                self.persistence.instrument_store.read_by_venue_symbol(&position.symbol).await
+                            {
+                                let position_side = match (position.position_side, position.position_amt) {
+                                    (BinancePositionSide::Long, _) => PositionSide::Long,
+                                    (BinancePositionSide::Short, _) => PositionSide::Short,
+                                    (BinancePositionSide::Both, q) => match q.is_sign_positive() {
+                                        true => PositionSide::Long,
+                                        false => PositionSide::Short,
+                                    },
+                                };
+                                let update = PositionUpdate::builder()
+                                    .event_time(position.update_time)
+                                    .portfolio(test_portfolio())
+                                    .instrument(instrument)
+                                    .entry_price(Decimal::ZERO)
+                                    .quantity(position.position_amt)
+                                    .realized_pnl(Decimal::ZERO)
+                                    .unrealized_pnl(position.unrealized_profit)
+                                    .position_side(position_side)
+                                    .build()
+                                    .into();
+                                self.pubsub.publish::<PositionUpdate>(update);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error: {:?}", e);
+                        return Err(ExecutorError::NetworkError(e.to_string()));
+                    }
+                }
+                Ok(())
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+                Err(ExecutorError::NetworkError(e.to_string()))
+            }
+        }
+    }
+
+    async fn get_balances(&self) -> Result<(), ExecutorError> {
+        let req: Request = BalanceRequest::builder().build().into();
+
+        match self.client.send(req).await {
+            Ok(res) => {
+                match serde_json::from_str::<Vec<BalanceDetails>>(&res.body) {
+                    Ok(balances) => {
+                        for balance in &balances {
+                            if let Ok(asset) = self.persistence.asset_store.read_by_symbol(&balance.asset).await {
+                                let update = BalanceUpdate::builder()
+                                    .event_time(balance.update_time)
+                                    .portfolio(test_portfolio())
+                                    .asset(asset)
+                                    .quantity(balance.balance)
+                                    // .balance_change(balance.balance_change)
+                                    .build()
+                                    .into();
+                                self.pubsub.publish::<BalanceUpdate>(update);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error: {:?}", e);
+                        return Err(ExecutorError::NetworkError(e.to_string()));
+                    }
+                }
+                Ok(())
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+                Err(ExecutorError::NetworkError(e.to_string()))
+            }
+        }
+    }
+
+    async fn get_positions(&self) -> Result<(), ExecutorError> {
+        let req: Request = PositionInfoRequest::builder().build().into();
+        match self.client.send(req).await {
+            Ok(res) => {
+                match serde_json::from_str::<Vec<PositionDetail>>(&res.body) {
+                    Ok(positions) => {
+                        for position in &positions {
+                            if let Ok(instrument) =
+                                self.persistence.instrument_store.read_by_venue_symbol(&position.symbol).await
+                            {
+                                let position_side = match (position.position_side, position.position_amt) {
+                                    (BinancePositionSide::Long, _) => PositionSide::Long,
+                                    (BinancePositionSide::Short, _) => PositionSide::Short,
+                                    (BinancePositionSide::Both, q) => match q.is_sign_positive() {
+                                        true => PositionSide::Long,
+                                        false => PositionSide::Short,
+                                    },
+                                };
+                                let update = PositionUpdate::builder()
+                                    .event_time(position.update_time)
+                                    .portfolio(test_portfolio())
+                                    .instrument(instrument)
+                                    .entry_price(position.entry_price)
+                                    .quantity(position.position_amt)
+                                    .realized_pnl(Decimal::ZERO)
+                                    .unrealized_pnl(position.un_realized_profit)
+                                    .position_side(position_side)
+                                    .build()
+                                    .into();
+                                self.pubsub.publish::<PositionUpdate>(update);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error: {:?}", e);
+                        return Err(ExecutorError::NetworkError(e.to_string()));
+                    }
+                }
+                Ok(())
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+                Err(ExecutorError::NetworkError(e.to_string()))
+            }
+        }
+    }
+
     async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError> {
         self.open_orders.insert(order.instrument.clone(), order.id);
 
-        let req: Request = NewOrder::builder()
+        let req: Request = NewOrderRequest::builder()
             .symbol(order.instrument.venue_symbol.clone())
             .order_type(order.order_type.into())
             .side(order.side.into())
@@ -357,7 +510,7 @@ impl Executor for BinanceExecutor {
     }
 
     async fn cancel_orders_by_instrument(&self, instrument: Arc<Instrument>) -> Result<(), ExecutorError> {
-        let req: Request = CancelOpenOrders::builder()
+        let req: Request = CancelOpenOrdersRequest::builder()
             .symbol(instrument.venue_symbol.clone())
             .build()
             .into();

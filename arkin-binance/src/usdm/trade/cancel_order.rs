@@ -15,7 +15,7 @@ use crate::http::{Credentials, Method, Request};
 ///
 /// let request = trade::cancel_order("BNBUSDT").order_id(12);
 /// ```
-pub struct CancelOrder {
+pub struct CancelOrderRequest {
     symbol: String,
     order_id: Option<u64>,
     orig_client_order_id: Option<String>,
@@ -23,7 +23,7 @@ pub struct CancelOrder {
     credentials: Option<Credentials>,
 }
 
-impl CancelOrder {
+impl CancelOrderRequest {
     pub fn new(symbol: &str) -> Self {
         Self {
             symbol: symbol.to_owned(),
@@ -55,8 +55,8 @@ impl CancelOrder {
     }
 }
 
-impl From<CancelOrder> for Request {
-    fn from(request: CancelOrder) -> Request {
+impl From<CancelOrderRequest> for Request {
+    fn from(request: CancelOrderRequest) -> Request {
         let mut params = vec![("symbol".to_owned(), request.symbol.to_string())];
 
         if let Some(order_id) = request.order_id {

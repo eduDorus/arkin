@@ -1,9 +1,9 @@
 mod allocation;
 mod asset;
+mod balance;
 mod book;
 mod common;
 mod execution_order;
-mod balance;
 mod insight;
 mod instance;
 mod instrument;
@@ -21,10 +21,10 @@ mod venue_order_fill;
 
 pub use allocation::*;
 pub use asset::*;
+pub use balance::*;
 pub use book::*;
 pub use common::*;
 pub use execution_order::*;
-pub use balance::*;
 pub use insight::*;
 pub use instance::*;
 pub use instrument::*;

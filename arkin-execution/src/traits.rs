@@ -58,7 +58,9 @@ pub trait ExecutionStrategy: Send + Sync {
 pub trait Executor: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError>;
 
-    // async fn subscribe(&self) -> Result<Receiver<Fill>, ExecutorError>;
+    async fn get_account(&self) -> Result<(), ExecutorError>;
+    async fn get_balances(&self) -> Result<(), ExecutorError>;
+    async fn get_positions(&self) -> Result<(), ExecutorError>;
 
     async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError>;
     async fn place_orders(&self, orders: Vec<Arc<VenueOrder>>) -> Result<(), ExecutorError>;

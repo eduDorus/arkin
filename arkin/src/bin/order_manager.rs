@@ -6,12 +6,13 @@ use std::{
     time::Duration,
 };
 
-use arkin_binance::prelude::*;
+use arkin_binance::{prelude::*, AggTradeStream, BookTickerStream};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use flume::{Receiver, Sender};
 use futures_util::StreamExt;
 use mimalloc::MiMalloc;
+use models::BinanceUSDMMarketEvent;
 use rust_decimal::prelude::*;
 use strum::Display;
 use time::OffsetDateTime;
@@ -21,6 +22,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
 use arkin_core::prelude::*;
+use trade::{CancelOpenOrdersRequest, CancelOrderRequest};
 
 pub static INSTRUMENT: LazyLock<Arc<Instrument>> = LazyLock::new(|| test_inst_binance_btc_usdt_perp());
 
@@ -927,7 +929,7 @@ impl Executor for BinanceExecutor {
 
         // Implement the cancel_order method for BinanceExecutor
         if let Some(order) = queue_order {
-            let req: Request = CancelOrder::new(&order.instrument)
+            let req: Request = CancelOrderRequest::new(&order.instrument)
                 .orig_client_order_id(&order.id.to_string())
                 .into();
             let res = self.client.send(req).await;
@@ -952,7 +954,7 @@ impl Executor for BinanceExecutor {
     }
 
     async fn cancel_all_orders(&self) {
-        let req: Request = CancelOpenOrders::new("SOLUSDT").into();
+        let req: Request = CancelOpenOrdersRequest::new("SOLUSDT").into();
         let res = self.client.send(req).await;
         match res {
             Ok(res) => {

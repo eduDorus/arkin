@@ -8,12 +8,9 @@ pub use http::{BinanceHttpClient, BinanceHttpClientError, Credentials, Method, R
 pub use ws::{BinanceWebSocketClient, Stream};
 
 pub use usdm::market_stream::*;
-pub use usdm::trade::*;
+pub use usdm::*;
 
 pub mod prelude {
-    pub use crate::usdm::market_models::*;
-    pub use crate::usdm::market_stream::*;
-    pub use crate::usdm::trade::*;
     pub use crate::usdm::*;
     pub use crate::ws::{BinanceWebSocketClient, Stream, WebSocketState};
     pub use crate::{BinanceHttpClient, BinanceHttpClientError, Credentials, Method, Request, Response};

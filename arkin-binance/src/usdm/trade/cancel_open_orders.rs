@@ -17,7 +17,7 @@ use crate::http::{Credentials, Method, Request};
 /// let request = trade::cancel_open_orders("BNBUSDT");
 /// ```
 #[derive(TypedBuilder)]
-pub struct CancelOpenOrders {
+pub struct CancelOpenOrdersRequest {
     symbol: String,
     #[builder(default)]
     recv_window: Option<u64>,
@@ -25,7 +25,7 @@ pub struct CancelOpenOrders {
     credentials: Option<Credentials>,
 }
 
-impl CancelOpenOrders {
+impl CancelOpenOrdersRequest {
     pub fn new(symbol: &str) -> Self {
         Self {
             symbol: symbol.to_owned(),
@@ -45,8 +45,8 @@ impl CancelOpenOrders {
     }
 }
 
-impl From<CancelOpenOrders> for Request {
-    fn from(request: CancelOpenOrders) -> Request {
+impl From<CancelOpenOrdersRequest> for Request {
+    fn from(request: CancelOpenOrdersRequest) -> Request {
         let mut params = vec![("symbol".to_owned(), request.symbol.to_string())];
 
         if let Some(recv_window) = request.recv_window {

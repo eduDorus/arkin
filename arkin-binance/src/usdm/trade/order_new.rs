@@ -36,7 +36,7 @@ use super::order::{NewOrderResponseType, OrderType, Side, TimeInForce};
 ///     .quantity(dec!(0.1));
 /// ```
 #[derive(TypedBuilder)]
-pub struct NewOrder {
+pub struct NewOrderRequest {
     symbol: String,
     side: Side,
     order_type: OrderType,
@@ -64,7 +64,7 @@ pub struct NewOrder {
     credentials: Option<Credentials>,
 }
 
-impl NewOrder {
+impl NewOrderRequest {
     pub fn time_in_force(mut self, time_in_force: TimeInForce) -> Self {
         self.time_in_force = Some(time_in_force);
         self
@@ -121,8 +121,8 @@ impl NewOrder {
     }
 }
 
-impl From<NewOrder> for Request {
-    fn from(request: NewOrder) -> Request {
+impl From<NewOrderRequest> for Request {
+    fn from(request: NewOrderRequest) -> Request {
         let mut params = vec![
             ("symbol".to_owned(), request.symbol),
             ("side".to_owned(), request.side.to_string()),

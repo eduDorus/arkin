@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
-use tracing::{debug, error};
+use tracing::{error, info};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -26,7 +26,7 @@ impl InsightsStore {
         };
 
         let insights = insights.into_iter().map(|t| t.into()).collect::<Vec<_>>();
-        debug!("Flushing {} insights", insights.len());
+        info!("Flushing {} insights", insights.len());
         if let Err(e) = self.insights_repo.insert_batch(insights).await {
             error!("Failed to flush ticks: {}", e);
             return Err(e);

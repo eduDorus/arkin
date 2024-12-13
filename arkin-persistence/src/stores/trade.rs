@@ -3,7 +3,7 @@ use std::sync::Arc;
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
-use tracing::{debug, error};
+use tracing::{error, info};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -35,7 +35,7 @@ impl TradeStore {
 
         // Convert to DTOs and insert into the database
         let trades = trades.into_iter().map(|t| t.into()).collect::<Vec<_>>();
-        debug!("Flushing {} trades", trades.len());
+        info!("Flushing {} trades", trades.len());
         if let Err(e) = self.trade_repo.insert_batch(trades).await {
             error!("Failed to flush trades: {}", e);
             return Err(e);
