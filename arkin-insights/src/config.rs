@@ -216,4 +216,5 @@ pub struct MeanVarianceConfig {
     pub max_exposure_long_per_asset: f64,
     pub max_exposure_short: f64,
     pub max_exposure_short_per_asset: f64,
+    pub transaction_cost: f64,
 }

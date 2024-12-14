@@ -1,27 +1,55 @@
 #![allow(non_snake_case)]
+use std::vec;
+
+use arkin_core::prelude::init_tracing;
 use clarabel::algebra::*;
 use clarabel::solver::*;
 use statrs::statistics::Statistics;
+use tracing::debug;
+use tracing::info;
 use typed_builder::TypedBuilder;
 
 const RISK_FREE_RATE: f64 = 0.00;
 
 fn main() {
+    init_tracing();
     let u = vec![inst_ret_1(), inst_ret_2(), inst_ret_3()];
 
-    let mu = [inst_ret_1().std_dev(), -inst_ret_2().std_dev(), inst_ret_3().std_dev()]; // expected returns
-    let mu = mu.iter().map(|r| (r * 10.) / 4.).collect::<Vec<_>>();
-    println!("Expected Returns: {:?}", mu);
+    let mu = [
+        inst_ret_2().first().unwrap() * 5. + 0.001,
+        inst_ret_1().first().unwrap() * 5.,
+        inst_ret_3().first().unwrap() * 5.,
+    ];
+    info!("Expected Returns: {:.5?}", mu);
 
-    let mvo = MeanVarianceOptimization::builder()
-        .lambda(0.00005)
-        .max_exposure_long(0.8)
-        .max_exposure_short(0.8)
-        .max_long_per_asset(0.3)
-        .max_short_per_asset(0.3)
-        .build();
+    let w0 = vec![-0.00000, -0.00000, 0.41679];
+    info!("Initial Weights: {:.5?}", w0);
 
-    mvo.solve(u, mu);
+    // run from 1000 to 10000 in steps of 100
+    for lamba in (0..=10).step_by(1) {
+        let mvo = MeanVarianceOptimization::builder()
+            .lambda(lamba as f64)
+            .max_exposure_long(0.9)
+            .max_exposure_short(0.9)
+            .max_long_per_asset(0.5)
+            .max_short_per_asset(0.5)
+            .transaction_cost(0.0010)
+            .risk_free_rate(RISK_FREE_RATE)
+            .build();
+
+        mvo.solve(&u, &mu, &w0);
+    }
+    // let mvo = MeanVarianceOptimization::builder()
+    //     .lambda(5000.0)
+    //     .max_exposure_long(0.8)
+    //     .max_exposure_short(0.8)
+    //     .max_long_per_asset(0.5)
+    //     .max_short_per_asset(0.5)
+    //     .transaction_cost(0.0006)
+    //     .risk_free_rate(RISK_FREE_RATE)
+    //     .build();
+
+    // mvo.solve(&u, &mu, &w0);
 }
 
 #[derive(Debug, TypedBuilder)]
@@ -31,40 +59,42 @@ pub struct MeanVarianceOptimization {
     max_exposure_short: f64,
     max_long_per_asset: f64,
     max_short_per_asset: f64,
+    transaction_cost: f64,
+    risk_free_rate: f64,
 }
 
 impl MeanVarianceOptimization {
-    pub fn solve(&self, u: Vec<Vec<f64>>, mu: Vec<f64>) -> Vec<f64> {
-        let lambda = self.lambda;
+    pub fn solve(&self, u: &[Vec<f64>], mu: &[f64], w0: &[f64]) -> Vec<f64> {
+        // Scale lambda to be in the range of 0.0 to 1.0
+        let lambda = self.lambda * 1000.0;
 
         let n = mu.len();
 
         // Assemble the covariance matrix
-        let covariance_matrix = compute_covariance_matrix(&u);
+        let covariance_matrix = compute_covariance_matrix(u);
 
-        for row in &covariance_matrix {
-            for val in row {
-                print!("{:.5} ", val);
-            }
-            println!();
-        }
-
+        debug!("Covariance Matrix: {:.5?}", covariance_matrix);
         // Problem definition
-        let P_data = covariance_matrix
-            .iter()
-            .map(|row| row.iter().map(|val| 2.0 * val).collect())
-            .collect::<Vec<Vec<f64>>>();
-        let P = CscMatrix::from(&P_data);
+        let mut col = Vec::new();
+        let mut row = Vec::new();
+        let mut val = Vec::new();
+
+        for row_ptr in 0..n {
+            for col_ptr in 0..n {
+                col.push(col_ptr);
+                row.push(row_ptr);
+                val.push(2. * lambda * covariance_matrix[row_ptr][col_ptr]);
+            }
+        }
+        let P = CscMatrix::new_from_triplets(2 * n, 2 * n, col, row, val);
+        debug!("P: {:?}", P);
 
         // Linear coefficients
-        // let q = vec![0., 0., 0., 0., 0.];
-        let q: Vec<f64> = mu.iter().map(|r| -lambda * r).collect();
-        // Minimize the portfolio variance
-        // q.iter_mut().enumerate().for_each(|(i, w)| *w += -gamma * forecast_var[i]);
-        // q.iter_mut().enumerate().for_each(|(i, w)| *w -= tau * prev_weights[i]);
+        let mut q = mu.iter().map(|r| -r).collect::<Vec<_>>();
+        q.extend(vec![self.transaction_cost; n]);
 
         // Constraints
-        let (A, b, cones) = self.create_constraints(n);
+        let (A, b, cones) = self.create_constraints(n, w0);
 
         // Solve the problem
         let mut settings = DefaultSettings::default();
@@ -73,82 +103,123 @@ impl MeanVarianceOptimization {
         let mut solver = DefaultSolver::new(&P, &q, &A, &b, &cones, settings);
         solver.solve();
 
-        let weights = solver.solution.x;
-        for (i, w) in weights.iter().enumerate() {
-            println!("Asset {}: {}%", i, (w * 100.).round());
+        let weights_z = solver.solution.x;
+
+        // Step 6: Retrieve and Process the Solution
+        let w = &weights_z[0..n];
+        let z = &weights_z[n..2 * n];
+
+        debug!("Transaction Costs (z_i)");
+        for (i, z_i) in z.iter().enumerate() {
+            debug!("Absolute difference {}: {:.2}", i, z_i);
         }
-        println!("Sum of weights: {:.5}", weights.iter().sum::<f64>());
-        println!(
+        debug!("Sum of weights: {:.5}", w.iter().sum::<f64>());
+        debug!(
             "Solution Status: {:?} with {:?} iterations",
             solver.solution.status, solver.solution.iterations
         );
 
-        let expected_return = weights.iter().zip(mu.iter()).map(|(w, r)| w * r).sum::<f64>();
-        let portfolio_variance = compute_portfolio_variance(&weights, &covariance_matrix);
+        let expected_return = compute_portfolio_return(&w, mu);
+        let portfolio_variance = compute_portfolio_variance(&w, &covariance_matrix);
         let risk = portfolio_variance.sqrt();
-        let sharpe = compute_sharpe_ratio(expected_return, portfolio_variance);
-        println!("Expected Return: {:.5}", expected_return);
-        println!("Portfolio Variance: {:.5}", portfolio_variance);
-        println!("Risk: {:.5}", risk);
-        println!("Sharpe Ratio: {:.5}", sharpe);
-        weights
+        let sharp = compute_sharpe_ratio(expected_return, portfolio_variance, self.risk_free_rate);
+        debug!("Expected Return: {:.5}", expected_return);
+        debug!("Portfolio Variance: {:.5}", portfolio_variance);
+        debug!("Risk: {:.5}", risk);
+        debug!("Sharp Ratio: {:.5}", sharp);
+
+        info!(
+            "Optimal Allocation with lambda: {} ({:.5?}) turnover: {:.5?} return {:.5?} risk: {:.5?} sharpe: {:.5?}",
+            self.lambda,
+            w,
+            z.sum(),
+            expected_return,
+            risk,
+            sharp,
+        );
+        w.to_vec()
     }
 
-    fn create_constraints(&self, n: usize) -> (CscMatrix<f64>, Vec<f64>, [SupportedConeT<f64>; 1]) {
-        let m = 2 + 2 * n;
+    fn create_constraints(&self, n: usize, w0: &[f64]) -> (CscMatrix<f64>, Vec<f64>, [SupportedConeT<f64>; 1]) {
+        // Total constraints:
+        // 1. Sum of weights <= max_exposure_long
+        // 2. Sum of -weights <= max_exposure_short
+        // 3. Each w_i <= max_long_per_asset (n constraints)
+        // 4. Each -w_i <= max_short_per_asset (n constraints)
+        // 5. For each asset, two constraints for |w_i - w0_i| <= z_i (2n constraints)
+        let m = 2 + 4 * n; // 2 + 4n
+
         let max_exposure_long = self.max_exposure_long;
         let max_exposure_short = self.max_exposure_short;
         let max_long_per_asset = self.max_long_per_asset;
         let max_short_per_asset = self.max_short_per_asset;
 
-        let mut I = Vec::with_capacity(m);
-        let mut J = Vec::with_capacity(n);
+        let mut I = Vec::new(); // Estimating non-zero entries
+        let mut J = Vec::new();
         let mut V = Vec::new();
 
-        // Max allocation constraint
+        let mut b = Vec::new();
+
+        // Constraint 1: Sum of weights <= max_exposure_long
         for i in 0..n {
-            let column = i;
-            let row = 0;
-            let val = 1.0;
-            I.push(row);
-            J.push(column);
-            V.push(val);
+            I.push(0); // Row for this constraint
+            J.push(i); // Column for w_i
+            V.push(1.0); // Coefficient for w_i
+        }
+        b.push(max_exposure_long);
+
+        // Constraint 2: Sum of -weights <= max_exposure_short
+        for i in 0..n {
+            I.push(1); // Row for this constraint
+            J.push(i); // Column for w_i
+            V.push(-1.0); // Coefficient for w_i
+        }
+        b.push(max_exposure_short);
+
+        // Constraint 3: w_i <= max_long_per_asset
+        for i in 0..n {
+            I.push(2 + i);
+            J.push(i);
+            V.push(1.0);
+            b.push(max_long_per_asset);
         }
 
+        // Constraint 4: -w_i <= max_short_per_asset
         for i in 0..n {
-            let column = i;
-            let row = 1;
-            let val = -1.0;
-            I.push(row);
-            J.push(column);
-            V.push(val);
+            I.push(2 + n + i);
+            J.push(i);
+            V.push(-1.0);
+            b.push(max_short_per_asset);
         }
 
-        // Max long constraint
+        // Constraint 5: For each asset, two constraints for |w_i - w0_i| <= z_i
         for i in 0..n {
-            let column = i;
-            let row = i + 2;
-            let val = 1.0;
-            I.push(row);
-            J.push(column);
-            V.push(val);
+            I.push(2 + 2 * n + i); // Row for this constraint
+            J.push(i); // Column for w_i
+            V.push(1.0); // Coefficient for w_i
+
+            I.push(2 + 2 * n + i); // Row for this constraint
+            J.push(n + i); // Column for z_i
+            V.push(-1.0); // Coefficient for z_i
+            b.push(w0[i]); // RHS
         }
 
-        // Max short constraint
+        // Constraint 6: For each asset, two constraints for |-w_i - w0_i| <= z_i
         for i in 0..n {
-            let column = i;
-            let row = i + n + 2;
-            let val = -1.0;
-            I.push(row);
-            J.push(column);
-            V.push(val);
+            // Constraint 2: -w_i - z_i <= -w0_i
+            I.push(2 + n * 3 + i); // Row for this constraint
+            J.push(i); // Column for w_i
+            V.push(-1.0); // Coefficient for w_i
+
+            I.push(2 + n * 3 + i); // Row for this constraint
+            J.push(n + i); // Column for z_i
+            V.push(-1.0); // Coefficient for z_i
+            b.push(-w0[i]); // RHS
         }
 
-        let A = CscMatrix::new_from_triplets(m, n, I, J, V);
+        debug!("A Shape: {} {}", I.len(), J.len());
 
-        let mut b = vec![max_exposure_long, max_exposure_short];
-        b.extend(vec![max_long_per_asset; n]);
-        b.extend(vec![max_short_per_asset; n]);
+        let A = CscMatrix::new_from_triplets(m, 2 * n, I, J, V);
 
         let cones = [NonnegativeConeT(m)];
 
@@ -157,7 +228,7 @@ impl MeanVarianceOptimization {
 }
 
 /// Function to compute the covariance matrix from data
-fn compute_covariance_matrix(u: &Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+fn compute_covariance_matrix(u: &[Vec<f64>]) -> Vec<Vec<f64>> {
     u.iter()
         .enumerate()
         .map(|(i, _)| {
@@ -169,8 +240,12 @@ fn compute_covariance_matrix(u: &Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         .collect::<Vec<Vec<_>>>()
 }
 
+fn compute_portfolio_return(weights: &[f64], expected_return: &[f64]) -> f64 {
+    weights.iter().zip(expected_return.iter()).map(|(w, r)| w * r).sum()
+}
+
 /// Function to compute portfolio variance: w^T * Sigma * w
-fn compute_portfolio_variance(weights: &Vec<f64>, covariance_matrix: &Vec<Vec<f64>>) -> f64 {
+fn compute_portfolio_variance(weights: &[f64], covariance_matrix: &Vec<Vec<f64>>) -> f64 {
     let mut variance = 0.0;
     let n = weights.len();
     for i in 0..n {
@@ -181,8 +256,8 @@ fn compute_portfolio_variance(weights: &Vec<f64>, covariance_matrix: &Vec<Vec<f6
     variance
 }
 
-fn compute_sharpe_ratio(expected_return: f64, portfolio_variance: f64) -> f64 {
-    (expected_return - RISK_FREE_RATE) / portfolio_variance.sqrt()
+fn compute_sharpe_ratio(expected_return: f64, portfolio_variance: f64, risk_free_rate: f64) -> f64 {
+    (expected_return - risk_free_rate) / portfolio_variance.sqrt()
 }
 
 fn inst_ret_1() -> Vec<f64> {

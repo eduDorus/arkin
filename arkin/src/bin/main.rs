@@ -55,7 +55,7 @@ async fn main() {
     info!("Executor created");
 
     // Work around for fetching instruments
-    let venue_symbols = vec!["ETHUSDT"];
+    let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
     let mut instruments = vec![];
     for symbol in venue_symbols {
         match persistence.instrument_store.read_by_venue_symbol(symbol).await {

@@ -172,6 +172,7 @@ impl FeatureFactory {
                             .max_exposure_short(c.max_exposure_short)
                             .max_exposure_long_per_asset(c.max_exposure_long_per_asset)
                             .max_exposure_short_per_asset(c.max_exposure_short_per_asset)
+                            .transaction_cost(c.transaction_cost)
                             .build(),
                     ),
                 };
