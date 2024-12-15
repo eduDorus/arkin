@@ -70,7 +70,7 @@ impl InsightsRepo {
         Ok(())
     }
 
-    pub async fn insert_batch(&self, insights: Vec<InsightDTO>) -> Result<(), PersistenceError> {
+    pub async fn insert_batch(&self, insights: &[InsightDTO]) -> Result<(), PersistenceError> {
         // Build batched insert queries
         for batch in insights.chunks(BIND_LIMIT / FIELD_COUNT) {
             // Create a query builder

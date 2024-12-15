@@ -25,15 +25,25 @@ impl InsightsStore {
             std::mem::take(&mut *lock) // Take ownership and clear the vector
         };
 
+        // If there are no insights to flush, return early
+        if insights.is_empty() {
+            info!("No insights to flush.");
+            return Ok(());
+        }
+
         let repo = self.insights_repo.clone();
+        let insights = insights.into_iter().map(|t| t.into()).collect::<Vec<_>>();
+
         tokio::spawn(async move {
-            let insights = insights.into_iter().map(|t| t.into()).collect::<Vec<_>>();
             info!("Flushing {} insights", insights.len());
 
             // Insert the insights into the database
             loop {
-                match repo.insert_batch(insights.clone()).await {
-                    Ok(_) => break,
+                match repo.insert_batch(&insights).await {
+                    Ok(_) => {
+                        info!("Successfully flushed {} insights", insights.len());
+                        break;
+                    }
                     Err(_) => {
                         error!("Failed to flush insights, will try again in 5 seconds");
                         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -74,7 +84,7 @@ impl InsightsStore {
             let mut lock = self.insights_buffer.lock().await; // Wait for lock
             lock.extend(insights);
         }
-
-        self.commit().await
+        Ok(())
+        // self.commit().await
     }
 }
