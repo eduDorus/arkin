@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
+use sqlx::ConnectOptions;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
@@ -42,7 +43,9 @@ impl PersistenceService {
             .username(&db_config.user)
             .password(&db_config.password)
             .database(&db_config.database)
-            .ssl_mode(PgSslMode::Prefer);
+            .ssl_mode(PgSslMode::Prefer)
+            .log_statements("DEBUG".parse().unwrap())
+            .log_slow_statements("DEBUG".parse().unwrap(), Duration::from_secs(300));
 
         let pool = PgPoolOptions::new()
             .min_connections(db_config.min_connections)

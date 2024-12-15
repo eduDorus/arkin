@@ -13,7 +13,7 @@ use crate::{PersistenceError, BIND_LIMIT};
 
 const FIELD_COUNT: usize = 6;
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, Clone, FromRow)]
 pub struct InsightDTO {
     pub id: Uuid,
     pub event_time: OffsetDateTime,

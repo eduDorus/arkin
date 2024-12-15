@@ -136,7 +136,7 @@ impl Insights for InsightsService {
         instruments: &[Arc<Instrument>],
         publish: bool,
     ) -> Result<Vec<Arc<Insight>>, InsightsError> {
-        info!("Running insights pipeline at event time: {}", event_time);
+        debug!("Running insights pipeline at event time: {}", event_time);
         let insights = self.graph.calculate(instruments, event_time);
         let insights_tick = InsightTick::builder()
             .event_time(event_time)
@@ -146,7 +146,7 @@ impl Insights for InsightsService {
         let insights_tick = Arc::new(insights_tick);
 
         if publish {
-            info!(
+            debug!(
                 "Publishing insights tick: {} with {} insights",
                 insights_tick.event_time,
                 insights.len()

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
-use tracing::{debug, error};
+use tracing::{error, info};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -25,12 +25,22 @@ impl InsightsStore {
             std::mem::take(&mut *lock) // Take ownership and clear the vector
         };
 
-        let insights = insights.into_iter().map(|t| t.into()).collect::<Vec<_>>();
-        debug!("Flushing {} insights", insights.len());
-        if let Err(e) = self.insights_repo.insert_batch(insights).await {
-            error!("Failed to flush ticks: {}", e);
-            return Err(e);
-        }
+        let repo = self.insights_repo.clone();
+        tokio::spawn(async move {
+            let insights = insights.into_iter().map(|t| t.into()).collect::<Vec<_>>();
+            info!("Flushing {} insights", insights.len());
+
+            // Insert the insights into the database
+            loop {
+                match repo.insert_batch(insights.clone()).await {
+                    Ok(_) => break,
+                    Err(_) => {
+                        error!("Failed to flush insights, will try again in 5 seconds");
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    }
+                }
+            }
+        });
         Ok(())
     }
 
