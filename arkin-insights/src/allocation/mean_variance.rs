@@ -13,7 +13,6 @@ use tracing::warn;
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
-use uuid::Uuid;
 
 use crate::{state::InsightsState, Computation};
 
@@ -142,7 +141,6 @@ impl Computation for MeanVarianceFeature {
             .zip(weights.iter())
             .map(|(i, w)| {
                 Insight::builder()
-                    .id(Uuid::new_v4())
                     .event_time(event_time)
                     .pipeline(self.pipeline.clone())
                     .instrument(Some(i.clone()))

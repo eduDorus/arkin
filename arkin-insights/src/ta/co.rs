@@ -7,7 +7,6 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 use yata::{
     helpers::MA,
     indicators::{ChaikinOscillator, ChaikinOscillatorInstance},
@@ -56,7 +55,6 @@ impl Computation for ChaikinOscillatorFeature {
                     }
                     let value = Decimal::from_f64(values[0])?;
                     let insight = Insight::builder()
-                        .id(Uuid::new_v4())
                         .event_time(timestamp)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))

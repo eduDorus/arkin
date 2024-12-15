@@ -10,7 +10,6 @@ use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
-use uuid::Uuid;
 
 use crate::{state::InsightsState, Computation};
 
@@ -119,7 +118,6 @@ impl Computation for CatBoostFeature {
                 // Return insight
                 Some(
                     Insight::builder()
-                        .id(Uuid::new_v4())
                         .event_time(event_time)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))

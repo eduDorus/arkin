@@ -5,17 +5,16 @@ use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 
 use arkin_core::Insight;
+use uuid::Uuid;
 
 use crate::{PersistenceError, BIND_LIMIT};
 
-const FIELD_COUNT: usize = 6;
+const FIELD_COUNT: usize = 5;
 
 #[derive(Debug, Clone, FromRow)]
 pub struct InsightDTO {
-    pub id: Uuid,
     pub event_time: OffsetDateTime,
     pub pipeline_id: Uuid,
     pub instrument_id: Option<Uuid>,
@@ -26,7 +25,6 @@ pub struct InsightDTO {
 impl From<Arc<Insight>> for InsightDTO {
     fn from(insight: Arc<Insight>) -> Self {
         Self {
-            id: insight.id,
             event_time: insight.event_time,
             pipeline_id: insight.pipeline.id,
             instrument_id: insight.instrument.as_ref().map(|i| i.id),
@@ -48,17 +46,15 @@ impl InsightsRepo {
             r#"
             INSERT INTO insights 
             (
-                id,
                 event_time, 
                 pipeline_id,
                 instrument_id, 
                 feature_id, 
                 value
-            ) VALUES ($1, $2, $3, $4, $5, $6)
+            ) VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (event_time, pipeline_id, instrument_id, feature_id)
             DO UPDATE SET value = EXCLUDED.value
             "#,
-            insight.id,
             insight.event_time,
             insight.pipeline_id,
             insight.instrument_id,
@@ -78,7 +74,6 @@ impl InsightsRepo {
                 r#"
                 INSERT INTO insights 
                 (
-                    id,
                     event_time, 
                     pipeline_id,
                     instrument_id, 
@@ -93,8 +88,7 @@ impl InsightsRepo {
                 // If you wanted to bind these by-reference instead of by-value,
                 // you'd need an iterator that yields references that live as long as `query_builder`,
                 // e.g. collect it to a `Vec` first.
-                b.push_bind(insight.id)
-                    .push_bind(insight.event_time)
+                b.push_bind(insight.event_time)
                     .push_bind(insight.pipeline_id)
                     .push_bind(insight.instrument_id)
                     .push_bind(insight.feature_id.clone())

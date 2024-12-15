@@ -7,7 +7,6 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 use yata::{
     methods::{DMA, EMA, SMA, TMA},
     prelude::*,
@@ -63,7 +62,6 @@ impl Computation for MovingAverageFeature {
                             let sma_value = sma.next(&value_f64);
                             let sma_value = Decimal::from_f64(sma_value)?;
                             let insight = Insight::builder()
-                                .id(Uuid::new_v4())
                                 .event_time(timestamp)
                                 .pipeline(self.pipeline.clone())
                                 .instrument(Some(instrument.clone()))
@@ -82,7 +80,6 @@ impl Computation for MovingAverageFeature {
                             let ema_value = ema.next(&value_f64);
                             let ema_value = Decimal::from_f64(ema_value)?;
                             let insight = Insight::builder()
-                                .id(Uuid::new_v4())
                                 .event_time(timestamp)
                                 .pipeline(self.pipeline.clone())
                                 .instrument(Some(instrument.clone()))
@@ -101,7 +98,6 @@ impl Computation for MovingAverageFeature {
                             let dma_value = dma.next(&value_f64);
                             let dma_value = Decimal::from_f64(dma_value)?;
                             let insight = Insight::builder()
-                                .id(Uuid::new_v4())
                                 .event_time(timestamp)
                                 .pipeline(self.pipeline.clone())
                                 .instrument(Some(instrument.clone()))
@@ -120,7 +116,6 @@ impl Computation for MovingAverageFeature {
                             let tma_value = tma.next(&value_f64);
                             let tma_value = Decimal::from_f64(tma_value)?;
                             let insight = Insight::builder()
-                                .id(Uuid::new_v4())
                                 .event_time(timestamp)
                                 .pipeline(self.pipeline.clone())
                                 .instrument(Some(instrument.clone()))

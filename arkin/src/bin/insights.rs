@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
 
     info!("Loaded {} instruments.", instruments.len());
 
-    let start = datetime!(2024-09-05 00:00).assume_utc();
+    let start = datetime!(2024-01-01 00:00).assume_utc();
     let end = datetime!(2024-12-10 00:00).assume_utc();
     let mut current_day = start.date() - Duration::from_secs(config.state_lookback);
     let frequency_secs = Duration::from_secs(config.frequency_secs);
@@ -68,10 +68,6 @@ async fn main() -> Result<()> {
             let lookback = Duration::from_secs(86400);
             let next_day = tick_end.replace_time(time::macros::time!(00:00:00)) + lookback;
             insights_service.remove(next_day - lookback).await?;
-
-            // Wait 1 second (To reduce db pressure)
-            info!("Waiting for db to catch up...");
-            tokio::time::sleep(Duration::from_secs(15)).await;
 
             // Load the data
             info!("Loading insights from {} till {}", next_day - lookback, next_day);

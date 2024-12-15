@@ -3,7 +3,6 @@ use std::{fmt, sync::Arc};
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 
 use crate::{Event, EventType, EventTypeOf, FeatureId};
 
@@ -12,8 +11,6 @@ use super::{Instrument, Pipeline};
 #[derive(Debug, Clone, TypedBuilder)]
 
 pub struct Insight {
-    #[builder(default = Uuid::new_v4())]
-    pub id: Uuid,
     pub event_time: OffsetDateTime,
     pub pipeline: Arc<Pipeline>,
     pub instrument: Option<Arc<Instrument>>,

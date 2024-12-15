@@ -6,7 +6,6 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
@@ -52,7 +51,6 @@ impl Computation for TimeFeature {
             .filter_map(|instrument| {
                 Some(vec![
                     Insight::builder()
-                        .id(Uuid::new_v4())
                         .event_time(event_time)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
@@ -61,7 +59,6 @@ impl Computation for TimeFeature {
                         .build()
                         .into(),
                     Insight::builder()
-                        .id(Uuid::new_v4())
                         .event_time(event_time)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
@@ -70,7 +67,6 @@ impl Computation for TimeFeature {
                         .build()
                         .into(),
                     Insight::builder()
-                        .id(Uuid::new_v4())
                         .event_time(event_time)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
@@ -79,7 +75,6 @@ impl Computation for TimeFeature {
                         .build()
                         .into(),
                     Insight::builder()
-                        .id(Uuid::new_v4())
                         .event_time(event_time)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))

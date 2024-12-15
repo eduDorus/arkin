@@ -6,7 +6,6 @@ use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
@@ -65,7 +64,6 @@ impl Computation for SignalStrengthFeature {
 
                 Some(
                     Insight::builder()
-                        .id(Uuid::new_v4())
                         .event_time(event_time)
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
