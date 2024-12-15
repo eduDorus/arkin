@@ -40,7 +40,12 @@ impl InsightsService {
             .await
             .expect("Could not find pipeline");
         let state = Arc::new(InsightsState::default());
-        let features = FeatureFactory::from_config(&config.pipeline.features, pipeline.clone(), state.clone());
+        let features = FeatureFactory::from_config(
+            &config.pipeline.features,
+            pipeline.clone(),
+            state.clone(),
+            config.scale_periods,
+        );
 
         Self {
             state,
@@ -121,7 +126,7 @@ impl Insights for InsightsService {
     async fn remove(&self, event_time: OffsetDateTime) -> Result<(), InsightsError> {
         let last_time = event_time - self.state_lookback;
         self.state.remove(last_time);
-        debug!("Removed insights before {}", last_time);
+        info!("Removed insights before {}", last_time);
         Ok(())
     }
 

@@ -22,6 +22,7 @@ impl FeatureFactory {
         configs: &[FeatureConfig],
         pipeline: Arc<Pipeline>,
         state: Arc<InsightsState>,
+        scale_periods: usize,
     ) -> Vec<Box<dyn Computation>> {
         // Create nodes
         configs
@@ -69,7 +70,7 @@ impl FeatureFactory {
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods(c.periods)
+                            .periods(c.periods * scale_periods)
                             .build(),
                     ),
                     FeatureConfig::StdDev(c) => Box::new(
@@ -78,7 +79,7 @@ impl FeatureFactory {
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods(c.periods)
+                            .periods(c.periods * scale_periods)
                             .build(),
                     ),
                     FeatureConfig::Sum(c) => Box::new(
@@ -87,7 +88,7 @@ impl FeatureFactory {
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods(c.periods)
+                            .periods(c.periods * scale_periods)
                             .build(),
                     ),
                     FeatureConfig::SignalStrength(c) => Box::new(
@@ -106,7 +107,7 @@ impl FeatureFactory {
                             .ma_type(c.ma_type.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods(c.periods)
+                            .periods(c.periods * scale_periods)
                             .build(),
                     ),
                     FeatureConfig::RSI(c) => Box::new(
@@ -115,7 +116,7 @@ impl FeatureFactory {
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods(c.periods)
+                            .periods(c.periods * scale_periods)
                             .build(),
                     ),
                     FeatureConfig::ADX(c) => Box::new(
@@ -124,7 +125,7 @@ impl FeatureFactory {
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods(c.periods)
+                            .periods(c.periods * scale_periods)
                             .build(),
                     ),
                     FeatureConfig::CMF(c) => Box::new(
@@ -133,7 +134,7 @@ impl FeatureFactory {
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods(c.periods)
+                            .periods(c.periods * scale_periods)
                             .build(),
                     ),
                     FeatureConfig::CO(c) => Box::new(
@@ -142,8 +143,8 @@ impl FeatureFactory {
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods_fast(c.periods_fast)
-                            .periods_slow(c.periods_slow)
+                            .periods_fast(c.periods_fast * scale_periods)
+                            .periods_slow(c.periods_slow * scale_periods)
                             .build(),
                     ),
                     FeatureConfig::CatBoost(c) => Box::new(
@@ -165,7 +166,7 @@ impl FeatureFactory {
                             .input_expected_returns(c.input_expected_returns.clone())
                             .input_returns(c.input_returns.clone())
                             .output(c.output.clone())
-                            .periods_returns(c.periods_returns)
+                            .periods_returns(c.periods_returns & scale_periods)
                             .risk_aversion(c.risk_aversion)
                             .risk_free_rate(c.risk_free_rate)
                             .max_exposure_long(c.max_exposure_long)

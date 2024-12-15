@@ -5,7 +5,6 @@ use metromc::{
     sampler::{Config, Sampler},
     Pdf,
 };
-use mimalloc::MiMalloc;
 use statrs::{distribution::Continuous, statistics::Statistics};
 use tinyrand::{Rand, Seeded, Wyrand};
 use typed_builder::TypedBuilder;
@@ -28,9 +27,6 @@ impl Pdf for LogNormal {
         self.dist.pdf(x)
     }
 }
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 const TIME_STEPS: f64 = 60.;
 const RISK_FREE_RATE: f64 = 0.00;

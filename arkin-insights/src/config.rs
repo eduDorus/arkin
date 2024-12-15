@@ -12,6 +12,8 @@ pub struct InsightsConfig {
 pub struct InsightsServiceConfig {
     pub pipeline: PipelineConfig,
     pub state_lookback: u64,
+    pub frequency_secs: u64,
+    pub scale_periods: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

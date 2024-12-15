@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use arkin_portfolio::{PortfolioConfig, PortfolioFactory};
-use mimalloc::MiMalloc;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 
@@ -12,9 +11,6 @@ use arkin_execution::prelude::*;
 use arkin_ingestors::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_persistence::prelude::*;
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {

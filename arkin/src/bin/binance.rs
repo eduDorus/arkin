@@ -2,16 +2,12 @@ use std::time::Duration;
 
 use anyhow::Result;
 use futures_util::StreamExt;
-use mimalloc::MiMalloc;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 
 use arkin_binance::{prelude::*, AggTradeStream, PartialDepthStream};
 use arkin_core::prelude::*;
 use trade::CancelOpenOrdersRequest;
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {

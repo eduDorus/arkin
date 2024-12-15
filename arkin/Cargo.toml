@@ -1,3 +1,4 @@
+# https://web.stanford.edu/~boyd/papers/pdf/markowitz.pdf
 [package]
 name = "arkin"
 version.workspace = true
@@ -27,7 +28,6 @@ arkin-binance = { path = "../arkin-binance" }
 
 futures-util = { workspace = true }
 tokio = { workspace = true }
-mimalloc = { workspace = true }
 tracing = { workspace = true }
 tokio-rustls = { workspace = true }
 time = { workspace = true }

@@ -11,7 +11,6 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use flume::{Receiver, Sender};
 use futures_util::StreamExt;
-use mimalloc::MiMalloc;
 use models::BinanceUSDMMarketEvent;
 use rust_decimal::prelude::*;
 use strum::Display;
@@ -25,9 +24,6 @@ use arkin_core::prelude::*;
 use trade::{CancelOpenOrdersRequest, CancelOrderRequest};
 
 pub static INSTRUMENT: LazyLock<Arc<Instrument>> = LazyLock::new(|| test_inst_binance_btc_usdt_perp());
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {

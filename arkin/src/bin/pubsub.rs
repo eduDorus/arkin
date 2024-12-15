@@ -1,12 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
-use mimalloc::MiMalloc;
 use time::OffsetDateTime;
 use tracing::info;
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {

@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
-use mimalloc::MiMalloc;
 use time::macros::datetime;
 use tokio_rustls::rustls::crypto::aws_lc_rs;
 use tokio_rustls::rustls::crypto::CryptoProvider;
@@ -14,9 +13,6 @@ use tracing::info;
 use arkin_core::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_persistence::prelude::*;
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
@@ -43,9 +39,8 @@ async fn main() -> Result<()> {
     });
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-    let config = load::<InsightsConfig>();
-    let insights_service =
-        Arc::new(InsightsService::from_config(&config.insights_service, pubsub.clone(), persistence.clone()).await);
+    let config = load::<InsightsConfig>().insights_service;
+    let insights_service = Arc::new(InsightsService::from_config(&config, pubsub.clone(), persistence.clone()).await);
 
     // Fetch instruments concurrently
     let venue_symbols = vec!["BTCUSDT", "ETHUSDT", "SOLUSDT"];
@@ -59,17 +54,18 @@ async fn main() -> Result<()> {
 
     info!("Loaded {} instruments.", instruments.len());
 
-    let start = datetime!(2024-11-30 00:00).assume_utc();
-    let end = datetime!(2024-12-10 00:00).assume_utc();
-    let mut current_day = start.date() - Duration::from_secs(86400);
-    let frequency_secs = Duration::from_secs(60);
+    let start = datetime!(2024-11-01 00:00).assume_utc();
+    let end = datetime!(2024-12-01 00:00).assume_utc();
+    let mut current_day = start.date() - Duration::from_secs(config.state_lookback);
+    let frequency_secs = Duration::from_secs(config.frequency_secs);
 
     let mut clock = Clock::new(start, end, frequency_secs);
 
     while let Some((_tick_start, tick_end)) = clock.next() {
         if tick_end.date() != current_day {
+            // Let's load the next chunk of data
             current_day = tick_end.date();
-            let lookback = Duration::from_secs(86400);
+            let lookback = Duration::from_secs(config.state_lookback);
             let next_day = tick_end.replace_time(time::macros::time!(00:00:00)) + lookback;
             insights_service.remove(next_day - lookback).await?;
             info!("Loading insights from {} till {}", next_day - lookback, next_day);

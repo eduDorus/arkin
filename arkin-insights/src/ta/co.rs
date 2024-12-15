@@ -65,15 +65,21 @@ impl Computation for ChaikinOscillatorFeature {
                         .build();
                     Some(Arc::new(insight))
                 } else {
-                    let co = ChaikinOscillator {
+                    let res = ChaikinOscillator {
                         ma1: MA::DMA(self.periods_fast as u8),
                         ma2: MA::DMA(self.periods_slow as u8),
                         window: 0,
                     }
-                    .init(&ohlcv)
-                    .expect("Failed to initialize Chaikin Oscillator");
-                    self.store.insert(instrument.clone(), co);
-                    None
+                    .init(&ohlcv);
+                    match res {
+                        Ok(co) => {
+                            self.store.insert(instrument.clone(), co);
+                        }
+                        Err(e) => {
+                            debug!("Failed to initialize Chaikin Oscillator: {}", e);
+                        }
+                    }
+                    return None;
                 }
             })
             .collect::<Vec<_>>();
