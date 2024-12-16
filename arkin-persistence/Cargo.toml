@@ -24,6 +24,11 @@ thiserror = { workspace = true }
 typed-builder = { workspace = true }
 moka2 = { workspace = true }
 
+# Parquet
+parquet = { version = "53.3.0", features = [ "async", "arrow", "zstd", "object_store" ] }
+arrow = { version = "53.3.0" }
+object_store = "0.11"
+
 mockall = { workspace = true }
 
 [dev-dependencies]

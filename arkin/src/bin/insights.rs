@@ -69,6 +69,9 @@ async fn main() -> Result<()> {
             let next_day = tick_end.replace_time(time::macros::time!(00:00:00)) + lookback;
             insights_service.remove(next_day - lookback).await?;
 
+            // Wait for the database to catch up
+            tokio::time::sleep(Duration::from_secs(10)).await;
+
             // Load the data
             info!("Loading insights from {} till {}", next_day - lookback, next_day);
             insights_service.load(next_day, &instruments, lookback).await?;

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use rust_decimal::Decimal;
+use serde::Serialize;
 use sqlx::{prelude::*, PgPool};
 use time::OffsetDateTime;
 use tracing::debug;
@@ -13,7 +14,7 @@ use crate::{PersistenceError, BIND_LIMIT};
 
 const FIELD_COUNT: usize = 5;
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, Serialize, FromRow)]
 pub struct InsightDTO {
     pub event_time: OffsetDateTime,
     pub pipeline_id: Uuid,

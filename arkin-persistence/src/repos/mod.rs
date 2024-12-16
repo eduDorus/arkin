@@ -2,6 +2,7 @@ mod allocation;
 mod assets;
 mod execution_orders;
 mod insights;
+mod insights_parquet;
 mod instances;
 mod instruments;
 mod pipelines;
