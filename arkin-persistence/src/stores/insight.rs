@@ -6,12 +6,12 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{repos::InsightsRepo, PersistenceError};
+use crate::{repos::InsightsParquetRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
 
 pub struct InsightsStore {
-    insights_repo: InsightsRepo,
+    insights_repo: InsightsParquetRepo,
     #[builder(default)]
     insights_buffer: Arc<Mutex<Vec<Arc<Insight>>>>,
     buffer_size: usize,
@@ -66,25 +66,29 @@ impl InsightsStore {
         Ok(())
     }
 
-    pub async fn insert(&self, insight: Arc<Insight>) -> Result<(), PersistenceError> {
-        self.insights_repo.insert(insight.into()).await
+    pub async fn close(&self) -> Result<(), PersistenceError> {
+        self.insights_repo.close().await
     }
 
     pub async fn insert_buffered(&self, insight: Arc<Insight>) -> Result<(), PersistenceError> {
-        {
-            let mut lock = self.insights_buffer.lock().await; // Wait for lock
-            lock.push(insight);
+        if !insight.persist {
+            return Ok(());
         }
 
-        self.commit().await
+        let mut lock = self.insights_buffer.lock().await; // Wait for lock
+        lock.push(insight);
+        Ok(())
     }
 
     pub async fn insert_buffered_vec(&self, insights: Vec<Arc<Insight>>) -> Result<(), PersistenceError> {
-        {
-            let mut lock = self.insights_buffer.lock().await; // Wait for lock
-            lock.extend(insights);
+        // Filter out any insights that don't need to be persisted
+        let insights = insights.into_iter().filter(|i| i.persist).collect::<Vec<_>>();
+        if insights.is_empty() {
+            return Ok(());
         }
+
+        let mut lock = self.insights_buffer.lock().await; // Wait for lock
+        lock.extend(insights);
         Ok(())
-        // self.commit().await
     }
 }

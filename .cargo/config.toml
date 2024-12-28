@@ -1,3 +1,4 @@
 [env]
 RUSTFLAGS = "-C target-cpu=native"
 RUST_LOG = "info"
+RUST_BACKTRACE = "1"

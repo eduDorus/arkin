@@ -16,6 +16,8 @@ pub struct Insight {
     pub instrument: Option<Arc<Instrument>>,
     pub feature_id: FeatureId,
     pub value: Decimal,
+    #[builder(default = false)]
+    pub persist: bool,
 }
 
 impl EventTypeOf for Insight {

@@ -44,14 +44,13 @@ tokio-util = { workspace = true }
 dashmap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-
 catboost-rs = { workspace = true }
 clarabel = { workspace = true }
 statrs = { workspace = true }
 metromc = "0.2"
 tinyrand = "0.5.0"
 typed-builder = { workspace = true }
-
+clap = { version = "4.5.23", features = [ "derive" ] }
 
 
 # Test DL

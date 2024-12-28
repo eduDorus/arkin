@@ -27,6 +27,7 @@ pub struct ChaikinOscillatorFeature {
     output: FeatureId,
     periods_fast: usize,
     periods_slow: usize,
+    persist: bool,
 }
 
 impl Computation for ChaikinOscillatorFeature {
@@ -60,6 +61,7 @@ impl Computation for ChaikinOscillatorFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
                         .value(value)
+                        .persist(self.persist)
                         .build();
                     Some(Arc::new(insight))
                 } else {

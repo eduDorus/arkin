@@ -22,7 +22,7 @@ async fn main() {
     info!("PubSub created");
 
     let config = load::<PersistenceConfig>();
-    let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()));
+    let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
     info!("Persistence created");
 
     let config = load::<PortfolioConfig>();
@@ -61,7 +61,7 @@ async fn main() {
     }
     info!("Loaded {} instruments.", instruments.len());
 
-    let engine = SingleStrategyEngine::builder()
+    let engine = ForecastEngine::builder()
         .pubsub(pubsub)
         .instruments(instruments)
         .persistor(persistence)

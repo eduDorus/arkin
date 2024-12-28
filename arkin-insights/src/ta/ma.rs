@@ -32,6 +32,7 @@ pub struct MovingAverageFeature {
     input: FeatureId,
     output: FeatureId,
     periods: usize,
+    persist: bool,
 }
 
 impl Computation for MovingAverageFeature {
@@ -66,6 +67,7 @@ impl Computation for MovingAverageFeature {
                                 .pipeline(self.pipeline.clone())
                                 .instrument(Some(instrument.clone()))
                                 .feature_id(self.output.clone())
+                                .persist(self.persist)
                                 .value(sma_value)
                                 .build();
                             Some(Arc::new(insight))
@@ -85,6 +87,7 @@ impl Computation for MovingAverageFeature {
                                 .instrument(Some(instrument.clone()))
                                 .feature_id(self.output.clone())
                                 .value(ema_value)
+                                .persist(self.persist)
                                 .build();
                             Some(Arc::new(insight))
                         } else {
@@ -103,6 +106,7 @@ impl Computation for MovingAverageFeature {
                                 .instrument(Some(instrument.clone()))
                                 .feature_id(self.output.clone())
                                 .value(dma_value)
+                                .persist(self.persist)
                                 .build();
                             Some(Arc::new(insight))
                         } else {
@@ -121,6 +125,7 @@ impl Computation for MovingAverageFeature {
                                 .instrument(Some(instrument.clone()))
                                 .feature_id(self.output.clone())
                                 .value(tma_value)
+                                .persist(self.persist)
                                 .build();
                             Some(Arc::new(insight))
                         } else {

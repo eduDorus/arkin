@@ -9,4 +9,5 @@ use crate::PersistenceError;
 pub trait Persistor: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PersistenceError>;
     async fn flush(&self) -> Result<(), PersistenceError>;
+    async fn close(&self) -> Result<(), PersistenceError>;
 }

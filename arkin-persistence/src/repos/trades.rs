@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rust_decimal::Decimal;
 use sqlx::{FromRow, PgPool};
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
@@ -17,8 +18,8 @@ pub struct TradeDTO {
     pub instrument_id: Uuid,
     pub trade_id: i64,
     pub side: MarketSide,
-    pub price: Price,
-    pub quantity: Quantity, // Negative for sell, positive for buy
+    pub price: Decimal,
+    pub quantity: Decimal, // Negative for sell, positive for buy
 }
 
 impl From<Arc<Trade>> for TradeDTO {

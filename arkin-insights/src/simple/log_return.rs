@@ -18,6 +18,7 @@ pub struct LogReturnFeature {
     input: FeatureId,
     output: FeatureId,
     periods: usize,
+    persist: bool,
 }
 
 impl Computation for LogReturnFeature {
@@ -46,7 +47,7 @@ impl Computation for LogReturnFeature {
 
                 // Check if we have enough data
                 if data.len() < self.periods + 1 {
-                    warn!("Not enough data to calculate percent change");
+                    warn!("Not enough data to calculate log return");
                     return None;
                 }
 
@@ -72,13 +73,16 @@ impl Computation for LogReturnFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
                         .value(log_return)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 )
             })
             .collect::<Vec<_>>();
 
+        // Insert the insights into the state
         self.insight_state.insert_batch(&insights);
+
         Ok(insights)
     }
 }

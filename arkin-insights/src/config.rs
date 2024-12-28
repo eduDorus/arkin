@@ -80,6 +80,8 @@ pub struct OHLCVConfig {
     pub output_buy_trade_count: FeatureId,
     pub output_sell_trade_count: FeatureId,
     pub window: u64,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -89,6 +91,8 @@ pub struct TimeConfig {
     pub output_hour_of_day: FeatureId,
     pub output_minute_of_day: FeatureId,
     pub output_minute_of_hour: FeatureId,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -97,6 +101,8 @@ pub struct VWAPConfig {
     pub input_quantity: FeatureId,
     pub output: FeatureId,
     pub window: u64,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -107,6 +113,8 @@ pub struct TradeCountConfig {
     pub output_total: FeatureId,
     pub output_ratio: FeatureId,
     pub window: u64,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -114,6 +122,8 @@ pub struct LogReturnConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -121,6 +131,8 @@ pub struct StdDevConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -128,6 +140,8 @@ pub struct SumConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -136,6 +150,8 @@ pub struct MovingAverageConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -143,6 +159,8 @@ pub struct SignalStrengthConfig {
     pub input_first: FeatureId,
     pub input_second: FeatureId,
     pub output: FeatureId,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -153,6 +171,8 @@ pub struct MACDConfig {
     pub output_histogram: FeatureId,
     pub signal_periods: usize,
     pub smoothing: Decimal,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -165,6 +185,8 @@ pub struct BollingerBandsConfig {
     pub output_oscillator: FeatureId,
     pub output_width: FeatureId,
     pub sigma: Decimal,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -172,6 +194,8 @@ pub struct RelativeStrengthIndexConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -179,6 +203,8 @@ pub struct AverageDirectionalIndexConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -186,6 +212,8 @@ pub struct ChaikinMoneyFlowConfig {
     pub input: FeatureId,
     pub output: FeatureId,
     pub periods: usize,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -194,6 +222,8 @@ pub struct ChaikinOscillatorConfig {
     pub output: FeatureId,
     pub periods_fast: usize,
     pub periods_slow: usize,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -204,6 +234,8 @@ pub struct CatBoostConfig {
     pub input_numerical: Vec<FeatureId>,
     pub input_categorical: Vec<FeatureId>,
     pub output: FeatureId,
+    #[serde(default)]
+    pub persist: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -219,4 +251,6 @@ pub struct MeanVarianceConfig {
     pub max_exposure_short: f64,
     pub max_exposure_short_per_asset: f64,
     pub transaction_cost: f64,
+    #[serde(default)]
+    pub persist: bool,
 }

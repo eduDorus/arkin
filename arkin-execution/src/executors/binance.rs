@@ -570,7 +570,7 @@ mod tests {
         // Create executor
         let pubsub = Arc::new(PubSub::new());
         let config = load::<PersistenceConfig>();
-        let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()));
+        let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
 
         let executor = Arc::new(
             BinanceExecutor::builder()

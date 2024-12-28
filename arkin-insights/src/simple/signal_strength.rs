@@ -18,6 +18,7 @@ pub struct SignalStrengthFeature {
     input_first: FeatureId,
     input_second: FeatureId,
     output: FeatureId,
+    persist: bool,
 }
 
 impl Computation for SignalStrengthFeature {
@@ -69,6 +70,7 @@ impl Computation for SignalStrengthFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
                         .value(signal_strength)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 )

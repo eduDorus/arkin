@@ -27,6 +27,7 @@ pub struct RelativeStrengthIndexFeature {
     input: FeatureId,
     output: FeatureId,
     periods: usize,
+    persist: bool,
 }
 
 impl Computation for RelativeStrengthIndexFeature {
@@ -60,6 +61,7 @@ impl Computation for RelativeStrengthIndexFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
                         .value(rsi_value)
+                        .persist(self.persist)
                         .build();
                     Some(Arc::new(insight))
                 } else {

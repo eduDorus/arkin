@@ -51,6 +51,7 @@ impl FeatureFactory {
                             .output_buy_trade_count(c.output_buy_trade_count.to_owned())
                             .output_sell_trade_count(c.output_sell_trade_count.to_owned())
                             .window(Duration::from_secs(c.window))
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::Time(c) => Box::new(
@@ -62,6 +63,7 @@ impl FeatureFactory {
                             .output_hour_of_day(c.output_hour_of_day.clone())
                             .output_minute_of_day(c.output_minute_of_day.clone())
                             .output_minute_of_hour(c.output_minute_of_hour.clone())
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::LogReturn(c) => Box::new(
@@ -71,6 +73,7 @@ impl FeatureFactory {
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods * scale_periods)
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::StdDev(c) => Box::new(
@@ -80,6 +83,7 @@ impl FeatureFactory {
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods * scale_periods)
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::Sum(c) => Box::new(
@@ -89,6 +93,7 @@ impl FeatureFactory {
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods * scale_periods)
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::SignalStrength(c) => Box::new(
@@ -98,6 +103,7 @@ impl FeatureFactory {
                             .input_first(c.input_first.clone())
                             .input_second(c.input_second.clone())
                             .output(c.output.clone())
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::MA(c) => Box::new(
@@ -108,6 +114,7 @@ impl FeatureFactory {
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods * scale_periods)
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::RSI(c) => Box::new(
@@ -117,6 +124,7 @@ impl FeatureFactory {
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods * scale_periods)
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::ADX(c) => Box::new(
@@ -126,6 +134,7 @@ impl FeatureFactory {
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods * scale_periods)
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::CMF(c) => Box::new(
@@ -135,6 +144,7 @@ impl FeatureFactory {
                             .input(c.input.clone())
                             .output(c.output.clone())
                             .periods(c.periods * scale_periods)
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::CO(c) => Box::new(
@@ -145,6 +155,7 @@ impl FeatureFactory {
                             .output(c.output.clone())
                             .periods_fast(c.periods_fast * scale_periods)
                             .periods_slow(c.periods_slow * scale_periods)
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::CatBoost(c) => Box::new(
@@ -157,6 +168,7 @@ impl FeatureFactory {
                             .input_numerical(c.input_numerical.clone())
                             .input_categorical(c.input_categorical.clone())
                             .output(c.output.clone())
+                            .persist(c.persist)
                             .build(),
                     ),
                     FeatureConfig::MeanVariance(c) => Box::new(
@@ -166,7 +178,7 @@ impl FeatureFactory {
                             .input_expected_returns(c.input_expected_returns.clone())
                             .input_returns(c.input_returns.clone())
                             .output(c.output.clone())
-                            .periods_returns(c.periods_returns & scale_periods)
+                            .periods_returns(c.periods_returns * scale_periods)
                             .risk_aversion(c.risk_aversion)
                             .risk_free_rate(c.risk_free_rate)
                             .max_exposure_long(c.max_exposure_long)
@@ -174,6 +186,7 @@ impl FeatureFactory {
                             .max_exposure_long_per_asset(c.max_exposure_long_per_asset)
                             .max_exposure_short_per_asset(c.max_exposure_short_per_asset)
                             .transaction_cost(c.transaction_cost)
+                            .persist(c.persist)
                             .build(),
                     ),
                 };

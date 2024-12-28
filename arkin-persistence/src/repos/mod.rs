@@ -1,8 +1,9 @@
+mod insights_parquet;
+// mod trades_parquet;
 mod allocation;
 mod assets;
 mod execution_orders;
 mod insights;
-mod insights_parquet;
 mod instances;
 mod instruments;
 mod pipelines;
@@ -14,10 +15,9 @@ mod trades;
 mod transactions;
 mod venue_orders;
 mod venues;
-// Currently beeing replaced by transactions
-// mod positions;
-// mod venue_order_fills;
 
+pub use insights_parquet::*;
+// pub use trades_parquet::*;
 pub use allocation::*;
 pub use assets::*;
 pub use execution_orders::*;

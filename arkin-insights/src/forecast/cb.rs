@@ -6,7 +6,7 @@ use dashmap::DashMap;
 use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -25,6 +25,7 @@ pub struct CatBoostFeature {
     input_numerical: Vec<FeatureId>,
     input_categorical: Vec<FeatureId>,
     output: FeatureId,
+    persist: bool,
 }
 
 impl fmt::Debug for CatBoostFeature {
@@ -52,7 +53,7 @@ impl Computation for CatBoostFeature {
     }
 
     fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
-        debug!("Calculating Log Returns...");
+        debug!("Calculating forecast...");
 
         // Retrieve the values for the feature over the window period
         let insights = instruments
@@ -64,9 +65,10 @@ impl Computation for CatBoostFeature {
                 // If we have a model file, load the model
                 // If we don't have a model file, log a warning and return None
                 if !self.models.contains_key(instrument) {
+                    info!("Initializing model for {}", instrument);
                     let filename = format!(
                         "{}/{}_{}_{}.cbm",
-                        self.model_location, instrument.secondary_id, self.model_name, self.model_version
+                        self.model_location, instrument.id, self.model_name, self.model_version
                     );
 
                     let model = Model::load(&filename).expect("Failed to load model");
@@ -84,7 +86,7 @@ impl Computation for CatBoostFeature {
                     })
                     .collect::<Vec<_>>();
 
-                let mut categorical_data = self
+                let categorical_data = self
                     .input_categorical
                     .iter()
                     .filter_map(|id| {
@@ -102,9 +104,6 @@ impl Computation for CatBoostFeature {
                     return None;
                 }
 
-                // Add the instrument ID
-                categorical_data.push(instrument.secondary_id.to_string());
-
                 // Apply the model
                 let prediction = model
                     .calc_model_prediction(vec![numerical_data], vec![categorical_data])
@@ -115,6 +114,8 @@ impl Computation for CatBoostFeature {
                 // Convert to decimal
                 let prediction = Decimal::from_f64(prediction[0]).expect("Failed to convert prediction to decimal");
 
+                debug!("Prediction for {} is {}", instrument, prediction);
+
                 // Return insight
                 Some(
                     Insight::builder()
@@ -123,6 +124,7 @@ impl Computation for CatBoostFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
                         .value(prediction)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 )

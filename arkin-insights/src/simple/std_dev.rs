@@ -18,6 +18,7 @@ pub struct StdDevFeature {
     input: FeatureId,
     output: FeatureId,
     periods: usize,
+    persist: bool,
 }
 
 impl Computation for StdDevFeature {
@@ -67,6 +68,7 @@ impl Computation for StdDevFeature {
                             .instrument(Some(instrument.clone()))
                             .feature_id(self.output.clone())
                             .value(std_dev)
+                            .persist(self.persist)
                             .build()
                             .into(),
                     )

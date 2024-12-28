@@ -94,7 +94,7 @@ impl Insights for InsightsService {
         lookback: Duration,
     ) -> Result<(), InsightsError> {
         let start = event_time - lookback;
-        debug!("Loading insights from {} to {}", start, event_time);
+        info!("Loading insights from {} to {}", start, event_time);
 
         // let ticks = self.persistence_service.read_ticks_range(instruments, from, to).await?;
         let trades = self

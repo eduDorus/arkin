@@ -35,7 +35,7 @@ pub struct PersistenceService {
 }
 
 impl PersistenceService {
-    pub fn from_config(config: &PersistenceConfig, pubsub: Arc<PubSub>) -> Self {
+    pub async fn from_config(config: &PersistenceConfig, pubsub: Arc<PubSub>) -> Self {
         let db_config = config.database.clone();
         let conn_options = PgConnectOptions::new()
             .host(&db_config.host)
@@ -63,7 +63,8 @@ impl PersistenceService {
         let asset_repo = AssetRepo::builder().pool(pool.clone()).build();
         let instrument_repo = InstrumentRepo::builder().pool(pool.clone()).build();
         let pipeline_repo = PipelineRepo::builder().pool(pool.clone()).build();
-        let insights_repo = InsightsRepo::builder().pool(pool.clone()).build();
+        let insights_repo = InsightsParquetRepo::new("insights_latest.parquet").await.unwrap();
+        // let insights_repo = InsightsRepo::builder().pool(pool.clone()).build();
         let strategy_repo = StrategyRepo::builder().pool(pool.clone()).build();
         let signal_repo = SignalRepo::builder().pool(pool.clone()).build();
         let allocation_repo = AllocationRepo::builder().pool(pool.clone()).build();
@@ -71,6 +72,7 @@ impl PersistenceService {
         let venue_order_repo = VenueOrderRepo::builder().pool(pool.clone()).build();
         let tick_repo = TickRepo::builder().pool(pool.clone()).build();
         let trade_repo = TradeRepo::builder().pool(pool.clone()).build();
+        // let trade_repo = TradeParquetRepo::new().await.unwrap();
 
         // Initialize stores
         let instance_store = Arc::new(InstanceStore::builder().instance_repo(instance_repo.to_owned()).build());
@@ -188,6 +190,9 @@ impl Persistor for PersistenceService {
                         if let Err(e) = self.flush().await {
                             error!("Failed to commit persistence service on shutdown: {}", e);
                         }
+                        if let Err(e) = self.close().await {
+                            error!("Failed to close persistence service on shutdown: {}", e);
+                        }
                         break;
                     }
             }
@@ -201,6 +206,11 @@ impl Persistor for PersistenceService {
         self.tick_store.flush().await?;
         self.trade_store.flush().await?;
         self.insights_store.flush().await?;
+        Ok(())
+    }
+
+    async fn close(&self) -> Result<(), PersistenceError> {
+        self.insights_store.close().await?;
         Ok(())
     }
 }

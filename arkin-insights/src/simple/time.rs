@@ -20,6 +20,7 @@ pub struct TimeFeature {
     output_hour_of_day: FeatureId,
     output_minute_of_day: FeatureId,
     output_minute_of_hour: FeatureId,
+    persist: bool,
 }
 
 impl Computation for TimeFeature {
@@ -56,6 +57,7 @@ impl Computation for TimeFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_day_of_week.clone())
                         .value(day_of_week)
+                        .persist(self.persist)
                         .build()
                         .into(),
                     Insight::builder()
@@ -64,6 +66,7 @@ impl Computation for TimeFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_hour_of_day.clone())
                         .value(hour_of_day)
+                        .persist(self.persist)
                         .build()
                         .into(),
                     Insight::builder()
@@ -72,6 +75,7 @@ impl Computation for TimeFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_minute_of_day.clone())
                         .value(minute_of_day)
+                        .persist(self.persist)
                         .build()
                         .into(),
                     Insight::builder()
@@ -80,6 +84,7 @@ impl Computation for TimeFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_minute_of_hour.clone())
                         .value(minute_of_hour)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 ])

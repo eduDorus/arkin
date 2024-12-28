@@ -33,6 +33,7 @@ pub struct OHLCVFeature {
     output_buy_trade_count: FeatureId,
     output_sell_trade_count: FeatureId,
     window: Duration,
+    persist: bool,
 }
 
 impl Computation for OHLCVFeature {
@@ -152,6 +153,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_open.clone())
                         .value(open)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -162,6 +164,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_high.clone())
                         .value(high)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -172,6 +175,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_low.clone())
                         .value(low)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -182,6 +186,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_close.clone())
                         .value(close)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -192,6 +197,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_typical_price.clone())
                         .value(typical_price)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -202,6 +208,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_vwap.clone())
                         .value(vwap)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -212,6 +219,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_volume.clone())
                         .value(volume)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -222,6 +230,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_buy_volume.clone())
                         .value(buy_volume)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -232,6 +241,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_sell_volume.clone())
                         .value(sell_volume)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -242,6 +252,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_notional_volume.clone())
                         .value(notional_volume)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -252,6 +263,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_buy_notional_volume.clone())
                         .value(buy_notional_volume)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -262,6 +274,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_sell_notional_volume.clone())
                         .value(sell_notional_volume)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -272,6 +285,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_trade_count.clone())
                         .value(trade_count)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -282,6 +296,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_buy_trade_count.clone())
                         .value(buy_trade_count)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );
@@ -292,6 +307,7 @@ impl Computation for OHLCVFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_sell_trade_count.clone())
                         .value(sell_trade_count)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 );

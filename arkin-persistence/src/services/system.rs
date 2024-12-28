@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use arkin_core::{Insight, Pipeline, Strategy, Venue};
+use arkin_core::{Allocation, Insight, Pipeline, Strategy, Venue};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{
-    stores::{InsightsStore, PipelineStore, StrategyStore, VenueStore},
+    stores::{AllocationStore, InsightsStore, PipelineStore, StrategyStore, VenueStore},
     PersistenceError,
 };
 
@@ -16,7 +16,7 @@ pub struct SystemService {
     pub venue_store: VenueStore,
     pub insight_store: InsightsStore,
     pub strategy_store: StrategyStore,
-    pub allocation_store: InsightsStore,
+    pub allocation_store: AllocationStore,
 }
 
 impl SystemService {
@@ -40,10 +40,6 @@ impl SystemService {
 
     pub async fn read_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
         self.pipeline_store.read_by_name(name).await
-    }
-
-    pub async fn insert_insight(&self, insight: Arc<Insight>) -> Result<(), PersistenceError> {
-        self.insight_store.insert(insight).await
     }
 
     pub async fn insert_insight_buffered(&self, insight: Arc<Insight>) -> Result<(), PersistenceError> {
@@ -76,15 +72,7 @@ impl SystemService {
     }
 
     // Allocation
-    pub async fn insert_allocation(&self, insight: Arc<Insight>) -> Result<(), PersistenceError> {
-        self.allocation_store.insert(insight).await
-    }
-
-    pub async fn insert_allocation_buffered(&self, insight: Arc<Insight>) -> Result<(), PersistenceError> {
-        self.allocation_store.insert_buffered(insight).await
-    }
-
-    pub async fn insert_allocation_buffered_vec(&self, insights: Vec<Arc<Insight>>) -> Result<(), PersistenceError> {
-        self.allocation_store.insert_buffered_vec(insights).await
+    pub async fn insert_allocation(&self, allocation: Arc<Allocation>) -> Result<(), PersistenceError> {
+        self.allocation_store.insert(allocation).await
     }
 }

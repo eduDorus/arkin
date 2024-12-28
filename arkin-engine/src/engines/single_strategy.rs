@@ -20,7 +20,7 @@ use arkin_portfolio::prelude::*;
 use crate::{TradingEngine, TradingEngineError};
 
 #[derive(Debug, TypedBuilder)]
-pub struct SingleStrategyEngine {
+pub struct ForecastEngine {
     pubsub: Arc<PubSub>,
     instruments: Vec<Arc<Instrument>>,
 
@@ -48,11 +48,6 @@ pub struct SingleStrategyEngine {
     insights_shutdown: CancellationToken,
     insights: Arc<dyn Insights>,
 
-    // #[builder(default)]
-    // strategy_task_tracker: TaskTracker,
-    // #[builder(default)]
-    // strategy_shutdown: CancellationToken,
-    // strategy: Arc<dyn Algorithm>,
     #[builder(default)]
     allocation_task_tracker: TaskTracker,
     #[builder(default)]
@@ -72,7 +67,7 @@ pub struct SingleStrategyEngine {
     executor: Arc<dyn Executor>,
 }
 
-impl SingleStrategyEngine {
+impl ForecastEngine {
     async fn load_state(&self) -> Result<(), TradingEngineError> {
         // Setup Insights
         let start = Instant::now();
@@ -81,24 +76,25 @@ impl SingleStrategyEngine {
         let end_time = end_time.replace_second(0).expect("Failed to replace second");
         let end_time = end_time.replace_nanosecond(0).expect("Failed to replace nanosecond");
 
-        let lookback_data = Duration::from_secs(3 * 86400);
-        let lookback_insights = Duration::from_secs(2 * 86400);
+        let frequency = Duration::from_secs(10);
+        let lookback_data = Duration::from_secs(2 * 86400);
+        let lookback_insights = Duration::from_secs(86400);
         self.insights.load(end_time, &self.instruments, lookback_data).await?;
-        let mut clock = Clock::new(end_time - lookback_insights, end_time, Duration::from_secs(60));
+        let mut clock = Clock::new(end_time - lookback_insights, end_time, frequency);
         while let Some((_start, end)) = clock.next() {
             self.insights.process(end, &self.instruments, false).await?;
         }
 
         // If we are now at the start of a new minute, we need to load the last minute of data
-        let diff = OffsetDateTime::now_utc() - end_time;
-        if diff > Duration::from_secs(60) {
-            info!("Hopping to the next minute to load the last minute of data");
-            self.insights
-                .load(end_time + Duration::from_secs(60), &self.instruments, Duration::from_secs(60))
-                .await?;
-            self.insights
-                .process(end_time + Duration::from_secs(60), &self.instruments, false)
-                .await?;
+        let mut last_tick = end_time;
+        let mut diff = OffsetDateTime::now_utc() - last_tick;
+        while diff > frequency {
+            info!("Hopping to the next tick to load the last minute of data");
+            self.insights.load(end_time + frequency, &self.instruments, frequency).await?;
+            self.insights.process(end_time + frequency, &self.instruments, false).await?;
+            last_tick = last_tick + frequency;
+            diff = OffsetDateTime::now_utc() - last_tick;
+            info!("Last tick {} diff {}", last_tick, diff)
         }
 
         info!("Loaded state in {:?}", start.elapsed());
@@ -106,7 +102,7 @@ impl SingleStrategyEngine {
     }
 
     async fn pipeline(&self) -> Result<(), TradingEngineError> {
-        let mut time_helper = TickHelper::new(Duration::from_secs(60));
+        let mut time_helper = TickHelper::new(Duration::from_secs(6));
 
         loop {
             tokio::select! {
@@ -131,7 +127,7 @@ impl SingleStrategyEngine {
 }
 
 #[async_trait]
-impl TradingEngine for SingleStrategyEngine {
+impl TradingEngine for ForecastEngine {
     async fn start(&self) -> Result<(), TradingEngineError> {
         // Start the persistor
         let shutdown = self.persistor_shutdown.clone();
@@ -174,16 +170,6 @@ impl TradingEngine for SingleStrategyEngine {
             }
         });
         tokio::time::sleep(Duration::from_millis(100)).await;
-
-        // // Start the strategies
-        // let shutdown = self.strategy_shutdown.clone();
-        // let strategy = self.strategy.clone();
-        // self.strategy_task_tracker.spawn(async move {
-        //     if let Err(e) = strategy.start(shutdown).await {
-        //         error!("Error in strategy: {}", e);
-        //     }
-        // });
-        // tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Start the allocation optimizer
         let shutdown = self.allocation_shutdown.clone();
@@ -234,11 +220,6 @@ impl TradingEngine for SingleStrategyEngine {
         self.insights_shutdown.cancel();
         self.insights_task_tracker.close();
         self.insights_task_tracker.wait().await;
-
-        // info!("Stopping strategies...");
-        // self.strategy_shutdown.cancel();
-        // self.strategy_task_tracker.close();
-        // self.strategy_task_tracker.wait().await;
 
         info!("Stopping allocation optimizer...");
         self.allocation_shutdown.cancel();

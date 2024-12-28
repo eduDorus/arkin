@@ -47,3 +47,6 @@ docker run -d -p 3000:3000 --user ${UID}:${GID} -v "$(pwd)/grafana:/var/lib/graf
 
 
 https://fapi.binance.com/fapi/v1/exchangeInfo
+
+
+pg2parquet export --host 127.0.0.1 --dbname arkin --output-file trades.parquet -q 'SELECT * FROM trades'

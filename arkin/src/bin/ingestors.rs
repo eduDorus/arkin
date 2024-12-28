@@ -22,7 +22,7 @@ async fn main() {
     let pubsub = Arc::new(PubSub::new());
 
     let config = load::<PersistenceConfig>();
-    let persistence_service = Arc::new(PersistenceService::from_config(&config, pubsub.clone()));
+    let persistence_service = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
 
     let config = load::<IngestorsConfig>();
     let ingestors = IngestorFactory::from_config(&config, pubsub.clone(), persistence_service.clone());

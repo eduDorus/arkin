@@ -18,6 +18,7 @@ pub struct SumFeature {
     input: FeatureId,
     output: FeatureId,
     periods: usize,
+    persist: bool,
 }
 
 impl Computation for SumFeature {
@@ -57,6 +58,7 @@ impl Computation for SumFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
                         .value(sum)
+                        .persist(self.persist)
                         .build()
                         .into(),
                 )

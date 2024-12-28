@@ -26,13 +26,13 @@ fn main() {
     info!("Initial Weights: {:.5?}", w0);
 
     // run from 1000 to 10000 in steps of 100
-    for lamba in (0..=10).step_by(1) {
+    for lamba in (0..=100).step_by(5) {
         let mvo = MeanVarianceOptimization::builder()
-            .lambda(lamba as f64)
+            .lambda(lamba as f64 / 10.0)
             .max_exposure_long(0.9)
             .max_exposure_short(0.9)
-            .max_long_per_asset(0.5)
-            .max_short_per_asset(0.5)
+            .max_long_per_asset(0.9)
+            .max_short_per_asset(0.9)
             .transaction_cost(0.0010)
             .risk_free_rate(RISK_FREE_RATE)
             .build();
@@ -129,7 +129,7 @@ impl MeanVarianceOptimization {
         debug!("Sharp Ratio: {:.5}", sharp);
 
         info!(
-            "Optimal Allocation with lambda: {} ({:.5?}) turnover: {:.5?} return {:.5?} risk: {:.5?} sharpe: {:.5?}",
+            "Optimal Allocation with lambda: {:.2} ({:.5?}) turnover: {:.5?} return {:.5?} risk: {:.5?} sharpe: {:.5?}",
             self.lambda,
             w,
             z.sum(),

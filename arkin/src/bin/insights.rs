@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     let pubsub = Arc::new(PubSub::new());
 
     let config = load::<PersistenceConfig>();
-    let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()));
+    let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
 
     // Start the persistence service
     let persistence_task_tracker = TaskTracker::new();
@@ -37,7 +37,6 @@ async fn main() -> Result<()> {
             error!("Failed to start persistence service: {}", e);
         }
     });
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
     let config = load::<InsightsConfig>().insights_service;
     let insights_service = Arc::new(InsightsService::from_config(&config, pubsub.clone(), persistence.clone()).await);
@@ -55,33 +54,30 @@ async fn main() -> Result<()> {
     info!("Loaded {} instruments.", instruments.len());
 
     let start = datetime!(2024-01-01 00:00).assume_utc();
-    let end = datetime!(2024-12-10 00:00).assume_utc();
-    let mut current_day = start.date() - Duration::from_secs(config.state_lookback);
+    let end = datetime!(2024-12-24 00:00).assume_utc();
+
+    let mut current_day = start.date();
     let frequency_secs = Duration::from_secs(config.frequency_secs);
 
     let mut clock = Clock::new(start, end, frequency_secs);
 
     while let Some((_tick_start, tick_end)) = clock.next() {
         if tick_end.date() != current_day {
-            // Let's clean up some state
             current_day = tick_end.date();
-            let lookback = Duration::from_secs(86400);
-            let next_day = tick_end.replace_time(time::macros::time!(00:00:00)) + lookback;
-            insights_service.remove(next_day - lookback).await?;
 
-            // Wait for the database to catch up
-            tokio::time::sleep(Duration::from_secs(10)).await;
+            // Remove the data
+            insights_service.remove(tick_end).await?;
 
             // Load the data
-            info!("Loading insights from {} till {}", next_day - lookback, next_day);
-            insights_service.load(next_day, &instruments, lookback).await?;
+            let tomorrow = tick_end + Duration::from_secs(86400);
+            insights_service
+                .load(tomorrow, &instruments, Duration::from_secs(86400))
+                .await?;
         }
         insights_service.process(tick_end, &instruments, true).await?;
     }
 
     persistence.flush().await?;
-
-    tokio::time::sleep(Duration::from_secs(120)).await;
 
     persistence_shutdown.cancel();
     persistence_task_tracker.close();

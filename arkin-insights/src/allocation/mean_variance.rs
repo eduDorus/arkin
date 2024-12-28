@@ -22,8 +22,9 @@ pub struct MeanVarianceFeature {
     insight_state: Arc<InsightsState>,
     input_expected_returns: FeatureId,
     input_returns: FeatureId,
-    output: FeatureId,
     periods_returns: usize,
+    output: FeatureId,
+    persist: bool,
     risk_aversion: f64,
     risk_free_rate: f64,
     max_exposure_long: f64,
@@ -62,7 +63,7 @@ impl Computation for MeanVarianceFeature {
     }
 
     fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
-        debug!("Calculating Mean Variance Portfolio...");
+        info!("Calculating Mean Variance Portfolio at {}", event_time);
 
         let mut w_prev = instruments
             .iter()
@@ -94,6 +95,7 @@ impl Computation for MeanVarianceFeature {
             return Ok(vec![]);
         }
 
+        info!("Fetching return input feature-id: {}", self.input_returns);
         let returns = instruments
             .iter()
             .map(|i| {
@@ -112,7 +114,7 @@ impl Computation for MeanVarianceFeature {
             .collect::<Vec<_>>();
 
         // Check if returns is empty and has the same length as instruments
-        if returns.is_empty() || returns.len() != instruments.len() {
+        if returns.is_empty() || returns.len() != instruments.len() || returns.iter().any(|r| r.is_empty()) {
             warn!("Returns is empty or has different length than instruments");
             return Ok(vec![]);
         }
@@ -146,6 +148,7 @@ impl Computation for MeanVarianceFeature {
                     .instrument(Some(i.clone()))
                     .feature_id(self.output.clone())
                     .value(Decimal::from_f64(*w).expect("Failed to convert to Decimal"))
+                    .persist(self.persist)
                     .build()
                     .into()
             })
@@ -177,7 +180,8 @@ impl MeanVarianceOptimization {
         // Assemble the covariance matrix
         let covariance_matrix = compute_covariance_matrix(u);
 
-        debug!("Covariance Matrix: {:.5?}", covariance_matrix);
+        info!("Predicted returns: {:.5?}", mu);
+        info!("Covariance Matrix: {:.9?}", covariance_matrix);
         // Problem definition
         let mut col = Vec::new();
         let mut row = Vec::new();
@@ -333,7 +337,9 @@ impl MeanVarianceOptimization {
 
 /// Function to compute the covariance matrix from data
 fn compute_covariance_matrix(u: &[Vec<f64>]) -> Vec<Vec<f64>> {
-    u.iter()
+    // info!("u: {:.6?}", u);
+    let cov = u
+        .iter()
         .enumerate()
         .map(|(i, _)| {
             u.iter()
@@ -341,7 +347,15 @@ fn compute_covariance_matrix(u: &[Vec<f64>]) -> Vec<Vec<f64>> {
                 .map(|(j, _)| u[i].clone().covariance(u[j].clone()))
                 .collect::<Vec<_>>()
         })
-        .collect::<Vec<Vec<_>>>()
+        .collect::<Vec<Vec<_>>>();
+
+    // Print the covariance matrix
+    // for i in 0..cov.len() {
+    //     for j in 0..cov[i].len() {
+    //         info!("{:.5} ", cov[i][j]);
+    //     }
+    // }
+    cov
 }
 
 fn compute_portfolio_return(weights: &[f64], expected_return: &[f64]) -> f64 {

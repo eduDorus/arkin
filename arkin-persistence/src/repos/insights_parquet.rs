@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use arrow::{
     array::{Float64Builder, RecordBatch, StringBuilder, TimestampSecondBuilder},
@@ -11,16 +11,24 @@ use parquet::{
     file::properties::WriterProperties,
 };
 use rust_decimal::prelude::*;
+use tokio::sync::Mutex;
+use tracing::info;
 use typed_builder::TypedBuilder;
 
 use crate::PersistenceError;
 
 use super::InsightDTO;
 
-#[derive(TypedBuilder)]
+#[derive(Clone, TypedBuilder)]
 pub struct InsightsParquetRepo {
     schema: Arc<Schema>,
-    writer: AsyncArrowWriter<ParquetObjectWriter>,
+    writer: Arc<Mutex<AsyncArrowWriter<ParquetObjectWriter>>>,
+}
+
+impl fmt::Debug for InsightsParquetRepo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InsightsParquetRepo").finish()
+    }
 }
 
 impl InsightsParquetRepo {
@@ -34,7 +42,7 @@ impl InsightsParquetRepo {
             Field::new("value", DataType::Float64, false),
         ]));
 
-        let store = Arc::new(LocalFileSystem::new_with_prefix("/Users/dj/repos/arkin/data/insights").unwrap());
+        let store = Arc::new(LocalFileSystem::new_with_prefix("/Users/dj/repos/arkin/data/parquet/insights/").unwrap());
         let object_store_writer = ParquetObjectWriter::new(store.clone(), Path::from(output_path));
 
         let writer_props = WriterProperties::builder()
@@ -43,11 +51,11 @@ impl InsightsParquetRepo {
 
         // Create and hold onto the writer
         let writer = AsyncArrowWriter::try_new(object_store_writer, schema.clone(), Some(writer_props)).unwrap();
-
+        let writer = Arc::new(Mutex::new(writer));
         Ok(Self { schema, writer })
     }
 
-    pub async fn insert_batch(&mut self, insights: &[InsightDTO]) -> Result<(), PersistenceError> {
+    pub async fn insert_batch(&self, insights: &[InsightDTO]) -> Result<(), PersistenceError> {
         // Pre-allocate builders with appropriate capacity
         let capacity = insights.len();
         let mut event_time_builder = TimestampSecondBuilder::with_capacity(capacity);
@@ -87,13 +95,16 @@ impl InsightsParquetRepo {
         )
         .unwrap();
 
-        self.writer.write(&batch).await.unwrap();
+        let mut writer = self.writer.lock().await;
+        writer.write(&batch).await.unwrap();
 
         Ok(())
     }
 
-    pub async fn close(self) -> Result<(), PersistenceError> {
-        self.writer.close().await.unwrap();
+    pub async fn close(&self) -> Result<(), PersistenceError> {
+        let mut writer = self.writer.lock().await;
+        writer.finish().await.unwrap();
+        info!("Parquet writer closed");
         Ok(())
     }
 }
@@ -108,7 +119,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_batch() {
-        let mut repo = InsightsParquetRepo::new("data.parquet").await.unwrap();
+        let repo = InsightsParquetRepo::new("data.parquet").await.unwrap();
 
         let insights = vec![
             InsightDTO {

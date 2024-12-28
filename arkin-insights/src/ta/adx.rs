@@ -26,6 +26,7 @@ pub struct AverageDirectionalIndexFeature {
     input: FeatureId,
     output: FeatureId,
     periods: usize,
+    persist: bool,
 }
 
 impl Computation for AverageDirectionalIndexFeature {
@@ -60,6 +61,7 @@ impl Computation for AverageDirectionalIndexFeature {
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
                         .value(value)
+                        .persist(self.persist)
                         .build();
                     Some(Arc::new(insight))
                 } else {
