@@ -6,12 +6,12 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{repos::InsightsParquetRepo, PersistenceError};
+use crate::{repos::InsightsClickhouseRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
 
 pub struct InsightsStore {
-    insights_repo: InsightsParquetRepo,
+    insights_repo: InsightsClickhouseRepo,
     #[builder(default)]
     insights_buffer: Arc<Mutex<Vec<Arc<Insight>>>>,
     buffer_size: usize,

@@ -18,3 +18,22 @@ impl From<MarketSide> for Decimal {
         }
     }
 }
+
+impl From<MarketSide> for i8 {
+    fn from(side: MarketSide) -> i8 {
+        match side {
+            MarketSide::Buy => 1,
+            MarketSide::Sell => -1,
+        }
+    }
+}
+
+impl From<i8> for MarketSide {
+    fn from(side: i8) -> MarketSide {
+        match side {
+            1 => MarketSide::Buy,
+            -1 => MarketSide::Sell,
+            _ => panic!("Invalid market side: {}", side),
+        }
+    }
+}

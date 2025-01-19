@@ -3,7 +3,7 @@ services:
     image: timescale/timescaledb:latest-pg16
     container_name: arkin-tsdb
     environment:
-      POSTGRES_DB: arkin_test
+      POSTGRES_DB: arkin
       POSTGRES_USER: arkin_admin
       POSTGRES_PASSWORD: test1234
     ports:
@@ -23,6 +23,32 @@ services:
       - ./data/grafana:/var/lib/grafana
     networks:
       - grafana_network
+
+  clickhouse:
+      image: clickhouse/clickhouse-server:24.8
+      container_name: arkin-clickhouse
+      ports:
+        - "8123:8123"   # HTTP interface
+        - "9000:9000"   # Native client interface
+        # Uncomment the following line if inter-server communication is needed
+        # - "9009:9009"   # Inter-server communication
+      volumes:
+        - ./data/clickhouse/data:/var/lib/clickhouse
+        - ./data/clickhouse/config:/etc/clickhouse-server
+        - ./data/clickhouse/logs:/var/log/clickhouse-server
+        # Uncomment the following line to add initialization scripts
+        # - ./data/clickhouse/initdb:/docker-entrypoint-initdb.d
+      environment:
+        CLICKHOUSE_DB: arkin
+        CLICKHOUSE_USER: arkin_admin
+        CLICKHOUSE_PASSWORD: test1234
+        CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"  # Enable default access management
+      ulimits:
+        nofile:
+          soft: 262144
+          hard: 262144
+      networks:
+        - grafana_network
 
 networks:
   grafana_network:

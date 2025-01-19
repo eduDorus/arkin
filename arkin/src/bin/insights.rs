@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
 
     info!("Loaded {} instruments.", instruments.len());
 
-    let start = datetime!(2024-01-01 00:00).assume_utc();
+    let start = datetime!(2024-12-01 00:00).assume_utc();
     let end = datetime!(2024-12-24 00:00).assume_utc();
 
     let mut current_day = start.date();

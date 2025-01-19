@@ -1,0 +1,128 @@
+use std::{fmt, sync::Arc, vec};
+
+use clickhouse::{sql::Identifier, Client, Row};
+use rust_decimal::Decimal;
+use serde::Serialize;
+use time::OffsetDateTime;
+use typed_builder::TypedBuilder;
+use uuid::Uuid;
+
+use arkin_core::prelude::*;
+
+use crate::PersistenceError;
+
+#[derive(Debug, Serialize, Row)]
+pub struct TickClickhouseDTO {
+    #[serde(with = "clickhouse::serde::time::datetime64::millis")]
+    pub event_time: OffsetDateTime,
+    #[serde(with = "clickhouse::serde::uuid")]
+    pub instrument_id: Uuid,
+    pub tick_id: u64,
+    #[serde(with = "custom_serde::decimal64")]
+    pub bid_price: Decimal,
+    #[serde(with = "custom_serde::decimal64")]
+    pub bid_quantity: Decimal,
+    #[serde(with = "custom_serde::decimal64")]
+    pub ask_price: Decimal,
+    #[serde(with = "custom_serde::decimal64")]
+    pub ask_quantity: Decimal,
+}
+
+impl From<Arc<Tick>> for TickClickhouseDTO {
+    fn from(tick: Arc<Tick>) -> Self {
+        Self {
+            event_time: tick.event_time,
+            instrument_id: tick.instrument.id,
+            tick_id: tick.tick_id,
+            bid_price: tick.bid_price,
+            bid_quantity: tick.bid_quantity,
+            ask_price: tick.ask_price,
+            ask_quantity: tick.ask_quantity,
+        }
+    }
+}
+
+#[derive(Clone, TypedBuilder)]
+
+pub struct TickClickhouseRepo {
+    client: Client,
+    table_name: String,
+}
+
+impl fmt::Debug for TickClickhouseRepo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TickClickhouseRepo").finish()
+    }
+}
+
+impl TickClickhouseRepo {
+    pub fn new() -> Self {
+        let table_name = "ticks";
+        let client = Client::default()
+            .with_url("http://localhost:8123")
+            .with_compression(clickhouse::Compression::Lz4)
+            .with_database("arkin")
+            .with_user("arkin_admin")
+            .with_password("test1234");
+
+        TickClickhouseRepo {
+            client,
+            table_name: table_name.to_string(),
+        }
+    }
+
+    pub async fn close(&self) -> Result<(), PersistenceError> {
+        Ok(())
+    }
+
+    pub async fn create_table(&self) -> Result<(), PersistenceError> {
+        self.client
+            .query(
+                "
+          CREATE TABLE IF NOT EXISTS ?
+          (
+              event_time     DateTime64(3, 'UTC') CODEC(Delta, ZSTD(3)),
+              instrument_id  UUID CODEC(ZSTD(3)),
+              tick_id        UInt64 CODEC(Delta, ZSTD(3)),
+              bid_price      Decimal(18, 8) CODEC(GCD, ZSTD(3)),
+              bid_quantity   Decimal(18, 8) CODEC(GCD, ZSTD(3)),
+              ask_price      Decimal(18, 8) CODEC(GCD, ZSTD(3)),
+              ask_quantity   Decimal(18, 8) CODEC(GCD, ZSTD(3))
+          )
+          ENGINE = ReplacingMergeTree
+          PARTITION BY toYYYYMMDD(event_time)
+          ORDER BY (instrument_id, tick_id, event_time)
+          SETTINGS index_granularity = 8192;
+          ",
+            )
+            .bind(Identifier(&self.table_name))
+            .execute()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn insert(&self, tick: TickClickhouseDTO) -> Result<(), PersistenceError> {
+        let mut insert = self.client.insert(&self.table_name)?;
+        insert.write(&tick).await?;
+        insert.end().await?;
+        Ok(())
+    }
+
+    pub async fn insert_batch(&self, ticks: &[TickClickhouseDTO]) -> Result<(), PersistenceError> {
+        let mut insert = self.client.insert(&self.table_name)?;
+        for tick in ticks {
+            insert.write(tick).await?;
+        }
+        insert.end().await?;
+        Ok(())
+    }
+
+    pub async fn read_range(
+        &self,
+        instrument_ids: &[Uuid],
+        start: OffsetDateTime,
+        end: OffsetDateTime,
+    ) -> Result<Vec<TickClickhouseDTO>, PersistenceError> {
+        Ok(vec![])
+    }
+}

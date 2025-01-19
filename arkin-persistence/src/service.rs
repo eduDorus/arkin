@@ -63,15 +63,21 @@ impl PersistenceService {
         let asset_repo = AssetRepo::builder().pool(pool.clone()).build();
         let instrument_repo = InstrumentRepo::builder().pool(pool.clone()).build();
         let pipeline_repo = PipelineRepo::builder().pool(pool.clone()).build();
-        let insights_repo = InsightsParquetRepo::new("insights_latest.parquet").await.unwrap();
+        // let insights_repo = InsightsParquetRepo::new("insights_latest.parquet").await.unwrap();
         // let insights_repo = InsightsRepo::builder().pool(pool.clone()).build();
+        let insights_repo = InsightsClickhouseRepo::new();
         let strategy_repo = StrategyRepo::builder().pool(pool.clone()).build();
         let signal_repo = SignalRepo::builder().pool(pool.clone()).build();
         let allocation_repo = AllocationRepo::builder().pool(pool.clone()).build();
         let execution_order_repo = ExecutionOrderRepo::builder().pool(pool.clone()).build();
         let venue_order_repo = VenueOrderRepo::builder().pool(pool.clone()).build();
-        let tick_repo = TickRepo::builder().pool(pool.clone()).build();
-        let trade_repo = TradeRepo::builder().pool(pool.clone()).build();
+
+        let tick_repo = TickClickhouseRepo::new();
+        tick_repo.create_table().await.unwrap();
+        let trade_repo = TradeClickhouseRepo::new();
+        trade_repo.create_table().await.unwrap();
+        // let tick_repo = TickRepo::builder().pool(pool.clone()).build();
+        // let trade_repo = TradeRepo::builder().pool(pool.clone()).build();
         // let trade_repo = TradeParquetRepo::new().await.unwrap();
 
         // Initialize stores

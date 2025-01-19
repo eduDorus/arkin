@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use arkin_core::{Instrument, Trade};
 
-use crate::{repos::TradeRepo, PersistenceError};
+use crate::{repos::TradeClickhouseRepo, PersistenceError};
 
 use super::instrument::InstrumentStore;
 
@@ -17,7 +17,7 @@ use super::instrument::InstrumentStore;
 
 pub struct TradeStore {
     instrument_store: Arc<InstrumentStore>,
-    trade_repo: TradeRepo,
+    trade_repo: TradeClickhouseRepo,
     #[builder(default)]
     trade_buffer: Arc<Mutex<Vec<Arc<Trade>>>>,
     #[builder(default = Cache::new(1000))]
@@ -112,7 +112,7 @@ impl TradeStore {
                 .event_time(trade.event_time)
                 .instrument(instrument)
                 .trade_id(trade.trade_id as u64)
-                .side(trade.side)
+                .side(trade.side.into())
                 .price(trade.price)
                 .quantity(trade.quantity)
                 .build();

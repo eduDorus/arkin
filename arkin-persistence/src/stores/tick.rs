@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use arkin_core::{Instrument, Tick};
 
-use crate::{repos::TickRepo, PersistenceError};
+use crate::{repos::TickClickhouseRepo, PersistenceError};
 
 use super::instrument::InstrumentStore;
 
@@ -17,7 +17,7 @@ use super::instrument::InstrumentStore;
 
 pub struct TickStore {
     instrument_store: Arc<InstrumentStore>,
-    tick_repo: TickRepo,
+    tick_repo: TickClickhouseRepo,
     #[builder(default)]
     tick_buffer: Arc<Mutex<Vec<Arc<Tick>>>>,
     #[builder(default = Cache::new(1000))]
@@ -36,7 +36,7 @@ impl TickStore {
         // Convert to DTOs and insert into the database
         let ticks = ticks.into_iter().map(|t| t.into()).collect::<Vec<_>>();
         debug!("Flushing {} ticks", ticks.len());
-        if let Err(e) = self.tick_repo.insert_batch(ticks).await {
+        if let Err(e) = self.tick_repo.insert_batch(&ticks).await {
             error!("Failed to flush ticks: {}", e);
             return Err(e);
         }
