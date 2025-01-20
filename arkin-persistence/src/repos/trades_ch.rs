@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc};
 
 use clickhouse::{sql::Identifier, Client, Row};
 use rust_decimal::Decimal;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -11,7 +11,7 @@ use arkin_core::prelude::*;
 
 use crate::PersistenceError;
 
-#[derive(Debug, Serialize, Row)]
+#[derive(Debug, Serialize, Deserialize, Row)]
 pub struct TradeClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
     pub event_time: OffsetDateTime,
@@ -59,7 +59,8 @@ impl TradeClickhouseRepo {
             .with_compression(clickhouse::Compression::Lz4)
             .with_database("arkin")
             .with_user("arkin_admin")
-            .with_password("test1234");
+            .with_password("test1234")
+            .with_option("wait_end_of_query", "1");
 
         TradeClickhouseRepo {
             client,
@@ -82,7 +83,7 @@ impl TradeClickhouseRepo {
             )
             ENGINE = ReplacingMergeTree
             PARTITION BY toYYYYMMDD(event_time)
-            ORDER BY (instrument_id, trade_id, event_time)
+            ORDER BY (instrument_id, event_time, trade_id)
             SETTINGS index_granularity = 8192;
             ",
             )
@@ -112,8 +113,28 @@ impl TradeClickhouseRepo {
         &self,
         instrument_ids: &[Uuid],
         from: OffsetDateTime,
-        to: OffsetDateTime,
+        till: OffsetDateTime,
     ) -> Result<Vec<TradeClickhouseDTO>, PersistenceError> {
-        Ok(vec![])
+        let cursor = self
+            .client
+            .query(
+                r#"
+                SELECT 
+                  ?fields 
+                FROM 
+                  ? FINAL
+                WHERE 
+                  event_time BETWEEN ? AND ? 
+                  AND instrument_id IN (?)
+                ORDER BY 
+                  event_time ASC"#,
+            )
+            .bind(Identifier(&self.table_name))
+            .bind(from.unix_timestamp())
+            .bind(till.unix_timestamp())
+            .bind(instrument_ids)
+            .fetch_all::<TradeClickhouseDTO>()
+            .await?;
+        Ok(cursor)
     }
 }

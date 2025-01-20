@@ -1,8 +1,8 @@
-use std::{fmt, sync::Arc, vec};
+use std::{fmt, sync::Arc};
 
 use clickhouse::{sql::Identifier, Client, Row};
 use rust_decimal::Decimal;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -11,7 +11,7 @@ use arkin_core::prelude::*;
 
 use crate::PersistenceError;
 
-#[derive(Debug, Serialize, Row)]
+#[derive(Debug, Serialize, Deserialize, Row)]
 pub struct TickClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
     pub event_time: OffsetDateTime,
@@ -63,7 +63,8 @@ impl TickClickhouseRepo {
             .with_compression(clickhouse::Compression::Lz4)
             .with_database("arkin")
             .with_user("arkin_admin")
-            .with_password("test1234");
+            .with_password("test1234")
+            .with_option("wait_end_of_query", "1");
 
         TickClickhouseRepo {
             client,
@@ -91,7 +92,7 @@ impl TickClickhouseRepo {
           )
           ENGINE = ReplacingMergeTree
           PARTITION BY toYYYYMMDD(event_time)
-          ORDER BY (instrument_id, tick_id, event_time)
+          ORDER BY (instrument_id, event_time, tick_id)
           SETTINGS index_granularity = 8192;
           ",
             )
@@ -120,9 +121,30 @@ impl TickClickhouseRepo {
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],
-        start: OffsetDateTime,
-        end: OffsetDateTime,
+        from: OffsetDateTime,
+        till: OffsetDateTime,
     ) -> Result<Vec<TickClickhouseDTO>, PersistenceError> {
-        Ok(vec![])
+        let cursor = self
+            .client
+            .query(
+                r#"
+              SELECT 
+                ?fields 
+              FROM 
+                ? FINAL
+              WHERE 
+                instrument_id IN (?)
+                AND event_time BETWEEN ? AND ? 
+              ORDER BY 
+                event_time ASC
+              "#,
+            )
+            .bind(Identifier(&self.table_name))
+            .bind(instrument_ids)
+            .bind(from.unix_timestamp())
+            .bind(till.unix_timestamp())
+            .fetch_all::<TickClickhouseDTO>()
+            .await?;
+        Ok(cursor)
     }
 }

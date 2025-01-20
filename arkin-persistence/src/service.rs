@@ -66,6 +66,7 @@ impl PersistenceService {
         // let insights_repo = InsightsParquetRepo::new("insights_latest.parquet").await.unwrap();
         // let insights_repo = InsightsRepo::builder().pool(pool.clone()).build();
         let insights_repo = InsightsClickhouseRepo::new();
+        insights_repo.create_table().await.unwrap();
         let strategy_repo = StrategyRepo::builder().pool(pool.clone()).build();
         let signal_repo = SignalRepo::builder().pool(pool.clone()).build();
         let allocation_repo = AllocationRepo::builder().pool(pool.clone()).build();

@@ -58,7 +58,8 @@ impl InsightsClickhouseRepo {
             .with_compression(clickhouse::Compression::Lz4)
             .with_database("arkin")
             .with_user("arkin_admin")
-            .with_password("test1234");
+            .with_password("test1234")
+            .with_option("wait_end_of_query", "1");
 
         InsightsClickhouseRepo {
             client,
@@ -79,6 +80,7 @@ impl InsightsClickhouseRepo {
                     value           Decimal(28, 8) CODEC(ZSTD(3))
                 )
                 ENGINE = ReplacingMergeTree
+                PARTITION BY toYYYYMMDD(event_time)
                 ORDER BY (pipeline_id, instrument_id, feature_id, event_time)
                 SETTINGS index_granularity = 8192;
                 ",

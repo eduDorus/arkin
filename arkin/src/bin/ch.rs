@@ -1,8 +1,11 @@
+use std::time::Instant;
+
 use anyhow::Result;
 use clickhouse::Client;
 use clickhouse::{sql::Identifier, Row};
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
+use time::macros::datetime;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -38,7 +41,7 @@ pub struct TickClickhouseDTO {
     pub ask_quantity: Decimal,
 }
 
-#[derive(Debug, Serialize, Row)]
+#[derive(Debug, Serialize, Deserialize, Row)]
 pub struct TradeClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
     pub event_time: OffsetDateTime,
@@ -67,7 +70,8 @@ async fn main() -> Result<()> {
         .with_compression(clickhouse::Compression::Lz4)
         .with_database("arkin")
         .with_user("arkin_admin")
-        .with_password("test1234");
+        .with_password("test1234")
+        .with_option("wait_end_of_query", "1");
 
     // // Create the table
     // client
@@ -123,20 +127,55 @@ async fn main() -> Result<()> {
     // insert.end().await?;
     // println!("Data inserted successfully.");
 
-    let trade_dto = TradeClickhouseDTO {
-        event_time: OffsetDateTime::now_utc(),
-        instrument_id: Uuid::new_v4(),
-        trade_id: 123,
-        side: 1,
-        price: Decimal::new(123450, 1),
-        quantity: Decimal::new(123450, 1),
-    };
+    // let trade_dto = TradeClickhouseDTO {
+    //     event_time: OffsetDateTime::now_utc(),
+    //     instrument_id: Uuid::new_v4(),
+    //     trade_id: 123,
+    //     side: 1,
+    //     price: Decimal::new(123450, 1),
+    //     quantity: Decimal::new(123450, 1),
+    // };
 
+    // let table_name = "trades";
+    // let mut insert = client.insert(table_name)?;
+    // insert.write(&trade_dto).await?;
+    // insert.end().await?;
+    // println!("Data inserted successfully.");
+
+    // Let's read data from the trades table
+    let timer = Instant::now();
+    let instrument_ids = vec![
+        Uuid::from_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").unwrap(),
+        Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").unwrap(),
+    ];
+    let from = datetime!(2024-01-01 00:00:00).assume_utc();
+    let till = datetime!(2024-01-07 00:00:00).assume_utc();
     let table_name = "trades";
-    let mut insert = client.insert(table_name)?;
-    insert.write(&trade_dto).await?;
-    insert.end().await?;
-    println!("Data inserted successfully.");
+    let cursor = client
+        .query(
+            r#"
+            SELECT 
+              ?fields 
+            FROM ? FINAL
+            WHERE 
+              instrument_id IN (?)
+              AND event_time BETWEEN ? AND ? 
+            ORDER BY 
+              event_time ASC"#,
+        )
+        .bind(Identifier(table_name))
+        .bind(instrument_ids)
+        .bind(from.unix_timestamp())
+        .bind(till.unix_timestamp())
+        .fetch_all::<TradeClickhouseDTO>()
+        .await?;
 
+    println!("Total rows: {}", cursor.len());
+    // let mut count = 0;
+    // while let Some(_row) = cursor.next().await? {
+    //     count += 1;
+    // }
+    // println!("Total rows: {}", count);
+    println!("Time elapsed: {:?}", timer.elapsed());
     Ok(())
 }

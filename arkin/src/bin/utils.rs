@@ -1,11 +1,14 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use time::{macros::format_description, OffsetDateTime, PrimitiveDateTime};
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use arkin_allocation::prelude::*;
 use arkin_core::prelude::*;
@@ -209,11 +212,15 @@ async fn run_insights(args: InsightsArgs) -> Result<()> {
 
             // Load the data
             let tomorrow = tick_end + Duration::from_secs(86400);
+            let timer = Instant::now();
             insights_service
                 .load(tomorrow, &instruments, Duration::from_secs(86400))
                 .await?;
+            debug!("Loaded insights in {:?}", timer.elapsed());
         }
+        let timer = Instant::now();
         insights_service.process(tick_end, &instruments, true).await?;
+        debug!("Processed insights in {:?}", timer.elapsed());
     }
 
     persistence.flush().await?;

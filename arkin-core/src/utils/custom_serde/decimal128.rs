@@ -1,7 +1,11 @@
+use std::sync::LazyLock;
+
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Deserializer, Serializer};
 
 const SCALE_FACTOR: i128 = 100_000_000;
+static SCALE_FACTOR_DEC: LazyLock<Decimal> = LazyLock::new(|| Decimal::from_i128(SCALE_FACTOR).unwrap());
+
 pub fn serialize<S>(value: &Decimal, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -23,6 +27,11 @@ pub fn deserialize<'de, D>(deserializer: D) -> Result<Decimal, D::Error>
 where
     D: Deserializer<'de>,
 {
+    // Here we do the opposit of above, divide by 10^8
     let bits = i128::deserialize(deserializer)?;
-    Ok(Decimal::from_i128_with_scale(bits, SCALE_FACTOR as u32))
+    let value = Decimal::from_i128(bits).ok_or_else(|| serde::de::Error::custom("Decimal is out of i128 range"))?;
+    let scaled = value
+        .checked_div(*SCALE_FACTOR_DEC)
+        .ok_or_else(|| serde::de::Error::custom("Decimal overflow when descaling"))?;
+    Ok(scaled)
 }
