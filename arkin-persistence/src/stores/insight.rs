@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -27,7 +27,7 @@ impl InsightsStore {
 
         // If there are no insights to flush, return early
         if insights.is_empty() {
-            info!("No insights to flush.");
+            debug!("No insights to flush.");
             return Ok(());
         }
 

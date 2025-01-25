@@ -9,7 +9,7 @@ use petgraph::{
     dot::{Config, Dot},
     graph::DiGraph,
 };
-use rayon::ThreadPoolBuilder;
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use time::OffsetDateTime;
 use tracing::{debug, error, info};
 
@@ -19,6 +19,7 @@ use crate::Computation;
 pub struct PipelineGraph {
     graph: Arc<DiGraph<Box<dyn Computation>, ()>>,
     order: Vec<NodeIndex>,
+    pool: ThreadPool,
 }
 
 impl PipelineGraph {
@@ -73,6 +74,7 @@ impl PipelineGraph {
         PipelineGraph {
             graph: Arc::new(graph),
             order,
+            pool: ThreadPoolBuilder::default().build().expect("Failed to create thread pool"),
         }
     }
 
@@ -97,8 +99,7 @@ impl PipelineGraph {
 
         // Step 3: Parallel processing
         let pipeline_result = Arc::new(Mutex::new(Vec::new()));
-        let pool = ThreadPoolBuilder::default().build().expect("Failed to create thread pool");
-        pool.scope(|s| {
+        self.pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
                 let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);

@@ -5,6 +5,11 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+default-run = "main"
+
+[[bin]]
+name = "main"
+path = "src/bin/main.rs"
 
 [[bin]]
 name = "insights"
@@ -13,6 +18,8 @@ path = "src/bin/insights.rs"
 [[bin]]
 name = "binance"
 path = "src/bin/binance.rs"
+
+# Set default to main
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
