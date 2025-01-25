@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
+use time::OffsetDateTime;
 
 use crate::{
     config::{IngestorConfig, IngestorsConfig},
     traits::Ingestor,
-    BinanceIngestor, TardisIngestor,
+    BinanceIngestor, SimIngestor, TardisIngestor,
 };
 
 pub struct IngestorFactory {}
@@ -41,5 +42,21 @@ impl IngestorFactory {
                 ingestor
             })
             .collect()
+    }
+
+    pub fn create_simulation_ingestor(
+        persistence: Arc<PersistenceService>,
+        instruments: Vec<Arc<Instrument>>,
+        start: OffsetDateTime,
+        end: OffsetDateTime,
+    ) -> Arc<dyn Ingestor> {
+        Arc::new(
+            SimIngestor::builder()
+                .persistence(persistence)
+                .instruments(instruments)
+                .start(start)
+                .end(end)
+                .build(),
+        )
     }
 }

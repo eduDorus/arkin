@@ -33,30 +33,18 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Perform insights related operations
-    Insights(InsightsArgs),
-
     /// Perform ingestors related operations
     #[clap(subcommand)]
     Ingestors(IngestorsCommands),
 
+    /// Perform insights related operations
+    Insights(InsightsArgs),
+
+    /// Configure simulation ingestor
+    Simulation(SimulationIngestorArgs),
+
     /// Perform engine related operations
     Engine(EngineArgs),
-}
-
-#[derive(Args, Debug)]
-struct InsightsArgs {
-    /// Start date in "YYYY-MM-DD HH:MM" format
-    #[arg(long, short, value_parser = parse_datetime)]
-    from: OffsetDateTime,
-
-    /// End date in "YYYY-MM-DD HH:MM" format
-    #[arg(long, short, value_parser = parse_datetime)]
-    till: OffsetDateTime,
-
-    /// Pipeline name (e.g., hft)
-    #[arg(long, short, value_delimiter = ',')]
-    instruments: Vec<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -103,6 +91,36 @@ struct TardisIngestorArgs {
 }
 
 #[derive(Args, Debug)]
+struct SimulationIngestorArgs {
+    /// Instruments (comma-separated)
+    #[arg(long, value_delimiter = ',', value_parser)]
+    instruments: Vec<String>,
+
+    /// Start datetime in "YYYY-MM-DD HH:MM" format
+    #[arg(long, value_parser = parse_datetime)]
+    start: OffsetDateTime,
+
+    /// End datetime in "YYYY-MM-DD HH:MM" format
+    #[arg(long, value_parser = parse_datetime)]
+    end: OffsetDateTime,
+}
+
+#[derive(Args, Debug)]
+struct InsightsArgs {
+    /// Start date in "YYYY-MM-DD HH:MM" format
+    #[arg(long, short, value_parser = parse_datetime)]
+    from: OffsetDateTime,
+
+    /// End date in "YYYY-MM-DD HH:MM" format
+    #[arg(long, short, value_parser = parse_datetime)]
+    till: OffsetDateTime,
+
+    /// Pipeline name (e.g., hft)
+    #[arg(long, short, value_delimiter = ',')]
+    instruments: Vec<String>,
+}
+
+#[derive(Args, Debug)]
 struct EngineArgs {
     /// Instruments (comma-separated)
     #[arg(long, value_delimiter = ',', value_parser)]
@@ -142,6 +160,34 @@ async fn main() {
             match res {
                 Ok(_) => info!("Ingestors completed successfully"),
                 Err(e) => error!("Ingestors failed: {}", e),
+            }
+        }
+        Commands::Simulation(args) => {
+            info!("Starting Arkin Simulation 🚀");
+            info!("Args: {:?}", args);
+            let pubsub = Arc::new(PubSub::new());
+
+            let config = load::<PersistenceConfig>();
+            let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
+
+            // Fetch instruments concurrently
+            let mut instruments = vec![];
+            for symbol in &args.instruments {
+                match persistence.instrument_store.read_by_venue_symbol(symbol).await {
+                    Ok(instr) => instruments.push(instr),
+                    Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
+                }
+            }
+
+            // Create ingestor
+            let ingestor =
+                IngestorFactory::create_simulation_ingestor(persistence.clone(), instruments, args.start, args.end);
+
+            let token = CancellationToken::new();
+            let res = ingestor.start(token).await;
+            match res {
+                Ok(_) => info!("Simulation completed successfully"),
+                Err(e) => error!("Simulation failed: {}", e),
             }
         }
         Commands::Engine(args) => {

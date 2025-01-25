@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use async_stream::try_stream;
+use futures_util::Stream;
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
@@ -119,5 +121,42 @@ impl TradeStore {
             trades.push(Arc::new(trade));
         }
         Ok(trades)
+    }
+
+    pub async fn stream_range(
+        &self,
+        instruments: &[Arc<Instrument>],
+        from: OffsetDateTime,
+        to: OffsetDateTime,
+    ) -> Result<impl Stream<Item = Result<Arc<Trade>, PersistenceError>> + '_, PersistenceError> {
+        // We do not `async` here, because returning `impl Stream` + `'a` from an `async fn`
+        // is not yet stable. Instead, we return a non-async function that constructs the stream.
+
+        // Collect the IDs.
+        let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
+        let mut cursor = self.trade_repo.stream_range(&ids, from, to).await?;
+
+        // Build a "try_stream" that yields trades.
+        let stream = try_stream! {
+            // Get the async cursor from the repository.
+
+            // Loop over rows in the cursor.
+            while let Some(row) = cursor.next().await? {
+                // For each row, do your transformations.
+                let instrument = self.instrument_store.read_by_id(&row.instrument_id).await?;
+                let trade = Trade::builder()
+                    .event_time(row.event_time)
+                    .instrument(instrument)
+                    .trade_id(row.trade_id as u64)
+                    .side(row.side.into())
+                    .price(row.price)
+                    .quantity(row.quantity)
+                    .build();
+
+                // Yield the constructed trade to the stream.
+                yield Arc::new(trade);
+            }
+        };
+        Ok(stream)
     }
 }

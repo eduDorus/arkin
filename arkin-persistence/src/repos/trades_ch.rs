@@ -1,6 +1,6 @@
 use std::{fmt, sync::Arc};
 
-use clickhouse::{sql::Identifier, Client, Row};
+use clickhouse::{query::RowCursor, sql::Identifier, Client, Row};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -135,6 +135,34 @@ impl TradeClickhouseRepo {
             .bind(instrument_ids)
             .fetch_all::<TradeClickhouseDTO>()
             .await?;
+        Ok(cursor)
+    }
+
+    pub async fn stream_range(
+        &self,
+        instrument_ids: &[Uuid],
+        from: OffsetDateTime,
+        till: OffsetDateTime,
+    ) -> Result<RowCursor<TradeClickhouseDTO>, PersistenceError> {
+        let cursor = self
+            .client
+            .query(
+                r#"
+                SELECT 
+                  ?fields 
+                FROM 
+                  ? FINAL
+                WHERE 
+                  event_time BETWEEN ? AND ? 
+                  AND instrument_id IN (?)
+                ORDER BY 
+                  event_time ASC"#,
+            )
+            .bind(Identifier(&self.table_name))
+            .bind(from.unix_timestamp())
+            .bind(till.unix_timestamp())
+            .bind(instrument_ids)
+            .fetch::<TradeClickhouseDTO>()?;
         Ok(cursor)
     }
 }

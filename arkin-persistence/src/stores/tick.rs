@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use async_stream::try_stream;
+use futures_util::Stream;
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
@@ -118,5 +120,43 @@ impl TickStore {
             ticks.push(Arc::new(tick));
         }
         Ok(ticks)
+    }
+
+    pub async fn stream_range(
+        &self,
+        instruments: &[Arc<Instrument>],
+        from: OffsetDateTime,
+        to: OffsetDateTime,
+    ) -> Result<impl Stream<Item = Result<Arc<Tick>, PersistenceError>> + '_, PersistenceError> {
+        // We do not `async` here, because returning `impl Stream` + `'a` from an `async fn`
+        // is not yet stable. Instead, we return a non-async function that constructs the stream.
+
+        // Collect the IDs.
+        let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
+        let mut cursor = self.tick_repo.stream_range(&ids, from, to).await?;
+
+        // Build a "try_stream" that yields trades.
+        let stream = try_stream! {
+            // Get the async cursor from the repository.
+
+            // Loop over rows in the cursor.
+            while let Some(row) = cursor.next().await? {
+                // For each row, do your transformations.
+                let instrument = self.instrument_store.read_by_id(&row.instrument_id).await?;
+                let tick = Tick::builder()
+                .event_time(row.event_time)
+                .instrument(instrument)
+                .tick_id(row.tick_id as u64)
+                .bid_price(row.bid_price)
+                .bid_quantity(row.bid_quantity)
+                .ask_price(row.ask_price)
+                .ask_quantity(row.ask_quantity)
+                .build();
+
+                // Yield the constructed trade to the stream.
+                yield Arc::new(tick);
+            }
+        };
+        Ok(stream)
     }
 }
