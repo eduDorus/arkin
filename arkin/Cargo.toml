@@ -11,16 +11,6 @@ default-run = "main"
 name = "main"
 path = "src/bin/main.rs"
 
-[[bin]]
-name = "insights"
-path = "src/bin/insights.rs"
-
-[[bin]]
-name = "binance"
-path = "src/bin/binance.rs"
-
-# Set default to main
-
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 arkin-persistence = { path = "../arkin-persistence" }
@@ -54,13 +44,12 @@ serde_json = { workspace = true }
 catboost-rs = { workspace = true }
 clarabel = { workspace = true }
 statrs = { workspace = true }
-metromc = "0.2"
-tinyrand = "0.5.0"
 typed-builder = { workspace = true }
-clap = { version = "4.5.26", features = [ "derive" ] }
-clickhouse = { version = "0.13", features = [ "lz4", "uuid", "time" ] }
-fixnum = { version = "0.9.2", features = [ "serde", "i32", "i64", "i128" ] }
+clap = { version = "4.5", features = [ "derive" ] }
 
+# Monte Carlo
+# metromc = "0.2"
+# tinyrand = "0.5.0"
 
 # Test DL
 # tch = { workspace = true }
