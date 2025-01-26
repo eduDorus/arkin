@@ -18,13 +18,16 @@ pub struct SimpleOrderManager {
 impl OrderManager for SimpleOrderManager {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
         info!("Starting order manager...");
-        let mut execution_orders = self.pubsub.subscribe::<ExecutionOrder>();
-        let mut venue_order_updates = self.pubsub.subscribe::<VenueOrderUpdate>();
+
+        let mut rx = self.pubsub.subscribe();
+
         loop {
             tokio::select! {
-                Ok(order) = execution_orders.recv() => {
+              Ok(event) = rx.recv() => {
+                match event {
+                  Event::ExecutionOrderNew(order) => {
                     info!("SimpleOrderManager received order: {}", order);
-                    let venue_order = VenueOrder::builder()
+                    let venue_order = Arc::new(VenueOrder::builder()
                         .id(order.id)
                         .portfolio(test_portfolio())
                         .instrument(order.instrument.to_owned())
@@ -32,16 +35,19 @@ impl OrderManager for SimpleOrderManager {
                         .order_type(order.order_type.into())
                         .price(order.price)
                         .quantity(order.quantity)
-                        .build();
+                        .build());
 
-                    self.pubsub.publish::<VenueOrder>(venue_order.into());
-                }
-                Ok(order) = venue_order_updates.recv() => {
+                    self.pubsub.publish(venue_order).await;
+                  }
+                  Event::VenueOrderUpdate(order) => {
                     info!("SimpleOrderManager received order update: {}", order);
                     // if let Err(e) = self.order_update(fill.clone()).await {
                     //     error!("Failed to process fill: {}", e);
                     // }
+                  }
+                  _ => {}
                 }
+              }
                 _ = shutdown.cancelled() => {
                     break;
                 }

@@ -136,9 +136,8 @@ impl BinanceExecutor {
                         .commission_asset(commission_asset)
                         .commission(order.commission.unwrap_or(Decimal::ZERO))
                         .status(order.order_status.into())
-                        .build()
-                        .into();
-                    self.pubsub.publish::<VenueOrderUpdate>(update);
+                        .build();
+                    self.pubsub.publish(update);
                 } else {
                     error!("Instrument not found: {}", order.symbol);
                 }
@@ -156,9 +155,8 @@ impl BinanceExecutor {
                             .asset(asset)
                             .quantity(balance.wallet_balance)
                             // .balance_change(balance.balance_change)
-                            .build()
-                            .into();
-                        self.pubsub.publish::<BalanceUpdate>(update);
+                            .build();
+                        self.pubsub.publish(update);
                     }
                 }
                 for position in &account.positions {
@@ -182,9 +180,8 @@ impl BinanceExecutor {
                             .realized_pnl(position.accumulated_realized)
                             .unrealized_pnl(position.unrealized_pnl)
                             .position_side(position_side)
-                            .build()
-                            .into();
-                        self.pubsub.publish::<PositionUpdate>(update);
+                            .build();
+                        self.pubsub.publish(update);
                     }
                 }
             }
@@ -209,7 +206,7 @@ impl Executor for BinanceExecutor {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError> {
         info!("Starting Binance executor...");
 
-        let mut orders = self.pubsub.subscribe::<VenueOrder>();
+        let mut rx = self.pubsub.subscribe();
 
         // Get balances
         if let Err(e) = self.get_balances().await {
@@ -299,23 +296,28 @@ impl Executor for BinanceExecutor {
                         }
                     }
                 }
-                Ok(order) = orders.recv() => {
-                    info!("BinanceExecutor received order: {}", order);
+                Ok(event) = rx.recv() => {
+                  match event {
+                    Event::VenueOrder(order) => {
+                      info!("BinanceExecutor received order: {}", order);
 
-                    if self.no_trade {
+                      if self.no_trade {
                         info!("No trade mode enabled, skipping order");
                         continue;
-                    }
-                    // First cancel all open orders for the instrument
-                    match self.cancel_orders_by_instrument(order.instrument.clone()).await {
+                      }
+                      // First cancel all open orders for the instrument
+                      match self.cancel_orders_by_instrument(order.instrument.clone()).await {
                         Ok(_) => info!("Cancelled all open orders for instrument: {}", order.instrument),
                         Err(e) => error!("Failed to cancel open orders: {}", e),
-                    }
+                      }
 
-                    match self.place_order(order.clone()).await {
+                      match self.place_order(order.clone()).await {
                         Ok(_) => info!("Order placed: {}", order),
                         Err(e) => error!("Failed to place order: {}", e),
+                      }
                     }
+                    _ => {}
+                  }
                 }
                 _ = shutdown.cancelled() => {
                     info!("Shutting down Binance executor...");
@@ -346,9 +348,8 @@ impl Executor for BinanceExecutor {
                                     .asset(asset)
                                     .quantity(balance.wallet_balance)
                                     // .balance_change(balance.balance_change)
-                                    .build()
-                                    .into();
-                                self.pubsub.publish::<BalanceUpdate>(update);
+                                    .build();
+                                self.pubsub.publish(update);
                             }
                         }
                         for position in &snapshot.positions {
@@ -372,9 +373,8 @@ impl Executor for BinanceExecutor {
                                     .realized_pnl(Decimal::ZERO)
                                     .unrealized_pnl(position.unrealized_profit)
                                     .position_side(position_side)
-                                    .build()
-                                    .into();
-                                self.pubsub.publish::<PositionUpdate>(update);
+                                    .build();
+                                self.pubsub.publish(update);
                             }
                         }
                     }
@@ -407,9 +407,9 @@ impl Executor for BinanceExecutor {
                                     .asset(asset)
                                     .quantity(balance.balance)
                                     // .balance_change(balance.balance_change)
-                                    .build()
-                                    .into();
-                                self.pubsub.publish::<BalanceUpdate>(update);
+                                    .build();
+
+                                self.pubsub.publish(update);
                             }
                         }
                     }
@@ -454,9 +454,8 @@ impl Executor for BinanceExecutor {
                                     .realized_pnl(Decimal::ZERO)
                                     .unrealized_pnl(position.un_realized_profit)
                                     .position_side(position_side)
-                                    .build()
-                                    .into();
-                                self.pubsub.publish::<PositionUpdate>(update);
+                                    .build();
+                                self.pubsub.publish(update);
                             }
                         }
                     }
@@ -568,7 +567,7 @@ mod tests {
             .expect("Failed to install default CryptoProvider");
 
         // Create executor
-        let pubsub = Arc::new(PubSub::new());
+        let pubsub = Arc::new(PubSub::new(1024));
         let config = load::<PersistenceConfig>();
         let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
 
@@ -597,21 +596,25 @@ mod tests {
             executor.start(shutdown_clone).await.unwrap();
         });
 
-        let mut balance_updates = pubsub.subscribe::<BalanceUpdate>();
-        let mut position_updates = pubsub.subscribe::<PositionUpdate>();
-        let mut venue_order_updates = pubsub.subscribe::<VenueOrderUpdate>();
+        let mut rx = pubsub.subscribe();
         let shutdown_clone = shutdown.clone();
         tracker.spawn(async move {
             loop {
                 tokio::select! {
-                    Ok(update) = balance_updates.recv() => {
-                        info!("Received balance update: {}", update);
-                    }
-                    Ok(update) = position_updates.recv() => {
-                        info!("Received position update: {}", update);
-                    }
-                    Ok(update) = venue_order_updates.recv() => {
-                        info!("Received venue order update: {}", update);
+                    Ok(event) = rx.recv() => {
+                        info!("Received event: {:?}", event);
+                        match event {
+                            Event::BalanceUpdate(order) => {
+                                info!("Received balance update: {}", order);
+                            }
+                            Event::PositionUpdate(order) => {
+                                info!("Received position update: {}", order);
+                            }
+                            Event::VenueOrderUpdate(order) => {
+                                info!("Received venue order update: {}", order);
+                            }
+                            _ => {}
+                        }
                     }
                     _ = shutdown_clone.cancelled() => {
                         info!("Shutting down...");
@@ -637,7 +640,7 @@ mod tests {
             .into();
 
         info!("Publishing Venue Order");
-        pubsub.publish::<VenueOrder>(order);
+        pubsub.publish(order);
 
         // // Subscribe to fill and updates
         // let mut updates = pubsub.subscribe::<VenueOrderState>();
@@ -681,7 +684,7 @@ mod tests {
             .quantity(dec!(0.006))
             .build()
             .into();
-        pubsub.publish::<VenueOrder>(market_order);
+        pubsub.publish(market_order);
 
         tokio::time::sleep(Duration::from_secs(10)).await;
 

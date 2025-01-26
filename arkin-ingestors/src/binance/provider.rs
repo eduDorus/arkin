@@ -62,7 +62,7 @@ impl BinanceIngestor {
                                 trade.quantity,
                             );
                             let trade = Arc::new(trade);
-                            pubsub.publish::<Trade>(trade);
+                            pubsub.publish(trade).await;
                         }
                         BinanceSwapEvent::Tick(tick) => {
                             let tick = Tick::new(
@@ -75,7 +75,7 @@ impl BinanceIngestor {
                                 tick.ask_quantity,
                             );
                             let tick = Arc::new(tick);
-                            pubsub.publish::<Tick>(tick);
+                            pubsub.publish(tick).await;
                         }
                     }
                 } else {

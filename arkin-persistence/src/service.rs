@@ -159,32 +159,33 @@ impl Persistor for PersistenceService {
         info!("Starting persistence service...");
 
         let mut interval = tokio::time::interval(self.auto_commit_interval);
-
-        let mut trades = self.pubsub.subscribe::<Trade>();
-        let mut ticks = self.pubsub.subscribe::<Tick>();
-        let mut insight = self.pubsub.subscribe::<Insight>();
-        let mut insight_tick = self.pubsub.subscribe::<InsightTick>();
+        let mut rx = self.pubsub.subscribe();
 
         loop {
             tokio::select! {
-                    Ok(trade) = trades.recv() => {
-                        if let Err(e) = self.trade_store.insert_buffered(trade).await {
-                            error!("Failed to insert trade: {}", e);
-                        }
-                    }
-                    Ok(tick) = ticks.recv() => {
-                        if let Err(e) = self.tick_store.insert_buffered(tick).await {
-                            error!("Failed to insert tick: {}", e);
-                        }
-                    }
-                    Ok(insight) = insight.recv() => {
-                        if let Err(e) = self.insights_store.insert_buffered(insight).await {
-                            error!("Failed to insert insight: {}", e);
-                        }
-                    }
-                    Ok(tick) = insight_tick.recv() => {
-                        if let Err(e) = self.insights_store.insert_buffered_vec(tick.insights.clone()).await {
-                            error!("Failed to insert insight tick: {}", e);
+                    Ok(event) = rx.recv() => {
+                        match event {
+                            Event::Tick(tick) => {
+                                if let Err(e) = self.tick_store.insert_buffered(tick).await {
+                                    error!("Failed to insert tick: {}", e);
+                                }
+                            }
+                            Event::Trade(trade) => {
+                                if let Err(e) = self.trade_store.insert_buffered(trade).await {
+                                    error!("Failed to insert trade: {}", e);
+                                }
+                            }
+                            Event::Insight(insight) => {
+                                if let Err(e) = self.insights_store.insert_buffered(insight).await {
+                                    error!("Failed to insert insight: {}", e);
+                                }
+                            }
+                            Event::InsightTick(tick) => {
+                                if let Err(e) = self.insights_store.insert_buffered_vec(tick.insights.clone()).await {
+                                    error!("Failed to insert insight tick: {}", e);
+                                }
+                            }
+                            _ => {}
                         }
                     }
                     _ = interval.tick() => {

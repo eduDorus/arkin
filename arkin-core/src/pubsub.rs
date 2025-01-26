@@ -1,12 +1,11 @@
 use std::fmt;
 use std::sync::Arc;
-use std::{any::Any, time::Duration};
+use std::time::Duration;
 
-use dashmap::DashMap;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 use typed_builder::TypedBuilder;
 
 use strum::EnumDiscriminants;
@@ -31,6 +30,12 @@ pub struct IntervalTick {
 impl EventTypeOf for IntervalTick {
     fn event_type() -> EventType {
         EventType::IntervalTick
+    }
+}
+
+impl From<IntervalTick> for Event {
+    fn from(tick: IntervalTick) -> Self {
+        Event::IntervalTick(Arc::new(tick))
     }
 }
 
@@ -105,6 +110,7 @@ pub enum Event {
     ExecutionOrderNew(Arc<ExecutionOrder>),
     VenueOrder(Arc<VenueOrder>),
     VenueOrderUpdate(Arc<VenueOrderUpdate>),
+    Finished,
 }
 
 impl Event {
@@ -115,39 +121,82 @@ impl Event {
 
 #[derive(Debug)]
 pub struct PubSub {
-    pub event_senders: DashMap<EventType, Box<dyn Any + Send + Sync>>,
+    sender: Sender<Event>,
+    capacity: usize,
 }
 
 impl PubSub {
-    pub fn new() -> Self {
+    pub fn new(capacity: usize) -> Self {
+        let (tx, _) = broadcast::channel(capacity);
         Self {
-            event_senders: DashMap::new(),
+            sender: tx,
+            capacity,
         }
     }
 
-    pub fn subscribe<E: EventTypeOf>(&self) -> Receiver<Arc<E>> {
-        let event_type = E::event_type();
-        let sender_any = self.event_senders.entry(event_type).or_insert_with(|| {
-            let (tx, _) = broadcast::channel::<Arc<E>>(1000000);
-            info!("New subscriber to event: {:?}", event_type);
-            Box::new(tx)
-        });
-        let sender = sender_any.downcast_ref::<Sender<Arc<E>>>().expect("Type mismatch");
-        sender.subscribe()
-    }
+    pub async fn publish<E>(&self, event: E)
+    where
+        E: Into<Event>,
+    {
+        let event: Event = event.into();
+        debug!("Publishing event: {:?}", event.event_type());
 
-    pub fn publish<E: EventTypeOf>(&self, event: Arc<E>) {
-        let event_type = E::event_type();
-        debug!("Publishing event: {:?}", event_type);
-        if let Some(sender_any) = self.event_senders.get(&event_type) {
-            let sender = sender_any.downcast_ref::<Sender<Arc<E>>>().expect("Type mismatch");
-            // Check if we have any subscribers
-            if sender.receiver_count() == 0 {
-                return;
-            }
-            if let Err(e) = sender.send(event) {
-                error!("Failed to publish event: {:?}", e);
+        // Try to send if the channel is full back off
+        loop {
+            // Check if we have capacity to send
+            if self.sender.len() < self.capacity {
+                if let Ok(_) = self.sender.send(event.clone()) {
+                    break;
+                }
+            } else {
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
         }
+    }
+
+    pub fn subscribe(&self) -> Receiver<Event> {
+        info!("New subscriber to events");
+        let rx = self.sender.subscribe();
+        info!("Subscriber count: {}", self.sender.receiver_count());
+        rx
     }
 }
+
+// #[derive(Debug)]
+// pub struct PubSub {
+//     pub event_senders: DashMap<EventType, Box<dyn Any + Send + Sync>>,
+// }
+
+// impl PubSub {
+//     pub fn new() -> Self {
+//         Self {
+//             event_senders: DashMap::new(),
+//         }
+//     }
+
+//     pub fn subscribe<E: EventTypeOf>(&self) -> Receiver<Arc<E>> {
+//         let event_type = E::event_type();
+//         let sender_any = self.event_senders.entry(event_type).or_insert_with(|| {
+//             let (tx, _) = broadcast::channel::<Arc<E>>(1000000);
+//             info!("New subscriber to event: {:?}", event_type);
+//             Box::new(tx)
+//         });
+//         let sender = sender_any.downcast_ref::<Sender<Arc<E>>>().expect("Type mismatch");
+//         sender.subscribe()
+//     }
+
+//     pub fn publish<E: EventTypeOf>(&self, event: Arc<E>) {
+//         let event_type = E::event_type();
+//         debug!("Publishing event: {:?}", event_type);
+//         if let Some(sender_any) = self.event_senders.get(&event_type) {
+//             let sender = sender_any.downcast_ref::<Sender<Arc<E>>>().expect("Type mismatch");
+//             // Check if we have any subscribers
+//             if sender.receiver_count() == 0 {
+//                 return;
+//             }
+//             if let Err(e) = sender.send(event) {
+//                 error!("Failed to publish event: {:?}", e);
+//             }
+//         }
+//     }
+// }

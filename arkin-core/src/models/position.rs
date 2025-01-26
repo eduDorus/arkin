@@ -281,6 +281,12 @@ impl From<Arc<PositionUpdate>> for Event {
     }
 }
 
+impl From<PositionUpdate> for Event {
+    fn from(update: PositionUpdate) -> Self {
+        Event::PositionUpdate(Arc::new(update))
+    }
+}
+
 impl fmt::Display for PositionUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

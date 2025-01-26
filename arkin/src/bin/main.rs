@@ -165,7 +165,7 @@ async fn main() {
         Commands::Simulation(args) => {
             info!("Starting Arkin Simulation 🚀");
             info!("Args: {:?}", args);
-            let pubsub = Arc::new(PubSub::new());
+            let pubsub = Arc::new(PubSub::new(10000000));
 
             let config = load::<PersistenceConfig>();
             let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
@@ -197,29 +197,26 @@ async fn main() {
                 }
             });
 
-            let pubsub_clone = pubsub.clone();
-            tokio::spawn(async move {
-                // Consume the pubsub messages
-                let mut sub = pubsub_clone.subscribe::<Tick>();
-                while let Ok(msg) = sub.recv().await {
-                    info!("Received tick: {}", msg);
+            let mut rx = pubsub.subscribe();
+            info!("Waiting for pubsub messages...");
+            // Consume the pubsub messages in case of error log it
+            let mut trade_counter = 0;
+            let mut tick_counter = 0;
+            while let Ok(event) = rx.recv().await {
+                match event {
+                    Event::Tick(_tick) => {
+                        tick_counter += 1;
+                    }
+                    Event::Trade(_trade) => {
+                        trade_counter += 1;
+                    }
+                    Event::Finished => {
+                        break;
+                    }
+                    _ => {}
                 }
-            });
-            let pubsub_clone = pubsub.clone();
-            tokio::spawn(async move {
-                // Consume the pubsub messages
-                let mut sub = pubsub_clone.subscribe::<Trade>();
-                while let Ok(msg) = sub.recv().await {
-                    info!("Received trade: {}", msg);
-                }
-            });
-
-            match tokio::signal::ctrl_c().await {
-                Ok(_) => {
-                    info!("Received Ctrl-C signal, shutting down...");
-                }
-                Err(e) => error!("Failed to listen for Ctrl-C signal: {}", e),
             }
+            info!("Received {} ticks and {} trades", tick_counter, trade_counter);
         }
         Commands::Engine(args) => {
             info!("Starting Arkin Trading Engine 🚀");
@@ -237,7 +234,7 @@ async fn run_insights(args: InsightsArgs) -> Result<()> {
     let start = args.from;
     let end = args.till;
 
-    let pubsub = Arc::new(PubSub::new());
+    let pubsub = Arc::new(PubSub::new(10240));
 
     let config = load::<PersistenceConfig>();
     let persistence = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
@@ -302,7 +299,7 @@ async fn run_insights(args: InsightsArgs) -> Result<()> {
 
 async fn run_ingestor(args: IngestorsCommands) -> Result<()> {
     info!("Args: {:?}", args);
-    let pubsub = Arc::new(PubSub::new());
+    let pubsub = Arc::new(PubSub::new(1000000));
 
     let config = load::<PersistenceConfig>();
     let persistence_service = Arc::new(PersistenceService::from_config(&config, pubsub.clone()).await);
@@ -353,7 +350,7 @@ async fn run_ingestor(args: IngestorsCommands) -> Result<()> {
 }
 
 async fn run_engine(args: EngineArgs) -> Result<()> {
-    let pubsub = Arc::new(PubSub::new());
+    let pubsub = Arc::new(PubSub::new(1000000));
     info!("PubSub created");
 
     let config = load::<PersistenceConfig>();

@@ -255,6 +255,12 @@ impl EventTypeOf for VenueOrderUpdate {
     }
 }
 
+impl From<VenueOrderUpdate> for Event {
+    fn from(update: VenueOrderUpdate) -> Self {
+        Event::VenueOrderUpdate(Arc::new(update))
+    }
+}
+
 impl From<Arc<VenueOrderUpdate>> for Event {
     fn from(update: Arc<VenueOrderUpdate>) -> Self {
         Event::VenueOrderUpdate(update)

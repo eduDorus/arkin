@@ -25,12 +25,19 @@ pub struct CrossoverStrategy {
 impl Algorithm for CrossoverStrategy {
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), StrategyError> {
         info!("Starting Crossover Strategy...");
-        let mut insight_ticks = self.pubsub.subscribe::<InsightTick>();
+
+        let mut rx = self.pubsub.subscribe();
+
         loop {
             select! {
-                Ok(tick) = insight_ticks.recv() => {
-                    info!("CrossoverStrategy received insight tick: {}", tick.event_time);
-                    self.insight_tick(tick).await?;
+                Ok(event) = rx.recv() => {
+                    match event {
+                        Event::InsightTick(tick) => {
+                            info!("CrossoverStrategy received insight tick: {}", tick.event_time);
+                            self.insight_tick(tick).await?;
+                        }
+                        _ => {}
+                    }
                 }
                 _ = _shutdown.cancelled() => {
                     break;

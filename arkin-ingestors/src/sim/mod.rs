@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use arkin_core::{Instrument, PubSub, Tick, Trade};
-use arkin_persistence::PersistenceService;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use time::OffsetDateTime;
@@ -9,6 +7,9 @@ use tokio::pin;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 use typed_builder::TypedBuilder;
+
+use arkin_core::prelude::*;
+use arkin_persistence::prelude::*;
 
 use crate::{Ingestor, IngestorError};
 
@@ -64,30 +65,33 @@ impl Ingestor for SimIngestor {
                     if tick_time <= trade_time {
                         // "take" the tick out of `next_tick`
                         let tick = next_tick.take().unwrap().unwrap();
-                        self.pubsub.publish::<Tick>(tick);
+                        self.pubsub.publish(tick).await;
                         // replace it with the next item from the stream
                         next_tick = tick_stream.next().await;
                     } else {
                         let trade = next_trade.take().unwrap().unwrap();
-                        self.pubsub.publish::<Trade>(trade);
+                        self.pubsub.publish(trade).await;
                         next_trade = trade_stream.next().await;
                     }
                 }
                 (Some(_), None) => {
                     // only ticks left
                     let tick = next_tick.take().unwrap().unwrap();
-                    self.pubsub.publish::<Tick>(tick);
+                    self.pubsub.publish(tick).await;
                     next_tick = tick_stream.next().await;
                 }
                 (None, Some(_)) => {
                     // only trades left
                     let trade = next_trade.take().unwrap().unwrap();
-                    self.pubsub.publish::<Trade>(trade);
+                    self.pubsub.publish(trade).await;
                     next_trade = trade_stream.next().await;
                 }
                 (None, None) => break, // no more data
             }
         }
+
+        self.pubsub.publish(Event::Finished).await;
+
         Ok(())
     }
 }

@@ -23,25 +23,26 @@ pub struct SingleStrategyPortfolio {
 impl Accounting for SingleStrategyPortfolio {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError> {
         info!("Starting portfolio...");
-        let mut balance_updates = self.pubsub.subscribe::<BalanceUpdate>();
-        let mut position_updates = self.pubsub.subscribe::<PositionUpdate>();
+
+        let mut rx = self.pubsub.subscribe();
+
         loop {
             tokio::select! {
-                Ok(balance) = balance_updates.recv() => {
-                    if let Err(e) = self.balance_update(balance).await {
-                        error!("Failed to process balance update: {}", e);
-                    }
+                Ok(event) = rx.recv() => {
+                    match event {
+                        Event::BalanceUpdate(update) => {
+                            if let Err(e) = self.balance_update(update).await {
+                                error!("Failed to process balance update: {}", e);
+                            }
+                        }
+                        Event::PositionUpdate(update) => {
+                            if let Err(e) = self.position_update(update).await {
+                                error!("Failed to process position update: {}", e);
+                            }
+                        }
+                        _ => {}
+                      }
                 }
-                Ok(position) = position_updates.recv() => {
-                    if let Err(e) = self.position_update(position).await {
-                        error!("Failed to process position update: {}", e);
-                    }
-                }
-                // Ok(fill) = fill_updates.recv() => {
-                //     if let Err(e) = self.fill_update(fill).await {
-                //         error!("Failed to process fill update: {}", e);
-                //     }
-                // }
                 _ = shutdown.cancelled() => {
                     break;
                 }

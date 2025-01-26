@@ -414,7 +414,7 @@ impl Ingestor for TardisIngestor {
                                 trade.quantity,
                             );
                             let trade = Arc::new(trade);
-                            self.pubsub.publish::<Trade>(trade);
+                            self.pubsub.publish(trade).await;
                         }
                         BinanceSwapsEvent::TickStream(stream) => {
                             let tick = stream.data;
@@ -428,7 +428,7 @@ impl Ingestor for TardisIngestor {
                                 tick.ask_quantity,
                             );
                             let tick = Arc::new(tick);
-                            self.pubsub.publish::<Tick>(tick);
+                            self.pubsub.publish(tick).await;
                         }
                     }
                 },

@@ -62,21 +62,27 @@ impl InsightsService {
 impl Insights for InsightsService {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), InsightsError> {
         info!("Starting insights service...");
-        let mut interval_tick = self.pubsub.subscribe::<IntervalTick>();
-        let mut trades = self.pubsub.subscribe::<Trade>();
+
+        let mut rx = self.pubsub.subscribe();
+
         loop {
             select! {
-                Ok(time_tick) = interval_tick.recv() => {
-                    debug!("InsightsService received interval tick: {}", time_tick.event_time);
-                    if let Err(e) = self.process(time_tick.event_time, &time_tick.instruments, true).await {
-                        error!("Error processing interval tick: {}", e);
-                    }
-                }
-                Ok(trade) = trades.recv() => {
-                    debug!("InsightsService received trade: {}", trade.event_time);
-                    let insights = trade.as_ref().clone().to_insights(self.pipeline.clone());
-                    if let Err(e) = self.insert_batch(insights.as_slice()).await {
-                        error!("Error inserting trade: {}", e);
+                Ok(event) = rx.recv() => {
+                    match event {
+                        Event::IntervalTick(tick) => {
+                            debug!("InsightsService received interval tick: {}", tick.event_time);
+                            if let Err(e) = self.process(tick.event_time, &tick.instruments, true).await {
+                                error!("Error processing interval tick: {}", e);
+                            }
+                        }
+                        Event::Trade(trade) => {
+                            debug!("InsightsService received trade: {}", trade.event_time);
+                            let insights = trade.as_ref().clone().to_insights(self.pipeline.clone());
+                            if let Err(e) = self.insert_batch(insights.as_slice()).await {
+                                error!("Error inserting trade: {}", e);
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 _ = shutdown.cancelled() => {
@@ -151,7 +157,7 @@ impl Insights for InsightsService {
                 insights_tick.event_time,
                 insights.len()
             );
-            self.pubsub.publish::<InsightTick>(insights_tick);
+            self.pubsub.publish(insights_tick).await;
         }
 
         Ok(insights)

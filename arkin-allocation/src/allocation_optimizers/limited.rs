@@ -46,12 +46,19 @@ pub struct DiffPosition {
 impl AllocationOptim for LimitedAllocationOptim {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), AllocationOptimError> {
         info!("Starting LimitedAllocation...");
-        let mut insight_tick = self.pubsub.subscribe::<InsightTick>();
+
+        let mut rx = self.pubsub.subscribe();
+
         loop {
             select! {
-                Ok(tick) = insight_tick.recv() => {
-                    info!("LimitedAllocationOptim received insight tick: {}", tick.event_time);
-                    self.optimize(tick).await?;
+                Ok(event) = rx.recv() => {
+                    match event {
+                        Event::InsightTick(tick) => {
+                            info!("LimitedAllocationOptim received insight tick: {}", tick.event_time);
+                            self.optimize(tick).await?;
+                        }
+                        _ => {}
+                    }
                 }
                 _ = shutdown.cancelled() => {
                     break;
@@ -196,7 +203,7 @@ impl AllocationOptim for LimitedAllocationOptim {
         }
 
         for order in execution_orders.iter() {
-            self.pubsub.publish::<ExecutionOrder>(order.clone());
+            self.pubsub.publish(order.clone()).await;
         }
 
         Ok(execution_orders)

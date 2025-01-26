@@ -113,7 +113,7 @@ impl ForecastEngine {
                         .instruments(self.instruments.clone())
                         .frequency(frequency)
                         .build();
-                   self.pubsub.publish::<IntervalTick>(interval_tick.into());
+                   self.pubsub.publish(interval_tick).await;
                 }
                 _ = tokio::signal::ctrl_c() => {
                     info!("Received Ctrl-C, shutting down...");
