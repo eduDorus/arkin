@@ -180,14 +180,45 @@ async fn main() {
             }
 
             // Create ingestor
-            let ingestor =
-                IngestorFactory::create_simulation_ingestor(persistence.clone(), instruments, args.start, args.end);
+            let ingestor = IngestorFactory::create_simulation_ingestor(
+                pubsub.clone(),
+                persistence.clone(),
+                instruments,
+                args.start,
+                args.end,
+            );
 
             let token = CancellationToken::new();
-            let res = ingestor.start(token).await;
-            match res {
-                Ok(_) => info!("Simulation completed successfully"),
-                Err(e) => error!("Simulation failed: {}", e),
+            tokio::spawn(async move {
+                let res = ingestor.start(token).await;
+                match res {
+                    Ok(_) => info!("Simulation completed successfully"),
+                    Err(e) => error!("Simulation failed: {}", e),
+                }
+            });
+
+            let pubsub_clone = pubsub.clone();
+            tokio::spawn(async move {
+                // Consume the pubsub messages
+                let mut sub = pubsub_clone.subscribe::<Tick>();
+                while let Ok(msg) = sub.recv().await {
+                    info!("Received tick: {}", msg);
+                }
+            });
+            let pubsub_clone = pubsub.clone();
+            tokio::spawn(async move {
+                // Consume the pubsub messages
+                let mut sub = pubsub_clone.subscribe::<Trade>();
+                while let Ok(msg) = sub.recv().await {
+                    info!("Received trade: {}", msg);
+                }
+            });
+
+            match tokio::signal::ctrl_c().await {
+                Ok(_) => {
+                    info!("Received Ctrl-C signal, shutting down...");
+                }
+                Err(e) => error!("Failed to listen for Ctrl-C signal: {}", e),
             }
         }
         Commands::Engine(args) => {

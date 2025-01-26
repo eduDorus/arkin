@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arkin_core::Instrument;
+use arkin_core::{Instrument, PubSub, Tick, Trade};
 use arkin_persistence::PersistenceService;
 use async_trait::async_trait;
 use futures_util::StreamExt;
@@ -14,7 +14,7 @@ use crate::{Ingestor, IngestorError};
 
 #[derive(Debug, TypedBuilder)]
 pub struct SimIngestor {
-    // pubsub: Arc<PubSub>,
+    pubsub: Arc<PubSub>,
     persistence: Arc<PersistenceService>,
     instruments: Vec<Arc<Instrument>>,
     start: OffsetDateTime,
@@ -26,27 +26,68 @@ impl Ingestor for SimIngestor {
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting SimIngestor...");
 
-        let stream = self
+        let tick_stream = self
             .persistence
             .tick_store
             .stream_range(&self.instruments, self.start, self.end)
             .await?;
 
-        pin!(stream);
+        let trade_stream = self
+            .persistence
+            .trade_store
+            .stream_range(&self.instruments, self.start, self.end)
+            .await?;
 
-        let mut counter = 0;
-        while let Some(data) = stream.next().await {
-            match data {
-                Ok(_trade) => {
-                    counter += 1;
+        pin!(tick_stream);
+        pin!(trade_stream);
+
+        let mut next_tick = tick_stream.next().await;
+        let mut next_trade = trade_stream.next().await;
+
+        while next_tick.is_some() || next_trade.is_some() {
+            // Convert the `Option<Result<Arc<Tick>, PersistenceError>>` to an Option of the timestamp,
+            // to decide which is earlier *by reference only*.
+            let tick_ts = match &next_tick {
+                Some(Ok(t)) => Some(t.event_time),
+                Some(Err(e)) => return Err(IngestorError::PersistenceServiceError(e.to_string())),
+                None => None,
+            };
+            let trade_ts = match &next_trade {
+                Some(Ok(t)) => Some(t.event_time),
+                Some(Err(e)) => return Err(IngestorError::PersistenceServiceError(e.to_string())),
+                None => None,
+            };
+
+            // Decide which to replay
+            match (tick_ts, trade_ts) {
+                (Some(tick_time), Some(trade_time)) => {
+                    if tick_time <= trade_time {
+                        // "take" the tick out of `next_tick`
+                        let tick = next_tick.take().unwrap().unwrap();
+                        self.pubsub.publish::<Tick>(tick);
+                        // replace it with the next item from the stream
+                        next_tick = tick_stream.next().await;
+                    } else {
+                        let trade = next_trade.take().unwrap().unwrap();
+                        self.pubsub.publish::<Trade>(trade);
+                        next_trade = trade_stream.next().await;
+                    }
                 }
-                Err(e) => {
-                    return Err(IngestorError::from(e));
+                (Some(_), None) => {
+                    // only ticks left
+                    let tick = next_tick.take().unwrap().unwrap();
+                    self.pubsub.publish::<Tick>(tick);
+                    next_tick = tick_stream.next().await;
                 }
+                (None, Some(_)) => {
+                    // only trades left
+                    let trade = next_trade.take().unwrap().unwrap();
+                    self.pubsub.publish::<Trade>(trade);
+                    next_trade = trade_stream.next().await;
+                }
+                (None, None) => break, // no more data
             }
         }
-        info!("Counted: {}", counter);
-
         Ok(())
     }
 }

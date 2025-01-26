@@ -20,6 +20,9 @@ pub enum IngestorError {
     #[error(transparent)]
     PersistenceError(#[from] arkin_persistence::PersistenceError),
 
+    #[error("Error in the persistence service: {0}")]
+    PersistenceServiceError(String),
+
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
 }

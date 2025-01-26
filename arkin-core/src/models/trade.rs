@@ -7,6 +7,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
     models::Insight,
+    prelude::TIMESTAMP_FORMAT,
     Event, EventType, EventTypeOf, Price, Quantity,
 };
 
@@ -99,10 +100,11 @@ impl Ord for Trade {
 
 impl fmt::Display for Trade {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let event_time = self.event_time.format(TIMESTAMP_FORMAT).expect("Failed to format timestamp");
         write!(
             f,
-            "instrument={} side={} price={} quantity={}",
-            self.instrument, self.side, self.price, self.quantity
+            "event_time={} instrument={} side={} price={} quantity={}",
+            event_time, self.instrument, self.side, self.price, self.quantity
         )
     }
 }

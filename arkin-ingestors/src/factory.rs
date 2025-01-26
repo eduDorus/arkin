@@ -45,6 +45,7 @@ impl IngestorFactory {
     }
 
     pub fn create_simulation_ingestor(
+        pubsub: Arc<PubSub>,
         persistence: Arc<PersistenceService>,
         instruments: Vec<Arc<Instrument>>,
         start: OffsetDateTime,
@@ -52,6 +53,7 @@ impl IngestorFactory {
     ) -> Arc<dyn Ingestor> {
         Arc::new(
             SimIngestor::builder()
+                .pubsub(pubsub)
                 .persistence(persistence)
                 .instruments(instruments)
                 .start(start)

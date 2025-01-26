@@ -10,6 +10,7 @@ use crate::{
         TICK_ASK_PRICE_FEATURE_ID, TICK_ASK_QUANTITY_FEATURE_ID, TICK_BID_PRICE_FEATURE_ID,
         TICK_BID_QUANTITY_FEATURE_ID,
     },
+    prelude::TIMESTAMP_FORMAT,
     Event, EventType, EventTypeOf, Price, Quantity,
 };
 
@@ -135,10 +136,11 @@ impl Ord for Tick {
 
 impl fmt::Display for Tick {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let event_time = self.event_time.format(TIMESTAMP_FORMAT).expect("Failed to format timestamp");
         write!(
             f,
-            "instrument={} bid_price={} bid_quantity={} ask_price={} ask_quantity={}",
-            self.instrument, self.bid_price, self.bid_quantity, self.ask_price, self.ask_quantity
+            "event_time={} instrument={} bid_price={} bid_quantity={} ask_price={} ask_quantity={}",
+            event_time, self.instrument, self.bid_price, self.bid_quantity, self.ask_price, self.ask_quantity
         )
     }
 }
