@@ -54,7 +54,7 @@ rust_decimal_macros = "1.36"
 bytes = "1.9"
 
 # Data Structures
-dashmap = { version = "6.1", features = [ "inline", "rayon" ], default-features = false }
+dashmap = { version = "6.1", features = [ "inline", "rayon", "inline" ], default-features = false }
 
 # Serialization
 serde = { version = "1.0", features = [ "derive" ] }

@@ -39,7 +39,7 @@ impl InsightsService {
             .read_by_name(&config.pipeline.name)
             .await
             .expect("Could not find pipeline");
-        let state = Arc::new(InsightsState::default());
+        let state = Arc::new(InsightsState::builder().build());
         let features = FeatureFactory::from_config(
             &config.pipeline.features,
             pipeline.clone(),
@@ -90,6 +90,7 @@ impl Insights for InsightsService {
                 }
             }
         }
+        info!("Insights service shutdown...");
         Ok(())
     }
 

@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use crate::{
     Asset, AssetType, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceStatus, InstanceType,
-    Instrument, InstrumentStatus, InstrumentType, MarketSide, Portfolio, Price, Quantity, Strategy, Tick, Venue,
-    VenueOrder, VenueOrderStatus, VenueOrderTimeInForce, VenueOrderType, VenueType,
+    Instrument, InstrumentStatus, InstrumentType, MarketSide, Pipeline, Portfolio, Price, Quantity, Strategy, Tick,
+    Venue, VenueOrder, VenueOrderStatus, VenueOrderTimeInForce, VenueOrderType, VenueType,
 };
 
 pub fn test_btc_asset() -> Arc<Asset> {
@@ -97,6 +97,17 @@ pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
         .status(InstrumentStatus::Trading)
         .build();
     Arc::new(instrument)
+}
+
+pub fn test_pipeline() -> Arc<Pipeline> {
+    let pipeline = Pipeline::builder()
+        .id(Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"))
+        .name("Test Pipeline".into())
+        .description("This Pipeline is for testing purposes".into())
+        .created_at(OffsetDateTime::now_utc())
+        .updated_at(OffsetDateTime::now_utc())
+        .build();
+    Arc::new(pipeline)
 }
 
 pub fn test_tick(

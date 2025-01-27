@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
@@ -48,6 +48,7 @@ impl IngestorFactory {
         pubsub: Arc<PubSub>,
         persistence: Arc<PersistenceService>,
         instruments: Vec<Arc<Instrument>>,
+        tick_frequency: Duration,
         start: OffsetDateTime,
         end: OffsetDateTime,
     ) -> Arc<dyn Ingestor> {
@@ -56,6 +57,7 @@ impl IngestorFactory {
                 .pubsub(pubsub)
                 .persistence(persistence)
                 .instruments(instruments)
+                .tick_frequency(tick_frequency)
                 .start(start)
                 .end(end)
                 .build(),

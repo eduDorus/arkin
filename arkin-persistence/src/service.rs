@@ -206,7 +206,7 @@ impl Persistor for PersistenceService {
             }
         }
 
-        info!("Persistence service started");
+        info!("Persistence service shutdown...");
         Ok(())
     }
 
