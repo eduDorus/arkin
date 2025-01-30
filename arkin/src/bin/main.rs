@@ -343,7 +343,7 @@ async fn run_simulation(args: SimulationArgs) -> Result<()> {
         pubsub.clone(),
         persistence.clone(),
         instruments,
-        Duration::from_secs(60),
+        Duration::from_secs(config.frequency_secs),
         args.start,
         args.end,
     );
