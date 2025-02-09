@@ -160,6 +160,7 @@ dependencies = [
  "anyhow",
  "arkin-allocation",
  "arkin-binance",
+ "arkin-cli",
  "arkin-core",
  "arkin-engine",
  "arkin-execution",
@@ -171,7 +172,6 @@ dependencies = [
  "async-trait",
  "async-tungstenite",
  "catboost-rs",
- "clap 4.5.28",
  "clarabel",
  "dashmap",
  "flume",
@@ -247,6 +247,14 @@ dependencies = [
  "typed-builder",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "arkin-cli"
+version = "0.1.0"
+dependencies = [
+ "clap 4.5.28",
+ "time",
 ]
 
 [[package]]

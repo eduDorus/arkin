@@ -4,7 +4,6 @@ use std::sync::Arc;
 use anyhow::Result;
 
 use arkin_core::prelude::*;
-use arkin_persistence::prelude::*;
 use async_trait::async_trait;
 use time::OffsetDateTime;
 use tokio::select;

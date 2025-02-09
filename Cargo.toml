@@ -2,6 +2,7 @@
 members = [
   "arkin",
   "arkin-core",
+  "arkin-cli",
   "arkin-persistence",
   "arkin-portfolio",
   "arkin-ingestors",

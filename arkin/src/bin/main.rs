@@ -1,149 +1,15 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
-use clap::{Args, Parser, Subcommand};
-use time::{macros::format_description, OffsetDateTime, PrimitiveDateTime};
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
+use arkin_cli::prelude::*;
 use arkin_core::prelude::*;
 use arkin_ingestors::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_persistence::prelude::*;
-
-/// CLI application for X
-#[derive(Parser)]
-#[clap(
-    name = "arkin",
-    version = "0.1.0",
-    about = "Welcome to the world of arkin!"
-)]
-struct Cli {
-    #[clap(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand, Debug)]
-enum Commands {
-    /// Perform ingestors related operations
-    #[clap(subcommand)]
-    Ingestors(IngestorsCommands),
-
-    /// Perform insights related operations
-    Insights(InsightsArgs),
-
-    /// Configure simulation ingestor
-    Simulation(SimulationArgs),
-
-    /// Perform engine related operations
-    Engine(EngineArgs),
-}
-
-#[derive(Subcommand, Debug)]
-enum IngestorsCommands {
-    /// Configure and start Binance ingestor
-    Binance(BinanceIngestorArgs),
-
-    /// Configure and start Tardis ingestor
-    Tardis(TardisIngestorArgs),
-}
-
-#[derive(Args, Debug)]
-struct BinanceIngestorArgs {
-    /// Configure the channels to subscribe to
-    #[arg(long, short, value_delimiter = ',')]
-    channels: Vec<String>,
-
-    /// Configure the instruments to subscribe to
-    #[arg(long, short, value_delimiter = ',')]
-    instruments: Vec<String>,
-
-    /// Dry run
-    #[arg(long)]
-    dry_run: bool,
-}
-
-#[derive(Args, Debug)]
-struct TardisIngestorArgs {
-    /// Venue name
-    #[arg(long)]
-    venue: String,
-
-    /// Channel name
-    #[arg(long)]
-    channel: String,
-
-    /// Instruments (comma-separated)
-    #[arg(long, value_delimiter = ',', value_parser)]
-    instruments: Vec<String>,
-
-    /// Start datetime in "YYYY-MM-DD HH:MM" format
-    #[arg(long, value_parser = parse_datetime)]
-    start: OffsetDateTime,
-
-    /// End datetime in "YYYY-MM-DD HH:MM" format
-    #[arg(long, value_parser = parse_datetime)]
-    end: OffsetDateTime,
-
-    /// Dry run
-    #[arg(long)]
-    dry_run: bool,
-}
-
-#[derive(Args, Debug)]
-struct SimulationArgs {
-    /// Instruments (comma-separated)
-    #[arg(long, value_delimiter = ',', value_parser)]
-    instruments: Vec<String>,
-
-    /// Start datetime in "YYYY-MM-DD HH:MM" format
-    #[arg(long, value_parser = parse_datetime)]
-    start: OffsetDateTime,
-
-    /// End datetime in "YYYY-MM-DD HH:MM" format
-    #[arg(long, value_parser = parse_datetime)]
-    end: OffsetDateTime,
-
-    /// Dry run
-    #[arg(long)]
-    dry_run: bool,
-}
-
-#[derive(Args, Debug)]
-struct InsightsArgs {
-    /// Start date in "YYYY-MM-DD HH:MM" format
-    #[arg(long, short, value_parser = parse_datetime)]
-    from: OffsetDateTime,
-
-    /// End date in "YYYY-MM-DD HH:MM" format
-    #[arg(long, short, value_parser = parse_datetime)]
-    till: OffsetDateTime,
-
-    /// Pipeline name (e.g., hft)
-    #[arg(long, short, value_delimiter = ',')]
-    instruments: Vec<String>,
-
-    /// Dry run
-    #[arg(long)]
-    dry_run: bool,
-}
-
-#[derive(Args, Debug)]
-struct EngineArgs {
-    /// Instruments (comma-separated)
-    #[arg(long, value_delimiter = ',', value_parser)]
-    instruments: Vec<String>,
-}
-
-/// Custom parser to convert string to OffsetDateTime
-fn parse_datetime(s: &str) -> Result<OffsetDateTime, String> {
-    let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
-    let ts = PrimitiveDateTime::parse(&s, &format)
-        .map_err(|e| format!("Failed to parse datetime '{}': {}", s, e))?
-        .assume_utc();
-    Ok(ts)
-}
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
@@ -152,7 +18,7 @@ async fn main() {
     // Install the default CryptoProvider
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
 
-    let cli = Cli::parse();
+    let cli = parse_cli();
 
     let res = match cli.command {
         Commands::Ingestors(args) => {
@@ -161,7 +27,7 @@ async fn main() {
         }
         Commands::Insights(args) => {
             info!("Starting arkin Pipeline 🚀");
-            insights(args).await
+            run_insights(args).await
         }
         Commands::Simulation(args) => {
             info!("Starting arkin Simulation 🚀");

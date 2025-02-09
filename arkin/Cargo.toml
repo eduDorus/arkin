@@ -13,6 +13,7 @@ path = "src/bin/main.rs"
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
+arkin-cli = { path = "../arkin-cli" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-portfolio = { path = "../arkin-portfolio" }
 arkin-ingestors = { path = "../arkin-ingestors" }
@@ -45,7 +46,7 @@ catboost-rs = { workspace = true }
 clarabel = { workspace = true }
 statrs = { workspace = true }
 typed-builder = { workspace = true }
-clap = { version = "4.5", features = [ "derive" ] }
+
 
 # Monte Carlo
 # metromc = "0.2"
