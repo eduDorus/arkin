@@ -134,6 +134,7 @@ impl InsightsState {
         let mut entry = self.features.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));
 
         entry.push(event.event_time, event.value);
+
         debug!("Insert took {:?}", start.elapsed());
     }
 
@@ -143,16 +144,6 @@ impl InsightsState {
             self.insert(e.clone());
         }
         debug!("Insert batch took {:?}", start.elapsed());
-    }
-
-    pub fn remove(&self, event_time: OffsetDateTime) {
-        let start = Instant::now();
-        // remove everything older than event_time for each buffer
-        self.features.retain(|_k, buf| {
-            buf.remove_before(event_time);
-            !buf.data.is_empty()
-        });
-        debug!("Remove took {:?}", start.elapsed());
     }
 
     pub fn last_candle(&self, instrument: Arc<Instrument>, timestamp: OffsetDateTime) -> Option<Candle> {

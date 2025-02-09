@@ -11,7 +11,7 @@ use typed_builder::TypedBuilder;
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
-use crate::{Ingestor, IngestorError};
+use crate::IngestorError;
 
 #[derive(Debug, TypedBuilder)]
 pub struct SimIngestor {
@@ -24,7 +24,9 @@ pub struct SimIngestor {
 }
 
 #[async_trait]
-impl Ingestor for SimIngestor {
+impl RunnableService for SimIngestor {
+    type Error = IngestorError;
+
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting SimIngestor...");
 

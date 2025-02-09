@@ -10,12 +10,12 @@ use arkin_core::prelude::*;
 
 use crate::repos::*;
 use crate::stores::*;
-use crate::traits::Persistor;
 use crate::{PersistenceConfig, PersistenceError};
 
 #[derive(Debug)]
 pub struct PersistenceService {
     pub pubsub: Arc<PubSub>,
+    pub dry_run: bool,
     pub auto_commit_interval: Duration,
     pub instance_store: Arc<InstanceStore>,
     pub portfolio_store: Arc<PortfolioStore>,
@@ -35,7 +35,7 @@ pub struct PersistenceService {
 }
 
 impl PersistenceService {
-    pub async fn from_config(config: &PersistenceConfig, pubsub: Arc<PubSub>) -> Self {
+    pub async fn from_config(config: &PersistenceConfig, pubsub: Arc<PubSub>, dry_run: bool) -> Self {
         let db_config = config.database.clone();
         let conn_options = PgConnectOptions::new()
             .host(&db_config.host)
@@ -133,6 +133,7 @@ impl PersistenceService {
 
         Self {
             pubsub,
+            dry_run,
             auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
             instance_store,
             portfolio_store,
@@ -151,10 +152,24 @@ impl PersistenceService {
             trade_store,
         }
     }
+
+    pub async fn flush(&self) -> Result<(), PersistenceError> {
+        self.tick_store.flush().await?;
+        self.trade_store.flush().await?;
+        self.insights_store.flush().await?;
+        Ok(())
+    }
+
+    pub async fn close(&self) -> Result<(), PersistenceError> {
+        self.insights_store.close().await?;
+        Ok(())
+    }
 }
 
 #[async_trait]
-impl Persistor for PersistenceService {
+impl RunnableService for PersistenceService {
+    type Error = PersistenceError;
+
     async fn start(&self, shutdown: CancellationToken) -> Result<(), PersistenceError> {
         info!("Starting persistence service...");
 
@@ -164,6 +179,9 @@ impl Persistor for PersistenceService {
         loop {
             tokio::select! {
                     Ok(event) = rx.recv() => {
+                        if self.dry_run {
+                            continue;
+                        }
                         match event {
                             Event::Tick(tick) => {
                                 if let Err(e) = self.tick_store.insert_buffered(tick).await {
@@ -207,18 +225,6 @@ impl Persistor for PersistenceService {
         }
 
         info!("Persistence service shutdown...");
-        Ok(())
-    }
-
-    async fn flush(&self) -> Result<(), PersistenceError> {
-        self.tick_store.flush().await?;
-        self.trade_store.flush().await?;
-        self.insights_store.flush().await?;
-        Ok(())
-    }
-
-    async fn close(&self) -> Result<(), PersistenceError> {
-        self.insights_store.close().await?;
         Ok(())
     }
 }

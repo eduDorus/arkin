@@ -1,14 +1,27 @@
 [workspace]
-members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-portfolio", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-execution", "arkin-engine", "arkin-binance", "test-integration" ]
+members = [
+  "arkin",
+  "arkin-core",
+  "arkin-persistence",
+  "arkin-portfolio",
+  "arkin-ingestors",
+  "arkin-insights",
+  "arkin-strategies",
+  "arkin-allocation",
+  "arkin-execution",
+  "arkin-engine",
+  "arkin-binance",
+  "test-integration",
+]
 
-default-members = [ "arkin" ]
+default-members = ["arkin"]
 
 resolver = "2"
 
-exclude = [ "*.md", "*.txt", ".git*", ".github/", "LICENSE*" ]
+exclude = ["*.md", "*.txt", ".git*", ".github/", "LICENSE*"]
 
 [workspace.package]
-authors = [ "Dorus Janssens <dorus.janssens@gmail.com>" ]
+authors = ["Dorus Janssens <dorus.janssens@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
 
@@ -18,75 +31,125 @@ license = "Proprietary"
 
 [workspace.dependencies]
 # Utiliy
-uuid = { version = "1.12", features = [ "v4", "rng", "fast-rng", "serde", "borsh" ] }
-rand = "0.8"
-strum = { version = "0.26", features = [ "derive" ] }
+uuid = { version = "1.13", features = [
+  "v4",
+  "rng",
+  "fast-rng",
+  "serde",
+  "borsh",
+] }
+rand = "0.9"
+strum = { version = "0.27", features = ["derive"] }
 url = { version = "2.5" }
-itertools = "0.13"
+itertools = "0.14"
 hmac = "0.12"
-sha2 = { version = "0.10", default-features = false, features = [ "oid" ] }
+sha2 = { version = "0.10", default-features = false, features = ["oid"] }
 signature = "2.2"
 base64 = "0.22"
-ed25519-dalek = { version = "2.1", features = [ "serde", "zeroize", "rand_core", "digest", "pkcs8", "pem" ] }
+ed25519-dalek = { version = "2.1", features = [
+  "serde",
+  "zeroize",
+  "rand_core",
+  "digest",
+  "pkcs8",
+  "pem",
+] }
 typed-builder = "0.20"
 statrs = { version = "0.18", default-features = false }
 
 # Multi-threading
-parking_lot = { version = "0.12", features = [ "hardware-lock-elision" ], default-features = false }
+parking_lot = { version = "0.12", features = [
+  "hardware-lock-elision",
+], default-features = false }
 rayon = "1.10"
 
 # Async
-tokio = { version = "1.43", features = [ "full" ] }
+tokio = { version = "1.43", features = ["full"] }
 flume = "0.11"
 async-trait = "0.1"
 async-stream = "0.3"
-futures-util = { version = "0.3", features = [ "io" ] }
-tokio-util = { version = "0.7", features = [ "rt" ] }
+futures-util = { version = "0.3", features = ["io"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 
 # HTTP & Websockets
 tokio-rustls = { version = "0.26" }
-async-tungstenite = { version = "0.28", features = [ "tokio-runtime", "tokio-rustls-webpki-roots" ], default-features = false }
-reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "http2", "gzip", "brotli", "zstd", "deflate", "socks", "hickory-dns" ], default-features = false }
+async-tungstenite = { version = "0.28", features = [
+  "tokio-runtime",
+  "tokio-rustls-webpki-roots",
+], default-features = false }
+reqwest = { version = "0.12", features = [
+  "json",
+  "rustls-tls-webpki-roots",
+  "http2",
+  "gzip",
+  "brotli",
+  "zstd",
+  "deflate",
+  "socks",
+  "hickory-dns",
+], default-features = false }
 
 # Data Types
-rust_decimal = { version = "1.36", default-features = false, features = [ "borsh", "maths", "serde" ] }
+rust_decimal = { version = "1.36", default-features = false, features = [
+  "borsh",
+  "maths",
+  "serde",
+] }
 rust_decimal_macros = "1.36"
-bytes = "1.9"
+bytes = "1.10"
 
 # Data Structures
-dashmap = { version = "6.1", features = [ "inline", "rayon", "inline" ], default-features = false }
+dashmap = { version = "6.1", features = [
+  "inline",
+  "rayon",
+  "inline",
+], default-features = false }
 
 # Serialization
-serde = { version = "1.0", features = [ "derive" ] }
-serde_json = { version = "1.0", features = [  ] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = [] }
 serde_repr = "0.1.19"
 
 # Database
-sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-rustls", "postgres", "time", "rust_decimal", "uuid", "derive" ] }
+sqlx = { version = "0.8", features = [
+  "runtime-tokio",
+  "tls-rustls",
+  "postgres",
+  "time",
+  "rust_decimal",
+  "uuid",
+  "derive",
+] }
 
 # Time
-time = { version = "0.3", features = [ "macros", "serde-human-readable" ] }
+time = { version = "0.3", features = ["macros", "serde-human-readable"] }
 
 # Logging & Tracing
-tracing = { version = "0.1", features = [  ] }
-tracing-futures = { version = "0.2", features = [ "tokio" ] }
-tracing-subscriber = { version = "0.3", features = [ "local-time", "parking_lot", "env-filter" ] }
+tracing = { version = "0.1", features = [] }
+tracing-futures = { version = "0.2", features = ["tokio"] }
+tracing-subscriber = { version = "0.3", features = [
+  "local-time",
+  "parking_lot",
+  "env-filter",
+] }
 
 # Error handling
-anyhow = { version = "1.0", features = [ "std" ], default-features = false }
-thiserror = { version = "2.0", features = [  ], default-features = false }
+anyhow = { version = "1.0", features = ["std"], default-features = false }
+thiserror = { version = "2.0", features = [], default-features = false }
 
 # Config
-config = { version = "0.14", features = [ "yaml" ] }
+config = { version = "0.15", features = ["yaml"] }
 
 # Retry
-backoff = { version = "0.4", features = [ "tokio" ] }
+backoff = { version = "0.4", features = ["tokio"] }
 
 # Graph Library
-petgraph = { version = "0.6", features = [ "graphmap" ], default-features = false }
+petgraph = { version = "0.7", features = [
+  "graphmap",
+], default-features = false }
 
 # Caching
-moka2 = { version = "0.13.0", features = [ "future" ] }
+moka2 = { version = "0.13.0", features = ["future"] }
 
 # TA
 yata = "0.7"
@@ -98,7 +161,10 @@ clarabel = "0"
 # Testing
 mockall = "0.13"
 test-case = "3.3"
-test-log = { version = "0.2", features = [ "color", "trace" ], default-features = false }
+test-log = { version = "0.2", features = [
+  "color",
+  "trace",
+], default-features = false }
 
 [profile.release]
 lto = "thin"

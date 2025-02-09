@@ -14,12 +14,37 @@ use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
 use crate::binance::swaps::BinanceSwapEvent;
-use crate::traits::Ingestor;
 use crate::ws::WebSocketManager;
 use crate::IngestorError;
 
+#[derive(Serialize, Clone)]
+pub struct Subscription {
+    method: String,
+    params: Vec<String>,
+    id: u64,
+}
+
+impl Subscription {
+    pub fn new(channels: Vec<&str>) -> Self {
+        Self {
+            method: "SUBSCRIBE".to_string(),
+            params: channels.iter().map(|c| c.to_string()).collect(),
+            id: 0,
+        }
+    }
+
+    pub fn update_id(&mut self, id: u64) {
+        self.id = id;
+    }
+}
+
+impl From<Subscription> for Message {
+    fn from(sub: Subscription) -> Self {
+        Message::Text(serde_json::to_string(&sub).expect("Failed to serialize subscription"))
+    }
+}
+
 #[derive(Debug, TypedBuilder, Clone)]
-//
 pub struct BinanceIngestor {
     pubsub: Arc<PubSub>,
     persistence: Arc<PersistenceService>,
@@ -91,7 +116,9 @@ impl BinanceIngestor {
 }
 
 #[async_trait]
-impl Ingestor for BinanceIngestor {
+impl RunnableService for BinanceIngestor {
+    type Error = IngestorError;
+
     async fn start(&self, shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting binance ingestor...");
 
@@ -135,32 +162,5 @@ impl Ingestor for BinanceIngestor {
         }
 
         Ok(())
-    }
-}
-
-#[derive(Serialize, Clone)]
-pub struct Subscription {
-    method: String,
-    params: Vec<String>,
-    id: u64,
-}
-
-impl Subscription {
-    pub fn new(channels: Vec<&str>) -> Self {
-        Self {
-            method: "SUBSCRIBE".to_string(),
-            params: channels.iter().map(|c| c.to_string()).collect(),
-            id: 0,
-        }
-    }
-
-    pub fn update_id(&mut self, id: u64) {
-        self.id = id;
-    }
-}
-
-impl From<Subscription> for Message {
-    fn from(sub: Subscription) -> Self {
-        Message::Text(serde_json::to_string(&sub).expect("Failed to serialize subscription"))
     }
 }

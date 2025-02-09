@@ -16,9 +16,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::pin;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
+use typed_builder::TypedBuilder;
 
 use crate::config::TardisIngestorConfig;
-use crate::traits::Ingestor;
 use crate::IngestorError;
 
 use super::binance_swap::BinanceSwapsEvent;
@@ -200,10 +200,10 @@ impl TardisRequest {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, TypedBuilder)]
 pub struct TardisIngestor {
     pub pubsub: Arc<PubSub>,
-    pub persistence_service: Arc<PersistenceService>,
+    pub persistence: Arc<PersistenceService>,
     pub client: TardisHttpClient,
     pub max_concurrent_requests: usize,
     pub venue: TardisExchange,
@@ -233,7 +233,7 @@ impl TardisIngestor {
         info!("Starting: {} Ending: {}", start_fmt, end_fmt);
         Self {
             pubsub,
-            persistence_service,
+            persistence: persistence_service,
             client: TardisHttpClient::builder()
                 .api_secret(config.api_secret.clone())
                 .base_url(config.http_url.clone())
@@ -351,10 +351,12 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 }
 
 #[async_trait]
-impl Ingestor for TardisIngestor {
+impl RunnableService for TardisIngestor {
+    type Error = IngestorError;
+
     async fn start(&self, shutdown: CancellationToken) -> Result<(), IngestorError> {
         info!("Starting tardis ingestor...");
-        let persistence_service = Arc::clone(&self.persistence_service);
+        let persistence_service = Arc::clone(&self.persistence);
 
         let req = TardisRequest::new(
             self.venue.clone(),
