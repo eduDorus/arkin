@@ -567,8 +567,9 @@ mod tests {
             .expect("Failed to install default CryptoProvider");
 
         // Create executor
-        let pubsub = Arc::new(PubSub::new(1024));
-        let persistence = PersistenceFactory::init_from_config(pubsub.clone(), true).await;
+        let pubsub = PubSub::new(1024);
+        let config = load::<PersistenceConfig>();
+        let persistence = PersistenceService::new(pubsub.clone(), &config, true).await;
 
         let executor = Arc::new(
             BinanceExecutor::builder()

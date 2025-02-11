@@ -5,7 +5,7 @@ use std::time::Duration;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
 use strum::EnumDiscriminants;
@@ -126,18 +126,24 @@ pub struct PubSub {
 }
 
 impl PubSub {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity: usize) -> Arc<Self> {
         let (tx, _) = broadcast::channel(capacity);
-        Self {
+        let pubsub = Self {
             sender: tx,
             capacity,
-        }
+        };
+        Arc::new(pubsub)
     }
 
     pub async fn publish<E>(&self, event: E)
     where
         E: Into<Event>,
     {
+        // Check if there are any receivers, if not we can skip sending
+        if self.sender.receiver_count() == 0 {
+            return;
+        }
+
         let event: Event = event.into();
         debug!("Publishing event: {:?}", event.event_type());
 
@@ -145,10 +151,15 @@ impl PubSub {
         loop {
             // Check if we have capacity to send
             if self.sender.len() < self.capacity {
-                if let Ok(_) = self.sender.send(event.clone()) {
-                    break;
+                match self.sender.send(event.clone()) {
+                    Ok(_) => break,
+                    Err(e) => {
+                        warn!("Failed to publish event: {:?}", e);
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
                 }
             } else {
+                warn!("PubSub channel is full, waiting to send");
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }
         }

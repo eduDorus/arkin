@@ -23,6 +23,9 @@ pub enum IngestorError {
     #[error("Error in the persistence service: {0}")]
     PersistenceServiceError(String),
 
+    #[error("Error in configuration: {0}")]
+    ConfigError(String),
+
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
 }

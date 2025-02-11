@@ -13,39 +13,41 @@ path = "src/bin/main.rs"
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
-arkin-cli = { path = "../arkin-cli" }
-arkin-persistence = { path = "../arkin-persistence" }
-arkin-portfolio = { path = "../arkin-portfolio" }
-arkin-ingestors = { path = "../arkin-ingestors" }
-arkin-insights = { path = "../arkin-insights" }
-arkin-strategies = { path = "../arkin-strategies" }
-arkin-allocation = { path = "../arkin-allocation" }
-arkin-execution = { path = "../arkin-execution" }
 arkin-engine = { path = "../arkin-engine" }
-arkin-binance = { path = "../arkin-binance" }
+arkin-ingestors = { path = "../arkin-ingestors" }
+# arkin-cli = { path = "../arkin-cli" }
+# arkin-persistence = { path = "../arkin-persistence" }
+# arkin-portfolio = { path = "../arkin-portfolio" }
+# arkin-insights = { path = "../arkin-insights" }
+# arkin-strategies = { path = "../arkin-strategies" }
+# arkin-allocation = { path = "../arkin-allocation" }
+# arkin-execution = { path = "../arkin-execution" }
+# arkin-binance = { path = "../arkin-binance" }
 
-futures-util = { workspace = true }
 tokio = { workspace = true }
-tracing = { workspace = true }
 tokio-rustls = { workspace = true }
+tracing = { workspace = true }
 time = { workspace = true }
-anyhow = { workspace = true }
-uuid = { workspace = true }
-rust_decimal = { workspace = true }
-rust_decimal_macros = { workspace = true }
-async-trait = { workspace = true }
-flume = { workspace = true }
-strum = { workspace = true }
-rand = { workspace = true }
-async-tungstenite = { workspace = true }
-tokio-util = { workspace = true }
-dashmap = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-catboost-rs = { workspace = true }
-clarabel = { workspace = true }
-statrs = { workspace = true }
-typed-builder = { workspace = true }
+clap = { workspace = true }
+
+# futures-util = { workspace = true }
+# anyhow = { workspace = true }
+# uuid = { workspace = true }
+# rust_decimal = { workspace = true }
+# rust_decimal_macros = { workspace = true }
+# async-trait = { workspace = true }
+# flume = { workspace = true }
+# strum = { workspace = true }
+# rand = { workspace = true }
+# async-tungstenite = { workspace = true }
+# tokio-util = { workspace = true }
+# dashmap = { workspace = true }
+# serde = { workspace = true }
+# serde_json = { workspace = true }
+# catboost-rs = { workspace = true }
+# clarabel = { workspace = true }
+# statrs = { workspace = true }
+# typed-builder = { workspace = true }
 
 
 # Monte Carlo

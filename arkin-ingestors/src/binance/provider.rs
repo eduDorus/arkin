@@ -54,7 +54,9 @@ pub struct BinanceIngestor {
     api_key: Option<String>,
     #[builder(default)]
     api_secret: Option<String>,
+    #[builder(default = 1)]
     connections_per_manager: usize,
+    #[builder(default = 10000)]
     duplicate_lookback: usize,
 }
 

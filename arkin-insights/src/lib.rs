@@ -1,7 +1,7 @@
 mod allocation;
 mod config;
 mod errors;
-mod factory;
+mod feature_factory;
 mod forecast;
 mod pipeline;
 mod service;
@@ -15,7 +15,6 @@ pub use service::InsightsService;
 pub use traits::*;
 
 pub mod prelude {
-    // pub use crate::base::*;
     pub use crate::config::*;
     pub use crate::errors::*;
     pub use crate::service::InsightsService;

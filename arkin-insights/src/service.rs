@@ -3,28 +3,38 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use arkin_core::prelude::*;
 use async_trait::async_trait;
 use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
+use arkin_core::prelude::*;
+use arkin_persistence::prelude::*;
+
 use crate::errors::InsightsError;
-use crate::factory::FeatureFactory;
+use crate::feature_factory::FeatureFactory;
 use crate::pipeline::PipelineGraph;
 use crate::{config::InsightsServiceConfig, state::InsightsState};
 
 #[derive(Debug)]
 pub struct InsightsService {
-    state: Arc<InsightsState>,
     pubsub: Arc<PubSub>,
+    state: Arc<InsightsState>,
     pipeline: Arc<Pipeline>,
     graph: PipelineGraph,
 }
 
 impl InsightsService {
-    pub async fn from_config(config: &InsightsServiceConfig, pubsub: Arc<PubSub>, pipeline: Arc<Pipeline>) -> Self {
+    pub async fn init(pubsub: Arc<PubSub>, persistence: Arc<PersistenceService>) -> Arc<Self> {
+        let config = load::<InsightsServiceConfig>();
+
+        let pipeline = persistence
+            .pipeline_store
+            .read_by_name(&config.pipeline.name)
+            .await
+            .expect("Failed to load pipeline");
+
         let state = Arc::new(InsightsState::builder().build());
         let features = FeatureFactory::from_config(
             &config.pipeline.features,
@@ -33,12 +43,13 @@ impl InsightsService {
             config.scale_periods,
         );
 
-        Self {
+        let service = Self {
             state,
             pubsub,
             pipeline,
             graph: PipelineGraph::from_config(features),
-        }
+        };
+        Arc::new(service)
     }
 
     pub async fn insert(&self, insight: Arc<Insight>) -> Result<(), InsightsError> {

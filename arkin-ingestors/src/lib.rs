@@ -1,3 +1,4 @@
+mod args;
 mod binance;
 mod config;
 mod errors;
@@ -15,6 +16,7 @@ pub use tardis::TardisIngestor;
 pub use traits::Ingestor;
 
 pub mod prelude {
+    pub use crate::args::*;
     pub use crate::binance::BinanceIngestorBuilder;
     pub use crate::config::*;
     pub use crate::errors::IngestorError;

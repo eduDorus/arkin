@@ -1,11 +1,4 @@
-use clap::Parser;
 use time::{macros::format_description, OffsetDateTime, PrimitiveDateTime};
-
-use crate::commands::Cli;
-
-pub fn parse_cli() -> Cli {
-    Cli::parse()
-}
 
 /// Custom parser to convert string to OffsetDateTime
 pub fn parse_datetime(s: &str) -> Result<OffsetDateTime, String> {

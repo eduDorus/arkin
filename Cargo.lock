@@ -157,39 +157,14 @@ dependencies = [
 name = "arkin"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "arkin-allocation",
- "arkin-binance",
- "arkin-cli",
  "arkin-core",
  "arkin-engine",
- "arkin-execution",
  "arkin-ingestors",
- "arkin-insights",
- "arkin-persistence",
- "arkin-portfolio",
- "arkin-strategies",
- "async-trait",
- "async-tungstenite",
- "catboost-rs",
- "clarabel",
- "dashmap",
- "flume",
- "futures-util",
- "rand 0.9.0",
- "rust_decimal",
- "rust_decimal_macros",
- "serde",
- "serde_json",
- "statrs",
- "strum",
+ "clap 4.5.28",
  "time",
  "tokio",
  "tokio-rustls",
- "tokio-util",
  "tracing",
- "typed-builder",
- "uuid",
 ]
 
 [[package]]
@@ -247,14 +222,6 @@ dependencies = [
  "typed-builder",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "arkin-cli"
-version = "0.1.0"
-dependencies = [
- "clap 4.5.28",
- "time",
 ]
 
 [[package]]
@@ -354,6 +321,7 @@ dependencies = [
  "async-tungstenite",
  "backoff",
  "bytes",
+ "clap 4.5.28",
  "flume",
  "futures-util",
  "mockall",
@@ -379,6 +347,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arkin-core",
+ "arkin-persistence",
  "async-trait",
  "catboost-rs",
  "clarabel",

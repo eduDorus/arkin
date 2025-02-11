@@ -11,14 +11,13 @@ use bytes::Bytes;
 use futures_util::{stream, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use time::macros::format_description;
-use time::{OffsetDateTime, PrimitiveDateTime};
+use time::OffsetDateTime;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::pin;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 
-use crate::config::TardisIngestorConfig;
 use crate::IngestorError;
 
 use super::binance_swap::BinanceSwapsEvent;
@@ -214,39 +213,6 @@ pub struct TardisIngestor {
 }
 
 impl TardisIngestor {
-    pub fn from_config(
-        config: &TardisIngestorConfig,
-        pubsub: Arc<PubSub>,
-        persistence_service: Arc<PersistenceService>,
-    ) -> Self {
-        let format = format_description!("[year]-[month]-[day] [hour]:[minute]");
-        let start = PrimitiveDateTime::parse(&config.start, &format)
-            .expect("Failed to parse start date")
-            .assume_utc();
-        let end = PrimitiveDateTime::parse(&config.end, &format)
-            .expect("Failed to parse end date")
-            .assume_utc();
-
-        let start_fmt = start.format(TIMESTAMP_FORMAT).unwrap();
-        let end_fmt = end.format(TIMESTAMP_FORMAT).unwrap();
-
-        info!("Starting: {} Ending: {}", start_fmt, end_fmt);
-        Self {
-            pubsub,
-            persistence: persistence_service,
-            client: TardisHttpClient::builder()
-                .api_secret(config.api_secret.clone())
-                .base_url(config.http_url.clone())
-                .build(),
-            max_concurrent_requests: config.max_concurrent_requests,
-            venue: TardisExchange::from_str(&config.venue).expect("Invalid venue for tardis"),
-            channel: TardisChannel::from_str(&config.channel).expect("Invalid channel for tardis"),
-            instruments: config.instruments.to_owned(),
-            start,
-            end,
-        }
-    }
-
     pub fn download_stream(
         &self,
         req: TardisRequest,
@@ -284,7 +250,7 @@ impl TardisIngestor {
 
     pub fn stream(&self, req: TardisRequest) -> impl Stream<Item = (OffsetDateTime, String)> + '_ {
         self.download_stream(req)
-            .buffer_unordered(self.max_concurrent_requests)
+            .buffered(self.max_concurrent_requests)
             .filter_map(|result| async move {
                 match result {
                     Ok(values) => Some(stream::iter(values)),
@@ -302,7 +268,7 @@ impl TardisIngestor {
         req: TardisRequest,
     ) -> impl Stream<Item = (OffsetDateTime, T)> + '_ {
         self.download_stream(req)
-            .buffer_unordered(self.max_concurrent_requests)
+            .buffered(self.max_concurrent_requests)
             .filter_map(|result| async move {
                 match result {
                     Ok(values) => Some(stream::iter(values)),
@@ -372,8 +338,15 @@ impl RunnableService for TardisIngestor {
         // No need to clone persistence_service for each iteration
         loop {
             tokio::select! {
-                    Some((_ts, json)) = stream.next() => {
-                        debug!("Received data: {}", json);
+                    event = stream.next() => {
+                    let (_ts, json) = match event {
+                      Some(e) => e,
+                      None => {
+                          info!("Stream ended");
+                          break;
+                      }
+                    };
+                    debug!("Received data: {}", json);
                     let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
                         Ok(e) => Some(e),
                         Err(e) => {

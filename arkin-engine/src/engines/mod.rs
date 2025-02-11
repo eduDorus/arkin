@@ -1,3 +1,3 @@
-mod single_strategy;
+mod default;
 
-pub use single_strategy::*;
+pub use default::*;

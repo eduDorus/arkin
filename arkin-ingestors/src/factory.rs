@@ -1,44 +1,87 @@
-use std::{sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 use time::OffsetDateTime;
 
 use crate::{
-    config::{IngestorConfig, IngestorsConfig},
+    args::IngestorsCommands,
+    config::IngestorConfig,
+    tardis::{TardisChannel, TardisExchange, TardisHttpClient},
     BinanceIngestor, IngestorError, SimIngestor, TardisIngestor,
 };
 
 pub struct IngestorFactory {}
 
 impl IngestorFactory {
-    pub fn from_config(
-        config: &IngestorsConfig,
+    pub fn init(
         pubsub: Arc<PubSub>,
         persistence: Arc<PersistenceService>,
-    ) -> Vec<Arc<dyn RunnableService<Error = IngestorError>>> {
-        config
-            .ingestors
-            .iter()
-            .map(|config| {
-                let ingestor: Arc<dyn RunnableService<Error = IngestorError>> = match config {
-                    IngestorConfig::Binance(c) => Self::binance_ingestor(
-                        pubsub.clone(),
-                        persistence.clone(),
-                        c.ws_url.to_owned(),
-                        c.ws_channels.to_owned(),
-                        c.api_key.to_owned(),
-                        c.api_secret.to_owned(),
-                        c.connections_per_manager,
-                        c.duplicate_lookback,
-                    ),
-                    IngestorConfig::Tardis(c) => {
-                        Arc::new(TardisIngestor::from_config(c, pubsub.clone(), persistence.clone()))
-                    }
-                };
-                ingestor
-            })
-            .collect()
+        config: &IngestorConfig,
+        args: &IngestorsCommands,
+    ) -> Result<Arc<dyn RunnableService<Error = IngestorError>>, IngestorError> {
+        match args {
+            IngestorsCommands::Binance(a) => {
+                if let Some(c) = &config.binance {
+                    let ingestor = BinanceIngestor::builder()
+                        .pubsub(pubsub)
+                        .persistence(persistence)
+                        .url(c.ws_url.parse().expect("Failed to parse ws binance URL"))
+                        .channels(a.channels.clone())
+                        .api_key(c.api_key.clone())
+                        .api_secret(c.api_secret.clone())
+                        .connections_per_manager(c.connections_per_manager)
+                        .duplicate_lookback(c.duplicate_lookback)
+                        .build();
+                    Ok(Arc::new(ingestor))
+                } else {
+                    Err(IngestorError::ConfigError("Binance ingestor config not found".to_string()))
+                }
+            }
+            IngestorsCommands::Tardis(a) => {
+                if let Some(c) = &config.tardis {
+                    let client = TardisHttpClient::builder()
+                        .api_secret(c.api_secret.clone())
+                        .base_url(c.http_url.clone())
+                        .build();
+
+                    let ingestor = TardisIngestor::builder()
+                        .pubsub(pubsub)
+                        .persistence(persistence)
+                        .client(client)
+                        .venue(TardisExchange::from_str(&a.venue).expect("Invalid venue for tardis"))
+                        .channel(TardisChannel::from_str(&a.channel).expect("Invalid channel for tardis"))
+                        .start(a.start)
+                        .end(a.end)
+                        .instruments(a.instruments.clone())
+                        .max_concurrent_requests(c.max_concurrent_requests)
+                        .build();
+                    Ok(Arc::new(ingestor))
+                } else {
+                    Err(IngestorError::ConfigError("Tardis ingestor config not found".to_string()))
+                }
+            }
+        }
+    }
+
+    pub fn init_simulation(
+        pubsub: Arc<PubSub>,
+        persistence: Arc<PersistenceService>,
+        instruments: Vec<Arc<Instrument>>,
+        tick_frequency: Duration,
+        start: OffsetDateTime,
+        end: OffsetDateTime,
+    ) -> Arc<dyn RunnableService<Error = IngestorError>> {
+        Arc::new(
+            SimIngestor::builder()
+                .pubsub(pubsub)
+                .persistence(persistence)
+                .instruments(instruments)
+                .tick_frequency(tick_frequency)
+                .start(start)
+                .end(end)
+                .build(),
+        )
     }
 
     pub fn binance_ingestor(
@@ -61,26 +104,6 @@ impl IngestorFactory {
                 .api_secret(api_secret)
                 .connections_per_manager(connections_per_manager)
                 .duplicate_lookback(duplicate_lookback)
-                .build(),
-        )
-    }
-
-    pub fn create_simulation_ingestor(
-        pubsub: Arc<PubSub>,
-        persistence: Arc<PersistenceService>,
-        instruments: Vec<Arc<Instrument>>,
-        tick_frequency: Duration,
-        start: OffsetDateTime,
-        end: OffsetDateTime,
-    ) -> Arc<dyn RunnableService<Error = IngestorError>> {
-        Arc::new(
-            SimIngestor::builder()
-                .pubsub(pubsub)
-                .persistence(persistence)
-                .instruments(instruments)
-                .tick_frequency(tick_frequency)
-                .start(start)
-                .end(end)
                 .build(),
         )
     }

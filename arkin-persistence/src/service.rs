@@ -35,7 +35,7 @@ pub struct PersistenceService {
 }
 
 impl PersistenceService {
-    pub async fn from_config(config: &PersistenceConfig, pubsub: Arc<PubSub>, dry_run: bool) -> Self {
+    pub async fn new(pubsub: Arc<PubSub>, config: &PersistenceConfig, dry_run: bool) -> Arc<Self> {
         let db_config = config.database.clone();
         let conn_options = PgConnectOptions::new()
             .host(&db_config.host)
@@ -131,7 +131,7 @@ impl PersistenceService {
                 .build(),
         );
 
-        Self {
+        let service = Self {
             pubsub,
             dry_run,
             auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
@@ -150,7 +150,8 @@ impl PersistenceService {
             venue_order_store,
             tick_store,
             trade_store,
-        }
+        };
+        Arc::new(service)
     }
 
     pub async fn flush(&self) -> Result<(), PersistenceError> {
