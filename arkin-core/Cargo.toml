@@ -25,6 +25,7 @@ thiserror = { workspace = true }
 serde_json = { workspace = true }
 typed-builder = { workspace = true }
 dashmap = { workspace = true }
+clap = { workspace = true }
 
 mockall = { workspace = true }
 

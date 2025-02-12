@@ -2,19 +2,8 @@ use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OrderManagerConfig {
-    pub order_manager: OrderManagerType,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum OrderManagerType {
-    #[serde(rename = "single_executor")]
-    SimpleExecutor,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExecutorConfig {
-    pub executor: ExecutorTypeConfig,
+    pub executors: ExecutorTypeConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

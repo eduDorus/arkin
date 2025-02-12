@@ -4,18 +4,18 @@ use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 use arkin_portfolio::prelude::*;
 
-use crate::{AllocationOptim, AllocationOptimConfig, AllocationTypeConfig, LimitedAllocationOptim};
+use crate::{AllocationOptimConfig, AllocationService, AllocationTypeConfig, LimitedAllocationOptim};
 
 pub struct AllocationFactory {}
 
 impl AllocationFactory {
-    pub fn from_config(
-        config: &AllocationOptimConfig,
+    pub fn init(
         pubsub: Arc<PubSub>,
         persistance: Arc<PersistenceService>,
         portfolio: Arc<dyn Accounting>,
-    ) -> Arc<dyn AllocationOptim> {
-        let allocation: Arc<dyn AllocationOptim> = match &config.allocation_optim {
+    ) -> Arc<dyn AllocationService> {
+        let config = load::<AllocationOptimConfig>();
+        let allocation: Arc<dyn AllocationService> = match &config.allocation_optim {
             AllocationTypeConfig::Limited(c) => Arc::new(
                 LimitedAllocationOptim::builder()
                     .pubsub(pubsub.clone())

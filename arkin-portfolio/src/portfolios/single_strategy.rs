@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 use typed_builder::TypedBuilder;
 
-use crate::{Accounting, PortfolioError};
+use crate::{Accounting, PortfolioError, PortfolioService};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct SingleStrategyPortfolio {
@@ -21,36 +21,6 @@ pub struct SingleStrategyPortfolio {
 
 #[async_trait]
 impl Accounting for SingleStrategyPortfolio {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError> {
-        info!("Starting portfolio...");
-
-        let mut rx = self.pubsub.subscribe();
-
-        loop {
-            tokio::select! {
-                Ok(event) = rx.recv() => {
-                    match event {
-                        Event::BalanceUpdate(update) => {
-                            if let Err(e) = self.balance_update(update).await {
-                                error!("Failed to process balance update: {}", e);
-                            }
-                        }
-                        Event::PositionUpdate(update) => {
-                            if let Err(e) = self.position_update(update).await {
-                                error!("Failed to process position update: {}", e);
-                            }
-                        }
-                        _ => {}
-                      }
-                }
-                _ = shutdown.cancelled() => {
-                    break;
-                }
-            }
-        }
-        Ok(())
-    }
-
     async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), PortfolioError> {
         info!("Portfolio processing balance update: {}", update);
         self.balances.insert(update.asset.clone(), update);
@@ -104,3 +74,39 @@ impl Accounting for SingleStrategyPortfolio {
             .collect()
     }
 }
+
+#[async_trait]
+impl RunnableService for SingleStrategyPortfolio {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
+        info!("Starting portfolio...");
+
+        let mut rx = self.pubsub.subscribe();
+
+        loop {
+            tokio::select! {
+                Ok(event) = rx.recv() => {
+                    match event {
+                        Event::BalanceUpdate(update) => {
+                            if let Err(e) = self.balance_update(update).await {
+                                error!("Failed to process balance update: {}", e);
+                            }
+                        }
+                        Event::PositionUpdate(update) => {
+                            if let Err(e) = self.position_update(update).await {
+                                error!("Failed to process position update: {}", e);
+                            }
+                        }
+                        _ => {}
+                      }
+                }
+                _ = shutdown.cancelled() => {
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl PortfolioService for SingleStrategyPortfolio {}

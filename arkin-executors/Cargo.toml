@@ -1,5 +1,5 @@
 [package]
-name = "arkin-execution"
+name = "arkin-executors"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,6 @@ license.workspace = true
 arkin-core = { path = "../arkin-core" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-binance = { path = "../arkin-binance" }
-
 
 tokio = { workspace = true }
 tokio-util = { workspace = true }
@@ -32,6 +31,7 @@ rand = { workspace = true }
 url = { workspace = true }
 tokio-rustls = { workspace = true }
 reqwest = { workspace = true }
+anyhow = { workspace = true }
 
 mockall = { workspace = true }
 test-case = { workspace = true }

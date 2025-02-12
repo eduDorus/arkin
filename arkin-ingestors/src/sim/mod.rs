@@ -11,8 +11,6 @@ use typed_builder::TypedBuilder;
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
-use crate::IngestorError;
-
 #[derive(Debug, TypedBuilder)]
 pub struct SimIngestor {
     pubsub: Arc<PubSub>,
@@ -25,9 +23,7 @@ pub struct SimIngestor {
 
 #[async_trait]
 impl RunnableService for SimIngestor {
-    type Error = IngestorError;
-
-    async fn start(&self, _shutdown: CancellationToken) -> Result<(), IngestorError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting SimIngestor...");
 
         let mut current_time;
@@ -52,17 +48,17 @@ impl RunnableService for SimIngestor {
         let mut next_tick = tick_stream.next().await;
         let mut next_trade = trade_stream.next().await;
 
-        while next_tick.is_some() || next_trade.is_some() {
+        while (next_tick.is_some() || next_trade.is_some()) && !shutdown.is_cancelled() {
             // Convert the `Option<Result<Arc<Tick>, PersistenceError>>` to an Option of the timestamp,
             // to decide which is earlier *by reference only*.
             let tick_ts = match &next_tick {
                 Some(Ok(t)) => Some(t.event_time),
-                Some(Err(e)) => return Err(IngestorError::PersistenceServiceError(e.to_string())),
+                Some(Err(e)) => return Err(anyhow::anyhow!(e.to_string())),
                 None => None,
             };
             let trade_ts = match &next_trade {
                 Some(Ok(t)) => Some(t.event_time),
-                Some(Err(e)) => return Err(IngestorError::PersistenceServiceError(e.to_string())),
+                Some(Err(e)) => return Err(anyhow::anyhow!(e.to_string())),
                 None => None,
             };
 

@@ -10,12 +10,12 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
 use arkin_core::prelude::*;
-use arkin_persistence::prelude::*;
 
+use crate::config::InsightsConfig;
 use crate::errors::InsightsError;
 use crate::feature_factory::FeatureFactory;
 use crate::pipeline::PipelineGraph;
-use crate::{config::InsightsServiceConfig, state::InsightsState};
+use crate::state::InsightsState;
 
 #[derive(Debug)]
 pub struct InsightsService {
@@ -26,22 +26,11 @@ pub struct InsightsService {
 }
 
 impl InsightsService {
-    pub async fn init(pubsub: Arc<PubSub>, persistence: Arc<PersistenceService>) -> Arc<Self> {
-        let config = load::<InsightsServiceConfig>();
-
-        let pipeline = persistence
-            .pipeline_store
-            .read_by_name(&config.pipeline.name)
-            .await
-            .expect("Failed to load pipeline");
-
+    pub async fn init(pubsub: Arc<PubSub>, pipeline: Arc<Pipeline>) -> Arc<Self> {
+        let config = load::<InsightsConfig>();
         let state = Arc::new(InsightsState::builder().build());
-        let features = FeatureFactory::from_config(
-            &config.pipeline.features,
-            pipeline.clone(),
-            state.clone(),
-            config.scale_periods,
-        );
+        let features =
+            FeatureFactory::from_config(&config.insights_service.pipeline.features, pipeline.clone(), state.clone());
 
         let service = Self {
             state,
@@ -92,9 +81,7 @@ impl InsightsService {
 
 #[async_trait]
 impl RunnableService for InsightsService {
-    type Error = InsightsError;
-
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), InsightsError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting insights service...");
 
         let mut rx = self.pubsub.subscribe();
@@ -120,11 +107,11 @@ impl RunnableService for InsightsService {
                     }
                 }
                 _ = shutdown.cancelled() => {
+                    info!("Insights service shutdown...");
                     break;
                 }
             }
         }
-        info!("Insights service shutdown...");
         Ok(())
     }
 }

@@ -7,16 +7,22 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{OrderManager, OrderManagerError};
+use crate::{OrderManager, OrderManagerService};
 
 #[derive(Debug, TypedBuilder)]
-pub struct SimpleOrderManager {
+pub struct DefaultOrderManager {
     pubsub: Arc<PubSub>,
 }
 
 #[async_trait]
-impl OrderManager for SimpleOrderManager {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), OrderManagerError> {
+impl OrderManagerService for DefaultOrderManager {}
+
+#[async_trait]
+impl OrderManager for DefaultOrderManager {}
+
+#[async_trait]
+impl RunnableService for DefaultOrderManager {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting order manager...");
 
         let mut rx = self.pubsub.subscribe();
@@ -49,6 +55,7 @@ impl OrderManager for SimpleOrderManager {
                 }
               }
                 _ = shutdown.cancelled() => {
+                    info!("Execution shutdown...");
                     break;
                 }
             }

@@ -18,8 +18,6 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 
-use crate::IngestorError;
-
 use super::binance_swap::BinanceSwapsEvent;
 use super::http::TardisHttpClient;
 
@@ -318,9 +316,7 @@ fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
 
 #[async_trait]
 impl RunnableService for TardisIngestor {
-    type Error = IngestorError;
-
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), IngestorError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting tardis ingestor...");
         let persistence_service = Arc::clone(&self.persistence);
 
@@ -413,6 +409,8 @@ impl RunnableService for TardisIngestor {
                 }
             }
         }
+
+        self.pubsub.publish(Event::Finished).await;
         Ok(())
     }
 }

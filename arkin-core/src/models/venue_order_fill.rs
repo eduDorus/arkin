@@ -7,7 +7,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     types::{Commission, MarketValue},
-    Notional, Price, Quantity,
+    Event, Notional, Price, Quantity,
 };
 
 use super::{Instrument, MarketSide, VenueOrder};
@@ -55,5 +55,17 @@ impl fmt::Display for VenueOrderFill {
             "instrument={} side={} price={} quantity={} commission={}",
             self.instrument, self.side, self.price, self.quantity, self.commission
         )
+    }
+}
+
+impl From<VenueOrderFill> for Event {
+    fn from(update: VenueOrderFill) -> Self {
+        Event::VenueOrderFill(Arc::new(update))
+    }
+}
+
+impl From<Arc<VenueOrderFill>> for Event {
+    fn from(update: Arc<VenueOrderFill>) -> Self {
+        Event::VenueOrderFill(update)
     }
 }

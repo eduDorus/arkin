@@ -1,23 +1,28 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
+use arkin_allocation::prelude::*;
 use arkin_core::prelude::*;
+use arkin_executors::prelude::*;
 use arkin_ingestors::prelude::*;
+use arkin_insights::prelude::*;
+use arkin_ordermanager::prelude::*;
 use arkin_persistence::prelude::*;
+use arkin_portfolio::prelude::*;
 
 use crate::TradingEngineError;
 
 pub struct DefaultEngine {
     pubsub: Arc<PubSub>,
     persistence: Arc<PersistenceService>,
-    persistence_task: TaskTracker,
-    persistence_shutdown: CancellationToken,
-
     service_tracker: TaskTracker,
     service_shutdown: CancellationToken,
+
+    core_service_shutdown: CancellationToken,
+    core_service_tracker: TaskTracker,
 }
 
 impl DefaultEngine {
@@ -27,51 +32,121 @@ impl DefaultEngine {
 
         // Init persistence
         let config = load::<PersistenceConfig>();
-        let persistence = PersistenceService::new(pubsub.clone(), &config, false).await;
-        let persistence_task = TaskTracker::new();
-        let persistence_shutdown = CancellationToken::new();
+        let persistence = PersistenceService::new(pubsub.clone(), &config, true).await;
 
-        // Start persistence service
-        let persistence_clone = persistence.clone();
-        let persistence_shutdown_clone = persistence_shutdown.clone();
-        persistence_task.spawn(async move {
-            let res = persistence_clone.start(persistence_shutdown_clone).await;
-            match res {
-                Ok(_) => info!("Persistence service shutdown"),
-                Err(e) => error!("Persistence service error: {:?}", e),
-            }
-        });
-
-        Self {
+        let engine = Self {
             pubsub,
-            persistence,
-            persistence_task,
-            persistence_shutdown,
+            persistence: persistence.clone(),
             service_tracker: TaskTracker::new(),
             service_shutdown: CancellationToken::new(),
-        }
+            core_service_shutdown: CancellationToken::new(),
+            core_service_tracker: TaskTracker::new(),
+        };
+
+        engine.start_service(persistence, true).await;
+        engine
     }
 
-    pub async fn start_ingestor(&self, args: &IngestorsCommands) -> Result<(), TradingEngineError> {
+    pub async fn run_ingestor(&self, args: &IngestorsCommands) -> Result<(), TradingEngineError> {
         let config = load::<IngestorsConfig>();
         let ingestor = IngestorFactory::init(self.pubsub.clone(), self.persistence.clone(), &config.ingestors, args)?;
+        self.start_service(ingestor, false).await;
+        Ok(())
+    }
 
-        let ingestor_clone = ingestor.clone();
-        let ingestor_shutdown = self.service_shutdown.clone();
-
-        let pubsub_clone = self.pubsub.clone();
-        self.service_tracker.spawn(async move {
-            let res = ingestor_clone.start(ingestor_shutdown).await;
-            match res {
-                Ok(_) => {
-                    info!("Ingestor service finished");
-                    pubsub_clone.publish(Event::Finished).await;
-                }
-                Err(e) => error!("Ingestor service error: {:?}", e),
+    pub async fn run_insights(&self, args: &InsightsArgs) -> Result<(), TradingEngineError> {
+        // Load Instruments
+        let mut instruments = vec![];
+        for symbol in &args.instruments {
+            match self.persistence.instrument_store.read_by_venue_symbol(symbol).await {
+                Ok(instr) => instruments.push(instr),
+                Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
             }
-        });
+        }
+
+        // Load Pipeline
+        let pipeline = self.persistence.pipeline_store.read_by_name(&args.pipeline).await?;
+        let insights = InsightsService::init(self.pubsub.clone(), pipeline).await;
+
+        // Load Simulation ingestor
+        let ingestor = IngestorFactory::init_simulation(
+            self.pubsub.clone(),
+            self.persistence.clone(),
+            instruments,
+            Duration::from_secs(60),
+            args.start,
+            args.end,
+        );
+
+        self.start_service(insights, false).await;
+        self.start_service(ingestor, false).await;
 
         Ok(())
+    }
+
+    pub async fn run_simulation(&self, args: &SimulationArgs) -> Result<(), TradingEngineError> {
+        // Load Instruments
+        let mut instruments = vec![];
+        for symbol in &args.instruments {
+            match self.persistence.instrument_store.read_by_venue_symbol(symbol).await {
+                Ok(instr) => instruments.push(instr),
+                Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
+            }
+        }
+
+        // Load Pipeline
+        let pipeline = self.persistence.pipeline_store.read_by_name(&args.pipeline).await?;
+        let insights = InsightsService::init(self.pubsub.clone(), pipeline).await;
+
+        // Load Simulation ingestor
+        let ingestor = IngestorFactory::init_simulation(
+            self.pubsub.clone(),
+            self.persistence.clone(),
+            instruments,
+            Duration::from_secs(60),
+            args.start,
+            args.end,
+        );
+
+        // Load strategies
+        let portfolio = PortfolioFactory::init(self.pubsub.clone());
+        let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), portfolio.clone());
+        let order_manager = OrderManagerFactory::init(self.pubsub.clone());
+        let execution = ExecutorFactory::init(self.pubsub.clone(), self.persistence.clone());
+
+        self.start_service(execution, false).await;
+        self.start_service(order_manager, false).await;
+        self.start_service(portfolio, false).await;
+        self.start_service(allocation, false).await;
+        self.start_service(insights, false).await;
+        self.start_service(ingestor, false).await;
+
+        Ok(())
+    }
+
+    async fn start_service(&self, service: Arc<dyn RunnableService>, core_service: bool) {
+        match core_service {
+            true => {
+                let shutdown = self.core_service_shutdown.clone();
+                self.core_service_tracker.spawn(async move {
+                    let res = service.start(shutdown).await;
+                    match res {
+                        Ok(_) => info!("Service finished"),
+                        Err(e) => error!("Service error: {:?}", e),
+                    }
+                });
+            }
+            false => {
+                let shutdown = self.service_shutdown.clone();
+                self.service_tracker.spawn(async move {
+                    let res = service.start(shutdown).await;
+                    match res {
+                        Ok(_) => info!("Service finished"),
+                        Err(e) => error!("Service error: {:?}", e),
+                    }
+                });
+            }
+        }
     }
 
     pub async fn wait_for_shutdown(&self) {
@@ -108,8 +183,9 @@ impl DefaultEngine {
         self.service_tracker.close();
         self.service_tracker.wait().await;
 
-        self.persistence_shutdown.cancel();
-        self.persistence_task.close();
-        self.persistence_task.wait().await;
+        info!("Shutting down core services...");
+        self.core_service_shutdown.cancel();
+        self.core_service_tracker.close();
+        self.core_service_tracker.wait().await;
     }
 }

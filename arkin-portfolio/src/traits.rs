@@ -4,17 +4,17 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use mockall::automock;
 use rust_decimal::prelude::*;
-use tokio_util::sync::CancellationToken;
 
 use arkin_core::prelude::*;
 
 use crate::PortfolioError;
 
+#[async_trait]
+pub trait PortfolioService: RunnableService + Accounting {}
+
 #[automock]
 #[async_trait]
 pub trait Accounting: std::fmt::Debug + Send + Sync {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), PortfolioError>;
-
     /// Update the current balance of a given asset
     /// This comes from the exchange and should be reconciled with the portfolio
     async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), PortfolioError>;

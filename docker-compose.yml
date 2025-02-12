@@ -25,7 +25,7 @@ services:
       - grafana_network
 
   clickhouse:
-      image: clickhouse/clickhouse-server:24.8
+      image: clickhouse/clickhouse-server:25.1
       container_name: arkin-clickhouse
       ports:
         - "8123:8123"   # HTTP interface

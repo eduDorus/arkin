@@ -1,23 +1,23 @@
 use std::{str::FromStr, sync::Arc};
 
-use arkin_binance::{BinanceHttpClient, Credentials};
-use arkin_core::PubSub;
-use arkin_persistence::PersistenceService;
 use url::Url;
 
-use crate::{Executor, ExecutorConfig, ExecutorTypeConfig};
+use arkin_binance::prelude::*;
+use arkin_core::prelude::*;
+use arkin_persistence::prelude::*;
 
-use super::BinanceExecutor;
+use crate::{
+    config::{ExecutorConfig, ExecutorTypeConfig},
+    executors::{BinanceExecutor, SimulationExecutor},
+    traits::ExecutorService,
+};
 
 pub struct ExecutorFactory {}
 
 impl ExecutorFactory {
-    pub fn from_config(
-        config: &ExecutorConfig,
-        pubsub: Arc<PubSub>,
-        persistence: Arc<PersistenceService>,
-    ) -> Arc<dyn Executor> {
-        let executor: Arc<dyn Executor> = match &config.executor {
+    pub fn init(pubsub: Arc<PubSub>, persistence: Arc<PersistenceService>) -> Arc<dyn ExecutorService> {
+        let config = load::<ExecutorConfig>();
+        let executor: Arc<dyn ExecutorService> = match &config.executors {
             // ExecutorTypeConfig::Simulation(_c) => Arc::new(SimulationExecutor::builder().pubsub(pubsub).build()),
             ExecutorTypeConfig::Binance(c) => Arc::new(
                 BinanceExecutor::builder()
@@ -37,5 +37,9 @@ impl ExecutorFactory {
         };
 
         executor
+    }
+
+    pub fn init_simulation(pubsub: Arc<PubSub>) -> Arc<dyn ExecutorService> {
+        Arc::new(SimulationExecutor::builder().pubsub(pubsub).build())
     }
 }

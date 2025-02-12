@@ -169,9 +169,7 @@ impl PersistenceService {
 
 #[async_trait]
 impl RunnableService for PersistenceService {
-    type Error = PersistenceError;
-
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), PersistenceError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting persistence service...");
 
         let mut interval = tokio::time::interval(self.auto_commit_interval);

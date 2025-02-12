@@ -1,11 +1,9 @@
-use clap::{Args, Parser, Subcommand};
-use time::OffsetDateTime;
+use clap::Parser;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::info;
 
 use arkin_core::prelude::*;
 use arkin_engine::prelude::*;
-use arkin_ingestors::prelude::*;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
@@ -21,95 +19,28 @@ async fn main() {
             info!("Starting arkin Ingestor 🚀");
             info!("Args: {:?}", args);
             let engine = DefaultEngine::new().await;
-            engine.start_ingestor(&args).await.expect("Failed to start ingestor");
+            engine.run_ingestor(&args).await.expect("Failed to start ingestor");
             engine.wait_for_shutdown().await;
         }
         Commands::Insights(args) => {
             info!("Starting arkin Pipeline 🚀");
             info!("Args: {:?}", args);
+            let engine = DefaultEngine::new().await;
+            engine.run_insights(&args).await.expect("Failed to start insights");
+            engine.wait_for_shutdown().await;
         }
         Commands::Simulation(args) => {
             info!("Starting arkin Simulation 🚀");
             info!("Args: {:?}", args);
+            let engine = DefaultEngine::new().await;
+            engine.run_simulation(&args).await.expect("Failed to start simulation");
+            engine.wait_for_shutdown().await;
         }
         Commands::Live(args) => {
             info!("Starting arkin Trading Engine 🚀");
             info!("Args: {:?}", args);
         }
     };
-}
-
-/// CLI application for X
-#[derive(Parser)]
-#[clap(
-    name = "arkin",
-    version = "0.1.0",
-    about = "Welcome to the world of arkin!"
-)]
-pub struct Cli {
-    #[clap(subcommand)]
-    pub command: Commands,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum Commands {
-    /// Run a ingestor
-    #[clap(subcommand)]
-    Ingestor(IngestorsCommands),
-
-    /// Perform insights related operations
-    Insights(InsightsArgs),
-
-    /// Configure simulation ingestor
-    Simulation(SimulationArgs),
-
-    /// Perform engine related operations
-    Live(LiveArgs),
-}
-
-#[derive(Args, Debug)]
-pub struct InsightsArgs {
-    /// Instruments (comma-separated)
-    #[arg(long, short, value_delimiter = ',')]
-    pub instruments: Vec<String>,
-
-    /// Start date in "YYYY-MM-DD HH:MM" format
-    #[arg(long, short, value_parser = parse_datetime)]
-    pub start: OffsetDateTime,
-
-    /// End date in "YYYY-MM-DD HH:MM" format
-    #[arg(long, short, value_parser = parse_datetime)]
-    pub end: OffsetDateTime,
-
-    /// Dry run
-    #[arg(long)]
-    pub dry_run: bool,
-}
-
-#[derive(Args, Debug)]
-pub struct SimulationArgs {
-    /// Instruments (comma-separated)
-    #[arg(long, value_delimiter = ',', value_parser)]
-    pub instruments: Vec<String>,
-
-    /// Start datetime in "YYYY-MM-DD HH:MM" format
-    #[arg(long, value_parser = parse_datetime)]
-    pub start: OffsetDateTime,
-
-    /// End datetime in "YYYY-MM-DD HH:MM" format
-    #[arg(long, value_parser = parse_datetime)]
-    pub end: OffsetDateTime,
-
-    /// Dry run
-    #[arg(long)]
-    pub dry_run: bool,
-}
-
-#[derive(Args, Debug)]
-pub struct LiveArgs {
-    /// Instruments (comma-separated)
-    #[arg(long, value_delimiter = ',', value_parser)]
-    pub instruments: Vec<String>,
 }
 
 // async fn run_insights(args: InsightsArgs) -> Result<()> {

@@ -13,7 +13,7 @@ arkin-ingestors = { path = "../arkin-ingestors" }
 arkin-insights = { path = "../arkin-insights" }
 arkin-strategies = { path = "../arkin-strategies" }
 arkin-allocation = { path = "../arkin-allocation" }
-arkin-execution = { path = "../arkin-execution" }
+arkin-ordermanager = { path = "../arkin-ordermanager" }
 arkin-engine = { path = "../arkin-engine" }
 
 [dev-dependencies]

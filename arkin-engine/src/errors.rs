@@ -21,7 +21,10 @@ pub enum TradingEngineError {
     AllocationOptimError(#[from] arkin_allocation::AllocationOptimError),
 
     #[error(transparent)]
-    OrderManagerError(#[from] arkin_execution::OrderManagerError),
+    OrderManagerError(#[from] arkin_ordermanager::OrderManagerError),
+
+    #[error(transparent)]
+    ExecutorError(#[from] arkin_executors::ExecutorError),
 
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),

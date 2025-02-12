@@ -26,6 +26,7 @@ strum = { workspace = true }
 moka2 = { workspace = true }
 async-stream = { workspace = true }
 
+anyhow = { workspace = true }
 # Parquet
 # parquet = { version = "53.3.0", features = [ "async", "arrow", "zstd", "object_store" ] }
 # arrow = { version = "53.3.0" }

@@ -14,7 +14,7 @@ use arkin_persistence::prelude::*;
 use arkin_portfolio::prelude::*;
 use uuid::Uuid;
 
-use crate::{AllocationOptim, AllocationOptimError};
+use crate::{AllocationOptim, AllocationOptimError, AllocationService};
 
 #[derive(Debug, TypedBuilder)]
 pub struct LimitedAllocationOptim {
@@ -44,30 +44,6 @@ pub struct DiffPosition {
 
 #[async_trait]
 impl AllocationOptim for LimitedAllocationOptim {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), AllocationOptimError> {
-        info!("Starting LimitedAllocation...");
-
-        let mut rx = self.pubsub.subscribe();
-
-        loop {
-            select! {
-                Ok(event) = rx.recv() => {
-                    match event {
-                        Event::InsightTick(tick) => {
-                            info!("LimitedAllocationOptim received insight tick: {}", tick.event_time);
-                            self.optimize(tick).await?;
-                        }
-                        _ => {}
-                    }
-                }
-                _ = shutdown.cancelled() => {
-                    break;
-                }
-            }
-        }
-        Ok(())
-    }
-
     async fn optimize(&self, tick: Arc<InsightTick>) -> Result<Vec<Arc<ExecutionOrder>>, AllocationOptimError> {
         // Save down new allocation
         tick.insights
@@ -209,3 +185,34 @@ impl AllocationOptim for LimitedAllocationOptim {
         Ok(execution_orders)
     }
 }
+
+#[async_trait]
+impl RunnableService for LimitedAllocationOptim {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
+        info!("Starting LimitedAllocation...");
+
+        let mut rx = self.pubsub.subscribe();
+
+        loop {
+            select! {
+                Ok(event) = rx.recv() => {
+                    match event {
+                        Event::InsightTick(tick) => {
+                            info!("LimitedAllocationOptim received insight tick: {}", tick.event_time);
+                            self.optimize(tick).await?;
+                        }
+                        _ => {}
+                    }
+                }
+                _ = shutdown.cancelled() => {
+                    info!("LimitedAllocationOptim shutdown...");
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl AllocationService for LimitedAllocationOptim {}

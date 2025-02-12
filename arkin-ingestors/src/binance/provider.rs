@@ -15,7 +15,6 @@ use arkin_persistence::prelude::*;
 
 use crate::binance::swaps::BinanceSwapEvent;
 use crate::ws::WebSocketManager;
-use crate::IngestorError;
 
 #[derive(Serialize, Clone)]
 pub struct Subscription {
@@ -119,9 +118,7 @@ impl BinanceIngestor {
 
 #[async_trait]
 impl RunnableService for BinanceIngestor {
-    type Error = IngestorError;
-
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), IngestorError> {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting binance ingestor...");
 
         // Check for API key and secret

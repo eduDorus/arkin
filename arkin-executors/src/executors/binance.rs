@@ -12,19 +12,12 @@ use tracing::{debug, error, info, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_binance::listen_key::NewListenKey;
-use arkin_binance::models::{
-    AccountSnapshot, BalanceDetails, BinancePositionSide, BinanceSwapsListenKeyResponse, BinanceUSDMUserStreamEvent,
-    PositionDetail,
-};
-use arkin_binance::trade::{
-    AccountRequest, BalanceRequest, CancelOpenOrdersRequest, NewOrderRequest, PositionInfoRequest,
-};
-use arkin_binance::{BinanceHttpClient, BinanceWebSocketClient, Request};
+use arkin_binance::prelude::*;
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
-use crate::{Executor, ExecutorError};
+use crate::errors::ExecutorError;
+use crate::traits::{Executor, ExecutorService};
 
 #[derive(Debug, TypedBuilder)]
 pub struct BinanceExecutor {
@@ -203,136 +196,6 @@ impl BinanceExecutor {
 
 #[async_trait]
 impl Executor for BinanceExecutor {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), ExecutorError> {
-        info!("Starting Binance executor...");
-
-        let mut rx = self.pubsub.subscribe();
-
-        // Get balances
-        if let Err(e) = self.get_balances().await {
-            error!("Failed to get balances: {}", e);
-        }
-
-        // Get positions
-        if let Err(e) = self.get_positions().await {
-            error!("Failed to get positions: {}", e);
-        }
-
-        // Get listen key
-        let mut listen_key_renewal_interval = tokio::time::interval(tokio::time::Duration::from_secs(1800));
-        let listen_key = match self.get_listen_key().await {
-            Ok(key) => key,
-            Err(e) => {
-                error!("Error: {:?}", e);
-                return Err(ExecutorError::NetworkError(e.to_string()));
-            }
-        };
-
-        let mut ws_client = match BinanceWebSocketClient::connect_with_listen_key(&listen_key).await {
-            Ok((stream, _)) => {
-                info!("Connected to Binance WebSocket");
-                stream
-            }
-            Err(e) => {
-                error!("Error: {:?}", e);
-                return Err(ExecutorError::NetworkError(e.to_string()));
-            }
-        };
-
-        loop {
-            select! {
-                _ = listen_key_renewal_interval.tick() => {
-                    info!("Renewing listen key...");
-                    let new_listen_key = match self.get_listen_key().await {
-                        Ok(key) => key,
-                        Err(e) => {
-                            error!("Error: {:?}", e);
-                            continue;
-                        }
-                    };
-                    ws_client = match BinanceWebSocketClient::connect_with_listen_key(&new_listen_key).await {
-                        Ok((stream, _)) => {
-                            info!("Connected to Binance WebSocket");
-                            stream
-                        }
-                        Err(e) => {
-                            error!("Error: {:?}", e);
-                            continue;
-                        }
-                    };
-                }
-                res = ws_client.as_mut().next() => {
-                    debug!("Received message: {:?}", res);
-                    match res {
-                        Some(Ok(msg)) => {
-                            match self.handle_websocket_message(msg).await {
-                                Ok(Some(msg)) => {
-                                    ws_client.socket.send(msg).await;
-                                }
-                                Ok(None) => {
-                                    continue;
-                                }
-                                Err(e) => {
-                                    error!("Error: {:?}", e);
-                                }
-                            }
-                        }
-                        Some(Err(e)) => {
-                            error!("Error: {:?}", e);
-                        }
-                        None => {
-                            error!("WebSocket stream closed");
-                            // Reconnect
-                            ws_client = match BinanceWebSocketClient::connect_with_listen_key(&listen_key).await {
-                                Ok((stream, _)) => {
-                                    info!("Connected to Binance WebSocket");
-                                    stream
-                                }
-                                Err(e) => {
-                                    error!("Error: {:?}", e);
-                                    continue;
-                                }
-                            };
-                        }
-                    }
-                }
-                Ok(event) = rx.recv() => {
-                  match event {
-                    Event::VenueOrder(order) => {
-                      info!("BinanceExecutor received order: {}", order);
-
-                      if self.no_trade {
-                        info!("No trade mode enabled, skipping order");
-                        continue;
-                      }
-                      // First cancel all open orders for the instrument
-                      match self.cancel_orders_by_instrument(order.instrument.clone()).await {
-                        Ok(_) => info!("Cancelled all open orders for instrument: {}", order.instrument),
-                        Err(e) => error!("Failed to cancel open orders: {}", e),
-                      }
-
-                      match self.place_order(order.clone()).await {
-                        Ok(_) => info!("Order placed: {}", order),
-                        Err(e) => error!("Failed to place order: {}", e),
-                      }
-                    }
-                    _ => {}
-                  }
-                }
-                _ = shutdown.cancelled() => {
-                    info!("Shutting down Binance executor...");
-                    info!("Cancelling all open orders");
-                    let instruments = self.open_orders.iter().map(|e| e.key().clone()).collect::<Vec<_>>();
-                    for inst in instruments {
-                      self.cancel_orders_by_instrument(inst).await?;
-                    }
-                    break;
-                }
-            }
-        }
-        Ok(())
-    }
-
     async fn get_account(&self) -> Result<(), ExecutorError> {
         let req: Request = AccountRequest::builder().build().into();
 
@@ -548,6 +411,142 @@ impl Executor for BinanceExecutor {
         unimplemented!()
     }
 }
+
+#[async_trait]
+impl RunnableService for BinanceExecutor {
+    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
+        info!("Starting Binance executor...");
+
+        let mut rx = self.pubsub.subscribe();
+
+        // Get balances
+        if let Err(e) = self.get_balances().await {
+            error!("Failed to get balances: {}", e);
+        }
+
+        // Get positions
+        if let Err(e) = self.get_positions().await {
+            error!("Failed to get positions: {}", e);
+        }
+
+        // Get listen key
+        let mut listen_key_renewal_interval = tokio::time::interval(tokio::time::Duration::from_secs(1800));
+        let listen_key = match self.get_listen_key().await {
+            Ok(key) => key,
+            Err(e) => {
+                error!("Error: {:?}", e);
+                return Err(anyhow::anyhow!(e.to_string()));
+            }
+        };
+
+        let mut ws_client = match BinanceWebSocketClient::connect_with_listen_key(&listen_key).await {
+            Ok((stream, _)) => {
+                info!("Connected to Binance WebSocket");
+                stream
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+                return Err(anyhow::anyhow!(e.to_string()));
+            }
+        };
+
+        loop {
+            select! {
+                _ = listen_key_renewal_interval.tick() => {
+                    info!("Renewing listen key...");
+                    let new_listen_key = match self.get_listen_key().await {
+                        Ok(key) => key,
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                            continue;
+                        }
+                    };
+                    ws_client = match BinanceWebSocketClient::connect_with_listen_key(&new_listen_key).await {
+                        Ok((stream, _)) => {
+                            info!("Connected to Binance WebSocket");
+                            stream
+                        }
+                        Err(e) => {
+                            error!("Error: {:?}", e);
+                            continue;
+                        }
+                    };
+                }
+                res = ws_client.as_mut().next() => {
+                    debug!("Received message: {:?}", res);
+                    match res {
+                        Some(Ok(msg)) => {
+                            match self.handle_websocket_message(msg).await {
+                                Ok(Some(msg)) => {
+                                    ws_client.socket.send(msg).await;
+                                }
+                                Ok(None) => {
+                                    continue;
+                                }
+                                Err(e) => {
+                                    error!("Error: {:?}", e);
+                                }
+                            }
+                        }
+                        Some(Err(e)) => {
+                            error!("Error: {:?}", e);
+                        }
+                        None => {
+                            error!("WebSocket stream closed");
+                            // Reconnect
+                            ws_client = match BinanceWebSocketClient::connect_with_listen_key(&listen_key).await {
+                                Ok((stream, _)) => {
+                                    info!("Connected to Binance WebSocket");
+                                    stream
+                                }
+                                Err(e) => {
+                                    error!("Error: {:?}", e);
+                                    continue;
+                                }
+                            };
+                        }
+                    }
+                }
+                Ok(event) = rx.recv() => {
+                  match event {
+                    Event::VenueOrder(order) => {
+                      info!("BinanceExecutor received order: {}", order);
+
+                      if self.no_trade {
+                        info!("No trade mode enabled, skipping order");
+                        continue;
+                      }
+                      // First cancel all open orders for the instrument
+                      match self.cancel_orders_by_instrument(order.instrument.clone()).await {
+                        Ok(_) => info!("Cancelled all open orders for instrument: {}", order.instrument),
+                        Err(e) => error!("Failed to cancel open orders: {}", e),
+                      }
+
+                      match self.place_order(order.clone()).await {
+                        Ok(_) => info!("Order placed: {}", order),
+                        Err(e) => error!("Failed to place order: {}", e),
+                      }
+                    }
+                    _ => {}
+                  }
+                }
+                _ = shutdown.cancelled() => {
+                    info!("Shutting down Binance executor...");
+                    info!("Cancelling all open orders");
+                    let instruments = self.open_orders.iter().map(|e| e.key().clone()).collect::<Vec<_>>();
+                    for inst in instruments {
+                      self.cancel_orders_by_instrument(inst).await?;
+                    }
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl ExecutorService for BinanceExecutor {}
 
 #[cfg(test)]
 mod tests {

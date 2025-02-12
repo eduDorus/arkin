@@ -5,7 +5,6 @@ use arkin_persistence::prelude::*;
 use time::OffsetDateTime;
 
 use crate::{
-    args::IngestorsCommands,
     config::IngestorConfig,
     tardis::{TardisChannel, TardisExchange, TardisHttpClient},
     BinanceIngestor, IngestorError, SimIngestor, TardisIngestor,
@@ -19,7 +18,7 @@ impl IngestorFactory {
         persistence: Arc<PersistenceService>,
         config: &IngestorConfig,
         args: &IngestorsCommands,
-    ) -> Result<Arc<dyn RunnableService<Error = IngestorError>>, IngestorError> {
+    ) -> Result<Arc<dyn RunnableService>, IngestorError> {
         match args {
             IngestorsCommands::Binance(a) => {
                 if let Some(c) = &config.binance {
@@ -71,7 +70,7 @@ impl IngestorFactory {
         tick_frequency: Duration,
         start: OffsetDateTime,
         end: OffsetDateTime,
-    ) -> Arc<dyn RunnableService<Error = IngestorError>> {
+    ) -> Arc<dyn RunnableService> {
         Arc::new(
             SimIngestor::builder()
                 .pubsub(pubsub)
@@ -93,7 +92,7 @@ impl IngestorFactory {
         api_secret: Option<String>,
         connections_per_manager: usize,
         duplicate_lookback: usize,
-    ) -> Arc<dyn RunnableService<Error = IngestorError>> {
+    ) -> Arc<dyn RunnableService> {
         Arc::new(
             BinanceIngestor::builder()
                 .pubsub(pubsub)

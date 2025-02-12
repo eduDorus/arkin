@@ -1,3 +1,4 @@
+mod cli;
 mod config;
 mod constants;
 mod logging;
@@ -16,6 +17,7 @@ pub use types::{FeatureId, Maturity, Notional, Price, Quantity, Weight};
 pub mod test_utils;
 
 pub mod prelude {
+    pub use crate::cli::*;
     pub use crate::config::*;
     pub use crate::constants::*;
     pub use crate::logging::*;
