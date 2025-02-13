@@ -12,16 +12,11 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }
-rust_decimal_macros = { workspace = true }
-serde = { workspace = true }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 typed-builder = { workspace = true }
-uuid = { workspace = true }
 
 [dev-dependencies]
-mockall = { workspace = true }
-test-case = { workspace = true }
 test-log = { workspace = true }

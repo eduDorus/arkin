@@ -19,24 +19,12 @@ futures-util = { workspace = true }
 async-trait = { workspace = true }
 uuid = { workspace = true }
 sqlx = { workspace = true }
-dashmap = { workspace = true }
 thiserror = { workspace = true }
 typed-builder = { workspace = true }
-strum = { workspace = true }
 moka2 = { workspace = true }
 async-stream = { workspace = true }
-
 anyhow = { workspace = true }
-# Parquet
-# parquet = { version = "53.3.0", features = [ "async", "arrow", "zstd", "object_store" ] }
-# arrow = { version = "53.3.0" }
-# object_store = "0.11"
-# datafusion = "43.0.0"
-
-mockall = { workspace = true }
-
-clickhouse = { version = "0.13", features = [ "lz4", "uuid", "time" ] }
+clickhouse = { workspace = true }
 
 [dev-dependencies]
-test-case = { workspace = true }
 test-log = { workspace = true }

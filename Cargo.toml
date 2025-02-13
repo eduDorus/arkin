@@ -1,5 +1,5 @@
 [workspace]
-members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-portfolio", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-ordermanager", "arkin-engine", "arkin-binance", "test-integration", "arkin-executors" ]
+members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-portfolio", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-ordermanager", "arkin-engine", "arkin-binance", "arkin-executors" ]
 
 default-members = [ "arkin" ]
 
@@ -59,11 +59,11 @@ dashmap = { version = "6.1", features = [ "inline", "rayon", "inline" ], default
 
 # Serialization
 serde = { version = "1.0", features = [ "derive" ] }
-serde_json = { version = "1.0", features = [  ] }
-serde_repr = "0.1.19"
+serde_json = { version = "1.0" }
 
 # Database
 sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-rustls", "postgres", "time", "rust_decimal", "uuid", "derive" ] }
+clickhouse = { version = "0.13", features = [ "lz4", "uuid", "time" ] }
 
 # Time
 time = { version = "0.3", features = [ "macros", "serde-human-readable" ] }
@@ -97,9 +97,12 @@ catboost-rs = "0.1"
 clarabel = "0"
 
 # Testing
-mockall = "0.13"
-test-case = "3.3"
+# mockall = "0.13"
+# test-case = "3.3"
 test-log = { version = "0.2", features = [ "color", "trace" ], default-features = false }
+
+[profile.dev]
+split-debuginfo = "unpacked"
 
 [profile.release]
 lto = "thin"

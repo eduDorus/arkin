@@ -7,33 +7,16 @@ license.workspace = true
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
-arkin-persistence = { path = "../arkin-persistence" }
-arkin-binance = { path = "../arkin-binance" }
-
 
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }
-rust_decimal_macros = { workspace = true }
-async-tungstenite = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
-flume = { workspace = true }
-uuid = { workspace = true }
-strum = { workspace = true }
 tracing = { workspace = true }
 typed-builder = { workspace = true }
-futures-util = { workspace = true }
-dashmap = { workspace = true }
-rand = { workspace = true }
-url = { workspace = true }
-tokio-rustls = { workspace = true }
-reqwest = { workspace = true }
 anyhow = { workspace = true }
 
-mockall = { workspace = true }
-test-case = { workspace = true }
+[dev-dependencies]
 test-log = { workspace = true }

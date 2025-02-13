@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use mockall::automock;
 use rust_decimal::prelude::*;
 
 use arkin_core::prelude::*;
@@ -12,7 +11,6 @@ use crate::PortfolioError;
 #[async_trait]
 pub trait PortfolioService: RunnableService + Accounting {}
 
-#[automock]
 #[async_trait]
 pub trait Accounting: std::fmt::Debug + Send + Sync {
     /// Update the current balance of a given asset

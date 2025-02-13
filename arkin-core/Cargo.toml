@@ -21,14 +21,8 @@ uuid = { workspace = true }
 sqlx = { workspace = true }
 futures-util = { workspace = true }
 async-trait = { workspace = true }
-thiserror = { workspace = true }
 serde_json = { workspace = true }
 typed-builder = { workspace = true }
-dashmap = { workspace = true }
-clap = { workspace = true }
-
-mockall = { workspace = true }
 
 [dev-dependencies]
-test-case = { workspace = true }
 test-log = { workspace = true }

@@ -22,7 +22,6 @@ flume = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 uuid = { workspace = true }
-itertools = { workspace = true }
 yata = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
@@ -32,6 +31,4 @@ clarabel = { workspace = true }
 statrs = { workspace = true }
 
 [dev-dependencies]
-mockall = { workspace = true }
-test-case = { workspace = true }
 test-log = { workspace = true }

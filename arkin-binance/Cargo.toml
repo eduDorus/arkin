@@ -8,13 +8,10 @@ license.workspace = true
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 
-anyhow = { workspace = true }
 tokio = { workspace = true }
-tokio-rustls = { workspace = true }
 async-tungstenite = { workspace = true }
 tracing = { workspace = true }
 time = { workspace = true }
-uuid = { workspace = true }
 futures-util = { workspace = true }
 reqwest = { workspace = true }
 hmac = { workspace = true }
@@ -32,6 +29,4 @@ serde_json = { workspace = true }
 typed-builder = { workspace = true }
 
 [dev-dependencies]
-mockall = { workspace = true }
-test-case = { workspace = true }
 test-log = { workspace = true }

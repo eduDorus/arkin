@@ -28,9 +28,6 @@ reqwest = { workspace = true }
 rust_decimal = { workspace = true }
 thiserror = { workspace = true }
 typed-builder = { workspace = true }
-clap = { workspace = true }
 
 [dev-dependencies]
-mockall = { workspace = true }
-test-case = { workspace = true }
 test-log = { workspace = true }

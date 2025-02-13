@@ -13,10 +13,7 @@ arkin-persistence = { path = "../arkin-persistence" }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 typed-builder = { workspace = true }
-time = { workspace = true }
 rust_decimal = { workspace = true }
-rust_decimal_macros = { workspace = true }
-serde = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
@@ -24,8 +21,6 @@ async-trait = { workspace = true }
 dashmap = { workspace = true }
 uuid = { workspace = true }
 
-mockall = { workspace = true }
 
 [dev-dependencies]
-test-case = { workspace = true }
 test-log = { workspace = true }

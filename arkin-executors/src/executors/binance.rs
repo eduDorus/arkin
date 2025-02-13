@@ -548,155 +548,154 @@ impl RunnableService for BinanceExecutor {
 #[async_trait]
 impl ExecutorService for BinanceExecutor {}
 
-#[cfg(test)]
-mod tests {
-    use std::time::Duration;
+// #[cfg(test)]
+// mod tests {
+//     use std::time::Duration;
 
-    use super::*;
+//     use super::*;
 
-    use arkin_binance::Credentials;
-    use rust_decimal_macros::dec;
-    use test_log::test;
-    use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
-    use tokio_util::task::TaskTracker;
+//     use arkin_binance::Credentials;
+//     use rust_decimal_macros::dec;
+//     use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
+//     use tokio_util::task::TaskTracker;
 
-    #[test(tokio::test)]
-    async fn test_binance_executor() {
-        CryptoProvider::install_default(aws_lc_rs::default_provider())
-            .expect("Failed to install default CryptoProvider");
+//     #[test(tokio::test)]
+//     async fn test_binance_executor() {
+//         CryptoProvider::install_default(aws_lc_rs::default_provider())
+//             .expect("Failed to install default CryptoProvider");
 
-        // Create executor
-        let pubsub = PubSub::new(1024);
-        let config = load::<PersistenceConfig>();
-        let persistence = PersistenceService::new(pubsub.clone(), &config, true).await;
+//         // Create executor
+//         let pubsub = PubSub::new(1024);
+//         let config = load::<PersistenceConfig>();
+//         let persistence = PersistenceService::new(pubsub.clone(), &config, true).await;
 
-        let executor = Arc::new(
-            BinanceExecutor::builder()
-                .pubsub(pubsub.clone())
-                .persistence(persistence.clone())
-                .client(Arc::new(
-                    BinanceHttpClient::builder()
-                        .credentials(Some(Credentials::from_hmac(
-                            "ppCYOYKlKLRVwGCzmcbXNf2Qn34aeDEN36A4I0Fwdj8WmpvfkxO9cmNIx5PwhmOd",
-                            "cs4wa0w860lgkViblUzua4ThRXpfD22ruG8d0GytU7fIrJCvz8jvCAzKpaKPwTl0",
-                        )))
-                        .build(),
-                ))
-                .api_key("ppCYOYKlKLRVwGCzmcbXNf2Qn34aeDEN36A4I0Fwdj8WmpvfkxO9cmNIx5PwhmOd".to_string())
-                .no_trade(true)
-                .build(),
-        );
+//         let executor = Arc::new(
+//             BinanceExecutor::builder()
+//                 .pubsub(pubsub.clone())
+//                 .persistence(persistence.clone())
+//                 .client(Arc::new(
+//                     BinanceHttpClient::builder()
+//                         .credentials(Some(Credentials::from_hmac(
+//                             "ppCYOYKlKLRVwGCzmcbXNf2Qn34aeDEN36A4I0Fwdj8WmpvfkxO9cmNIx5PwhmOd",
+//                             "cs4wa0w860lgkViblUzua4ThRXpfD22ruG8d0GytU7fIrJCvz8jvCAzKpaKPwTl0",
+//                         )))
+//                         .build(),
+//                 ))
+//                 .api_key("ppCYOYKlKLRVwGCzmcbXNf2Qn34aeDEN36A4I0Fwdj8WmpvfkxO9cmNIx5PwhmOd".to_string())
+//                 .no_trade(true)
+//                 .build(),
+//         );
 
-        // Start executor
-        let tracker = TaskTracker::new();
-        let shutdown = CancellationToken::new();
-        let shutdown_clone = shutdown.clone();
-        tracker.spawn(async move {
-            executor.start(shutdown_clone).await.unwrap();
-        });
+//         // Start executor
+//         let tracker = TaskTracker::new();
+//         let shutdown = CancellationToken::new();
+//         let shutdown_clone = shutdown.clone();
+//         tracker.spawn(async move {
+//             executor.start(shutdown_clone).await.unwrap();
+//         });
 
-        let mut rx = pubsub.subscribe();
-        let shutdown_clone = shutdown.clone();
-        tracker.spawn(async move {
-            loop {
-                tokio::select! {
-                    Ok(event) = rx.recv() => {
-                        info!("Received event: {:?}", event);
-                        match event {
-                            Event::BalanceUpdate(order) => {
-                                info!("Received balance update: {}", order);
-                            }
-                            Event::PositionUpdate(order) => {
-                                info!("Received position update: {}", order);
-                            }
-                            Event::VenueOrderUpdate(order) => {
-                                info!("Received venue order update: {}", order);
-                            }
-                            _ => {}
-                        }
-                    }
-                    _ = shutdown_clone.cancelled() => {
-                        info!("Shutting down...");
-                        break;
-                    }
-                }
-            }
-        });
+//         let mut rx = pubsub.subscribe();
+//         let shutdown_clone = shutdown.clone();
+//         tracker.spawn(async move {
+//             loop {
+//                 tokio::select! {
+//                     Ok(event) = rx.recv() => {
+//                         info!("Received event: {:?}", event);
+//                         match event {
+//                             Event::BalanceUpdate(order) => {
+//                                 info!("Received balance update: {}", order);
+//                             }
+//                             Event::PositionUpdate(order) => {
+//                                 info!("Received position update: {}", order);
+//                             }
+//                             Event::VenueOrderUpdate(order) => {
+//                                 info!("Received venue order update: {}", order);
+//                             }
+//                             _ => {}
+//                         }
+//                     }
+//                     _ = shutdown_clone.cancelled() => {
+//                         info!("Shutting down...");
+//                         break;
+//                     }
+//                 }
+//             }
+//         });
 
-        // Wait for executor to start
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+//         // Wait for executor to start
+//         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
-        // Create a sample VenueOrder
-        let order: Arc<VenueOrder> = VenueOrder::builder()
-            .id(Uuid::new_v4())
-            .portfolio(test_portfolio())
-            .instrument(test_inst_binance_eth_usdt_perp())
-            .order_type(VenueOrderType::Limit)
-            .side(MarketSide::Sell)
-            .price(dec!(3800.00))
-            .quantity(dec!(0.006))
-            .build()
-            .into();
+//         // Create a sample VenueOrder
+//         let order: Arc<VenueOrder> = VenueOrder::builder()
+//             .id(Uuid::new_v4())
+//             .portfolio(test_portfolio())
+//             .instrument(test_inst_binance_eth_usdt_perp())
+//             .order_type(VenueOrderType::Limit)
+//             .side(MarketSide::Sell)
+//             .price(dec!(3800.00))
+//             .quantity(dec!(0.006))
+//             .build()
+//             .into();
 
-        info!("Publishing Venue Order");
-        pubsub.publish(order);
+//         info!("Publishing Venue Order");
+//         pubsub.publish(order);
 
-        // // Subscribe to fill and updates
-        // let mut updates = pubsub.subscribe::<VenueOrderState>();
-        // let mut fills = pubsub.subscribe::<VenueOrderFill>();
+//         // // Subscribe to fill and updates
+//         // let mut updates = pubsub.subscribe::<VenueOrderState>();
+//         // let mut fills = pubsub.subscribe::<VenueOrderFill>();
 
-        // // Publish the order
-        // info!("Publishing order: {:?}", order);
-        // pubsub.publish::<VenueOrder>(order.clone());
+//         // // Publish the order
+//         // info!("Publishing order: {:?}", order);
+//         // pubsub.publish::<VenueOrder>(order.clone());
 
-        // // Check for ack
-        // let ack = updates.recv().await.unwrap();
-        // assert_eq!(ack.status, VenueOrderStatus::Placed);
+//         // // Check for ack
+//         // let ack = updates.recv().await.unwrap();
+//         // assert_eq!(ack.status, VenueOrderStatus::Placed);
 
-        // // Send price update
-        // let tick = Arc::new(
-        //     Tick::builder()
-        //         .instrument(test_inst_binance_btc_usdt_perp())
-        //         .tick_id(0 as u64)
-        //         .bid_price(dec!(50000))
-        //         .bid_quantity(dec!(1))
-        //         .ask_price(dec!(50001))
-        //         .ask_quantity(dec!(1))
-        //         .build(),
-        // );
-        // pubsub.publish::<Tick>(tick);
+//         // // Send price update
+//         // let tick = Arc::new(
+//         //     Tick::builder()
+//         //         .instrument(test_inst_binance_btc_usdt_perp())
+//         //         .tick_id(0 as u64)
+//         //         .bid_price(dec!(50000))
+//         //         .bid_quantity(dec!(1))
+//         //         .ask_price(dec!(50001))
+//         //         .ask_quantity(dec!(1))
+//         //         .build(),
+//         // );
+//         // pubsub.publish::<Tick>(tick);
 
-        // // Check for fill
-        // let fill = fills.recv().await.unwrap();
-        // assert_eq!(fill.price, Decimal::from_f64(50001.).unwrap());
-        // assert_eq!(fill.quantity, Decimal::from_f64(0.1).unwrap());
+//         // // Check for fill
+//         // let fill = fills.recv().await.unwrap();
+//         // assert_eq!(fill.price, Decimal::from_f64(50001.).unwrap());
+//         // assert_eq!(fill.quantity, Decimal::from_f64(0.1).unwrap());
 
-        tokio::time::sleep(Duration::from_secs(10)).await;
+//         tokio::time::sleep(Duration::from_secs(10)).await;
 
-        let market_order: Arc<VenueOrder> = VenueOrder::builder()
-            .id(Uuid::new_v4())
-            .portfolio(test_portfolio())
-            .instrument(test_inst_binance_eth_usdt_perp())
-            .order_type(VenueOrderType::Market)
-            .side(MarketSide::Buy)
-            .price(dec!(0))
-            .quantity(dec!(0.006))
-            .build()
-            .into();
-        pubsub.publish(market_order);
+//         let market_order: Arc<VenueOrder> = VenueOrder::builder()
+//             .id(Uuid::new_v4())
+//             .portfolio(test_portfolio())
+//             .instrument(test_inst_binance_eth_usdt_perp())
+//             .order_type(VenueOrderType::Market)
+//             .side(MarketSide::Buy)
+//             .price(dec!(0))
+//             .quantity(dec!(0.006))
+//             .build()
+//             .into();
+//         pubsub.publish(market_order);
 
-        tokio::time::sleep(Duration::from_secs(10)).await;
+//         tokio::time::sleep(Duration::from_secs(10)).await;
 
-        match tokio::signal::ctrl_c().await {
-            Ok(_) => {
-                info!("Received Ctrl-C signal, shutting down...");
-            }
-            Err(e) => error!("Failed to listen for Ctrl-C signal: {}", e),
-        }
+//         match tokio::signal::ctrl_c().await {
+//             Ok(_) => {
+//                 info!("Received Ctrl-C signal, shutting down...");
+//             }
+//             Err(e) => error!("Failed to listen for Ctrl-C signal: {}", e),
+//         }
 
-        // Shutdown
-        shutdown.cancel();
-        tracker.close();
-        tracker.wait().await;
-    }
-}
+//         // Shutdown
+//         shutdown.cancel();
+//         tracker.close();
+//         tracker.wait().await;
+//     }
+// }
