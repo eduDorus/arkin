@@ -9,6 +9,9 @@ use arkin_core::prelude::*;
 use crate::StrategyError;
 
 #[async_trait]
+pub trait StrategyService: RunnableService + Algorithm {}
+
+#[async_trait]
 pub trait Algorithm: std::fmt::Debug + Send + Sync {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), StrategyError>;
 

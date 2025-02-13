@@ -6,7 +6,7 @@ use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -54,7 +54,7 @@ impl SimulationExecutor {
     }
 
     pub fn update_balance(&self, _asset: &Arc<Asset>, _quantity: Decimal) {
-        unimplemented!("SimulationExecutor::update_balance")
+        warn!("Not implemented");
         // let mut entry = self
         //     .balances
         //     .entry(asset.clone())

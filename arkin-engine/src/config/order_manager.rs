@@ -8,7 +8,7 @@ pub struct OrderManagersConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OrderManagerTypeConfig {
-    pub single_executor: SingleExecutorTypeConfig,
+    pub single_executor: Option<SingleExecutorTypeConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

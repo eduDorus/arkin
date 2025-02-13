@@ -1,4 +1,3 @@
-use clap::Parser;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::info;
 
@@ -12,35 +11,9 @@ async fn main() {
     // Install the default CryptoProvider
     CryptoProvider::install_default(aws_lc_rs::default_provider()).expect("Failed to install default CryptoProvider");
 
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Ingestor(args) => {
-            info!("Starting arkin Ingestor 🚀");
-            info!("Args: {:?}", args);
-            let engine = DefaultEngine::new().await;
-            engine.run_ingestor(&args).await.expect("Failed to start ingestor");
-            engine.wait_for_shutdown().await;
-        }
-        Commands::Insights(args) => {
-            info!("Starting arkin Pipeline 🚀");
-            info!("Args: {:?}", args);
-            let engine = DefaultEngine::new().await;
-            engine.run_insights(&args).await.expect("Failed to start insights");
-            engine.wait_for_shutdown().await;
-        }
-        Commands::Simulation(args) => {
-            info!("Starting arkin Simulation 🚀");
-            info!("Args: {:?}", args);
-            let engine = DefaultEngine::new().await;
-            engine.run_simulation(&args).await.expect("Failed to start simulation");
-            engine.wait_for_shutdown().await;
-        }
-        Commands::Live(args) => {
-            info!("Starting arkin Trading Engine 🚀");
-            info!("Args: {:?}", args);
-        }
-    };
+    info!("Starting arkin 🚀");
+    let engine = DefaultEngine::new().await;
+    engine.wait_for_shutdown().await;
 }
 
 // async fn run_insights(args: InsightsArgs) -> Result<()> {

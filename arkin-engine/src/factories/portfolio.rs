@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
+use arkin_portfolio::prelude::*;
 
-use crate::{PortfolioConfig, PortfolioService, PortfolioType, SingleStrategyPortfolio};
+use crate::config::{PortfolioConfig, PortfolioType};
 
 pub struct PortfolioFactory {}
 

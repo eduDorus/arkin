@@ -10,7 +10,7 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{Algorithm, StrategyError};
+use crate::{Algorithm, StrategyError, StrategyService};
 
 #[derive(Debug, Clone, TypedBuilder)]
 #[allow(unused)]
@@ -19,6 +19,16 @@ pub struct CrossoverStrategy {
     id: Arc<Strategy>,
     fast_ma: FeatureId,
     slow_ma: FeatureId,
+}
+
+#[async_trait]
+impl StrategyService for CrossoverStrategy {}
+
+#[async_trait]
+impl RunnableService for CrossoverStrategy {
+    async fn start(&self, _shutdown: CancellationToken) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
 }
 
 #[async_trait]

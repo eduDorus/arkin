@@ -1,18 +1,18 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
+use clap::Parser;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
-use arkin_allocation::prelude::*;
 use arkin_core::prelude::*;
-use arkin_executors::prelude::*;
-use arkin_ingestors::prelude::*;
-use arkin_insights::prelude::*;
-use arkin_ordermanager::prelude::*;
 use arkin_persistence::prelude::*;
-use arkin_portfolio::prelude::*;
 
+use crate::cli::{Cli, Commands, DownloadArgs, IngestorsArgs, InsightsArgs, SimulationArgs};
+use crate::config::EngineConfig;
+use crate::factories::{
+    AllocationFactory, ExecutorFactory, IngestorFactory, InsightsFactory, OrderManagerFactory, PortfolioFactory,
+};
 use crate::TradingEngineError;
 
 pub struct DefaultEngine {
@@ -27,8 +27,12 @@ pub struct DefaultEngine {
 
 impl DefaultEngine {
     pub async fn new() -> Self {
-        // Init pubsub
-        let pubsub = PubSub::new(1000000);
+        let config = load::<EngineConfig>();
+        let args = Cli::parse();
+
+        // Check if default engine is configured
+        let config = config.engine.default.expect("Default engine not configured");
+        let pubsub = PubSub::new(config.pubsub_capacity);
 
         // Init persistence
         let config = load::<PersistenceConfig>();
@@ -44,39 +48,39 @@ impl DefaultEngine {
         };
 
         engine.start_service(persistence, true).await;
+
+        let res = match &args.command {
+            Commands::Download(args) => engine.run_download(&args).await,
+            Commands::Ingestor(args) => engine.run_ingestor(&args).await,
+            Commands::Insights(args) => engine.run_insights(&args).await,
+            Commands::Simulation(args) => engine.run_simulation(&args).await,
+            Commands::Live(_args) => unimplemented!(),
+        };
+        match res {
+            Ok(_) => info!("Engine started successfully"),
+            Err(e) => {
+                error!("Failed to start engine: {:?}", e);
+                engine.shutdown().await;
+            }
+        }
         engine
     }
 
-    pub async fn run_ingestor(&self, args: &IngestorsCommands) -> Result<(), TradingEngineError> {
-        let config = load::<IngestorsConfig>();
-        let ingestor = IngestorFactory::init(self.pubsub.clone(), self.persistence.clone(), &config.ingestors, args)?;
+    pub async fn run_download(&self, args: &DownloadArgs) -> Result<(), TradingEngineError> {
+        let ingestor = IngestorFactory::init_download(self.pubsub.clone(), self.persistence.clone(), &args);
+        self.start_service(ingestor, false).await;
+        Ok(())
+    }
+
+    pub async fn run_ingestor(&self, args: &IngestorsArgs) -> Result<(), TradingEngineError> {
+        let ingestor = IngestorFactory::init(self.pubsub.clone(), self.persistence.clone(), args);
         self.start_service(ingestor, false).await;
         Ok(())
     }
 
     pub async fn run_insights(&self, args: &InsightsArgs) -> Result<(), TradingEngineError> {
-        // Load Instruments
-        let mut instruments = vec![];
-        for symbol in &args.instruments {
-            match self.persistence.instrument_store.read_by_venue_symbol(symbol).await {
-                Ok(instr) => instruments.push(instr),
-                Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
-            }
-        }
-
-        // Load Pipeline
-        let pipeline = self.persistence.pipeline_store.read_by_name(&args.pipeline).await?;
-        let insights = InsightsService::init(self.pubsub.clone(), pipeline).await;
-
-        // Load Simulation ingestor
-        let ingestor = IngestorFactory::init_simulation(
-            self.pubsub.clone(),
-            self.persistence.clone(),
-            instruments,
-            Duration::from_secs(60),
-            args.start,
-            args.end,
-        );
+        let insights = InsightsFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.pipeline).await;
+        let ingestor = IngestorFactory::init_insights(self.pubsub.clone(), self.persistence.clone(), args).await;
 
         self.start_service(insights, false).await;
         self.start_service(ingestor, false).await;
@@ -85,39 +89,19 @@ impl DefaultEngine {
     }
 
     pub async fn run_simulation(&self, args: &SimulationArgs) -> Result<(), TradingEngineError> {
-        // Load Instruments
-        let mut instruments = vec![];
-        for symbol in &args.instruments {
-            match self.persistence.instrument_store.read_by_venue_symbol(symbol).await {
-                Ok(instr) => instruments.push(instr),
-                Err(e) => error!("Failed to read instrument {}: {}", symbol, e),
-            }
-        }
-
-        // Load Pipeline
-        let pipeline = self.persistence.pipeline_store.read_by_name(&args.pipeline).await?;
-        let insights = InsightsService::init(self.pubsub.clone(), pipeline).await;
-
-        // Load Simulation ingestor
-        let ingestor = IngestorFactory::init_simulation(
-            self.pubsub.clone(),
-            self.persistence.clone(),
-            instruments,
-            Duration::from_secs(60),
-            args.start,
-            args.end,
-        );
-
-        // Load strategies
+        // Init services
+        let insights = InsightsFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.pipeline).await;
+        let ingestor = IngestorFactory::init_simulation(self.pubsub.clone(), self.persistence.clone(), args).await;
         let portfolio = PortfolioFactory::init(self.pubsub.clone());
         let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), portfolio.clone());
         let order_manager = OrderManagerFactory::init(self.pubsub.clone());
-        let execution = ExecutorFactory::init(self.pubsub.clone(), self.persistence.clone());
+        let execution = ExecutorFactory::init_simulation(self.pubsub.clone());
 
+        // Start services
         self.start_service(execution, false).await;
         self.start_service(order_manager, false).await;
-        self.start_service(portfolio, false).await;
         self.start_service(allocation, false).await;
+        self.start_service(portfolio, false).await;
         self.start_service(insights, false).await;
         self.start_service(ingestor, false).await;
 

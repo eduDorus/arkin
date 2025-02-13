@@ -11,7 +11,7 @@ use tracing::{debug, error, info};
 
 use arkin_core::prelude::*;
 
-use crate::config::InsightsConfig;
+use crate::config::PipelineConfig;
 use crate::errors::InsightsError;
 use crate::feature_factory::FeatureFactory;
 use crate::pipeline::PipelineGraph;
@@ -26,11 +26,9 @@ pub struct InsightsService {
 }
 
 impl InsightsService {
-    pub async fn init(pubsub: Arc<PubSub>, pipeline: Arc<Pipeline>) -> Arc<Self> {
-        let config = load::<InsightsConfig>();
+    pub async fn init(pubsub: Arc<PubSub>, pipeline: Arc<Pipeline>, pipeline_config: &PipelineConfig) -> Arc<Self> {
         let state = Arc::new(InsightsState::builder().build());
-        let features =
-            FeatureFactory::from_config(&config.insights_service.pipeline.features, pipeline.clone(), state.clone());
+        let features = FeatureFactory::from_config(&pipeline_config.features, pipeline.clone(), state.clone());
 
         let service = Self {
             state,

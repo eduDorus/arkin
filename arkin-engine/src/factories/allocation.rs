@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
+use arkin_allocation::prelude::*;
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 use arkin_portfolio::prelude::*;
 
-use crate::{AllocationOptimConfig, AllocationService, AllocationTypeConfig, LimitedAllocationOptim};
+use crate::{AllocationOptimConfig, AllocationTypeConfig};
 
 pub struct AllocationFactory {}
 

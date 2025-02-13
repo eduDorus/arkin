@@ -28,7 +28,6 @@ tokio = { workspace = true }
 tokio-rustls = { workspace = true }
 tracing = { workspace = true }
 time = { workspace = true }
-clap = { workspace = true }
 
 # futures-util = { workspace = true }
 # anyhow = { workspace = true }

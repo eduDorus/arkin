@@ -1,16 +1,13 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use url::Url;
 
 use arkin_binance::prelude::*;
 use arkin_core::prelude::*;
+use arkin_executors::prelude::*;
 use arkin_persistence::prelude::*;
 
-use crate::{
-    config::{ExecutorConfig, ExecutorTypeConfig},
-    executors::{BinanceExecutor, SimulationExecutor},
-    traits::ExecutorService,
-};
+use crate::config::{ExecutorConfig, ExecutorTypeConfig};
 
 pub struct ExecutorFactory {}
 
@@ -25,7 +22,7 @@ impl ExecutorFactory {
                     .persistence(persistence)
                     .client(Arc::new(
                         BinanceHttpClient::builder()
-                            .base_url(Url::from_str(&c.base_url).expect("Invalid URL for binance http client"))
+                            .base_url(Url::parse(&c.base_url).expect("Invalid URL for binance http client"))
                             .credentials(Some(Credentials::from_hmac(c.api_key.clone(), c.api_secret.clone())))
                             .build(),
                     ))

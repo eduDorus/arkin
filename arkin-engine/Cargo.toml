@@ -15,6 +15,7 @@ arkin-strategies = { path = "../arkin-strategies" }
 arkin-allocation = { path = "../arkin-allocation" }
 arkin-ordermanager = { path = "../arkin-ordermanager" }
 arkin-executors = { path = "../arkin-executors" }
+arkin-binance = { path = "../arkin-binance" }
 
 tokio = { workspace = true }
 tokio-util = { workspace = true }
@@ -24,6 +25,11 @@ time = { workspace = true }
 typed-builder = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
+serde = { workspace = true }
+rust_decimal = { workspace = true }
+uuid = { workspace = true }
+clap = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }

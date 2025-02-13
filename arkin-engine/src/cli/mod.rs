@@ -1,7 +1,8 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use time::OffsetDateTime;
 
-use crate::utils::parse_datetime;
+use arkin_core::prelude::*;
+use arkin_ingestors::prelude::*;
 
 /// CLI application for X
 #[derive(Parser)]
@@ -17,9 +18,11 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    /// Download data
+    Download(DownloadArgs),
+
     /// Run a ingestor
-    #[clap(subcommand)]
-    Ingestor(IngestorsCommands),
+    Ingestor(IngestorsArgs),
 
     /// Perform insights related operations
     Insights(InsightsArgs),
@@ -31,43 +34,19 @@ pub enum Commands {
     Live(LiveArgs),
 }
 
-#[derive(Subcommand, Debug)]
-pub enum IngestorsCommands {
-    /// Configure and start Binance ingestor
-    Binance(BinanceIngestorArgs),
-
-    /// Configure and start Tardis ingestor
-    Tardis(TardisIngestorArgs),
-}
-
 #[derive(Args, Debug)]
-pub struct BinanceIngestorArgs {
-    /// Configure the channels to subscribe to
-    #[arg(long, short, value_delimiter = ',')]
-    pub channels: Vec<String>,
-
-    /// Configure the instruments to subscribe to
-    #[arg(long, short, value_delimiter = ',')]
-    pub instruments: Vec<String>,
-
-    /// Dry run
-    #[arg(long)]
-    pub dry_run: bool,
-}
-
-#[derive(Args, Debug)]
-pub struct TardisIngestorArgs {
-    /// Venue name
-    #[arg(long)]
-    pub venue: String,
-
-    /// Channel name
-    #[arg(long)]
-    pub channel: String,
-
+pub struct DownloadArgs {
     /// Instruments (comma-separated)
     #[arg(long, value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,
+
+    /// Venue name
+    #[arg(long, short)]
+    pub venue: TardisExchange,
+
+    /// Channel name
+    #[arg(long, short)]
+    pub channel: TardisChannel,
 
     /// Start datetime in "YYYY-MM-DD HH:MM" format
     #[arg(long, value_parser = parse_datetime)]
@@ -82,11 +61,35 @@ pub struct TardisIngestorArgs {
     pub dry_run: bool,
 }
 
+#[derive(Debug, Clone, ValueEnum)]
+pub enum IngestorType {
+    Binance,
+}
+
+#[derive(Args, Debug)]
+pub struct IngestorsArgs {
+    /// Ingestor type
+    #[arg(long, short)]
+    pub ingestor: IngestorType,
+
+    /// Configure the instruments to subscribe to
+    #[arg(long, value_delimiter = ',')]
+    pub instruments: Vec<String>,
+
+    /// Dry run
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
 #[derive(Args, Debug)]
 pub struct InsightsArgs {
     /// Instruments (comma-separated)
     #[arg(long, short, value_delimiter = ',')]
     pub instruments: Vec<String>,
+
+    /// Tick frequency in seconds
+    #[arg(long, short)]
+    pub tick_frequency: u64,
 
     /// Pipeline name
     #[arg(long, short)]
@@ -108,19 +111,23 @@ pub struct InsightsArgs {
 #[derive(Args, Debug)]
 pub struct SimulationArgs {
     /// Instruments (comma-separated)
-    #[arg(long, value_delimiter = ',', value_parser)]
+    #[arg(long, short, value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,
 
+    /// Tick frequency in seconds
+    #[arg(long, short)]
+    pub tick_frequency: u64,
+
     /// Pipeline name
-    #[arg(long)]
+    #[arg(long, short)]
     pub pipeline: String,
 
     /// Start datetime in "YYYY-MM-DD HH:MM" format
-    #[arg(long, value_parser = parse_datetime)]
+    #[arg(long, short, value_parser = parse_datetime)]
     pub start: OffsetDateTime,
 
     /// End datetime in "YYYY-MM-DD HH:MM" format
-    #[arg(long, value_parser = parse_datetime)]
+    #[arg(long, short, value_parser = parse_datetime)]
     pub end: OffsetDateTime,
 
     /// Dry run
@@ -133,4 +140,8 @@ pub struct LiveArgs {
     /// Instruments (comma-separated)
     #[arg(long, value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,
+
+    /// Ingestors
+    #[arg(long, value_delimiter = ',')]
+    pub ingestors: Vec<IngestorType>,
 }
