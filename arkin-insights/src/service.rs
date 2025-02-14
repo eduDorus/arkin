@@ -97,7 +97,7 @@ impl RunnableService for InsightsService {
                         Event::Trade(trade) => {
                             debug!("InsightsService received trade: {}", trade.event_time);
                             let insights = trade.as_ref().clone().to_insights(self.pipeline.clone());
-                            if let Err(e) = self.insert_batch(insights.as_slice()).await {
+                            if let Err(e) = self.insert_batch(&insights).await {
                                 error!("Error inserting trade: {}", e);
                             }
                         }

@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use dashmap::DashMap;
+use parking_lot::RwLock;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 
@@ -122,7 +122,7 @@ impl BoundedBuffer {
 #[derive(Debug, TypedBuilder)]
 pub struct InsightsState {
     #[builder(default)]
-    features: DashMap<(Option<Arc<Instrument>>, FeatureId), BoundedBuffer>,
+    features: RwLock<HashMap<(Option<Arc<Instrument>>, FeatureId), BoundedBuffer>>,
     #[builder(default = 100_000)]
     capacity: usize,
 }
@@ -131,17 +131,19 @@ impl InsightsState {
     pub fn insert(&self, event: Arc<Insight>) {
         let start = Instant::now();
         let key = (event.instrument.clone(), event.feature_id.clone());
-        let mut entry = self.features.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));
-
+        let mut lock = self.features.write();
+        let entry = lock.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));
         entry.push(event.event_time, event.value);
-
         debug!("Insert took {:?}", start.elapsed());
     }
 
     pub fn insert_batch(&self, events: &[Arc<Insight>]) {
         let start = Instant::now();
-        for e in events {
-            self.insert(e.clone());
+        let mut lock = self.features.write();
+        for event in events {
+            let key = (event.instrument.clone(), event.feature_id.clone());
+            let entry = lock.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));
+            entry.push(event.event_time, event.value);
         }
         debug!("Insert batch took {:?}", start.elapsed());
     }
@@ -183,7 +185,8 @@ impl InsightsState {
     ) -> Option<Decimal> {
         let start = Instant::now();
         let key = (instrument, feature_id);
-        let val = self.features.get(&key).and_then(|buf| buf.last_inclusive(timestamp));
+        let lock = self.features.read();
+        let val = lock.get(&key).and_then(|buf| buf.last_inclusive(timestamp));
         debug!("Last took {:?}", start.elapsed());
         val
     }
@@ -197,7 +200,8 @@ impl InsightsState {
     ) -> Option<Decimal> {
         let start = Instant::now();
         let key = (instrument, feature_id);
-        let val = self.features.get(&key).and_then(|buf| buf.last_exclusive(timestamp));
+        let lock = self.features.read();
+        let val = lock.get(&key).and_then(|buf| buf.last_exclusive(timestamp));
         debug!("Last exclusive took {:?}", start.elapsed());
         val
     }
@@ -213,11 +217,8 @@ impl InsightsState {
         let start = Instant::now();
         let start_time = timestamp - window;
         let key = (instrument, feature_id);
-        let vals = self
-            .features
-            .get(&key)
-            .map(|buf| buf.window(start_time, timestamp))
-            .unwrap_or_default();
+        let lock = self.features.read();
+        let vals = lock.get(&key).map(|buf| buf.window(start_time, timestamp)).unwrap_or_default();
         debug!("Window took {:?}", start.elapsed());
         vals
     }
@@ -231,10 +232,8 @@ impl InsightsState {
         periods: usize,
     ) -> Vec<Decimal> {
         let key = (instrument, feature_id);
-        self.features
-            .get(&key)
-            .map(|buf| buf.periods(timestamp, periods))
-            .unwrap_or_default()
+        let lock = self.features.read();
+        lock.get(&key).map(|buf| buf.periods(timestamp, periods)).unwrap_or_default()
     }
 }
 

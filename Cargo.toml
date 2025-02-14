@@ -18,11 +18,9 @@ license = "Proprietary"
 
 [workspace.dependencies]
 # Utiliy
-uuid = { version = "1.13", features = [ "v4", "rng", "fast-rng", "serde", "borsh" ] }
-rand = "0.9"
-strum = { version = "0.27", features = [ "derive" ] }
-url = { version = "2.5" }
-itertools = "0.14"
+uuid = { version = "1.13", features = [ "v4", "fast-rng", "serde" ], default-features = false }
+strum = { version = "0.27", features = [ "derive" ], default-features = false }
+url = { version = "2.5", default-features = false }
 hmac = "0.12"
 sha2 = { version = "0.10", default-features = false, features = [ "oid" ] }
 signature = "2.2"

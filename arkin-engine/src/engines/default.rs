@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use clap::Parser;
 use tokio::signal::unix::{signal, SignalKind};
@@ -16,6 +17,7 @@ use crate::factories::{
 use crate::TradingEngineError;
 
 pub struct DefaultEngine {
+    timer: Instant,
     pubsub: Arc<PubSub>,
     persistence: Arc<PersistenceService>,
     service_tracker: TaskTracker,
@@ -39,6 +41,7 @@ impl DefaultEngine {
         let persistence = PersistenceService::new(pubsub.clone(), &config, true).await;
 
         let engine = Self {
+            timer: Instant::now(),
             pubsub,
             persistence: persistence.clone(),
             service_tracker: TaskTracker::new(),
@@ -104,7 +107,6 @@ impl DefaultEngine {
         self.start_service(portfolio, false).await;
         self.start_service(insights, false).await;
         self.start_service(ingestor, false).await;
-
         Ok(())
     }
 
@@ -171,5 +173,7 @@ impl DefaultEngine {
         self.core_service_shutdown.cancel();
         self.core_service_tracker.close();
         self.core_service_tracker.wait().await;
+
+        info!("Service was running for {:?}", self.timer.elapsed());
     }
 }

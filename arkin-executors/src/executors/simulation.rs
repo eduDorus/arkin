@@ -17,7 +17,6 @@ use crate::{
 };
 
 #[derive(Debug, TypedBuilder)]
-
 pub struct SimulationExecutor {
     pubsub: Arc<PubSub>,
     #[builder(default)]
@@ -202,7 +201,7 @@ impl RunnableService for SimulationExecutor {
                 Ok(event) = rx.recv() => {
                     match event {
                        Event::VenueOrder(order) => {
-                           info!("SimulationExecutor received order: {}", order);
+                           debug!("SimulationExecutor received order: {}", order);
                            self.place_order(order).await?;
                        }
                        Event::Tick(tick) => {

@@ -6,7 +6,7 @@ use dashmap::DashMap;
 use rust_decimal::prelude::*;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -56,7 +56,7 @@ impl AllocationOptim for LimitedAllocationOptim {
 
         // Check if we have any signals
         if self.optimal_allocation.is_empty() {
-            warn!("No allocations found for optimization");
+            debug!("No allocations found for optimization");
             return Ok(Vec::new());
         }
 
