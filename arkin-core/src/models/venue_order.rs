@@ -92,10 +92,15 @@ pub struct VenueOrder {
 
 impl VenueOrder {
     pub fn add_fill(&mut self, event_time: OffsetDateTime, price: Price, quantity: Quantity, commission: Commission) {
+        self.last_fill_price = price;
+        self.last_fill_quantity = quantity;
+        self.last_fill_commission = commission;
+
         self.filled_price =
             (self.filled_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
         self.filled_quantity += quantity;
         self.commission += commission;
+
         self.status = match self.filled_quantity == self.quantity {
             true => VenueOrderStatus::Filled,
             false => VenueOrderStatus::PartiallyFilled,

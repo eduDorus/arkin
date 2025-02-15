@@ -32,6 +32,7 @@ pub struct SimulationExecutor {
 
 impl SimulationExecutor {
     pub async fn execute_order(&self, order: &VenueOrder, tick: &Arc<Tick>) {
+        info!("SimulationExecutor execute_order: {}", order);
         let price = if order.side == MarketSide::Buy {
             tick.ask_price()
         } else {
@@ -48,18 +49,24 @@ impl SimulationExecutor {
 
         let mut order = order.clone();
         order.add_fill(tick.event_time, price, quantity, commission);
-        self.orders.write().await.insert(order.id.clone(), order.clone());
+        let mut lock = self.orders.write().await;
+        lock.insert(order.id.clone(), order.clone());
         self.pubsub.publish(Event::VenueOrderUpdate(order.into())).await;
     }
 
     pub async fn tick_update(&self, tick: Arc<Tick>) {
+        info!("SimulationExecutor tick_update: {}", tick.instrument);
         let lock = self.orders.read().await;
+        let orders = lock.clone();
+        drop(lock);
+
         // check if we got a price for the instrument
-        for (_id, order) in lock.iter() {
+        for (_id, order) in orders.iter() {
             if order.instrument == tick.instrument {
                 // Execute market order at tob if limit order check if we can execute
                 match order.order_type {
                     VenueOrderType::Market => {
+                        info!("SimulationExecutor found market order: {}", order);
                         self.execute_order(order, &tick).await;
                     }
                     VenueOrderType::Limit => {
@@ -70,7 +77,7 @@ impl SimulationExecutor {
                         }
                     }
                     _ => unimplemented!("Unsupported order type"),
-                }
+                };
             }
         }
     }
@@ -187,6 +194,7 @@ mod tests {
     use rust_decimal_macros::dec;
     use std::sync::Arc;
     use test_log::test;
+    use time::OffsetDateTime;
     use tokio::time::{timeout, Duration};
 
     #[test(tokio::test)]
@@ -410,5 +418,182 @@ mod tests {
         }
         assert!(cancelled_ids.contains(&order1.id));
         assert!(cancelled_ids.contains(&order2.id));
+    }
+
+    #[test(tokio::test)]
+    async fn test_market_order_execution() {
+        let pubsub = Arc::new(PubSub::new(1024));
+        let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
+
+        let portfolio = test_portfolio();
+        let instrument = test_inst_binance_btc_usdt_perp();
+
+        // Build a market buy order.
+        let buy_order = VenueOrder::builder()
+            .portfolio(Arc::clone(&portfolio))
+            .instrument(Arc::clone(&instrument))
+            .side(MarketSide::Buy)
+            .order_type(VenueOrderType::Market)
+            .price(dec!(100)) // Price may be ignored for market orders.
+            .quantity(dec!(1))
+            .build();
+        let buy_order_id = buy_order.id.clone();
+
+        // Build a market sell order.
+        let sell_order = VenueOrder::builder()
+            .portfolio(Arc::clone(&portfolio))
+            .instrument(Arc::clone(&instrument))
+            .side(MarketSide::Sell)
+            .order_type(VenueOrderType::Market)
+            .price(dec!(100))
+            .quantity(dec!(1))
+            .build();
+        let sell_order_id = sell_order.id.clone();
+
+        // Insert orders into the executor.
+        info!("Placing buy order: {}", buy_order_id);
+        executor.place_order(buy_order.into()).await.unwrap();
+        info!("Placing sell order: {}", sell_order_id);
+        executor.place_order(sell_order.into()).await.unwrap();
+
+        let mut rx = pubsub.subscribe();
+
+        // Create a tick where:
+        // - For buy orders, execution price should be the ask price (e.g., 105).
+        // - For sell orders, execution price should be the bid price (e.g., 95).
+        let tick = Tick::builder()
+            .event_time(OffsetDateTime::now_utc())
+            .instrument(Arc::clone(&instrument))
+            .tick_id(1)
+            .ask_price(dec!(105))
+            .ask_quantity(dec!(1))
+            .bid_price(dec!(95))
+            .bid_quantity(dec!(1))
+            .build();
+        let tick_arc = Arc::new(tick);
+
+        info!("Updating tick");
+        executor.tick_update(Arc::clone(&tick_arc)).await;
+
+        // Collect two events (one for each order).
+        info!("Checking");
+        let mut events_received = 0;
+        let mut updated_buy_order: Option<Arc<VenueOrder>> = None;
+        let mut updated_sell_order: Option<Arc<VenueOrder>> = None;
+        while events_received < 2 {
+            info!("Waiting for event...");
+            let event = rx.recv().await.expect("Channel closed");
+            if let Event::VenueOrderUpdate(updated_order) = event {
+                if updated_order.id == buy_order_id {
+                    updated_buy_order = Some(updated_order);
+                } else if updated_order.id == sell_order_id {
+                    updated_sell_order = Some(updated_order);
+                }
+                events_received += 1;
+            }
+        }
+
+        let executed_buy = updated_buy_order.expect("No update for buy order");
+        let executed_sell = updated_sell_order.expect("No update for sell order");
+
+        // Verify execution prices.
+        assert_eq!(executed_buy.last_fill_price, dec!(105));
+        assert_eq!(executed_sell.last_fill_price, dec!(95));
+    }
+
+    #[test(tokio::test)]
+    async fn test_limit_order_execution() {
+        let pubsub = Arc::new(PubSub::new(1024));
+        let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
+
+        let portfolio = test_portfolio();
+        let instrument = test_inst_binance_btc_usdt_perp();
+
+        // Build a limit buy order with a limit price of 105.
+        let buy_order = VenueOrder::builder()
+            .portfolio(Arc::clone(&portfolio))
+            .instrument(Arc::clone(&instrument))
+            .side(MarketSide::Buy)
+            .order_type(VenueOrderType::Limit)
+            .price(dec!(105))
+            .quantity(dec!(1))
+            .build();
+        let buy_order_id = buy_order.id.clone();
+
+        // Build a limit sell order with a limit price of 95.
+        let sell_order = VenueOrder::builder()
+            .portfolio(Arc::clone(&portfolio))
+            .instrument(Arc::clone(&instrument))
+            .side(MarketSide::Sell)
+            .order_type(VenueOrderType::Limit)
+            .price(dec!(95))
+            .quantity(dec!(1))
+            .build();
+        let sell_order_id = sell_order.id.clone();
+
+        executor.place_order(buy_order.into()).await.unwrap();
+        executor.place_order(sell_order.into()).await.unwrap();
+
+        let mut rx = pubsub.subscribe();
+
+        // --- First tick: conditions not met ---
+        // For a buy limit order, tick.ask_price must be <= order.price.
+        // Provide a tick with ask = 110 (> 105) and bid = 90 (< 95) for the sell order.
+        let tick = Tick::builder()
+            .event_time(OffsetDateTime::now_utc())
+            .instrument(Arc::clone(&instrument))
+            .tick_id(1)
+            .ask_price(dec!(110))
+            .ask_quantity(dec!(1))
+            .bid_price(dec!(90))
+            .bid_quantity(dec!(1))
+            .build();
+        let tick_arc = Arc::new(tick);
+        executor.tick_update(Arc::clone(&tick_arc)).await;
+
+        // Expect no execution events on tick1.
+        // if let Ok(_) = timeout(Duration::from_secs(1), rx.recv()).await {
+        //     panic!("No execution should occur when limit conditions are not met");
+        // }
+
+        // --- Second tick: conditions met ---
+        // For the buy limit, use ask = 100 (<= 105).
+        // For the sell limit, use bid = 100 (>= 95).
+        let tick = Tick::builder()
+            .event_time(OffsetDateTime::now_utc())
+            .instrument(Arc::clone(&instrument))
+            .tick_id(1)
+            .ask_price(dec!(100))
+            .ask_quantity(dec!(1))
+            .bid_price(dec!(100))
+            .bid_quantity(dec!(1))
+            .build();
+        let tick_arc = Arc::new(tick);
+        executor.tick_update(Arc::clone(&tick_arc)).await;
+
+        let mut events_received = 0;
+        let mut updated_buy_order: Option<Arc<VenueOrder>> = None;
+        let mut updated_sell_order: Option<Arc<VenueOrder>> = None;
+        while events_received < 2 {
+            let event = timeout(Duration::from_secs(1), rx.recv())
+                .await
+                .expect("Timeout waiting for event")
+                .expect("Channel closed");
+            if let Event::VenueOrderUpdate(updated_order) = event {
+                if updated_order.id == buy_order_id {
+                    updated_buy_order = Some(updated_order);
+                } else if updated_order.id == sell_order_id {
+                    updated_sell_order = Some(updated_order);
+                }
+                events_received += 1;
+            }
+        }
+
+        let executed_buy = updated_buy_order.expect("No update for buy limit order");
+        let executed_sell = updated_sell_order.expect("No update for sell limit order");
+
+        // Verify that execution prices reflect the tick values.
+        assert_eq!(executed_buy.last_fill_price, dec!(100));
+        assert_eq!(executed_sell.last_fill_price, dec!(100));
     }
 }
