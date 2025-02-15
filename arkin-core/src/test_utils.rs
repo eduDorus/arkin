@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::{
     Asset, AssetType, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceStatus, InstanceType,
     Instrument, InstrumentStatus, InstrumentType, MarketSide, Pipeline, Portfolio, Price, Quantity, Strategy, Tick,
-    Venue, VenueOrder, VenueOrderStatus, VenueOrderTimeInForce, VenueOrderType, VenueType,
+    Venue, VenueType,
 };
 
 pub fn test_btc_asset() -> Arc<Asset> {
@@ -159,20 +159,20 @@ pub fn test_strategy() -> Arc<Strategy> {
     Arc::new(strategy)
 }
 
-pub fn test_venue_order() -> Arc<VenueOrder> {
-    let order = VenueOrder::builder()
-        .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-        .portfolio(test_portfolio())
-        .instrument(test_inst_binance_btc_usdt_perp())
-        .order_type(VenueOrderType::Market)
-        .time_in_force(VenueOrderTimeInForce::Gtc)
-        .side(MarketSide::Buy)
-        .price(dec!(100))
-        .quantity(dec!(1))
-        .status(VenueOrderStatus::Placed)
-        .build();
-    Arc::new(order)
-}
+// pub fn test_venue_order() -> Arc<VenueOrder> {
+//     let order = VenueOrder::builder()
+//         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
+//         .portfolio(test_portfolio())
+//         .instrument(test_inst_binance_btc_usdt_perp())
+//         .order_type(VenueOrderType::Market)
+//         .time_in_force(VenueOrderTimeInForce::Gtc)
+//         .side(MarketSide::Buy)
+//         .price(dec!(100))
+//         .quantity(dec!(1))
+//         .status(VenueOrderStatus::Placed)
+//         .build();
+//     Arc::new(order)
+// }
 
 pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
     let order = ExecutionOrder::builder()

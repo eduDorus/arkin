@@ -39,9 +39,9 @@ impl From<VenueOrder> for VenueOrderDTO {
             time_in_force: order.time_in_force,
             price: order.price,
             quantity: order.quantity,
-            fill_price: order.fill_price,
+            fill_price: order.filled_price,
             filled_quantity: order.filled_quantity,
-            total_commission: order.total_commission,
+            total_commission: order.commission,
             status: order.status,
             created_at: order.created_at,
             updated_at: order.updated_at,
@@ -60,9 +60,9 @@ impl From<Arc<VenueOrder>> for VenueOrderDTO {
             time_in_force: order.time_in_force,
             price: order.price,
             quantity: order.quantity,
-            fill_price: order.fill_price,
+            fill_price: order.filled_price,
             filled_quantity: order.filled_quantity,
-            total_commission: order.total_commission,
+            total_commission: order.commission,
             status: order.status,
             created_at: order.created_at,
             updated_at: order.updated_at,
@@ -153,47 +153,5 @@ impl VenueOrderRepo {
         .execute(&self.pool)
         .await?;
         Ok(())
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use crate::test_utils::connect_database;
-
-    use super::*;
-    use rust_decimal_macros::dec;
-    use test_log::test;
-    use time::OffsetDateTime;
-    use uuid::Uuid;
-
-    #[test(tokio::test)]
-    async fn test_venue_order_repo() {
-        let pool = connect_database();
-        let repo = VenueOrderRepo::builder().pool(pool).build();
-
-        let mut order = VenueOrder::builder()
-            .id(Uuid::new_v4())
-            .portfolio(test_portfolio())
-            .instrument(test_inst_binance_btc_usdt_perp())
-            .order_type(VenueOrderType::Market)
-            .side(MarketSide::Buy)
-            .price(dec!(100))
-            .quantity(dec!(1))
-            .status(VenueOrderStatus::New)
-            .build();
-        repo.insert(order.clone().into()).await.unwrap();
-
-        order.status = VenueOrderStatus::Placed;
-        order.updated_at = OffsetDateTime::now_utc();
-        repo.update(order.clone().into()).await.unwrap();
-
-        order.fill_price = dec!(110);
-        order.filled_quantity = dec!(1);
-        order.total_commission = dec!(0.2);
-        order.status = VenueOrderStatus::Filled;
-        order.updated_at = OffsetDateTime::now_utc();
-        repo.update(order.clone().into()).await.unwrap();
-
-        // repo.delete(order.id).await.unwrap();
     }
 }

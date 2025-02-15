@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity};
 
-use super::{Instrument, MarketSide, Portfolio, VenueOrderFill};
+use super::{Instrument, MarketSide, Portfolio};
 
 pub type ExecutionOrderId = Uuid;
 
@@ -65,12 +65,12 @@ pub struct ExecutionOrder {
 }
 
 impl ExecutionOrder {
-    pub fn add_fill(&mut self, fill: VenueOrderFill) {
-        self.fill_price = (self.fill_price * self.filled_quantity + fill.price * fill.quantity)
-            / (self.filled_quantity + fill.quantity);
-        self.filled_quantity += fill.quantity;
-        self.total_commission += fill.commission;
-        self.updated_at = fill.event_time;
+    pub fn add_fill(&mut self, event_time: OffsetDateTime, price: Price, quantity: Quantity, commission: Commission) {
+        self.fill_price =
+            (self.fill_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
+        self.filled_quantity += quantity;
+        self.total_commission += commission;
+        self.updated_at = event_time;
 
         // Update the state
         match self.remaining_quantity().is_zero() {

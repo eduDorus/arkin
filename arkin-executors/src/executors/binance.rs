@@ -196,64 +196,64 @@ impl BinanceExecutor {
 
 #[async_trait]
 impl Executor for BinanceExecutor {
-    async fn get_account(&self) -> Result<(), ExecutorError> {
-        let req: Request = AccountRequest::builder().build().into();
+    // async fn get_account(&self) -> Result<(), ExecutorError> {
+    //     let req: Request = AccountRequest::builder().build().into();
 
-        match self.client.send(req).await {
-            Ok(res) => {
-                match serde_json::from_str::<AccountSnapshot>(&res.body) {
-                    Ok(snapshot) => {
-                        for balance in &snapshot.assets {
-                            if let Ok(asset) = self.persistence.asset_store.read_by_symbol(&balance.asset).await {
-                                let update = BalanceUpdate::builder()
-                                    .event_time(balance.update_time)
-                                    .portfolio(test_portfolio())
-                                    .asset(asset)
-                                    .quantity(balance.wallet_balance)
-                                    // .balance_change(balance.balance_change)
-                                    .build();
-                                self.pubsub.publish(update);
-                            }
-                        }
-                        for position in &snapshot.positions {
-                            if let Ok(instrument) =
-                                self.persistence.instrument_store.read_by_venue_symbol(&position.symbol).await
-                            {
-                                let position_side = match (position.position_side, position.position_amt) {
-                                    (BinancePositionSide::Long, _) => PositionSide::Long,
-                                    (BinancePositionSide::Short, _) => PositionSide::Short,
-                                    (BinancePositionSide::Both, q) => match q.is_sign_positive() {
-                                        true => PositionSide::Long,
-                                        false => PositionSide::Short,
-                                    },
-                                };
-                                let update = PositionUpdate::builder()
-                                    .event_time(position.update_time)
-                                    .portfolio(test_portfolio())
-                                    .instrument(instrument)
-                                    .entry_price(Decimal::ZERO)
-                                    .quantity(position.position_amt)
-                                    .realized_pnl(Decimal::ZERO)
-                                    .unrealized_pnl(position.unrealized_profit)
-                                    .position_side(position_side)
-                                    .build();
-                                self.pubsub.publish(update);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("Error: {:?}", e);
-                        return Err(ExecutorError::NetworkError(e.to_string()));
-                    }
-                }
-                Ok(())
-            }
-            Err(e) => {
-                error!("Error: {:?}", e);
-                Err(ExecutorError::NetworkError(e.to_string()))
-            }
-        }
-    }
+    //     match self.client.send(req).await {
+    //         Ok(res) => {
+    //             match serde_json::from_str::<AccountSnapshot>(&res.body) {
+    //                 Ok(snapshot) => {
+    //                     for balance in &snapshot.assets {
+    //                         if let Ok(asset) = self.persistence.asset_store.read_by_symbol(&balance.asset).await {
+    //                             let update = BalanceUpdate::builder()
+    //                                 .event_time(balance.update_time)
+    //                                 .portfolio(test_portfolio())
+    //                                 .asset(asset)
+    //                                 .quantity(balance.wallet_balance)
+    //                                 // .balance_change(balance.balance_change)
+    //                                 .build();
+    //                             self.pubsub.publish(update);
+    //                         }
+    //                     }
+    //                     for position in &snapshot.positions {
+    //                         if let Ok(instrument) =
+    //                             self.persistence.instrument_store.read_by_venue_symbol(&position.symbol).await
+    //                         {
+    //                             let position_side = match (position.position_side, position.position_amt) {
+    //                                 (BinancePositionSide::Long, _) => PositionSide::Long,
+    //                                 (BinancePositionSide::Short, _) => PositionSide::Short,
+    //                                 (BinancePositionSide::Both, q) => match q.is_sign_positive() {
+    //                                     true => PositionSide::Long,
+    //                                     false => PositionSide::Short,
+    //                                 },
+    //                             };
+    //                             let update = PositionUpdate::builder()
+    //                                 .event_time(position.update_time)
+    //                                 .portfolio(test_portfolio())
+    //                                 .instrument(instrument)
+    //                                 .entry_price(Decimal::ZERO)
+    //                                 .quantity(position.position_amt)
+    //                                 .realized_pnl(Decimal::ZERO)
+    //                                 .unrealized_pnl(position.unrealized_profit)
+    //                                 .position_side(position_side)
+    //                                 .build();
+    //                             self.pubsub.publish(update);
+    //                         }
+    //                     }
+    //                 }
+    //                 Err(e) => {
+    //                     error!("Error: {:?}", e);
+    //                     return Err(ExecutorError::NetworkError(e.to_string()));
+    //                 }
+    //             }
+    //             Ok(())
+    //         }
+    //         Err(e) => {
+    //             error!("Error: {:?}", e);
+    //             Err(ExecutorError::NetworkError(e.to_string()))
+    //         }
+    //     }
+    // }
 
     async fn get_balances(&self) -> Result<(), ExecutorError> {
         let req: Request = BalanceRequest::builder().build().into();
@@ -509,7 +509,7 @@ impl RunnableService for BinanceExecutor {
                 }
                 Ok(event) = rx.recv() => {
                   match event {
-                    Event::VenueOrder(order) => {
+                    Event::VenueOrderNew(order) => {
                       info!("BinanceExecutor received order: {}", order);
 
                       if self.no_trade {

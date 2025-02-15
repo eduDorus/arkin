@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity};
 
-use super::{Asset, ExecutionOrder, ExecutionOrderType, Instrument, MarketSide, Portfolio, VenueOrderFill};
+use super::{Asset, Instrument, MarketSide, Portfolio};
 
 pub type VenueOrderId = Uuid;
 
@@ -24,19 +24,6 @@ pub enum VenueOrderType {
     TakeProfit,
     TakeProfitMarket,
     TrailingStopMarket,
-    Liquidation,
-}
-
-impl From<ExecutionOrderType> for VenueOrderType {
-    fn from(order_type: ExecutionOrderType) -> Self {
-        match order_type {
-            ExecutionOrderType::Maker => VenueOrderType::Limit,
-            ExecutionOrderType::Taker => VenueOrderType::Market,
-            ExecutionOrderType::VWAP => unimplemented!("VWAP not supported"),
-            ExecutionOrderType::TWAP => unimplemented!("TWAP not supported"),
-            ExecutionOrderType::ALGO => unimplemented!("ALGO not supported"),
-        }
-    }
 }
 
 #[derive(Debug, Display, Clone, Copy, Type)]
@@ -60,7 +47,7 @@ pub enum VenueOrderStatus {
     PartiallyFilledCanceled,
     PartiallyFilledExpired,
     Filled,
-    Canceled,
+    Cancelled,
     Rejected,
     Expired,
 }
@@ -72,17 +59,29 @@ pub struct VenueOrder {
     pub portfolio: Arc<Portfolio>,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
+    #[builder(default = VenueOrderType::Market)]
     pub order_type: VenueOrderType,
     #[builder(default = VenueOrderTimeInForce::Gtc)]
     pub time_in_force: VenueOrderTimeInForce,
+    // Initial order price and quantity
     pub price: Price,
     pub quantity: Quantity,
+    // Last fill price and quantity
     #[builder(default = Price::ZERO)]
-    pub fill_price: Price,
+    pub last_fill_price: Price,
+    #[builder(default = Quantity::ZERO)]
+    pub last_fill_quantity: Quantity,
+    #[builder(default = Commission::ZERO)]
+    pub last_fill_commission: Commission,
+    // Average fill price and total filled quantity
+    #[builder(default = Price::ZERO)]
+    pub filled_price: Price,
     #[builder(default = Quantity::ZERO)]
     pub filled_quantity: Quantity,
+    #[builder(default = None)]
+    pub commission_asset: Option<Arc<Asset>>,
     #[builder(default = Commission::ZERO)]
-    pub total_commission: Commission,
+    pub commission: Commission,
     #[builder(default = VenueOrderStatus::New)]
     pub status: VenueOrderStatus,
     #[builder(default = OffsetDateTime::now_utc())]
@@ -92,16 +91,16 @@ pub struct VenueOrder {
 }
 
 impl VenueOrder {
-    pub fn add_fill(&mut self, fill: Arc<VenueOrderFill>) {
-        self.fill_price = (self.fill_price * self.filled_quantity + fill.price * fill.quantity)
-            / (self.filled_quantity + fill.quantity);
-        self.filled_quantity += fill.quantity;
-        self.total_commission += fill.commission;
+    pub fn add_fill(&mut self, event_time: OffsetDateTime, price: Price, quantity: Quantity, commission: Commission) {
+        self.filled_price =
+            (self.filled_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
+        self.filled_quantity += quantity;
+        self.commission += commission;
         self.status = match self.filled_quantity == self.quantity {
             true => VenueOrderStatus::Filled,
             false => VenueOrderStatus::PartiallyFilled,
         };
-        self.updated_at = fill.event_time;
+        self.updated_at = event_time;
     }
 
     pub fn update_status(&mut self, new_status: VenueOrderStatus) {
@@ -117,8 +116,8 @@ impl VenueOrder {
 
     pub fn cancel(&mut self) {
         match self.status {
-            VenueOrderStatus::New => self.status = VenueOrderStatus::Canceled,
-            VenueOrderStatus::Placed => self.status = VenueOrderStatus::Canceled,
+            VenueOrderStatus::New => self.status = VenueOrderStatus::Cancelled,
+            VenueOrderStatus::Placed => self.status = VenueOrderStatus::Cancelled,
             VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledCanceled,
             _ => error!("Cannot cancel order in state {}", self.status),
         }
@@ -133,10 +132,10 @@ impl VenueOrder {
             (&self.status, new_status),
             (VenueOrderStatus::New, VenueOrderStatus::Placed)
                 | (VenueOrderStatus::New, VenueOrderStatus::Rejected)
-                | (VenueOrderStatus::New, VenueOrderStatus::Canceled)
+                | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::Placed, VenueOrderStatus::Canceled)
+                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Expired)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledCanceled)
@@ -158,7 +157,7 @@ impl VenueOrder {
             VenueOrderStatus::PartiallyFilledCanceled
                 | VenueOrderStatus::PartiallyFilledExpired
                 | VenueOrderStatus::Filled
-                | VenueOrderStatus::Canceled
+                | VenueOrderStatus::Cancelled
                 | VenueOrderStatus::Rejected
                 | VenueOrderStatus::Expired
         )
@@ -173,101 +172,19 @@ impl VenueOrder {
     }
 }
 
-impl From<ExecutionOrder> for VenueOrder {
-    fn from(order: ExecutionOrder) -> Self {
-        Self {
-            id: order.id,
-            portfolio: order.portfolio,
-            instrument: order.instrument,
-            side: order.side,
-            order_type: order.order_type.into(),
-            time_in_force: VenueOrderTimeInForce::Gtc,
-            price: order.price,
-            quantity: order.quantity,
-            fill_price: Price::ZERO,
-            filled_quantity: Quantity::ZERO,
-            total_commission: Commission::ZERO,
-            status: VenueOrderStatus::New,
-            created_at: order.created_at,
-            updated_at: order.updated_at,
-        }
-    }
-}
-
 impl EventTypeOf for VenueOrder {
     fn event_type() -> EventType {
-        EventType::VenueOrder
+        EventType::VenueOrderNew
     }
 }
 
 impl From<Arc<VenueOrder>> for Event {
     fn from(order: Arc<VenueOrder>) -> Self {
-        Event::VenueOrder(order)
+        Event::VenueOrderNew(order)
     }
 }
 
 impl fmt::Display for VenueOrder {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "instrument={} side={} order_type={} price={} quantity={} total_value={} status={}",
-            self.instrument,
-            self.side,
-            self.order_type,
-            self.price,
-            self.quantity,
-            self.total_value(),
-            self.status
-        )
-    }
-}
-
-#[derive(Debug, Clone, TypedBuilder)]
-pub struct VenueOrderUpdate {
-    pub event_time: OffsetDateTime,
-    pub portfolio: Arc<Portfolio>,
-    pub instrument: Arc<Instrument>,
-    pub order_id: String,
-    pub venue_order_id: i64,
-    pub side: MarketSide,
-    pub order_type: VenueOrderType,
-    pub time_in_force: VenueOrderTimeInForce,
-    pub price: Price,
-    pub quantity: Quantity,
-    pub fill_price: Price,
-    pub fill_quantity: Quantity,
-    pub last_fill_price: Price,
-    pub last_fill_quantity: Quantity,
-    pub status: VenueOrderStatus,
-    pub commission_asset: Option<Arc<Asset>>,
-    pub commission: Commission,
-}
-
-impl VenueOrderUpdate {
-    pub fn total_value(&self) -> Price {
-        self.price * self.quantity * self.instrument.contract_size
-    }
-}
-
-impl EventTypeOf for VenueOrderUpdate {
-    fn event_type() -> EventType {
-        EventType::VenueOrderUpdate
-    }
-}
-
-impl From<VenueOrderUpdate> for Event {
-    fn from(update: VenueOrderUpdate) -> Self {
-        Event::VenueOrderUpdate(Arc::new(update))
-    }
-}
-
-impl From<Arc<VenueOrderUpdate>> for Event {
-    fn from(update: Arc<VenueOrderUpdate>) -> Self {
-        Event::VenueOrderUpdate(update)
-    }
-}
-
-impl fmt::Display for VenueOrderUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

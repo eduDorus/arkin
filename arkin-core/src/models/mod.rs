@@ -17,7 +17,7 @@ mod trade;
 mod transaction;
 mod venue;
 mod venue_order;
-mod venue_order_fill;
+// mod venue_order_fill;
 
 pub use allocation::*;
 pub use asset::*;
@@ -38,4 +38,4 @@ pub use trade::*;
 pub use transaction::*;
 pub use venue::*;
 pub use venue_order::*;
-pub use venue_order_fill::*;
+// pub use venue_order_fill::*;

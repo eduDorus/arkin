@@ -12,7 +12,7 @@ use strum::EnumDiscriminants;
 
 use crate::{
     Balance, BalanceUpdate, Book, ExecutionOrder, Insight, Instrument, Position, PositionUpdate, Signal, Tick, Trade,
-    VenueOrder, VenueOrderFill, VenueOrderUpdate,
+    VenueOrder, VenueOrderId,
 };
 
 pub trait EventTypeOf: fmt::Debug + Send + Sync + Clone + 'static {
@@ -108,9 +108,11 @@ pub enum Event {
     Signal(Arc<Signal>),
     AllocationTick(Arc<AllocationTick>),
     ExecutionOrderNew(Arc<ExecutionOrder>),
-    VenueOrder(Arc<VenueOrder>),
-    VenueOrderUpdate(Arc<VenueOrderUpdate>),
-    VenueOrderFill(Arc<VenueOrderFill>),
+    // To the executor
+    VenueOrderNew(Arc<VenueOrder>),
+    VenueOrderCancel(VenueOrderId),
+    // From the executor
+    VenueOrderUpdate(Arc<VenueOrder>),
     Finished,
 }
 

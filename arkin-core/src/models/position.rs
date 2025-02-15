@@ -4,11 +4,10 @@ use rust_decimal::Decimal;
 use sqlx::prelude::Type;
 use strum::Display;
 use time::OffsetDateTime;
-use tracing::info;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity, VenueOrderFill};
+use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity};
 
 use super::{Instrument, MarketSide, Portfolio, Strategy};
 
@@ -76,74 +75,74 @@ impl Position {
         self.last_price = price;
     }
 
-    pub fn add_fill(&mut self, fill: VenueOrderFill) -> Option<VenueOrderFill> {
-        info!("Updating position with fill: {}", fill);
-        let action = match (self.side, fill.side) {
-            (PositionSide::Long, MarketSide::Buy) => Action::Increase,
-            (PositionSide::Long, MarketSide::Sell) => Action::Decrease,
-            (PositionSide::Short, MarketSide::Buy) => Action::Decrease,
-            (PositionSide::Short, MarketSide::Sell) => Action::Increase,
-        };
+    // pub fn add_fill(
+    //     &mut self,
+    //     event_time: OffsetDateTime,
+    //     price: Price,
+    //     quantity: Quantity,
+    //     side: MarketSide,
+    //     commission: Commission,
+    // ) {
+    //     let action = match (self.side, side) {
+    //         (PositionSide::Long, MarketSide::Buy) => Action::Increase,
+    //         (PositionSide::Long, MarketSide::Sell) => Action::Decrease,
+    //         (PositionSide::Short, MarketSide::Buy) => Action::Decrease,
+    //         (PositionSide::Short, MarketSide::Sell) => Action::Increase,
+    //     };
 
-        match action {
-            Action::Increase => {
-                self.increase_position(fill);
-                None
-            }
-            Action::Decrease => {
-                let max_fill_quantity = fill.quantity.min(self.open_quantity);
-                let remaining_fill_quantity = fill.quantity - max_fill_quantity;
+    //     match action {
+    //         Action::Increase => {
+    //             self.increase_position(price, quantity);
+    //             self.total_commission += commission;
+    //             self.updated_at = event_time;
+    //         }
+    //         Action::Decrease => {
+    //             let max_fill_quantity = fill.quantity.min(self.open_quantity);
+    //             let remaining_fill_quantity = fill.quantity - max_fill_quantity;
 
-                if remaining_fill_quantity.is_zero() {
-                    self.decrease_position(fill);
-                    None
-                } else {
-                    let mut current_fill = fill.clone();
-                    current_fill.quantity = max_fill_quantity;
-                    current_fill.commission = ((current_fill.commission / fill.quantity) * max_fill_quantity)
-                        .round_dp(self.instrument.price_precision);
-                    self.decrease_position(current_fill);
-                    let mut remaining_fill = fill.clone();
-                    remaining_fill.quantity = remaining_fill_quantity;
-                    remaining_fill.commission = ((remaining_fill.commission / fill.quantity) * remaining_fill_quantity)
-                        .round_dp(self.instrument.price_precision);
+    //             if remaining_fill_quantity.is_zero() {
+    //                 self.decrease_position(fill);
+    //                 self.total_commission += commission;
+    //                 self.updated_at = event_time;
+    //             } else {
+    //                 current_fill.quantity = max_fill_quantity;
+    //                 current_fill.commission = ((current_fill.commission / fill.quantity) * max_fill_quantity)
+    //                     .round_dp(self.instrument.price_precision);
+    //                 self.decrease_position(current_fill);
+    //                 let mut remaining_fill = fill.clone();
+    //                 remaining_fill.quantity = remaining_fill_quantity;
+    //                 remaining_fill.commission = ((remaining_fill.commission / fill.quantity) * remaining_fill_quantity)
+    //                     .round_dp(self.instrument.price_precision);
 
-                    Some(remaining_fill)
-                }
-            }
-        }
-    }
+    //                 Some(remaining_fill)
+    //             }
+    //         }
+    //     }
+    // }
 
-    fn increase_position(&mut self, fill: VenueOrderFill) {
-        info!("Increasing position: {}", self);
-        self.open_price = (self.open_price * self.open_quantity)
-            + (fill.price * fill.quantity) / (self.open_quantity + fill.quantity);
-        self.open_quantity += fill.quantity;
-        self.total_commission += fill.commission;
-        self.updated_at = fill.event_time;
-        info!("Updated position: {}", self);
-    }
+    // fn increase_position(&mut self, price: Price, quantity: Quantity) {
+    //     self.open_price = (self.open_price * self.open_quantity) + (price * quantity) / (self.open_quantity + quantity);
+    //     self.open_quantity += quantity;
+    //     info!("Updated position: {}", self);
+    // }
 
-    fn decrease_position(&mut self, fill: VenueOrderFill) {
-        info!("Decreasing position: {}", self);
-        self.close_price = (self.close_price * self.close_quantity)
-            + (fill.price * fill.quantity) / (self.close_quantity + fill.quantity);
-        self.close_quantity += fill.quantity;
-        self.total_commission += fill.commission;
-        let realized_pnl = match self.side {
-            PositionSide::Long => fill.price * fill.quantity - self.open_price * fill.quantity,
-            PositionSide::Short => self.open_price * fill.quantity - fill.price * fill.quantity,
-        };
-        self.realized_pnl += realized_pnl.round_dp(self.instrument.price_precision);
-        self.updated_at = fill.event_time;
+    // fn decrease_position(&mut self, price: Price, quantity: Quantity) {
+    //     self.close_price =
+    //         (self.close_price * self.close_quantity) + (price * quantity) / (self.close_quantity + quantity);
+    //     self.close_quantity += quantity;
+    //     let realized_pnl = match self.side {
+    //         PositionSide::Long => price * quantity - self.open_price * quantity,
+    //         PositionSide::Short => self.open_price * quantity - price * quantity,
+    //     };
+    //     self.realized_pnl += realized_pnl.round_dp(self.instrument.price_precision);
 
-        if self.quantity().is_zero() {
-            self.status = PositionStatus::Closed;
-            info!("Closed position: {}", self);
-        } else {
-            info!("Updated position: {}", self);
-        }
-    }
+    //     if self.quantity().is_zero() {
+    //         self.status = PositionStatus::Closed;
+    //         info!("Closed position: {}", self);
+    //     } else {
+    //         info!("Updated position: {}", self);
+    //     }
+    // }
 
     /// The total value of your current position based on the latest market prices.
     pub fn market_value(&self) -> Notional {
