@@ -19,6 +19,12 @@ pub struct SingleStrategyPortfolio {
     balances: DashMap<Arc<Asset>, Arc<BalanceUpdate>>,
 }
 
+impl SingleStrategyPortfolio {
+    pub fn add_balance(&self, balance: Arc<BalanceUpdate>) {
+        self.balances.insert(balance.asset.clone(), balance);
+    }
+}
+
 #[async_trait]
 impl Accounting for SingleStrategyPortfolio {
     async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), PortfolioError> {

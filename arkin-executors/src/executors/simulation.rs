@@ -21,9 +21,9 @@ pub struct SimulationExecutor {
     #[builder(default)]
     orders: RwLock<HashMap<VenueOrderId, VenueOrder>>,
     #[builder(default)]
-    _balances: RwLock<HashMap<Arc<Asset>, Balance>>,
+    balances: RwLock<HashMap<Arc<Asset>, Balance>>,
     #[builder(default)]
-    _positions: RwLock<HashMap<Arc<Instrument>, Arc<Position>>>,
+    positions: RwLock<HashMap<Arc<Instrument>, Arc<Position>>>,
     #[builder(default = dec!(0.0005))]
     taker_commission: Decimal,
     #[builder(default = dec!(0.0002))]
@@ -46,6 +46,66 @@ impl SimulationExecutor {
             VenueOrderType::Limit => (price * quantity) * self.maker_commission,
             _ => unimplemented!("Unsupported order type"),
         };
+
+        // Remove price * quantity * commission from balance
+        self.balances
+            .write()
+            .await
+            .entry(order.instrument.base_asset.clone())
+            .and_modify(|balance| match order.side {
+                MarketSide::Buy => {
+                    balance.quantity -= price * quantity + commission;
+                }
+                MarketSide::Sell => {
+                    balance.quantity += price * quantity - commission;
+                }
+            });
+        let balance = self.balances.read().await.get(&order.instrument.base_asset).unwrap().clone();
+        let balance_update = BalanceUpdate::builder()
+            .event_time(tick.event_time)
+            .asset(balance.asset)
+            .portfolio(balance.portfolio)
+            .quantity(balance.quantity)
+            .build();
+        self.pubsub.publish(Event::BalanceUpdate(balance_update.into())).await;
+
+        // Check if we have a position, if so update it else create a new one
+        // let mut positions = self.positions.write().await;
+        // if let Some(position) = self.positions.write().await.get(&order.instrument) {
+        //     let mut position = position.clone();
+        //     position.update_price(price);
+        //     position.add_fill(tick.event_time, price, quantity, order.side, commission);
+        //     let position_update = PositionUpdate::builder()
+        //         .event_time(tick.event_time)
+        //         .instrument(position.instrument)
+        //         .portfolio(position.portfolio)
+        //         .side(position.side)
+        //         .open_price(position.open_price)
+        //         .open_quantity(position.open_quantity)
+        //         .close_price(position.close_price)
+        //         .close_quantity(position.close_quantity)
+        //         .last_price(position.last_price)
+        //         .realized_pnl(position.realized_pnl)
+        //         .total_commission(position.total_commission)
+        //         .status(position.status)
+        //         .created_at(position.created_at)
+        //         .updated_at(position.updated_at)
+        //         .build();
+        //     self.pubsub.publish(Event::PositionUpdate(position_update.into())).await;
+        //     return;
+        // } else {
+        //     let position = Position::builder()
+        //         .instrument(order.instrument.clone())
+        //         .side(order.side.into())
+        //         .open_price(price)
+        //         .last_price(price)
+        //         .open_quantity(quantity)
+        //         .status(PositionStatus::Open)
+        //         .created_at(tick.event_time)
+        //         .updated_at(tick.event_time)
+        //         .build();
+        //     self.pubsub.publish(Event::PositionUpdate(position_update.into())).await;
+        // }
 
         let mut order = order.clone();
         order.add_fill(tick.event_time, price, quantity, commission);

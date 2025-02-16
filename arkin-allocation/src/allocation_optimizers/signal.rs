@@ -22,7 +22,7 @@ pub struct SignalAllocationOptim {
     persistence: Arc<PersistenceService>,
     portfolio: Arc<dyn Accounting>,
     #[builder(default = DashMap::new())]
-    optimal_allocation: DashMap<Arc<Instrument>, Arc<Insight>>,
+    optimal_allocation: DashMap<Arc<Instrument>, Arc<Signal>>,
     leverage: Decimal,
     min_trade_value: Decimal,
     allocation_feature_id: FeatureId,
@@ -44,15 +44,10 @@ pub struct DiffPosition {
 
 #[async_trait]
 impl AllocationOptim for SignalAllocationOptim {
-    async fn optimize(&self, tick: Arc<InsightTick>) -> Result<Vec<Arc<ExecutionOrder>>, AllocationOptimError> {
+    async fn optimize(&self, signal: Arc<Signal>) -> Result<Vec<Arc<ExecutionOrder>>, AllocationOptimError> {
         // Save down new allocation
-        tick.insights
-            .iter()
-            .filter(|insight| insight.feature_id == self.allocation_feature_id)
-            .for_each(|a| {
-                self.optimal_allocation
-                    .insert(a.instrument.clone().expect("Can't allocation empty instruments"), a.clone());
-            });
+
+        self.optimal_allocation.insert(signal.instrument.clone(), signal.clone());
 
         // Check if we have any signals
         if self.optimal_allocation.is_empty() {
@@ -94,18 +89,18 @@ impl AllocationOptim for SignalAllocationOptim {
             .iter()
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect::<HashMap<_, _>>();
-        for (instrument, insight) in optimal_weights.iter() {
-            info!("Optimal weight for {} is {}", instrument, insight.value);
+        for (instrument, signal) in optimal_weights.iter() {
+            info!("Optimal weight for {} is {}", instrument, signal.weight);
         }
 
         // Calculate the difference between current and optimal allocation weights
         let mut allocation_change = HashMap::new();
         for (optimal_instrument, optimal_weight) in optimal_weights.iter() {
             if let Some(current_weight) = current_weights.get(optimal_instrument) {
-                let diff = optimal_weight.value - current_weight;
+                let diff = optimal_weight.weight - current_weight;
                 allocation_change.insert(optimal_instrument.clone(), diff);
             } else {
-                allocation_change.insert(optimal_instrument.clone(), optimal_weight.value);
+                allocation_change.insert(optimal_instrument.clone(), optimal_weight.weight);
             }
         }
         for (instrument, weight) in allocation_change.iter() {
@@ -197,9 +192,9 @@ impl RunnableService for SignalAllocationOptim {
             select! {
                 Ok(event) = rx.recv() => {
                     match event {
-                        Event::InsightTick(tick) => {
-                            debug!("LimitedAllocationOptim received insight tick: {}", tick.event_time);
-                            self.optimize(tick).await?;
+                        Event::Signal(signal) => {
+                            debug!("LimitedAllocationOptim received signal: {}", signal.event_time);
+                            self.optimize(signal).await?;
                         }
                         _ => {}
                     }

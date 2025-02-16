@@ -251,6 +251,7 @@ dependencies = [
  "arkin-strategies",
  "clap 4.5.29",
  "rust_decimal",
+ "rust_decimal_macros",
  "serde",
  "test-log",
  "thiserror 2.0.11",

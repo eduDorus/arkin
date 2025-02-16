@@ -18,7 +18,7 @@ impl AllocationFactory {
         let config = load::<AllocationOptimConfig>();
         let allocation: Arc<dyn AllocationService> = match &config.allocation_optim {
             AllocationTypeConfig::Limited(c) => Arc::new(
-                ForecastAllocationOptim::builder()
+                SignalAllocationOptim::builder()
                     .pubsub(pubsub.clone())
                     .persistence(persistance)
                     .portfolio(portfolio)

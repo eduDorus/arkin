@@ -95,7 +95,7 @@ impl DefaultEngine {
         // Init services
         let insights = InsightsFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.pipeline).await;
         let ingestor = IngestorFactory::init_simulation(self.pubsub.clone(), self.persistence.clone(), args).await;
-        let portfolio = PortfolioFactory::init(self.pubsub.clone());
+        let portfolio = PortfolioFactory::init(self.pubsub.clone(), self.persistence.clone()).await;
         let strategies = StrategyFactory::init(self.pubsub.clone());
         let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), portfolio.clone());
         let order_manager = OrderManagerFactory::init(self.pubsub.clone());

@@ -153,8 +153,12 @@ impl TickStore {
                 .ask_quantity(row.ask_quantity)
                 .build();
 
-                // Yield the constructed trade to the stream.
-                yield Arc::new(tick);
+                let tick_arc = Arc::new(tick);
+
+                self.update_tick_cache(Arc::clone(&tick_arc)).await;
+
+                // Yield the constructed tick to the stream.
+                yield tick_arc;
             }
         };
         Ok(stream)

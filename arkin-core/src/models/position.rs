@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity};
 
-use super::{Instrument, MarketSide, Portfolio, Strategy};
+use super::{Instrument, MarketSide, Portfolio};
 
 #[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type)]
 #[strum(serialize_all = "snake_case")]
@@ -43,7 +43,7 @@ pub struct Position {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
     // pub portfolio: Arc<Portfolio>,
-    pub strategy: Arc<Strategy>,
+    // pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub side: PositionSide,
     pub open_price: Price,
@@ -97,11 +97,11 @@ impl Position {
     //             self.updated_at = event_time;
     //         }
     //         Action::Decrease => {
-    //             let max_fill_quantity = fill.quantity.min(self.open_quantity);
-    //             let remaining_fill_quantity = fill.quantity - max_fill_quantity;
+    //             let max_fill_quantity = quantity.min(self.open_quantity);
+    //             let remaining_fill_quantity = quantity - max_fill_quantity;
 
     //             if remaining_fill_quantity.is_zero() {
-    //                 self.decrease_position(fill);
+    //                 self.decrease_position(price, quantity);
     //                 self.total_commission += commission;
     //                 self.updated_at = event_time;
     //             } else {

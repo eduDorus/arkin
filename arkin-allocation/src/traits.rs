@@ -8,7 +8,7 @@ use crate::AllocationOptimError;
 
 #[async_trait]
 pub trait AllocationOptim: std::fmt::Debug + Send + Sync {
-    async fn optimize(&self, tick: Arc<InsightTick>) -> Result<Vec<Arc<ExecutionOrder>>, AllocationOptimError>;
+    async fn optimize(&self, signal: Arc<Signal>) -> Result<Vec<Arc<ExecutionOrder>>, AllocationOptimError>;
 }
 
 #[async_trait]

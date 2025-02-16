@@ -24,6 +24,7 @@ time = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
 uuid = { workspace = true }
 clap = { workspace = true }
 url = { workspace = true }
