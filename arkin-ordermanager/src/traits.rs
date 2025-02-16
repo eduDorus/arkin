@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
 use arkin_core::prelude::*;
+
+use crate::OrderManagerError;
 
 #[async_trait]
 pub trait OrderManagerService: RunnableService + OrderManager {}
@@ -15,7 +19,7 @@ pub trait OrderManager: std::fmt::Debug + Send + Sync {
     // async fn list_cancelled_orders(&self) -> Vec<Arc<ExecutionOrder>>;
     // async fn list_closed_orders(&self) -> Vec<Arc<ExecutionOrder>>;
 
-    // async fn place_order(&self, order: Arc<ExecutionOrder>) -> Result<(), OrderManagerError>;
+    async fn place_order(&self, order: Arc<ExecutionOrder>) -> Result<(), OrderManagerError>;
     // async fn place_orders(&self, orders: Vec<Arc<ExecutionOrder>>) -> Result<(), OrderManagerError>;
 
     // async fn replace_order_by_id(

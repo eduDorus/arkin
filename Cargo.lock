@@ -352,6 +352,7 @@ dependencies = [
  "arkin-core",
  "async-trait",
  "rust_decimal",
+ "rust_decimal_macros",
  "test-log",
  "thiserror 2.0.11",
  "time",

@@ -1,3 +1,3 @@
-mod simple;
+mod default;
 
-pub use simple::DefaultOrderManager;
+pub use default::*;
