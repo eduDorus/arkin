@@ -13,6 +13,7 @@ use crate::cli::{Cli, Commands, DownloadArgs, IngestorsArgs, InsightsArgs, Simul
 use crate::config::EngineConfig;
 use crate::factories::{
     AllocationFactory, ExecutorFactory, IngestorFactory, InsightsFactory, OrderManagerFactory, PortfolioFactory,
+    StrategyFactory,
 };
 use crate::TradingEngineError;
 
@@ -87,7 +88,6 @@ impl DefaultEngine {
 
         self.start_service(insights, false).await;
         self.start_service(ingestor, false).await;
-
         Ok(())
     }
 
@@ -96,17 +96,19 @@ impl DefaultEngine {
         let insights = InsightsFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.pipeline).await;
         let ingestor = IngestorFactory::init_simulation(self.pubsub.clone(), self.persistence.clone(), args).await;
         let portfolio = PortfolioFactory::init(self.pubsub.clone());
+        let strategies = StrategyFactory::init(self.pubsub.clone());
         let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), portfolio.clone());
         let order_manager = OrderManagerFactory::init(self.pubsub.clone());
         let execution = ExecutorFactory::init_simulation(self.pubsub.clone());
 
+        let mut services: Vec<Arc<dyn RunnableService>> =
+            vec![insights, ingestor, portfolio, allocation, order_manager, execution];
+        for strategy in strategies {
+            services.push(strategy);
+        }
+
         // Start services
-        self.start_service(execution, false).await;
-        self.start_service(order_manager, false).await;
-        self.start_service(allocation, false).await;
-        self.start_service(portfolio, false).await;
-        self.start_service(insights, false).await;
-        self.start_service(ingestor, false).await;
+        self.start_services(services, false).await;
         Ok(())
     }
 
@@ -115,23 +117,28 @@ impl DefaultEngine {
             true => {
                 let shutdown = self.core_service_shutdown.clone();
                 self.core_service_tracker.spawn(async move {
-                    let res = service.start(shutdown).await;
-                    match res {
-                        Ok(_) => info!("Service finished"),
-                        Err(e) => error!("Service error: {:?}", e),
+                    if let Err(e) = service.start(shutdown).await {
+                        error!("Core service error: {:?}", e);
                     }
                 });
             }
             false => {
                 let shutdown = self.service_shutdown.clone();
                 self.service_tracker.spawn(async move {
-                    let res = service.start(shutdown).await;
-                    match res {
-                        Ok(_) => info!("Service finished"),
-                        Err(e) => error!("Service error: {:?}", e),
+                    if let Err(e) = service.start(shutdown).await {
+                        error!("Service error: {:?}", e);
                     }
                 });
             }
+        }
+    }
+
+    async fn start_services<I>(&self, services: I, core_service: bool)
+    where
+        I: IntoIterator<Item = Arc<dyn RunnableService>>,
+    {
+        for service in services {
+            self.start_service(service, core_service).await;
         }
     }
 

@@ -1,4 +1,5 @@
-mod limited;
+mod forecast;
+mod signal;
 
-pub use limited::LimitedAllocationOptim;
-pub use limited::LimitedAllocationOptimBuilder;
+pub use forecast::ForecastAllocationOptim;
+pub use signal::SignalAllocationOptim;

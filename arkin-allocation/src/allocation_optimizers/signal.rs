@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::{AllocationOptim, AllocationOptimError, AllocationService};
 
 #[derive(Debug, TypedBuilder)]
-pub struct LimitedAllocationOptim {
+pub struct SignalAllocationOptim {
     pubsub: Arc<PubSub>,
     persistence: Arc<PersistenceService>,
     portfolio: Arc<dyn Accounting>,
@@ -43,7 +43,7 @@ pub struct DiffPosition {
 }
 
 #[async_trait]
-impl AllocationOptim for LimitedAllocationOptim {
+impl AllocationOptim for SignalAllocationOptim {
     async fn optimize(&self, tick: Arc<InsightTick>) -> Result<Vec<Arc<ExecutionOrder>>, AllocationOptimError> {
         // Save down new allocation
         tick.insights
@@ -187,7 +187,7 @@ impl AllocationOptim for LimitedAllocationOptim {
 }
 
 #[async_trait]
-impl RunnableService for LimitedAllocationOptim {
+impl RunnableService for SignalAllocationOptim {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting LimitedAllocation...");
 
@@ -198,7 +198,7 @@ impl RunnableService for LimitedAllocationOptim {
                 Ok(event) = rx.recv() => {
                     match event {
                         Event::InsightTick(tick) => {
-                            info!("LimitedAllocationOptim received insight tick: {}", tick.event_time);
+                            debug!("LimitedAllocationOptim received insight tick: {}", tick.event_time);
                             self.optimize(tick).await?;
                         }
                         _ => {}
@@ -215,4 +215,4 @@ impl RunnableService for LimitedAllocationOptim {
 }
 
 #[async_trait]
-impl AllocationService for LimitedAllocationOptim {}
+impl AllocationService for SignalAllocationOptim {}

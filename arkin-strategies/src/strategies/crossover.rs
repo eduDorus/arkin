@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
-use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{debug, info};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -27,13 +26,6 @@ impl StrategyService for CrossoverStrategy {}
 #[async_trait]
 impl RunnableService for CrossoverStrategy {
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), anyhow::Error> {
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl Algorithm for CrossoverStrategy {
-    async fn start(&self, _shutdown: CancellationToken) -> Result<(), StrategyError> {
         info!("Starting Crossover Strategy...");
 
         let mut rx = self.pubsub.subscribe();
@@ -43,7 +35,7 @@ impl Algorithm for CrossoverStrategy {
                 Ok(event) = rx.recv() => {
                     match event {
                         Event::InsightTick(tick) => {
-                            info!("CrossoverStrategy received insight tick: {}", tick.event_time);
+                            debug!("CrossoverStrategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
                         _ => {}
@@ -56,18 +48,17 @@ impl Algorithm for CrossoverStrategy {
         }
         Ok(())
     }
+}
 
-    async fn insight_update(
-        &self,
-        instruments: &[Arc<Instrument>],
-        event_time: OffsetDateTime,
-        insights: &[Arc<Insight>],
-    ) -> Result<Vec<Arc<Signal>>, StrategyError> {
-        info!("Processing insights for Crossover Strategy...");
-        let signals = instruments
+#[async_trait]
+impl Algorithm for CrossoverStrategy {
+    async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError> {
+        debug!("Processing insight tick for Crossover Strategy...");
+        let signals = tick
+            .instruments
             .iter()
             .filter_map(|i| {
-                let fast_ma = insights.iter().find(|x| {
+                let fast_ma = tick.insights.iter().find(|x| {
                     if let Some(inst) = x.instrument.as_ref() {
                         inst == i && x.feature_id == self.fast_ma
                     } else {
@@ -75,7 +66,7 @@ impl Algorithm for CrossoverStrategy {
                     }
                 });
 
-                let slow_ma = insights.iter().find(|x| {
+                let slow_ma = tick.insights.iter().find(|x| {
                     if let Some(inst) = x.instrument.as_ref() {
                         inst == i && x.feature_id == self.slow_ma
                     } else {
@@ -84,14 +75,17 @@ impl Algorithm for CrossoverStrategy {
                 });
 
                 let weight = match (fast_ma, slow_ma) {
-                    (Some(f), Some(s)) => match f.value > s.value {
-                        true => Decimal::ONE,
-                        false => Decimal::NEGATIVE_ONE,
-                    },
+                    (Some(f), Some(s)) => {
+                        info!("Crossover comparing fast_ma: {} and slow_ma: {}", f.value, s.value);
+                        match f.value > s.value {
+                            true => Decimal::ONE,
+                            false => Decimal::NEGATIVE_ONE,
+                        }
+                    }
                     _ => Decimal::ZERO,
                 };
                 let signal = Signal::builder()
-                    .event_time(event_time)
+                    .event_time(tick.event_time)
                     .instrument(i.clone())
                     .strategy(self.id.clone())
                     .weight(weight)
@@ -100,27 +94,12 @@ impl Algorithm for CrossoverStrategy {
                 return Some(signal);
             })
             .collect::<Vec<_>>();
-        Ok(signals)
-    }
 
-    async fn insight_tick(&self, _tick: Arc<InsightTick>) -> Result<(), StrategyError> {
-        info!("Processing insight tick for Crossover Strategy...");
-        // let signals = self
-        //     .insight_update(&tick.instruments, tick.event_time, tick.insights.as_slice())
-        //     .await?;
-        // let signal_tick = AllocationTick::builder()
-        //     .event_time(tick.event_time)
-        //     .instruments(tick.instruments.clone())
-        //     .signals(signals)
-        //     .build();
-        // let signal_tick = Arc::new(signal_tick);
-
-        // info!(
-        //     "Publishing signal tick: {} with {} signals",
-        //     signal_tick.event_time,
-        //     signal_tick.weight.len()
-        // );
-        // self.pubsub.publish::<AllocationTick>(signal_tick);
+        info!("Crossover sending {} signals", signals.len());
+        for signal in signals {
+            info!("Crossover sending signal: {}", signal);
+            self.pubsub.publish(Event::Signal(signal.clone())).await;
+        }
         Ok(())
     }
 }
