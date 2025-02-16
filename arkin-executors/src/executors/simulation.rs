@@ -264,11 +264,7 @@ mod tests {
             .build();
         let order_id = order.id.clone();
 
-        // Insert the order manually into the orders map.
-        {
-            let mut orders = executor.orders.write().await;
-            orders.insert(order_id.clone(), order.clone());
-        }
+        executor.place_order(order.into()).await.unwrap();
 
         let mut rx = pubsub.subscribe();
         executor.cancel_order(order_id.clone()).await.unwrap();
