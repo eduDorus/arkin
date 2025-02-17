@@ -40,6 +40,16 @@ pub fn test_usdt_asset() -> Arc<Asset> {
     Arc::new(asset)
 }
 
+pub fn test_bnb_asset() -> Arc<Asset> {
+    let asset = Asset::builder()
+        .id(Uuid::parse_str("91e61c74-9e4c-4226-b848-8b96e1ec4941").expect("Invalid UUID"))
+        .symbol("BNB".into())
+        .name("Binance Coin".into())
+        .asset_type(AssetType::Crypto)
+        .build();
+    Arc::new(asset)
+}
+
 pub fn test_binance_venue() -> Arc<Venue> {
     let venue = Venue::builder()
         .id(Uuid::parse_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID"))

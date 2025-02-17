@@ -11,12 +11,14 @@ arkin-core = { path = "../arkin-core" }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
 dashmap = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 typed-builder = { workspace = true }
 anyhow = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }
