@@ -169,6 +169,15 @@ pub fn test_strategy() -> Arc<Strategy> {
     Arc::new(strategy)
 }
 
+pub fn test_strategy_crossover() -> Arc<Strategy> {
+    let strategy = Strategy::builder()
+        .id(Uuid::from_str("1fce35ce-1583-4334-a410-bc0f71c7469b").expect("Invalid UUID"))
+        .name("Test Crossover Strategy".into())
+        .description(Some("Test Description".into()))
+        .build();
+    Arc::new(strategy)
+}
+
 // pub fn test_venue_order() -> Arc<VenueOrder> {
 //     let order = VenueOrder::builder()
 //         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))

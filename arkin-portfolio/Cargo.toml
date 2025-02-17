@@ -19,6 +19,8 @@ async-trait = { workspace = true }
 typed-builder = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
+time = { workspace = true }
+strum = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }
