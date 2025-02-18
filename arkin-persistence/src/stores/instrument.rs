@@ -55,6 +55,7 @@ impl InstrumentStore {
 
                 let base_asset = self.asset_store.read_by_id(&instrument_dto.base_asset_id).await?;
                 let quote_asset = self.asset_store.read_by_id(&instrument_dto.quote_asset_id).await?;
+                let margin_asset = self.asset_store.read_by_id(&instrument_dto.margin_asset_id).await?;
 
                 let instrument = Instrument {
                     id: instrument_dto.id,
@@ -65,6 +66,7 @@ impl InstrumentStore {
                     instrument_type: instrument_dto.instrument_type.into(),
                     base_asset,
                     quote_asset,
+                    margin_asset,
                     maturity: instrument_dto.maturity,
                     strike: instrument_dto.strike,
                     option_type: instrument_dto.option_type.map(|v| v.into()),
@@ -97,6 +99,7 @@ impl InstrumentStore {
 
                 let base_asset = self.asset_store.read_by_id(&instrument_dto.base_asset_id).await?;
                 let quote_asset = self.asset_store.read_by_id(&instrument_dto.quote_asset_id).await?;
+                let margin_asset = self.asset_store.read_by_id(&instrument_dto.margin_asset_id).await?;
 
                 let instrument = Instrument {
                     id: instrument_dto.id,
@@ -107,6 +110,7 @@ impl InstrumentStore {
                     instrument_type: instrument_dto.instrument_type.into(),
                     base_asset,
                     quote_asset,
+                    margin_asset,
                     maturity: instrument_dto.maturity,
                     strike: instrument_dto.strike,
                     option_type: instrument_dto.option_type.map(|v| v.into()),

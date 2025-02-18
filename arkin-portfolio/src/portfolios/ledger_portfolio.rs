@@ -8,15 +8,16 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-#[derive(Debug, TypedBuilder)]
-pub struct TransactionPortfolio {
-    pub pubsub: Arc<PubSub>,
+use crate::ledger::Ledger;
 
-    pub transactions: Vec<Arc<Transaction>>,
+#[derive(Debug, TypedBuilder)]
+pub struct LedgerPortfolio {
+    pub pubsub: Arc<PubSub>,
+    pub ledger: Ledger,
 }
 
 #[async_trait]
-impl RunnableService for TransactionPortfolio {
+impl RunnableService for LedgerPortfolio {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         let mut rx = self.pubsub.subscribe();
 
@@ -24,7 +25,10 @@ impl RunnableService for TransactionPortfolio {
             select! {
                 Ok(event) = rx.recv() => {
                   match event {
-                    Event::VenueOrderUpdate(e) => info!("Venue order update: {:?}", e),
+                    Event::VenueOrderUpdate(e) => {
+                      info!("Venue order update: {:?}", e);
+                      // self.ledger.update_order(e).await?;
+                    },
                     _ => {}
                   }
                 }

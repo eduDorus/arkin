@@ -45,6 +45,7 @@ pub struct Instrument {
     pub instrument_type: InstrumentType,
     pub base_asset: Arc<Asset>,
     pub quote_asset: Arc<Asset>,
+    pub margin_asset: Arc<Asset>,
     pub maturity: Option<Maturity>,
     pub strike: Option<Price>,
     pub option_type: Option<InstrumentOptionType>,

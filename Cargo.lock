@@ -396,6 +396,7 @@ dependencies = [
  "arkin-core",
  "async-trait",
  "dashmap",
+ "parking_lot",
  "rust_decimal",
  "rust_decimal_macros",
  "strum",

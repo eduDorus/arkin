@@ -25,7 +25,7 @@ impl OrderManager for DefaultOrderManager {
                 info!("Placing market order: {}", order);
                 let venue_order = VenueOrder::builder()
                     .id(order.id)
-                    .portfolio(test_portfolio())
+                    .strategy(test_strategy())
                     .instrument(order.instrument.clone())
                     .side(order.side)
                     .quantity(order.quantity)
@@ -38,7 +38,7 @@ impl OrderManager for DefaultOrderManager {
                 info!("Placing limit order: {}", order);
                 let venue_order = VenueOrder::builder()
                     .id(order.id)
-                    .portfolio(test_portfolio())
+                    .strategy(test_strategy())
                     .instrument(order.instrument.clone())
                     .side(order.side)
                     .quantity(order.quantity)

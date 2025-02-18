@@ -1,10 +1,8 @@
+use parking_lot::RwLock;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
-use std::fmt;
-use std::sync::{Arc, Mutex};
-use strum::Display;
-use time::OffsetDateTime;
+use std::sync::Arc;
 use tracing::info;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -13,133 +11,110 @@ use arkin_core::prelude::*;
 
 use crate::PortfolioError;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Tradable {
-    /// A simple asset (spot currency like BTC, USDT, BNB, etc.)
-    Asset(Arc<Asset>),
-
-    /// A derivative instrument (future, option, perpetual, etc.)
-    Instrument(Arc<Instrument>),
-}
-
-impl fmt::Display for Tradable {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Tradable::Asset(a) => write!(f, "{}", a.symbol),
-            Tradable::Instrument(i) => write!(f, "{}", i.symbol),
-        }
-    }
-}
-
-#[derive(Debug, Display, Clone, PartialEq)]
-pub enum AccountType {
-    ExchangeWallet,
-    Strategy(Arc<Strategy>),
-    LiquidityProvider,
-}
-
-/// Each account references a specific currency.
-/// We'll store the balance as a Decimal, but you could use integer
-/// amounts of "cents" or "atomic units" for real usage.
-#[derive(Debug, Clone, TypedBuilder)]
-pub struct Account {
-    #[builder(default = Uuid::new_v4())]
-    pub id: Uuid,
-    pub name: String,
-    pub asset: Tradable,
-    #[builder(default = dec!(0))]
-    pub balance: Decimal,
-    pub account_type: AccountType,
-}
-
-impl fmt::Display for Account {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: {} {} {}", self.name, self.balance, self.asset, self.account_type)
-    }
-}
-
-#[derive(Debug, Display, Clone, PartialEq)]
-pub enum TransferType {
-    Deposit,
-    Withdrawal,
-    Trade,
-    Exchange,
-    Margin,
-    Fee,
-    Interest,
-    Funding,
-    Settlement,
-    Liquidation,
-    Rebate,
-    Adjustment,
-    Other,
-}
-
-/// A single same-currency "transfer" in double-entry style.
-/// In TigerBeetle's lingo, this is one row in the ledger for a single currency.
-#[derive(Debug, Clone, TypedBuilder)]
-pub struct Transfer {
-    #[builder(default = Uuid::new_v4())]
-    pub id: Uuid,
-    /// The event time of this transfer.
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub event_time: OffsetDateTime,
-    /// The currency must be the same for both `debit_account_id` and `credit_account_id`.
-    pub asset: Tradable,
-    /// The account that is debited (balance goes down).
-    pub debit_account: Account,
-    /// The account that is credited (balance goes up).
-    pub credit_account: Account,
-    /// The amount of this transfer.
-    pub amount: Decimal,
-    /// Transfer type (e.g. deposit, withdrawal, trade, etc.)
-    pub transfer_type: TransferType,
-    /// If this transfer is linked to another (for cross-currency exchange),
-    /// we can store a link ID.
-    #[builder(default = false)]
-    pub linked: bool,
-}
-
-impl fmt::Display for Transfer {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}: {} -> {} {}",
-            self.transfer_type, self.debit_account.name, self.credit_account.name, self.amount
-        )
-    }
-}
-
 /// The in-memory ledger tracks accounts and can apply sets of transfers atomically.
 #[derive(Debug, TypedBuilder)]
 pub struct Ledger {
     // For simplicity, we'll hold accounts in a HashMap
-    #[builder(default = Mutex::new(HashMap::new()))]
-    accounts: Mutex<HashMap<Uuid, Account>>,
+    #[builder(default = RwLock::new(HashMap::new()))]
+    accounts: RwLock<HashMap<Uuid, Arc<Account>>>,
     // We store completed transfers here, or you could store them in a DB, etc.
-    #[builder(default = Mutex::new(Vec::new()))]
-    transfers: Mutex<Vec<Transfer>>,
+    #[builder(default = RwLock::new(Vec::new()))]
+    transfers: RwLock<Vec<Arc<Transfer>>>,
 }
 
 impl Ledger {
     /// Adds an account to the ledger, returns its ID.
-    pub fn add_account(&self, name: &str, asset: Tradable, balance: Decimal, account_type: AccountType) -> Account {
-        let mut lock = self.accounts.lock().unwrap();
-        let account = Account::builder()
-            .name(name.into())
-            .asset(asset)
-            .balance(balance)
-            .account_type(account_type)
-            .build();
+    pub fn add_account(&self, name: &str, asset: Tradable, account_type: AccountType) -> Arc<Account> {
+        let mut lock = self.accounts.write();
+        let account = Arc::new(
+            Account::builder()
+                .name(name.into())
+                .asset(asset)
+                .account_type(account_type)
+                .build(),
+        );
         let id = account.id;
         lock.insert(id, account.clone());
         account
     }
 
     /// Retrieves an account (immutable) for debugging or inspection.
-    pub fn get_account(&self, account_id: Uuid) -> Option<Account> {
-        let lock = self.accounts.lock().unwrap();
+    pub fn get_account(&self, account_id: Uuid) -> Option<Arc<Account>> {
+        let lock = self.accounts.read();
         lock.get(&account_id).cloned()
+    }
+
+    pub fn get_liquidity_provider_account(
+        &self,
+        venue: &Arc<Venue>,
+        asset: &Tradable,
+    ) -> Result<Arc<Account>, PortfolioError> {
+        let lock = self.accounts.read();
+        for account in lock.values() {
+            if account.account_type.eq(&AccountType::LiquidityProvider(venue.clone())) && account.asset.eq(&asset) {
+                return Ok(account.clone());
+            }
+        }
+        Err(PortfolioError::LiquidityAccountNotFound(venue.clone(), asset.clone()))
+    }
+
+    pub fn get_venue_account(&self, venue: &Arc<Venue>, asset: &Tradable) -> Result<Arc<Account>, PortfolioError> {
+        let lock = self.accounts.read();
+        for account in lock.values() {
+            if account.account_type.eq(&AccountType::ExchangeWallet(venue.clone())) && account.asset.eq(&asset) {
+                return Ok(account.clone());
+            }
+        }
+        Err(PortfolioError::VenueAccountNotFound(venue.clone(), asset.clone()))
+    }
+
+    pub fn get_strategy_account(
+        &self,
+        strategy: &Arc<Strategy>,
+        asset: &Tradable,
+    ) -> Result<Arc<Account>, PortfolioError> {
+        let lock = self.accounts.read();
+        for account in lock.values() {
+            if account.account_type.eq(&AccountType::Strategy(strategy.clone())) && account.asset.eq(&asset) {
+                return Ok(account.clone());
+            }
+        }
+        Err(PortfolioError::StrategyAccountNotFound(strategy.clone(), asset.clone()))
+    }
+
+    /// Computes current balance for a given account by replaying all transfers.
+    pub fn get_balance(&self, account_id: Uuid) -> Result<Decimal, PortfolioError> {
+        // We want to sum all credits minus all debits for this account
+        let transfers = self.transfers.read();
+        let mut balance = Decimal::ZERO;
+
+        for t in transfers.iter() {
+            // If this account is credited
+            if t.credit_account.id == account_id {
+                balance += t.amount;
+            }
+            // If this account is debited
+            if t.debit_account.id == account_id {
+                balance -= t.amount;
+            }
+        }
+
+        Ok(balance)
+    }
+
+    /// Return the current ledger balances in assets
+    pub fn get_balances(&self) -> HashMap<Tradable, Decimal> {
+        let accounts_lock = self.accounts.read();
+        let mut balances = HashMap::new();
+        for account in accounts_lock.values() {
+            if matches!(account.account_type, AccountType::LiquidityProvider(_)) {
+                continue;
+            }
+            let balance = self.get_balance(account.id).unwrap();
+            let entry = balances.entry(account.asset.clone()).or_insert(Decimal::ZERO);
+            *entry += balance;
+        }
+        balances
     }
 
     /// Performs one or more same-currency transfers **atomically**:
@@ -147,46 +122,30 @@ impl Ledger {
     /// - For double-entry: each Transfer has a `debit_account_id` and `credit_account_id`.
     ///
     /// Returns an error if any of the transfers are invalid.
-    pub fn apply_transfers(&self, transfers: &[Transfer]) -> Result<(), PortfolioError> {
-        let mut accounts_lock = self.accounts.lock().unwrap();
-        let mut tx_log_lock = self.transfers.lock().unwrap();
-
-        // 1. Validate all transfers first (currency matching, sufficient balances, etc.)
+    pub fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<(), PortfolioError> {
         for t in transfers {
-            let debit_acct = accounts_lock
-                .get(&t.debit_account.id)
-                .ok_or(PortfolioError::DebitAccountNotFound(t.debit_account.name.clone()))?;
-            let credit_acct = accounts_lock
-                .get(&t.credit_account.id)
-                .ok_or(PortfolioError::CreditAccountNotFound(t.credit_account.name.clone()))?;
-
-            if debit_acct.asset != credit_acct.asset || debit_acct.asset != t.asset {
+            // Check for currency mismatch
+            if t.debit_account.asset != t.credit_account.asset || t.debit_account.asset != t.asset {
                 return Err(PortfolioError::CurrencyMismatch(t.clone()));
             }
-            if !debit_acct.account_type.eq(&AccountType::LiquidityProvider) {
-                if debit_acct.balance < t.amount {
+
+            // Check for insufficient balance on exchange wallets
+            if matches!(t.debit_account.account_type, AccountType::ExchangeWallet(_)) {
+                if self.get_balance(t.debit_account.id)? < t.amount {
                     return Err(PortfolioError::InsufficientBalance(t.clone()));
                 }
             }
+
+            // Check for invalid transfer amount
             if t.amount <= dec!(0) {
                 return Err(PortfolioError::InvalidTransferAmount(t.clone()));
             }
         }
 
         // 2. All validations passed, apply them in memory.
+        // This could potentially be a problem since we are validating before we lock
+        let mut tx_log_lock = self.transfers.write();
         for t in transfers {
-            // Debit side
-            let debit_acct = accounts_lock
-                .get_mut(&t.debit_account.id)
-                .ok_or(PortfolioError::DebitAccountNotFound(t.debit_account.name.clone()))?;
-            debit_acct.balance -= t.amount;
-            // Credit side
-            let credit_acct = accounts_lock
-                .get_mut(&t.credit_account.id)
-                .ok_or(PortfolioError::CreditAccountNotFound(t.credit_account.name.clone()))?;
-            credit_acct.balance += t.amount;
-
-            // Record the transfer
             info!("Applying transfer: {}", t);
             tx_log_lock.push(t.clone());
         }
@@ -195,47 +154,34 @@ impl Ledger {
     }
 
     /// Returns a snapshot of all transfers for debugging.
-    pub fn list_transfers(&self) -> Vec<Transfer> {
-        self.transfers.lock().unwrap().clone()
+    pub fn list_transfers(&self) -> Vec<Arc<Transfer>> {
+        self.transfers.read().clone()
     }
 
     /// Print all accounts for debugging.
     pub fn list_accounts(&self) {
-        let accounts_lock = self.accounts.lock().unwrap();
+        let accounts_lock = self.accounts.read();
         info!("---------------- Accounts ----------------");
         for account in accounts_lock.values() {
-            if account.account_type.eq(&AccountType::LiquidityProvider) {
+            if matches!(account.account_type, AccountType::LiquidityProvider(_)) {
                 continue;
             }
             info!("{}", account);
         }
     }
 
-    /// Return the current ledger balances in assets
-    pub fn balances(&self) -> HashMap<Arc<Asset>, Decimal> {
-        let accounts_lock = self.accounts.lock().unwrap();
-        let mut balances = HashMap::new();
-        for account in accounts_lock.values() {
-            if account.account_type.eq(&AccountType::LiquidityProvider) {
-                continue;
-            }
-            if let Tradable::Asset(asset) = &account.asset {
-                balances.insert(asset.clone(), account.balance);
-            }
-        }
-        balances
-    }
-
     /// Return the current ledger positions in instruments
     pub fn positions(&self) -> HashMap<Arc<Instrument>, Decimal> {
-        let accounts_lock = self.accounts.lock().unwrap();
+        let accounts_lock = self.accounts.read();
         let mut positions = HashMap::new();
         for account in accounts_lock.values() {
-            if account.account_type.eq(&AccountType::LiquidityProvider) {
+            if matches!(account.account_type, AccountType::LiquidityProvider(_)) {
                 continue;
             }
             if let Tradable::Instrument(instrument) = &account.asset {
-                positions.insert(instrument.clone(), account.balance);
+                let balance = self.get_balance(account.id).unwrap();
+                let entry = positions.entry(instrument.clone()).or_insert(Decimal::ZERO);
+                *entry += balance;
             }
         }
         positions
@@ -244,119 +190,217 @@ impl Ledger {
     /// Return the strategy positions
     pub fn strategy_positions(&self, strategy: &Arc<Strategy>) -> HashMap<Arc<Instrument>, Decimal> {
         let strategy_account = AccountType::Strategy(strategy.clone());
-        let accounts_lock = self.accounts.lock().unwrap();
+        let accounts_lock = self.accounts.read();
         let mut positions = HashMap::new();
         for account in accounts_lock.values() {
             if !account.account_type.eq(&strategy_account) {
                 continue;
             }
             if let Tradable::Instrument(instrument) = &account.asset {
-                positions.insert(instrument.clone(), account.balance);
+                let balance = self.get_balance(account.id).unwrap();
+                positions.insert(instrument.clone(), balance);
             }
         }
         positions
     }
 
-    /// Processes the last fill from a venue order, generating relevant ledger transfers.
-    ///
-    /// Arguments:
-    /// - `order`: The VenueOrder with last_fill_price, last_fill_quantity, last_fill_commission, etc.
-    /// - `user_quote_acct`: The user's quote currency account (e.g. USDT).
-    /// - `exchange_quote_acct`: The exchange's quote currency account (liquidity provider).
-    /// - `user_instrument_acct`: The user's instrument account (e.g. BTC-USDT).
-    /// - `exchange_instrument_acct`: The exchange's instrument account (liquidity provider).
-    /// - `user_fee_acct`: The user's account for paying fees (could be same as quote, or e.g. BNB).
-    /// - `exchange_fee_acct`: The exchange's fee-asset account (liquidity provider).
-    ///
-    /// Returns `Ok(())` or an error if insufficient balance or mismatch.
-    pub fn process_venue_order_fill(
+    /// Transfer funds into an account deposit
+    pub fn deposit(
         &self,
-        order: &VenueOrder,
-        user_quote_acct: &Account,
-        exchange_quote_acct: &Account,
-        user_instrument_acct: &Account,
-        exchange_instrument_acct: &Account,
-        user_fee_acct: &Account,
-        exchange_fee_acct: &Account,
+        debit_account: &Arc<Account>,
+        credit_account: &Arc<Account>,
+        amount: Decimal,
     ) -> Result<(), PortfolioError> {
-        // 1) We only do something if there's a last_fill_quantity > 0
-        if order.last_fill_quantity <= dec!(0) {
+        info!("Deposit: {} -> {} = {}", debit_account, credit_account, amount);
+        let transfer = Transfer::builder()
+            .asset(debit_account.asset.clone())
+            .debit_account(debit_account.clone())
+            .credit_account(credit_account.clone())
+            .amount(amount)
+            .transfer_type(TransferType::Deposit)
+            .build()
+            .into();
+        self.apply_transfers(&[transfer])
+    }
+
+    /// Exchange currency between two accounts
+    pub fn exchange(
+        &self,
+        from_account: &Arc<Account>,
+        to_account: &Arc<Account>,
+        amount: Decimal,
+        rate: Decimal,
+    ) -> Result<(), PortfolioError> {
+        // Get the venue from the account wallet type
+        let venue = match &from_account.account_type {
+            AccountType::ExchangeWallet(venue) => venue,
+            _ => {
+                return Err(PortfolioError::InvalidExchange(
+                    "Exchange only possible for exchange wallets".into(),
+                ))
+            }
+        };
+        let from_exchange_account = self.get_liquidity_provider_account(venue, &from_account.asset)?;
+        let to_exchange_account = self.get_liquidity_provider_account(venue, &to_account.asset)?;
+        let exchange_amount = amount / rate;
+        info!(
+            "Exchange: {} = {} -> {} = {} @ {}",
+            from_account.asset, amount, to_account.asset, exchange_amount, rate
+        );
+
+        let t1 = Transfer::builder()
+            .asset(from_account.asset.clone())
+            .debit_account(from_account.clone())
+            .credit_account(from_exchange_account.clone())
+            .amount(amount)
+            .transfer_type(TransferType::Exchange)
+            .linked(true)
+            .build()
+            .into();
+
+        let t2 = Transfer::builder()
+            .asset(to_account.asset.clone())
+            .debit_account(to_exchange_account.clone())
+            .credit_account(to_account.clone())
+            .amount(exchange_amount)
+            .transfer_type(TransferType::Exchange)
+            .build()
+            .into();
+
+        self.apply_transfers(&[t1, t2])
+    }
+
+    /// Merges "open/close" logic into one function for *isolated margin*
+    /// by reading the last fill from a `VenueOrder`.
+    ///
+    /// - We check old_position vs new_position (in absolute contracts).
+    /// - If new_position > old_position, we deposit additional margin.
+    /// - If new_position < old_position, we free margin back to the user.
+    /// - Commission is deducted from the user's margin account.
+    /// - The instrument itself is transferred from venue -> user (buy) or user -> venue (sell).
+    ///
+    /// `order.instrument.margin_asset` is used as the margin currency (e.g. USDT).
+    /// If the order is partial or repeated, call this each time `last_fill_quantity` changes.
+    pub fn trade_perpetual_isolated_from_order(&self, order: &Arc<VenueOrder>) -> Result<(), PortfolioError> {
+        info!("Trade Perpetual Isolated: {}", order);
+        // 1) Basic fields from the order
+        let side = order.side;
+        let fill_price = order.last_fill_price;
+        let fill_qty = order.last_fill_quantity; // how many contracts user is adding/closing
+        let commission_amount = order.last_fill_commission;
+        let instrument = &order.instrument;
+
+        // If nothing was filled, do nothing
+        if fill_qty <= dec!(0) {
             return Ok(());
         }
 
-        // For clarity:
-        let fill_price = order.last_fill_price;
-        let fill_qty = order.last_fill_quantity;
-        let commission = order.last_fill_commission; // e.g. 0.1 BNB or 5 USDT
-        let side = order.side;
+        // 2) Identify accounts via ledger lookups
+        let strategy = &order.strategy; // e.g. user or strategy ID
+        let venue = &instrument.venue;
 
-        // 2) Build the margin/cost transfer for the fill in the quote currency
-        //    e.g. user -> exchange if it's a buy, or exchange -> user if it's a sell
-        let cost = fill_price * fill_qty; // ignoring any contract multiplier for simplicity
-        let margin_transfer_type = TransferType::Margin; // or Trade, up to your design
+        // Margin is the instrument's margin_asset
+        let margin_asset = Tradable::Asset(instrument.margin_asset.clone());
 
-        let margin_transfer = if side == MarketSide::Buy {
-            // user_quote_acct => exchange_quote_acct
-            Transfer::builder()
-                .asset(user_quote_acct.asset.clone()) // must match user_quote_acct & exch_quote_acct
-                .debit_account(user_quote_acct.clone())
-                .credit_account(exchange_quote_acct.clone())
-                .amount(cost)
-                .transfer_type(margin_transfer_type)
-                .build()
+        let user_margin_acct = self.get_venue_account(venue, &margin_asset)?;
+        let venue_margin_acct = self.get_liquidity_provider_account(venue, &margin_asset)?;
+
+        // Commission uses the same margin asset by default; if the order has a
+        // separate commission_asset, you'd handle it here:
+        let commission_asset = match &order.commission_asset {
+            Some(asset) => Tradable::Asset(asset.clone()),
+            None => margin_asset.clone(),
+        };
+        let user_commission_acct = self.get_venue_account(venue, &commission_asset)?;
+        let venue_commission_acct = self.get_liquidity_provider_account(venue, &commission_asset)?;
+
+        // Instrument accounts
+        let user_instrument_acct = self.get_strategy_account(strategy, &Tradable::Instrument(instrument.clone()))?;
+        let venue_instrument_acct =
+            self.get_liquidity_provider_account(venue, &Tradable::Instrument(instrument.clone()))?;
+
+        // 3) Old position in user_instrument_acct
+        let old_position = self.get_balance(user_instrument_acct.id)?;
+        // e.g. +2 => user is long 2 contracts; -1 => short 1
+
+        // 4) Calculate new_position
+        let new_position = if side == MarketSide::Buy {
+            old_position + fill_qty
         } else {
-            // Sell: user receives the quote; exchange pays the user
-            Transfer::builder()
-                .asset(user_quote_acct.asset.clone())
-                .debit_account(exchange_quote_acct.clone())
-                .credit_account(user_quote_acct.clone())
-                .amount(cost)
-                .transfer_type(margin_transfer_type)
-                .build()
+            old_position - fill_qty
         };
 
-        // 3) Build the "position" or "instrument" transfer
-        //    e.g. exchange_instrument -> user_instrument if it's a buy
-        //         user_instrument -> exchange_instrument if it's a sell
-        let trade_transfer_type = TransferType::Trade;
+        // 5) Compute old vs new margin
+        // For a simple approach: margin_required = |position| * fill_price * contract_size
+        let contract_size = instrument.contract_size;
+        let old_margin_required = old_position.abs() * fill_price * contract_size;
+        let new_margin_required = new_position.abs() * fill_price * contract_size;
+        let margin_diff = new_margin_required - old_margin_required;
 
-        let trade_transfer = if side == MarketSide::Buy {
-            // user obtains the instrument
-            Transfer::builder()
-                .asset(user_instrument_acct.asset.clone())
-                .debit_account(exchange_instrument_acct.clone())
-                .credit_account(user_instrument_acct.clone())
-                .amount(fill_qty)
-                .transfer_type(trade_transfer_type)
-                .build()
+        // 6) Build Commission Transfer
+        let commission_transfer = Transfer::builder()
+            .asset(commission_asset.clone())
+            .debit_account(user_commission_acct.clone())
+            .credit_account(venue_commission_acct.clone())
+            .amount(commission_amount)
+            .transfer_type(TransferType::Commission)
+            .build()
+            .into();
+
+        // 7) Build Instrument Transfer
+        let (instrument_debit_acct, instrument_credit_acct) = if side == MarketSide::Buy {
+            // venue -> user
+            (venue_instrument_acct.clone(), user_instrument_acct.clone())
         } else {
-            // user_instrument -> exchange_instrument
-            Transfer::builder()
-                .asset(user_instrument_acct.asset.clone())
-                .debit_account(user_instrument_acct.clone())
-                .credit_account(exchange_instrument_acct.clone())
-                .amount(fill_qty)
-                .transfer_type(trade_transfer_type)
-                .build()
+            // user -> venue
+            (user_instrument_acct.clone(), venue_instrument_acct.clone())
         };
 
-        // 4) Build a fee transfer if commission > 0
-        //    user_fee_acct => exchange_fee_acct
-        //    (Both accounts should have the same asset, e.g. BNB or USDT)
-        let mut all_transfers = vec![margin_transfer, trade_transfer];
+        let instrument_transfer = Transfer::builder()
+            .asset(Tradable::Instrument(instrument.clone()))
+            .debit_account(instrument_debit_acct)
+            .credit_account(instrument_credit_acct)
+            .amount(fill_qty)
+            .transfer_type(TransferType::Trade)
+            .build()
+            .into();
 
-        if commission > dec!(0) {
-            let fee_transfer = Transfer::builder()
-                .asset(user_fee_acct.asset.clone())
-                .debit_account(user_fee_acct.clone())
-                .credit_account(exchange_fee_acct.clone())
-                .amount(commission)
-                .transfer_type(TransferType::Fee)
-                .build();
-            all_transfers.push(fee_transfer);
-        }
+        // 8) Margin transfers: if margin_diff > 0 => deposit more, if < 0 => free up
+        let margin_transfers = if margin_diff > Decimal::ZERO {
+            // deposit additional margin
+            let t = Transfer::builder()
+                .asset(margin_asset.clone())
+                .debit_account(user_margin_acct.clone())
+                .credit_account(venue_margin_acct.clone())
+                .amount(margin_diff)
+                .transfer_type(TransferType::Margin)
+                .build()
+                .into();
+            vec![t]
+        } else if margin_diff < Decimal::ZERO {
+            // free margin back
+            let freed_margin = margin_diff.abs();
+            let t = Transfer::builder()
+                .asset(margin_asset.clone())
+                .debit_account(venue_margin_acct.clone())
+                .credit_account(user_margin_acct.clone())
+                .amount(freed_margin)
+                .transfer_type(TransferType::Margin)
+                .build()
+                .into();
+            vec![t]
+        } else {
+            // no margin change
+            vec![]
+        };
 
-        // 5) Apply them atomically
+        // 9) Combine all transfers
+        let mut all_transfers = vec![];
+        all_transfers.extend(margin_transfers.into_iter());
+        all_transfers.push(commission_transfer);
+        all_transfers.push(instrument_transfer);
+
+        // 10) Apply them atomically
         self.apply_transfers(&all_transfers)
     }
 }
@@ -365,6 +409,7 @@ impl Ledger {
 mod tests {
     use super::*;
     use test_log::test;
+    use time::OffsetDateTime;
     use tracing::info;
 
     #[test(tokio::test)]
@@ -378,172 +423,145 @@ mod tests {
         let btc_usdt = Tradable::Instrument(test_inst_binance_btc_usdt_perp());
         let eth_usdt = Tradable::Instrument(test_inst_binance_eth_usdt_perp());
 
+        let binance_venue = test_binance_venue();
+        let personal_venue = test_personal_venue();
+
+        let s1 = test_strategy();
+        let s2 = test_strategy_crossover();
+
         // Create some accounts
-        let a_btc = ledger.add_account("Main-BTC", btc.clone(), dec!(0), AccountType::ExchangeWallet); // Enough for the example
-        let a_bnb = ledger.add_account("Main-BNB", bnb.clone(), dec!(5), AccountType::ExchangeWallet); // Enough for the example
-        let a_usdt = ledger.add_account("Main-USDT", usdt.clone(), dec!(100_000), AccountType::ExchangeWallet);
-        let s_1_btc_usdt = ledger.add_account(
-            "Strategy-1-BTC-USDT",
-            btc_usdt.clone(),
-            dec!(0),
-            AccountType::Strategy(test_strategy()),
-        );
-        let s_2_btc_usdt = ledger.add_account(
-            "Strategy-2-BTC-USDT",
-            btc_usdt.clone(),
-            dec!(0),
-            AccountType::Strategy(test_strategy_crossover()),
-        );
-        let s_2_eth_usdt = ledger.add_account(
-            "Strategy-2-ETH-USDT",
-            eth_usdt.clone(),
-            dec!(0),
-            AccountType::Strategy(test_strategy_crossover()),
-        );
+        let _a_btc = ledger.add_account("Main-BTC", btc.clone(), AccountType::ExchangeWallet(binance_venue.clone())); // Enough for the example
+        let a_bnb = ledger.add_account("Main-BNB", bnb.clone(), AccountType::ExchangeWallet(binance_venue.clone())); // Enough for the example
+        let a_usdt = ledger.add_account("Main-USDT", usdt.clone(), AccountType::ExchangeWallet(binance_venue.clone())); // Enough for the example
+        let _s_1_btc_usdt =
+            ledger.add_account("Strategy-1-BTC-USDT", btc_usdt.clone(), AccountType::Strategy(s1.clone()));
+        let _s_2_btc_usdt =
+            ledger.add_account("Strategy-2-BTC-USDT", btc_usdt.clone(), AccountType::Strategy(s2.clone()));
+        let _s_2_eth_usdt =
+            ledger.add_account("Strategy-2-ETH-USDT", eth_usdt.clone(), AccountType::Strategy(s2.clone()));
 
         // Liquidity provider accounts
-        let l_btc = ledger.add_account("Binance-BTC", btc.clone(), dec!(0), AccountType::LiquidityProvider);
-        let l_bnb = ledger.add_account("Binance-BNB", bnb.clone(), dec!(0), AccountType::LiquidityProvider);
-        let l_usdt = ledger.add_account("Binance-USDT", usdt.clone(), dec!(0), AccountType::LiquidityProvider);
-        let l_btc_usdt =
-            ledger.add_account("Binance-BTC-USDT", btc_usdt.clone(), dec!(0), AccountType::LiquidityProvider);
-        let l_eth_usdt =
-            ledger.add_account("Binance-ETH-USDT", eth_usdt.clone(), dec!(0), AccountType::LiquidityProvider);
+        let l_personal_usdt = ledger.add_account(
+            "Personal-Fund-USDT",
+            usdt.clone(),
+            AccountType::LiquidityProvider(personal_venue.clone()),
+        );
+        let _l_btc = ledger.add_account(
+            "Binance-BTC",
+            btc.clone(),
+            AccountType::LiquidityProvider(binance_venue.clone()),
+        );
+        let _l_bnb = ledger.add_account(
+            "Binance-BNB",
+            bnb.clone(),
+            AccountType::LiquidityProvider(binance_venue.clone()),
+        );
+        let _l_usdt = ledger.add_account(
+            "Binance-USDT",
+            usdt.clone(),
+            AccountType::LiquidityProvider(binance_venue.clone()),
+        );
+        let _l_btc_usdt = ledger.add_account(
+            "Binance-BTC-USDT",
+            btc_usdt.clone(),
+            AccountType::LiquidityProvider(binance_venue.clone()),
+        );
+        let _l_eth_usdt = ledger.add_account(
+            "Binance-ETH-USDT",
+            eth_usdt.clone(),
+            AccountType::LiquidityProvider(binance_venue.clone()),
+        );
 
-        // Let's say we want to send $100 from A1 (USD) to A2 (INR).
-        // Exchange rate: $1.00 = ₹82.42135 => $100 = ₹8242.135
-        // We'll multiply by 100 for "integer" style amounts if we want but let's keep decimals simple.
+        // Deposti 100k USDT
+        ledger.deposit(&l_personal_usdt, &a_usdt, dec!(100000))?;
 
-        let usdt_amount = dec!(46200);
-        let btc_amount = dec!(0.1);
+        ledger.exchange(&a_usdt, &a_bnb, dec!(5000), dec!(600))?;
 
-        // We create two same-currency transfers, "linked" together for atomic exchange:
-
-        // 1) Transfer T1: from A1 to L1 (USD)
-        //    Debits A1(USD), credits L1(USD).
-        //    linked = true for the first part
-        let t1 = Transfer::builder()
-            .asset(usdt.clone())
-            .debit_account(a_usdt.clone())
-            .credit_account(l_usdt.clone())
-            .amount(usdt_amount)
-            .transfer_type(TransferType::Exchange)
-            .linked(true)
+        let mut order = VenueOrder::builder()
+            .strategy(s2.clone())
+            .instrument(test_inst_binance_btc_usdt_perp())
+            .side(MarketSide::Buy)
+            .quantity(dec!(1.0))
+            .price(dec!(50000.0))
+            .order_type(VenueOrderType::Market)
+            .commission_asset(Some(test_bnb_asset()))
             .build();
 
-        // 2) Transfer T2: from L2 to A2 (INR)
-        //    Debits L2(INR), credits A2(INR).
-        //    linked = false for second
-        let t2 = Transfer::builder()
-            .asset(btc.clone())
-            .debit_account(l_btc.clone())
-            .credit_account(a_btc.clone())
-            .amount(btc_amount)
-            .transfer_type(TransferType::Exchange)
+        ledger.trade_perpetual_isolated_from_order(&Arc::new(order.clone()))?;
+
+        order.add_fill(OffsetDateTime::now_utc(), dec!(5001), dec!(0.5), dec!(0.1));
+
+        ledger.trade_perpetual_isolated_from_order(&Arc::new(order.clone()))?;
+
+        order.add_fill(OffsetDateTime::now_utc(), dec!(4990), dec!(0.5), dec!(0.13));
+
+        ledger.trade_perpetual_isolated_from_order(&Arc::new(order.clone()))?;
+
+        let mut order = VenueOrder::builder()
+            .strategy(s2.clone())
+            .instrument(test_inst_binance_btc_usdt_perp())
+            .side(MarketSide::Sell)
+            .quantity(dec!(1.0))
+            .price(dec!(50000.0))
+            .order_type(VenueOrderType::Market)
+            .commission_asset(Some(test_bnb_asset()))
             .build();
 
-        // We apply them as a batch atomically:
-        ledger.apply_transfers(&[t1, t2])?;
+        ledger.trade_perpetual_isolated_from_order(&Arc::new(order.clone()))?;
 
-        // Now do a "buy 1 BTC-PERP contract" for 2000 USDT margin
-        let t1 = Transfer::builder()
-            .asset(usdt.clone())
-            .debit_account(a_usdt.clone())
-            .credit_account(l_usdt.clone())
-            .amount(dec!(4000))
-            .transfer_type(TransferType::Margin)
-            .build();
+        order.add_fill(OffsetDateTime::now_utc(), dec!(5001), dec!(0.5), dec!(0.1));
 
-        // We pay the trading fees in BNB
-        let t2 = Transfer::builder()
-            .asset(bnb.clone())
-            .debit_account(a_bnb.clone())
-            .credit_account(l_bnb.clone())
-            .amount(dec!(0.1))
-            .transfer_type(TransferType::Fee)
-            .build();
+        ledger.trade_perpetual_isolated_from_order(&Arc::new(order.clone()))?;
 
-        let t3 = Transfer::builder()
-            .asset(btc_usdt.clone())
-            .debit_account(l_btc_usdt.clone())
-            .credit_account(s_1_btc_usdt.clone())
-            .amount(dec!(2))
-            .transfer_type(TransferType::Trade)
-            .build();
+        order.add_fill(OffsetDateTime::now_utc(), dec!(4990), dec!(0.5), dec!(0.13));
 
-        ledger.apply_transfers(&[t1, t2, t3])?;
+        ledger.trade_perpetual_isolated_from_order(&Arc::new(order.clone()))?;
 
-        // Now do a "buy 1 BTC-PERP contract" for 2000 USDT margin
-        let t1 = Transfer::builder()
-            .asset(usdt.clone())
-            .debit_account(a_usdt.clone())
-            .credit_account(l_usdt.clone())
-            .amount(dec!(2300))
-            .transfer_type(TransferType::Margin)
-            .build();
+        // ledger.trade_perpetual(
+        //     &MarketSide::Sell,
+        //     &s1,
+        //     &test_inst_binance_btc_usdt_perp(),
+        //     dec!(2000),
+        //     dec!(0.02),
+        //     dec!(0.4),
+        //     Some(&bnb),
+        // )?;
 
-        // We pay the trading fees in BNB
-        let t2 = Transfer::builder()
-            .asset(bnb.clone())
-            .debit_account(a_bnb.clone())
-            .credit_account(l_bnb.clone())
-            .amount(dec!(0.2))
-            .transfer_type(TransferType::Fee)
-            .build();
+        // ledger.trade_perpetual(
+        //     &MarketSide::Sell,
+        //     &s2,
+        //     &test_inst_binance_btc_usdt_perp(),
+        //     dec!(4000),
+        //     dec!(0.04),
+        //     dec!(0.8),
+        //     Some(&bnb),
+        // )?;
 
-        let t3 = Transfer::builder()
-            .asset(eth_usdt.clone())
-            .debit_account(l_eth_usdt.clone())
-            .credit_account(s_2_eth_usdt.clone())
-            .amount(dec!(12))
-            .transfer_type(TransferType::Trade)
-            .build();
-
-        ledger.apply_transfers(&[t1, t2, t3])?;
-
-        // Now do a "buy 1 BTC-PERP contract" for 2000 USDT margin
-        let t1 = Transfer::builder()
-            .asset(usdt.clone())
-            .debit_account(a_usdt.clone())
-            .credit_account(l_usdt.clone())
-            .amount(dec!(7000))
-            .transfer_type(TransferType::Margin)
-            .build();
-
-        // We pay the trading fees in BNB
-        let t2 = Transfer::builder()
-            .asset(bnb.clone())
-            .debit_account(a_bnb.clone())
-            .credit_account(l_bnb.clone())
-            .amount(dec!(0.15))
-            .transfer_type(TransferType::Fee)
-            .build();
-
-        let t3 = Transfer::builder()
-            .asset(btc_usdt.clone())
-            .debit_account(l_btc_usdt.clone())
-            .credit_account(s_2_btc_usdt.clone())
-            .amount(dec!(0.5))
-            .transfer_type(TransferType::Trade)
-            .build();
-
-        ledger.apply_transfers(&[t1, t2, t3])?;
+        // ledger.trade_perpetual(
+        //     &MarketSide::Sell,
+        //     &s2,
+        //     &test_inst_binance_eth_usdt_perp(),
+        //     dec!(16000),
+        //     dec!(0.02),
+        //     dec!(3.5),
+        //     Some(&bnb),
+        // )?;
 
         // Now let's see final balances:
         ledger.list_accounts();
 
         // List balances
-        let balances = ledger.balances();
+        let balances = ledger.get_balances();
         info!("Balances:");
         for (asset, balance) in balances {
-            info!("{}: {}", asset.symbol, balance);
+            info!(" - {}: {}", asset, balance);
         }
 
         // List positions
         let positions = ledger.positions();
         info!("Positions:");
         for (instrument, position) in positions {
-            info!("{}: {}", instrument.symbol, position);
+            info!(" - {}: {}", instrument.symbol, position);
         }
 
         // List strategy positions
@@ -551,14 +569,14 @@ mod tests {
         let strategy_positions = ledger.strategy_positions(&strategy);
         info!("{}", strategy);
         for (instrument, position) in strategy_positions {
-            info!("{}: {}", instrument.symbol, position);
+            info!(" - {}: {}", instrument.symbol, position);
         }
 
         let strategy = test_strategy_crossover();
         let strategy_positions = ledger.strategy_positions(&strategy);
         info!("{}", strategy);
         for (instrument, position) in strategy_positions {
-            info!("{}: {}", instrument.symbol, position);
+            info!(" - {}: {}", instrument.symbol, position);
         }
         Ok(())
     }

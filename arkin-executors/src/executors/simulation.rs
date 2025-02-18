@@ -200,12 +200,12 @@ mod tests {
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
         // Create dummy portfolio and instrument.
-        let portfolio = test_portfolio();
+        let strategy = test_strategy();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         // Build an order.
         let order = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Buy)
             .price(dec!(100))
@@ -248,11 +248,11 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let portfolio = test_portfolio();
+        let strategy = test_strategy();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         let order = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Sell)
             .price(dec!(200))
@@ -291,20 +291,20 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let portfolio = test_portfolio();
+        let strategy = test_strategy();
         let instrument_btc = test_inst_binance_btc_usdt_perp();
         let instrument_eth = test_inst_binance_eth_usdt_perp();
 
         // Create two orders with the same instrument...
         let order1 = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument_btc))
             .side(MarketSide::Buy)
             .price(dec!(150))
             .quantity(dec!(3))
             .build();
         let order2 = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument_btc))
             .side(MarketSide::Sell)
             .price(dec!(155))
@@ -312,7 +312,7 @@ mod tests {
             .build();
         // ...and one order with a different instrument.
         let order3 = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument_eth))
             .side(MarketSide::Buy)
             .price(dec!(160))
@@ -361,18 +361,18 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let portfolio = test_portfolio();
+        let strategy = test_strategy();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         let order1 = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Buy)
             .price(dec!(100))
             .quantity(dec!(1))
             .build();
         let order2 = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Sell)
             .price(dec!(110))
@@ -417,12 +417,12 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let portfolio = test_portfolio();
+        let strategy = test_strategy();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         // Build a market buy order.
         let buy_order = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Buy)
             .order_type(VenueOrderType::Market)
@@ -433,7 +433,7 @@ mod tests {
 
         // Build a market sell order.
         let sell_order = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Sell)
             .order_type(VenueOrderType::Market)
@@ -498,12 +498,12 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let portfolio = test_portfolio();
+        let strategy = test_strategy();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         // Build a limit buy order with a limit price of 105.
         let buy_order = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Buy)
             .order_type(VenueOrderType::Limit)
@@ -514,7 +514,7 @@ mod tests {
 
         // Build a limit sell order with a limit price of 95.
         let sell_order = VenueOrder::builder()
-            .portfolio(Arc::clone(&portfolio))
+            .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Sell)
             .order_type(VenueOrderType::Limit)

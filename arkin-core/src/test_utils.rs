@@ -59,6 +59,15 @@ pub fn test_binance_venue() -> Arc<Venue> {
     Arc::new(venue)
 }
 
+pub fn test_personal_venue() -> Arc<Venue> {
+    let venue = Venue::builder()
+        .id(Uuid::parse_str("b8b9dcf2-77ea-4d24-964e-8243bb7298ea").expect("Invalid UUID"))
+        .name("Personal".into())
+        .venue_type(VenueType::Otc)
+        .build();
+    Arc::new(venue)
+}
+
 pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
     let instrument = Instrument::builder()
         .id(Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"))
@@ -69,6 +78,7 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
         .instrument_type(InstrumentType::Perpetual)
         .base_asset(test_btc_asset())
         .quote_asset(test_usdt_asset())
+        .margin_asset(test_usdt_asset())
         .maturity(None)
         .strike(None)
         .option_type(None)
@@ -94,6 +104,7 @@ pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
         .instrument_type(InstrumentType::Perpetual)
         .base_asset(test_eth_asset())
         .quote_asset(test_usdt_asset())
+        .margin_asset(test_usdt_asset())
         .maturity(None)
         .strike(None)
         .option_type(None)

@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity};
 
-use super::{Asset, Instrument, MarketSide, Portfolio};
+use super::{Asset, Instrument, MarketSide, Strategy};
 
 pub type VenueOrderId = Uuid;
 
@@ -56,7 +56,7 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
-    pub portfolio: Arc<Portfolio>,
+    pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
     #[builder(default = VenueOrderType::Market)]

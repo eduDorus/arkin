@@ -21,6 +21,7 @@ pub struct InstrumentDTO {
     pub instrument_type: InstrumentType,
     pub base_asset_id: Uuid,
     pub quote_asset_id: Uuid,
+    pub margin_asset_id: Uuid,
     pub strike: Option<Decimal>,
     pub maturity: Option<OffsetDateTime>,
     pub option_type: Option<InstrumentOptionType>,
@@ -45,6 +46,7 @@ impl From<Arc<Instrument>> for InstrumentDTO {
             instrument_type: instrument.instrument_type.clone(),
             base_asset_id: instrument.base_asset.id,
             quote_asset_id: instrument.quote_asset.id,
+            margin_asset_id: instrument.margin_asset.id,
             strike: instrument.strike,
             maturity: instrument.maturity,
             option_type: instrument.option_type.as_ref().map(|v| v.clone()),
@@ -72,10 +74,10 @@ impl InstrumentRepo {
         sqlx::query!(
             r#"
             INSERT INTO instruments (
-                id, secondary_id, venue_id, symbol, venue_symbol, instrument_type, base_asset_id, quote_asset_id, strike, maturity, option_type,
+                id, secondary_id, venue_id, symbol, venue_symbol, instrument_type, base_asset_id, quote_asset_id, margin_asset_id, strike, maturity, option_type,
                 contract_size, price_precision, quantity_precision, base_precision, quote_precision, lot_size, tick_size, status
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11, $12, $13, $14, $15, $16, $17, $18, $19
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11, $12, $13, $14, $15, $16, $17, $18, $19, $20
             )
             "#,
             instrument.id,
@@ -86,6 +88,7 @@ impl InstrumentRepo {
             instrument.instrument_type as InstrumentType,
             instrument.base_asset_id,
             instrument.quote_asset_id,
+            instrument.margin_asset_id,
             instrument.strike,
             instrument.maturity,
             instrument.option_type as Option<InstrumentOptionType>,
@@ -116,6 +119,7 @@ impl InstrumentRepo {
                 instrument_type AS "instrument_type:InstrumentType",
                 base_asset_id,
                 quote_asset_id,
+                margin_asset_id,
                 strike,
                 maturity,
                 option_type AS "option_type:InstrumentOptionType",
@@ -155,6 +159,7 @@ impl InstrumentRepo {
                 instrument_type AS "instrument_type:InstrumentType",
                 base_asset_id,
                 quote_asset_id,
+                margin_asset_id,
                 strike,
                 maturity,
                 option_type AS "option_type:InstrumentOptionType",

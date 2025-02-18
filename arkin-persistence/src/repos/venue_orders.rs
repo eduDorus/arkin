@@ -13,7 +13,7 @@ use crate::PersistenceError;
 #[derive(Debug, Clone)]
 pub struct VenueOrderDTO {
     pub id: VenueOrderId,
-    pub portfolio_id: Uuid,
+    pub strategy_id: Uuid,
     pub instrument_id: Uuid,
     pub side: MarketSide,
     pub order_type: VenueOrderType,
@@ -32,7 +32,7 @@ impl From<VenueOrder> for VenueOrderDTO {
     fn from(order: VenueOrder) -> Self {
         Self {
             id: order.id,
-            portfolio_id: order.portfolio.id,
+            strategy_id: order.strategy.id,
             instrument_id: order.instrument.id,
             side: order.side,
             order_type: order.order_type,
@@ -53,7 +53,7 @@ impl From<Arc<VenueOrder>> for VenueOrderDTO {
     fn from(order: Arc<VenueOrder>) -> Self {
         Self {
             id: order.id,
-            portfolio_id: order.portfolio.id,
+            strategy_id: order.strategy.id,
             instrument_id: order.instrument.id,
             side: order.side,
             order_type: order.order_type,
@@ -71,7 +71,6 @@ impl From<Arc<VenueOrder>> for VenueOrderDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct VenueOrderRepo {
     pool: PgPool,
 }
@@ -83,7 +82,7 @@ impl VenueOrderRepo {
             INSERT INTO venue_orders
             (
                 id, 
-                portfolio_id, 
+                strategy_id, 
                 instrument_id, 
                 side, 
                 order_type, 
@@ -99,7 +98,7 @@ impl VenueOrderRepo {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             order.id,
-            order.portfolio_id,
+            order.strategy_id,
             order.instrument_id,
             order.side as MarketSide,
             order.order_type as VenueOrderType,
