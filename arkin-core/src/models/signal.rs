@@ -8,14 +8,14 @@ use crate::{EventType, EventTypeOf, Weight};
 
 use super::{Instrument, Strategy};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]
+#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
 
 pub struct Signal {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
     pub event_time: OffsetDateTime,
-    pub instrument: Arc<Instrument>,
     pub strategy: Arc<Strategy>,
+    pub instrument: Arc<Instrument>,
     pub weight: Weight,
 }
 

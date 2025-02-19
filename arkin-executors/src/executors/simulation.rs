@@ -51,7 +51,6 @@ impl SimulationExecutor {
     }
 
     pub async fn tick_update(&self, tick: Arc<Tick>) {
-        info!("SimulationExecutor tick_update: {}", tick.instrument);
         let lock = self.orders.read().await;
         let orders = lock.clone();
         drop(lock);

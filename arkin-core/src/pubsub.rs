@@ -107,7 +107,7 @@ pub enum Event {
     InsightTick(Arc<InsightTick>),
     Signal(Arc<Signal>),
     AllocationTick(Arc<AllocationTick>),
-    ExecutionOrderNew(Arc<ExecutionOrder>),
+    ExecutionOrder(Arc<ExecutionOrder>),
     // To the executor
     VenueOrderNew(Arc<VenueOrder>),
     VenueOrderCancel(VenueOrderId),

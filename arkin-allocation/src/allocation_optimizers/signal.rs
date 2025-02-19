@@ -158,7 +158,7 @@ impl AllocationOptim for SignalAllocationOptim {
 
             let order = ExecutionOrder::builder()
                 .id(Uuid::new_v4())
-                .portfolio(test_portfolio())
+                .strategy(Some(test_strategy()))
                 .instrument(instrument.clone())
                 .order_type(ExecutionOrderType::Maker)
                 .side(order_side)

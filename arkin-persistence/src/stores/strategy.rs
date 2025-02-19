@@ -29,6 +29,17 @@ impl StrategyStore {
         Ok(strategy)
     }
 
+    pub async fn read_by_name_or_create(&self, name: &str) -> Result<Arc<Strategy>, PersistenceError> {
+        if let Ok(strategy_dto) = self.strategy_repo.read_by_name(name).await {
+            let strategy: Arc<Strategy> = Arc::new(Strategy::from(strategy_dto));
+            return Ok(strategy);
+        } else {
+            let strategy = Arc::new(Strategy::builder().name(name.to_string()).description(None).build());
+            self.insert(strategy.clone()).await?;
+            return Ok(strategy);
+        }
+    }
+
     pub async fn update(&self, strategy: Arc<Strategy>) -> Result<(), PersistenceError> {
         self.strategy_repo.update(strategy.into()).await
     }

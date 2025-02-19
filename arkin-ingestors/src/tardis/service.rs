@@ -248,7 +248,7 @@ impl TardisIngestor {
 
     pub fn stream(&self, req: TardisRequest) -> impl Stream<Item = (OffsetDateTime, String)> + '_ {
         self.download_stream(req)
-            .buffered(self.max_concurrent_requests)
+            .buffer_unordered(self.max_concurrent_requests)
             .filter_map(|result| async move {
                 match result {
                     Ok(values) => Some(stream::iter(values)),
@@ -266,7 +266,7 @@ impl TardisIngestor {
         req: TardisRequest,
     ) -> impl Stream<Item = (OffsetDateTime, T)> + '_ {
         self.download_stream(req)
-            .buffered(self.max_concurrent_requests)
+            .buffer_unordered(self.max_concurrent_requests)
             .filter_map(|result| async move {
                 match result {
                     Ok(values) => Some(stream::iter(values)),

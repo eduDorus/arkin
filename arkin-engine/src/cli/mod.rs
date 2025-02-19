@@ -110,6 +110,10 @@ pub struct InsightsArgs {
 
 #[derive(Args, Debug)]
 pub struct SimulationArgs {
+    /// Instance name
+    #[arg(long, short = 'n')]
+    pub instance_name: String,
+
     /// Instruments (comma-separated)
     #[arg(long, short, value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,
@@ -137,6 +141,10 @@ pub struct SimulationArgs {
 
 #[derive(Args, Debug)]
 pub struct LiveArgs {
+    /// Instance name
+    #[arg(long, short = 'n')]
+    pub instance_name: String,
+
     /// Instruments (comma-separated)
     #[arg(long, value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,

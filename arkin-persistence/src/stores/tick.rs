@@ -59,7 +59,7 @@ impl TickStore {
 
     async fn update_tick_cache(&self, tick: Arc<Tick>) {
         if let Some(cached_tick) = self.last_tick_cache.get(&tick.instrument).await {
-            if cached_tick.event_time < tick.event_time {
+            if cached_tick.tick_id < tick.tick_id {
                 self.last_tick_cache.insert(tick.instrument.clone(), tick.clone()).await;
             }
         } else {

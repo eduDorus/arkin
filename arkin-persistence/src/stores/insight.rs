@@ -44,8 +44,8 @@ impl InsightsStore {
                         info!("Successfully flushed {} insights", insights.len());
                         break;
                     }
-                    Err(_) => {
-                        error!("Failed to flush insights, will try again in 5 seconds");
+                    Err(e) => {
+                        error!("Failed to flush insights: {}", e);
                         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     }
                 }

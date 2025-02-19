@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
-use tokio::select;
+use tokio::{select, sync::RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 use typed_builder::TypedBuilder;
@@ -11,13 +11,15 @@ use arkin_core::prelude::*;
 
 use crate::{Algorithm, StrategyError, StrategyService};
 
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, TypedBuilder)]
 #[allow(unused)]
 pub struct CrossoverStrategy {
     pubsub: Arc<PubSub>,
-    id: Arc<Strategy>,
+    strategy: Arc<Strategy>,
     fast_ma: FeatureId,
     slow_ma: FeatureId,
+    #[builder(default = RwLock::new(HashMap::new()))]
+    current_weight: RwLock<HashMap<Arc<Instrument>, Decimal>>,
 }
 
 #[async_trait]
@@ -54,46 +56,55 @@ impl RunnableService for CrossoverStrategy {
 impl Algorithm for CrossoverStrategy {
     async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError> {
         debug!("Processing insight tick for Crossover Strategy...");
-        let signals = tick
-            .instruments
-            .iter()
-            .filter_map(|i| {
-                let fast_ma = tick.insights.iter().find(|x| {
-                    if let Some(inst) = x.instrument.as_ref() {
-                        inst == i && x.feature_id == self.fast_ma
-                    } else {
-                        false
-                    }
-                });
 
-                let slow_ma = tick.insights.iter().find(|x| {
-                    if let Some(inst) = x.instrument.as_ref() {
-                        inst == i && x.feature_id == self.slow_ma
-                    } else {
-                        false
-                    }
-                });
+        // Lock the current weight map
+        let mut current_weight = self.current_weight.write().await;
 
-                let weight = match (fast_ma, slow_ma) {
-                    (Some(f), Some(s)) => {
-                        info!("Crossover comparing fast_ma: {} and slow_ma: {}", f.value, s.value);
-                        match f.value > s.value {
-                            true => Decimal::ONE,
-                            false => Decimal::NEGATIVE_ONE,
-                        }
+        let mut signals = vec![];
+        for i in &tick.instruments {
+            let fast_ma = tick.insights.iter().find(|x| {
+                if let Some(inst) = x.instrument.as_ref() {
+                    inst == i && x.feature_id == self.fast_ma
+                } else {
+                    false
+                }
+            });
+
+            let slow_ma = tick.insights.iter().find(|x| {
+                if let Some(inst) = x.instrument.as_ref() {
+                    inst == i && x.feature_id == self.slow_ma
+                } else {
+                    false
+                }
+            });
+
+            let weight = match (fast_ma, slow_ma) {
+                (Some(f), Some(s)) => {
+                    info!("Crossover comparing fast_ma: {} and slow_ma: {}", f.value, s.value);
+                    match f.value > s.value {
+                        true => Decimal::ONE,
+                        false => Decimal::NEGATIVE_ONE,
                     }
-                    _ => Decimal::ZERO,
-                };
-                let signal = Signal::builder()
-                    .event_time(tick.event_time)
-                    .instrument(i.clone())
-                    .strategy(self.id.clone())
-                    .weight(weight)
-                    .build();
-                let signal = Arc::new(signal);
-                return Some(signal);
-            })
-            .collect::<Vec<_>>();
+                }
+                _ => Decimal::ZERO,
+            };
+
+            // Check if the weight has changed and update or insert
+            let current_weight = current_weight.entry(i.clone()).or_insert(Decimal::ZERO);
+            if *current_weight == weight {
+                continue;
+            }
+            *current_weight = weight;
+
+            let signal = Signal::builder()
+                .event_time(tick.event_time)
+                .instrument(i.clone())
+                .strategy(self.strategy.clone())
+                .weight(weight)
+                .build();
+            let signal = Arc::new(signal);
+            signals.push(signal);
+        }
 
         info!("Crossover sending {} signals", signals.len());
         for signal in signals {

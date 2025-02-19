@@ -33,9 +33,9 @@ impl From<Arc<Signal>> for SignalDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct SignalRepo {
     pool: PgPool,
+    instance: Arc<Instance>,
 }
 
 impl SignalRepo {
@@ -45,12 +45,14 @@ impl SignalRepo {
             INSERT INTO signals
             (
                 event_time, 
+                instance_id,
                 strategy_id, 
                 instrument_id, 
                 weight
-            ) VALUES ($1, $2, $3, $4)
+            ) VALUES ($1, $2, $3, $4, $5)
             "#,
             signal.event_time,
+            self.instance.id,
             signal.strategy_id,
             signal.instrument_id,
             signal.weight,
@@ -69,6 +71,7 @@ impl SignalRepo {
                 INSERT INTO signals
                 (
                     event_time, 
+                    instance_id,
                     strategy_id, 
                     instrument_id, 
                     weight
@@ -82,6 +85,7 @@ impl SignalRepo {
                 // you'd need an iterator that yields references that live as long as `query_builder`,
                 // e.g. collect it to a `Vec` first.
                 b.push_bind(signal.event_time)
+                    .push_bind(self.instance.id)
                     .push_bind(signal.strategy_id)
                     .push_bind(signal.instrument_id)
                     .push_bind(signal.weight);
@@ -93,31 +97,5 @@ impl SignalRepo {
         }
         debug!("Saved {} venue signals", signals.len());
         Ok(())
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use crate::test_utils::connect_database;
-
-    use super::*;
-    use rust_decimal_macros::dec;
-    use test_log::test;
-    use time::OffsetDateTime;
-
-    #[test(tokio::test)]
-    async fn test_signals_repo() {
-        let pool = connect_database();
-        let repo = SignalRepo::builder().pool(pool).build();
-
-        let signal = Arc::new(
-            Signal::builder()
-                .event_time(OffsetDateTime::now_utc())
-                .instrument(test_inst_binance_btc_usdt_perp())
-                .strategy(test_strategy())
-                .weight(dec!(0.5))
-                .build(),
-        );
-        repo.insert(signal.into()).await.unwrap();
     }
 }

@@ -5,9 +5,9 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    Asset, AssetType, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceStatus, InstanceType,
-    Instrument, InstrumentStatus, InstrumentType, MarketSide, Pipeline, Portfolio, Price, Quantity, Strategy, Tick,
-    Venue, VenueType,
+    Asset, AssetType, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceType, Instrument,
+    InstrumentStatus, InstrumentType, MarketSide, Pipeline, Portfolio, Price, Quantity, Strategy, Tick, Venue,
+    VenueType,
 };
 
 pub fn test_btc_asset() -> Arc<Asset> {
@@ -153,9 +153,7 @@ pub fn test_instance() -> Arc<Instance> {
     let instance = Instance::builder()
         .id(Uuid::from_str("31c79d6c-8dce-44a5-a5c8-c02578671afb").expect("Invalid UUID"))
         .name("Test Instance".into())
-        .start_time(OffsetDateTime::now_utc())
         .instance_type(InstanceType::Live)
-        .status(InstanceStatus::Running)
         .build();
     Arc::new(instance)
 }
@@ -207,7 +205,7 @@ pub fn test_strategy_crossover() -> Arc<Strategy> {
 pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
     let order = ExecutionOrder::builder()
         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-        .portfolio(test_portfolio())
+        .strategy(Some(test_strategy()))
         .instrument(test_inst_binance_btc_usdt_perp())
         .order_type(ExecutionOrderType::Maker)
         .side(MarketSide::Buy)
@@ -223,7 +221,7 @@ pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
 pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
     let order = ExecutionOrder::builder()
         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-        .portfolio(test_portfolio())
+        .strategy(Some(test_strategy()))
         .instrument(test_inst_binance_btc_usdt_perp())
         .order_type(ExecutionOrderType::Maker)
         .side(MarketSide::Buy)

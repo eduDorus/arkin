@@ -156,7 +156,7 @@ impl TradeClickhouseRepo {
                   event_time BETWEEN ? AND ? 
                   AND instrument_id IN (?)
                 ORDER BY 
-                  event_time ASC"#,
+                  event_time, trade_id ASC"#,
             )
             .bind(Identifier(&self.table_name))
             .bind(from.unix_timestamp())

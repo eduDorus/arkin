@@ -66,7 +66,7 @@ impl RunnableService for DefaultOrderManager {
             tokio::select! {
                 Ok(event) = rx.recv() => {
                   match event {
-                    Event::ExecutionOrderNew(order) => {
+                    Event::ExecutionOrder(order) => {
                       info!("SimpleOrderManager received order: {}", order);
                       self.place_order(order).await.unwrap();
                     }
@@ -102,7 +102,7 @@ mod tests {
 
         let order = ExecutionOrder::builder()
             .id(VenueOrderId::new_v4())
-            .portfolio(test_portfolio())
+            .strategy(Some(test_strategy()))
             .instrument(test_inst_binance_btc_usdt_perp())
             .side(MarketSide::Buy)
             .quantity(dec!(1.0))
@@ -139,7 +139,7 @@ mod tests {
 
         let order = ExecutionOrder::builder()
             .id(VenueOrderId::new_v4())
-            .portfolio(test_portfolio())
+            .strategy(Some(test_strategy()))
             .instrument(test_inst_binance_btc_usdt_perp())
             .side(MarketSide::Buy)
             .quantity(dec!(1.0))

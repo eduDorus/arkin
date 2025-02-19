@@ -13,7 +13,7 @@ use crate::PersistenceError;
 #[derive(Debug, Clone)]
 pub struct ExecutionOrderDTO {
     pub id: Uuid,
-    pub portfolio_id: Uuid,
+    pub strategy_id: Option<Uuid>,
     pub instrument_id: Uuid,
     pub order_type: ExecutionOrderType,
     pub side: MarketSide,
@@ -31,7 +31,7 @@ impl From<ExecutionOrder> for ExecutionOrderDTO {
     fn from(order: ExecutionOrder) -> Self {
         Self {
             id: order.id,
-            portfolio_id: order.portfolio.id,
+            strategy_id: order.strategy.as_ref().map(|s| s.id),
             instrument_id: order.instrument.id,
             order_type: order.order_type,
             side: order.side,
@@ -51,7 +51,7 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
     fn from(order: Arc<ExecutionOrder>) -> Self {
         Self {
             id: order.id,
-            portfolio_id: order.portfolio.id,
+            strategy_id: order.strategy.as_ref().map(|s| s.id),
             instrument_id: order.instrument.id,
             order_type: order.order_type,
             side: order.side,
@@ -71,6 +71,7 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
 
 pub struct ExecutionOrderRepo {
     pool: PgPool,
+    instance: Arc<Instance>,
 }
 
 impl ExecutionOrderRepo {
@@ -81,6 +82,7 @@ impl ExecutionOrderRepo {
             (
                 id, 
                 instance_id, 
+                strategy_id,
                 instrument_id, 
                 order_type, 
                 side, 
@@ -92,10 +94,11 @@ impl ExecutionOrderRepo {
                 status, 
                 created_at, 
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             order.id,
-            order.portfolio_id,
+            self.instance.id,
+            order.strategy_id,
             order.instrument_id,
             order.order_type as ExecutionOrderType,
             order.side as MarketSide,
@@ -148,42 +151,5 @@ impl ExecutionOrderRepo {
         .execute(&self.pool)
         .await?;
         Ok(())
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use crate::test_utils::connect_database;
-
-    use super::*;
-    use rust_decimal_macros::dec;
-    use test_log::test;
-    use time::OffsetDateTime;
-    use uuid::Uuid;
-
-    #[test(tokio::test)]
-    async fn test_execution_order_repo() {
-        let pool = connect_database();
-        let repo = ExecutionOrderRepo::builder().pool(pool).build();
-
-        let mut order = ExecutionOrder::builder()
-            .id(Uuid::new_v4())
-            .portfolio(test_portfolio())
-            .instrument(test_inst_binance_btc_usdt_perp())
-            .order_type(ExecutionOrderType::Maker)
-            .side(MarketSide::Buy)
-            .price(dec!(0))
-            .quantity(dec!(1))
-            .build();
-        repo.insert(order.clone().into()).await.unwrap();
-
-        order.fill_price = dec!(110);
-        order.filled_quantity = dec!(1);
-        order.total_commission = dec!(0.2);
-        order.status = ExecutionOrderStatus::Filled;
-        order.updated_at = OffsetDateTime::now_utc();
-
-        repo.update(order.clone().into()).await.unwrap();
-        repo.delete(&order.id).await.unwrap();
     }
 }

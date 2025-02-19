@@ -1,7 +1,6 @@
 use arkin_core::prelude::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StrategyConfig {
@@ -18,14 +17,14 @@ pub enum StrategyAlgorithmConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CrossoverConfig {
-    pub id: Uuid,
+    pub name: String,
     pub fast_ma: FeatureId,
     pub slow_ma: FeatureId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SpreaderConfig {
-    pub id: Uuid,
+    pub name: String,
     pub front_leg: FeatureId,
     pub back_leg: FeatureId,
     pub min_spread: Decimal,

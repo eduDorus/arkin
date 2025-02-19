@@ -1,27 +1,19 @@
 CREATE TYPE market_side AS ENUM ('buy', 'sell');
 
 
-
-CREATE TYPE instance_type AS ENUM ( 'live', 'simulation');
-CREATE TYPE instance_status AS ENUM ('new', 'running', 'stopped', 'completed', 'failed');
+-- CREATE INSTANCE TABLE
+CREATE TYPE instance_type AS ENUM ( 'live', 'simulation', 'other');
 CREATE TABLE IF NOT EXISTS instances (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
-    start_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    end_time TIMESTAMP(3) WITH TIME ZONE,
-    instance_type instance_type NOT NULL,
-    status instance_status NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    instance_type instance_type NOT NULL
 );
 
 
 CREATE TABLE IF NOT EXISTS strategies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    description TEXT NOT NULL
 );
 
 CREATE TYPE venue_type AS ENUM ('cex', 'dex', 'otc');
@@ -29,8 +21,6 @@ CREATE TABLE IF NOT EXISTS venues (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
     venue_type venue_type NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 
@@ -40,16 +30,12 @@ CREATE TABLE IF NOT EXISTS assets (
     symbol TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     asset_type asset_type NOT NULL
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 CREATE TABLE IF NOT EXISTS pipelines (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
 
 
@@ -173,8 +159,8 @@ CREATE TYPE execution_order_status AS ENUM (
 );
 CREATE TABLE IF NOT EXISTS execution_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    portfolio_id uuid NOT NULL REFERENCES portfolios(id),
-    strategy_id uuid NOT NULL REFERENCES strategies(id),
+    instance_id uuid NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    strategy_id uuid REFERENCES strategies(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     order_type execution_order_type NOT NULL,
     side market_side NOT NULL,
@@ -184,8 +170,8 @@ CREATE TABLE IF NOT EXISTS execution_orders (
     filled_quantity NUMERIC NOT NULL,
     total_commission NUMERIC NOT NULL,
     status execution_order_status NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 
 
@@ -250,14 +236,13 @@ SELECT add_dimension('insights', by_hash('pipeline_id', 4));
 
 CREATE TABLE IF NOT EXISTS signals (
     id uuid DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    instance_id uuid NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
     strategy_id uuid NOT NULL REFERENCES strategies(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     weight NUMERIC NOT NULL,
-    PRIMARY KEY (instrument_id, strategy_id, event_time)
+    PRIMARY KEY (instance_id, instrument_id, strategy_id, event_time)
 );
-SELECT create_hypertable('signals', by_range('event_time', interval '1 day'));
-SELECT add_dimension('signals', by_hash('instrument_id', 4));
 
 CREATE TABLE IF NOT EXISTS allocations (
     id uuid DEFAULT gen_random_uuid (),

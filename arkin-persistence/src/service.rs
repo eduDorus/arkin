@@ -35,7 +35,7 @@ pub struct PersistenceService {
 }
 
 impl PersistenceService {
-    pub async fn new(pubsub: Arc<PubSub>, config: &PersistenceConfig, dry_run: bool) -> Arc<Self> {
+    pub async fn new(pubsub: Arc<PubSub>, config: &PersistenceConfig, instance: Instance, dry_run: bool) -> Arc<Self> {
         let db_config = config.database.clone();
         let conn_options = PgConnectOptions::new()
             .host(&db_config.host)
@@ -57,6 +57,15 @@ impl PersistenceService {
 
         // Initialize repositories
         let instance_repo = InstanceRepo::builder().pool(pool.clone()).build();
+        let instance_store = Arc::new(InstanceStore::builder().instance_repo(instance_repo.to_owned()).build());
+        let instance = if let Ok(instance) = instance_store.read_by_name(&instance.name).await {
+            instance
+        } else {
+            let instance = Arc::new(instance);
+            instance_store.insert(instance.clone()).await.unwrap();
+            instance
+        };
+
         let portfolio = PortfolioRepo::builder().pool(pool.clone()).build();
         let transactions_repo = TransactionRepo::builder().pool(pool.clone()).build();
         let venue_repo = VenueRepo::builder().pool(pool.clone()).build();
@@ -68,9 +77,12 @@ impl PersistenceService {
         let insights_repo = InsightsClickhouseRepo::new();
         insights_repo.create_table().await.unwrap();
         let strategy_repo = StrategyRepo::builder().pool(pool.clone()).build();
-        let signal_repo = SignalRepo::builder().pool(pool.clone()).build();
+        let signal_repo = SignalRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
         let allocation_repo = AllocationRepo::builder().pool(pool.clone()).build();
-        let execution_order_repo = ExecutionOrderRepo::builder().pool(pool.clone()).build();
+        let execution_order_repo = ExecutionOrderRepo::builder()
+            .pool(pool.clone())
+            .instance(instance.clone())
+            .build();
         let venue_order_repo = VenueOrderRepo::builder().pool(pool.clone()).build();
 
         let tick_repo = TickClickhouseRepo::new();
@@ -82,7 +94,7 @@ impl PersistenceService {
         // let trade_repo = TradeParquetRepo::new().await.unwrap();
 
         // Initialize stores
-        let instance_store = Arc::new(InstanceStore::builder().instance_repo(instance_repo.to_owned()).build());
+
         let portfolio_store = Arc::new(PortfolioStore::builder().portfolio_repo(portfolio.to_owned()).build());
         let transaction_store = Arc::new(
             TransactionStore::builder()
@@ -200,6 +212,16 @@ impl RunnableService for PersistenceService {
                             Event::InsightTick(tick) => {
                                 if let Err(e) = self.insights_store.insert_buffered_vec(tick.insights.clone()).await {
                                     error!("Failed to insert insight tick: {}", e);
+                                }
+                            }
+                            Event::Signal(signal) => {
+                                if let Err(e) = self.signal_store.insert(signal).await {
+                                    error!("Failed to insert signal: {}", e);
+                                }
+                            }
+                            Event::ExecutionOrder(order) => {
+                                if let Err(e) = self.execution_order_store.insert(order).await {
+                                    error!("Failed to insert execution order: {}", e);
                                 }
                             }
                             _ => {}

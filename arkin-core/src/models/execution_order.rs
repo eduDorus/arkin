@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity};
 
-use super::{Instrument, MarketSide, Portfolio};
+use super::{Instrument, MarketSide, Strategy};
 
 pub type ExecutionOrderId = Uuid;
 
@@ -40,11 +40,10 @@ pub enum ExecutionOrderStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder, Hash)]
-
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
-    pub portfolio: Arc<Portfolio>,
+    pub strategy: Option<Arc<Strategy>>,
     pub instrument: Arc<Instrument>,
     pub order_type: ExecutionOrderType,
     pub side: MarketSide,
@@ -167,13 +166,13 @@ impl ExecutionOrder {
 
 impl EventTypeOf for ExecutionOrder {
     fn event_type() -> EventType {
-        EventType::ExecutionOrderNew
+        EventType::ExecutionOrder
     }
 }
 
 impl From<Arc<ExecutionOrder>> for Event {
     fn from(order: Arc<ExecutionOrder>) -> Self {
-        Event::ExecutionOrderNew(order)
+        Event::ExecutionOrder(order)
     }
 }
 

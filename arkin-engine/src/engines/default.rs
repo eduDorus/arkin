@@ -39,7 +39,28 @@ impl DefaultEngine {
 
         // Init persistence
         let config = load::<PersistenceConfig>();
-        let persistence = PersistenceService::new(pubsub.clone(), &config, true).await;
+        let instance = match &args.command {
+            Commands::Simulation(args) => Instance::builder()
+                .name(args.instance_name.clone())
+                .instance_type(InstanceType::Simulation)
+                .build(),
+            Commands::Live(args) => Instance::builder()
+                .name(args.instance_name.clone())
+                .instance_type(InstanceType::Live)
+                .build(),
+            _ => Instance::builder()
+                .name("other".to_string())
+                .instance_type(InstanceType::Other)
+                .build(),
+        };
+        let dry_run = match &args.command {
+            Commands::Download(args) => args.dry_run,
+            Commands::Ingestor(args) => args.dry_run,
+            Commands::Insights(args) => args.dry_run,
+            Commands::Simulation(args) => args.dry_run,
+            Commands::Live(_args) => false,
+        };
+        let persistence = PersistenceService::new(pubsub.clone(), &config, instance, dry_run).await;
 
         let engine = Self {
             timer: Instant::now(),
@@ -96,7 +117,7 @@ impl DefaultEngine {
         let insights = InsightsFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.pipeline).await;
         let ingestor = IngestorFactory::init_simulation(self.pubsub.clone(), self.persistence.clone(), args).await;
         let portfolio = PortfolioFactory::init(self.pubsub.clone(), self.persistence.clone()).await;
-        let strategies = StrategyFactory::init(self.pubsub.clone());
+        let strategies = StrategyFactory::init(self.pubsub.clone(), self.persistence.clone()).await;
         let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), portfolio.clone());
         let order_manager = OrderManagerFactory::init(self.pubsub.clone());
         let execution = ExecutorFactory::init_simulation(self.pubsub.clone());
@@ -107,7 +128,6 @@ impl DefaultEngine {
             services.push(strategy);
         }
 
-        // Start services
         self.start_services(services, false).await;
         Ok(())
     }
