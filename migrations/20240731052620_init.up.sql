@@ -159,6 +159,7 @@ CREATE TYPE execution_order_status AS ENUM (
 );
 CREATE TABLE IF NOT EXISTS execution_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instance_id uuid NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
     strategy_id uuid REFERENCES strategies(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
@@ -170,7 +171,6 @@ CREATE TABLE IF NOT EXISTS execution_orders (
     filled_quantity NUMERIC NOT NULL,
     total_commission NUMERIC NOT NULL,
     status execution_order_status NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 
@@ -204,19 +204,24 @@ CREATE TYPE venue_order_status AS ENUM (
 );
 CREATE TABLE IF NOT EXISTS venue_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    portfolio_id uuid NOT NULL REFERENCES portfolios(id),
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    instance_id uuid REFERENCES instances(id) ON DELETE CASCADE,
+    strategy_id uuid REFERENCES portfolios(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     side market_side NOT NULL,
     order_type venue_order_type NOT NULL,
     time_in_force venue_order_time_in_force NOT NULL,
     price NUMERIC,
     quantity NUMERIC NOT NULL,
-    fill_price NUMERIC NOT NULL,
+    last_fill_price NUMERIC NOT NULL,
+    last_fill_quantity NUMERIC NOT NULL,
+    last_fill_commission NUMERIC NOT NULL,
+    filled_price NUMERIC NOT NULL,
     filled_quantity NUMERIC NOT NULL,
-    total_commission NUMERIC NOT NULL,
+    commission_asset_id uuid REFERENCES assets(id),
+    commission NUMERIC NOT NULL,
     status venue_order_status NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 
 

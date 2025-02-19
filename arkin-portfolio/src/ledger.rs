@@ -479,6 +479,7 @@ mod tests {
 
         let mut order = VenueOrder::builder()
             .strategy(s2.clone())
+            .event_time(OffsetDateTime::now_utc())
             .instrument(test_inst_binance_btc_usdt_perp())
             .side(MarketSide::Buy)
             .quantity(dec!(1.0))
@@ -499,6 +500,7 @@ mod tests {
 
         let mut order = VenueOrder::builder()
             .strategy(s2.clone())
+            .event_time(OffsetDateTime::now_utc())
             .instrument(test_inst_binance_btc_usdt_perp())
             .side(MarketSide::Sell)
             .quantity(dec!(1.0))

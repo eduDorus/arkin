@@ -13,6 +13,7 @@ use crate::PersistenceError;
 #[derive(Debug, Clone)]
 pub struct ExecutionOrderDTO {
     pub id: Uuid,
+    pub event_time: OffsetDateTime,
     pub strategy_id: Option<Uuid>,
     pub instrument_id: Uuid,
     pub order_type: ExecutionOrderType,
@@ -23,7 +24,6 @@ pub struct ExecutionOrderDTO {
     pub filled_quantity: Decimal,
     pub total_commission: Decimal,
     pub status: ExecutionOrderStatus,
-    pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
 
@@ -31,6 +31,7 @@ impl From<ExecutionOrder> for ExecutionOrderDTO {
     fn from(order: ExecutionOrder) -> Self {
         Self {
             id: order.id,
+            event_time: order.event_time,
             strategy_id: order.strategy.as_ref().map(|s| s.id),
             instrument_id: order.instrument.id,
             order_type: order.order_type,
@@ -41,7 +42,6 @@ impl From<ExecutionOrder> for ExecutionOrderDTO {
             filled_quantity: order.filled_quantity,
             total_commission: order.total_commission,
             status: order.status,
-            created_at: order.created_at,
             updated_at: order.updated_at,
         }
     }
@@ -51,6 +51,7 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
     fn from(order: Arc<ExecutionOrder>) -> Self {
         Self {
             id: order.id,
+            event_time: order.event_time,
             strategy_id: order.strategy.as_ref().map(|s| s.id),
             instrument_id: order.instrument.id,
             order_type: order.order_type,
@@ -61,7 +62,6 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
             filled_quantity: order.filled_quantity,
             total_commission: order.total_commission,
             status: order.status,
-            created_at: order.created_at,
             updated_at: order.updated_at,
         }
     }
@@ -81,6 +81,7 @@ impl ExecutionOrderRepo {
             INSERT INTO execution_orders
             (
                 id, 
+                event_time, 
                 instance_id, 
                 strategy_id,
                 instrument_id, 
@@ -92,11 +93,11 @@ impl ExecutionOrderRepo {
                 filled_quantity, 
                 total_commission, 
                 status, 
-                created_at, 
                 updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             order.id,
+            order.event_time,
             self.instance.id,
             order.strategy_id,
             order.instrument_id,
@@ -108,7 +109,6 @@ impl ExecutionOrderRepo {
             order.filled_quantity,
             order.total_commission,
             order.status as ExecutionOrderStatus,
-            order.created_at,
             order.updated_at,
         )
         .execute(&self.pool)

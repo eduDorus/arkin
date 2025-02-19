@@ -158,13 +158,13 @@ impl AllocationOptim for SignalAllocationOptim {
 
             let order = ExecutionOrder::builder()
                 .id(Uuid::new_v4())
+                .event_time(tick.event_time)
                 .strategy(Some(test_strategy()))
                 .instrument(instrument.clone())
-                .order_type(ExecutionOrderType::Maker)
+                .order_type(ExecutionOrderType::Taker)
                 .side(order_side)
                 .quantity(final_quantity)
                 .price(final_price)
-                .created_at(tick.event_time)
                 .updated_at(tick.event_time)
                 .build();
             execution_orders.push(order.into());

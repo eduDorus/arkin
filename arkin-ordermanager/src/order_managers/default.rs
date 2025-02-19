@@ -25,6 +25,7 @@ impl OrderManager for DefaultOrderManager {
                 info!("Placing market order: {}", order);
                 let venue_order = VenueOrder::builder()
                     .id(order.id)
+                    .event_time(order.event_time)
                     .strategy(test_strategy())
                     .instrument(order.instrument.clone())
                     .side(order.side)
@@ -38,6 +39,7 @@ impl OrderManager for DefaultOrderManager {
                 info!("Placing limit order: {}", order);
                 let venue_order = VenueOrder::builder()
                     .id(order.id)
+                    .event_time(order.event_time)
                     .strategy(test_strategy())
                     .instrument(order.instrument.clone())
                     .side(order.side)
@@ -93,6 +95,7 @@ mod tests {
     use super::*;
     use rust_decimal_macros::dec;
     use test_log::test;
+    use time::OffsetDateTime;
     use tokio::time::timeout;
 
     #[test(tokio::test)]
@@ -102,6 +105,7 @@ mod tests {
 
         let order = ExecutionOrder::builder()
             .id(VenueOrderId::new_v4())
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Some(test_strategy()))
             .instrument(test_inst_binance_btc_usdt_perp())
             .side(MarketSide::Buy)
@@ -139,6 +143,7 @@ mod tests {
 
         let order = ExecutionOrder::builder()
             .id(VenueOrderId::new_v4())
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Some(test_strategy()))
             .instrument(test_inst_binance_btc_usdt_perp())
             .side(MarketSide::Buy)

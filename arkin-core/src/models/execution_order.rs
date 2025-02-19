@@ -43,6 +43,7 @@ pub enum ExecutionOrderStatus {
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
+    pub event_time: OffsetDateTime,
     pub strategy: Option<Arc<Strategy>>,
     pub instrument: Arc<Instrument>,
     pub order_type: ExecutionOrderType,
@@ -57,8 +58,6 @@ pub struct ExecutionOrder {
     pub total_commission: Commission,
     #[builder(default = ExecutionOrderStatus::New)]
     pub status: ExecutionOrderStatus,
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub created_at: OffsetDateTime,
     #[builder(default = OffsetDateTime::now_utc())]
     pub updated_at: OffsetDateTime,
 }

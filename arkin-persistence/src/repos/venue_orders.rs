@@ -13,6 +13,7 @@ use crate::PersistenceError;
 #[derive(Debug, Clone)]
 pub struct VenueOrderDTO {
     pub id: VenueOrderId,
+    pub event_time: OffsetDateTime,
     pub strategy_id: Uuid,
     pub instrument_id: Uuid,
     pub side: MarketSide,
@@ -20,11 +21,14 @@ pub struct VenueOrderDTO {
     pub time_in_force: VenueOrderTimeInForce,
     pub price: Decimal,
     pub quantity: Decimal,
-    pub fill_price: Decimal,
+    pub last_fill_price: Decimal,
+    pub last_fill_quantity: Decimal,
+    pub last_fill_commission: Decimal,
+    pub filled_price: Decimal,
     pub filled_quantity: Decimal,
-    pub total_commission: Decimal,
+    pub commission_asset_id: Option<Uuid>,
+    pub commission: Decimal,
     pub status: VenueOrderStatus,
-    pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
 
@@ -32,6 +36,7 @@ impl From<VenueOrder> for VenueOrderDTO {
     fn from(order: VenueOrder) -> Self {
         Self {
             id: order.id,
+            event_time: order.event_time,
             strategy_id: order.strategy.id,
             instrument_id: order.instrument.id,
             side: order.side,
@@ -39,11 +44,14 @@ impl From<VenueOrder> for VenueOrderDTO {
             time_in_force: order.time_in_force,
             price: order.price,
             quantity: order.quantity,
-            fill_price: order.filled_price,
+            last_fill_price: order.last_fill_price,
+            last_fill_quantity: order.last_fill_quantity,
+            last_fill_commission: order.last_fill_commission,
+            filled_price: order.filled_price,
             filled_quantity: order.filled_quantity,
-            total_commission: order.commission,
+            commission_asset_id: order.commission_asset.as_ref().map(|asset| asset.id),
+            commission: order.commission,
             status: order.status,
-            created_at: order.created_at,
             updated_at: order.updated_at,
         }
     }
@@ -53,6 +61,7 @@ impl From<Arc<VenueOrder>> for VenueOrderDTO {
     fn from(order: Arc<VenueOrder>) -> Self {
         Self {
             id: order.id,
+            event_time: order.event_time,
             strategy_id: order.strategy.id,
             instrument_id: order.instrument.id,
             side: order.side,
@@ -60,11 +69,14 @@ impl From<Arc<VenueOrder>> for VenueOrderDTO {
             time_in_force: order.time_in_force,
             price: order.price,
             quantity: order.quantity,
-            fill_price: order.filled_price,
+            last_fill_price: order.last_fill_price,
+            last_fill_quantity: order.last_fill_quantity,
+            last_fill_commission: order.last_fill_commission,
+            filled_price: order.filled_price,
             filled_quantity: order.filled_quantity,
-            total_commission: order.commission,
+            commission_asset_id: order.commission_asset.as_ref().map(|asset| asset.id),
+            commission: order.commission,
             status: order.status,
-            created_at: order.created_at,
             updated_at: order.updated_at,
         }
     }
@@ -73,6 +85,7 @@ impl From<Arc<VenueOrder>> for VenueOrderDTO {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct VenueOrderRepo {
     pool: PgPool,
+    instance: Arc<Instance>,
 }
 
 impl VenueOrderRepo {
@@ -82,6 +95,8 @@ impl VenueOrderRepo {
             INSERT INTO venue_orders
             (
                 id, 
+                event_time,
+                instance_id,
                 strategy_id, 
                 instrument_id, 
                 side, 
@@ -89,15 +104,20 @@ impl VenueOrderRepo {
                 time_in_force, 
                 price, 
                 quantity, 
-                fill_price, 
+                last_fill_price,
+                last_fill_quantity,
+                last_fill_commission,
+                filled_price, 
                 filled_quantity, 
-                total_commission, 
+                commission_asset_id,
+                commission, 
                 status, 
-                created_at, 
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             "#,
             order.id,
+            order.event_time,
+            self.instance.id,
             order.strategy_id,
             order.instrument_id,
             order.side as MarketSide,
@@ -105,11 +125,14 @@ impl VenueOrderRepo {
             order.time_in_force as VenueOrderTimeInForce,
             order.price,
             order.quantity,
-            order.fill_price,
+            order.last_fill_price,
+            order.last_fill_quantity,
+            order.last_fill_commission,
+            order.filled_price,
             order.filled_quantity,
-            order.total_commission,
+            order.commission_asset_id,
+            order.commission,
             order.status as VenueOrderStatus,
-            order.created_at,
             order.updated_at,
         )
         .execute(&self.pool)
@@ -122,17 +145,23 @@ impl VenueOrderRepo {
             r#"
             UPDATE venue_orders
             SET
-                fill_price = $2,
-                filled_quantity = $3,
-                total_commission = $4,
-                status = $5,
-                updated_at = $6
+                last_fill_price = $2,
+                last_fill_quantity = $3,
+                last_fill_commission = $4,
+                filled_price = $5,
+                filled_quantity = $6,
+                commission = $7,
+                status = $8,
+                updated_at = $9
             WHERE id = $1
             "#,
             order.id,
-            order.fill_price,
+            order.last_fill_price,
+            order.last_fill_quantity,
+            order.last_fill_commission,
+            order.filled_price,
             order.filled_quantity,
-            order.total_commission,
+            order.commission,
             order.status as VenueOrderStatus,
             order.updated_at,
         )

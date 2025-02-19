@@ -205,6 +205,7 @@ pub fn test_strategy_crossover() -> Arc<Strategy> {
 pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
     let order = ExecutionOrder::builder()
         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
+        .event_time(OffsetDateTime::now_utc())
         .strategy(Some(test_strategy()))
         .instrument(test_inst_binance_btc_usdt_perp())
         .order_type(ExecutionOrderType::Maker)
@@ -212,7 +213,6 @@ pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
         .price(dec!(0))
         .quantity(dec!(1))
         .status(ExecutionOrderStatus::New)
-        .created_at(OffsetDateTime::now_utc())
         .updated_at(OffsetDateTime::now_utc())
         .build();
     Arc::new(order)
@@ -221,6 +221,7 @@ pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
 pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
     let order = ExecutionOrder::builder()
         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
+        .event_time(OffsetDateTime::now_utc())
         .strategy(Some(test_strategy()))
         .instrument(test_inst_binance_btc_usdt_perp())
         .order_type(ExecutionOrderType::Maker)
@@ -231,7 +232,6 @@ pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
         .filled_quantity(dec!(1))
         .total_commission(dec!(0.2))
         .status(ExecutionOrderStatus::Filled)
-        .created_at(OffsetDateTime::now_utc())
         .updated_at(OffsetDateTime::now_utc())
         .build();
     Arc::new(order)

@@ -83,7 +83,7 @@ impl PersistenceService {
             .pool(pool.clone())
             .instance(instance.clone())
             .build();
-        let venue_order_repo = VenueOrderRepo::builder().pool(pool.clone()).build();
+        let venue_order_repo = VenueOrderRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
 
         let tick_repo = TickClickhouseRepo::new();
         tick_repo.create_table().await.unwrap();
@@ -193,38 +193,18 @@ impl RunnableService for PersistenceService {
                         if self.dry_run {
                             continue;
                         }
-                        match event {
-                            Event::Tick(tick) => {
-                                if let Err(e) = self.tick_store.insert_buffered(tick).await {
-                                    error!("Failed to insert tick: {}", e);
-                                }
-                            }
-                            Event::Trade(trade) => {
-                                if let Err(e) = self.trade_store.insert_buffered(trade).await {
-                                    error!("Failed to insert trade: {}", e);
-                                }
-                            }
-                            Event::Insight(insight) => {
-                                if let Err(e) = self.insights_store.insert_buffered(insight).await {
-                                    error!("Failed to insert insight: {}", e);
-                                }
-                            }
-                            Event::InsightTick(tick) => {
-                                if let Err(e) = self.insights_store.insert_buffered_vec(tick.insights.clone()).await {
-                                    error!("Failed to insert insight tick: {}", e);
-                                }
-                            }
-                            Event::Signal(signal) => {
-                                if let Err(e) = self.signal_store.insert(signal).await {
-                                    error!("Failed to insert signal: {}", e);
-                                }
-                            }
-                            Event::ExecutionOrder(order) => {
-                                if let Err(e) = self.execution_order_store.insert(order).await {
-                                    error!("Failed to insert execution order: {}", e);
-                                }
-                            }
-                            _ => {}
+                        let res = match event {
+                            Event::Tick(tick) => self.tick_store.insert_buffered(tick).await,
+                            Event::Trade(trade) =>self.trade_store.insert_buffered(trade).await ,
+                            Event::Insight(insight) => self.insights_store.insert_buffered(insight).await ,
+                            Event::InsightTick(tick) => self.insights_store.insert_buffered_vec(tick.insights.clone()).await ,
+                            Event::Signal(signal) => self.signal_store.insert(signal).await ,
+                            Event::ExecutionOrder(order) => self.execution_order_store.insert(order).await ,
+                            Event::VenueOrderNew(order) => self.venue_order_store.insert(order).await ,
+                            _ => {Ok(())}
+                        };
+                        if let Err(e) = res {
+                            error!("Failed to insert event: {:?}", e);
                         }
                     }
                     _ = interval.tick() => {

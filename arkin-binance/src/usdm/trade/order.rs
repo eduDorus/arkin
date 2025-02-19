@@ -15,8 +15,8 @@ impl From<VenueOrderType> for OrderType {
             VenueOrderType::Market => OrderType::Market,
             VenueOrderType::Limit => OrderType::Limit,
             VenueOrderType::StopMarket => unimplemented!("Stop market is not supported"),
+            VenueOrderType::StopLimit => unimplemented!("Stop is not supported"),
             VenueOrderType::TakeProfit => unimplemented!("Take profit is not supported"),
-            VenueOrderType::Stop => unimplemented!("Stop is not supported"),
             VenueOrderType::TakeProfitMarket => unimplemented!("Take Profit not supported"),
             VenueOrderType::TrailingStopMarket => unimplemented!("Trailing Stop Market is not supported"),
         }

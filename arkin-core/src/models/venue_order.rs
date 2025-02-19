@@ -19,7 +19,7 @@ pub type VenueOrderId = Uuid;
 pub enum VenueOrderType {
     Market,
     Limit,
-    Stop,
+    StopLimit,
     StopMarket,
     TakeProfit,
     TakeProfitMarket,
@@ -56,6 +56,7 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
+    pub event_time: OffsetDateTime,
     pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
@@ -84,8 +85,6 @@ pub struct VenueOrder {
     pub commission: Commission,
     #[builder(default = VenueOrderStatus::New)]
     pub status: VenueOrderStatus,
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub created_at: OffsetDateTime,
     #[builder(default = OffsetDateTime::now_utc())]
     pub updated_at: OffsetDateTime,
 }

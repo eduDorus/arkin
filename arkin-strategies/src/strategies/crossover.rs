@@ -79,13 +79,10 @@ impl Algorithm for CrossoverStrategy {
             });
 
             let weight = match (fast_ma, slow_ma) {
-                (Some(f), Some(s)) => {
-                    info!("Crossover comparing fast_ma: {} and slow_ma: {}", f.value, s.value);
-                    match f.value > s.value {
-                        true => Decimal::ONE,
-                        false => Decimal::NEGATIVE_ONE,
-                    }
-                }
+                (Some(f), Some(s)) => match f.value > s.value {
+                    true => Decimal::ONE,
+                    false => Decimal::NEGATIVE_ONE,
+                },
                 _ => Decimal::ZERO,
             };
 
@@ -106,7 +103,7 @@ impl Algorithm for CrossoverStrategy {
             signals.push(signal);
         }
 
-        info!("Crossover sending {} signals", signals.len());
+        debug!("Crossover sending {} signals", signals.len());
         for signal in signals {
             info!("Crossover sending signal: {}", signal);
             self.pubsub.publish(Event::Signal(signal.clone())).await;

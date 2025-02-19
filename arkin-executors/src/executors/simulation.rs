@@ -45,13 +45,24 @@ impl SimulationExecutor {
 
         let mut order = order.clone();
         order.add_fill(tick.event_time, price, quantity, commission);
-        let mut lock = self.orders.write().await;
-        lock.insert(order.id.clone(), order.clone());
-        self.pubsub.publish(Event::VenueOrderUpdate(order.into())).await;
+        self.pubsub.publish(Event::VenueOrderUpdate(order.clone().into())).await;
+
+        // If the order is partially filled we need to update the hashmap else remove it
+        if order.status != VenueOrderStatus::Filled {
+            let mut orders = self.orders.write().await;
+            orders.insert(order.id.clone(), order.clone());
+        } else {
+            let mut orders = self.orders.write().await;
+            orders.remove(&order.id);
+        }
     }
 
     pub async fn tick_update(&self, tick: Arc<Tick>) {
+        // Check if orders is empty
         let lock = self.orders.read().await;
+        if lock.is_empty() {
+            return;
+        }
         let orders = lock.clone();
         drop(lock);
 
@@ -204,6 +215,7 @@ mod tests {
 
         // Build an order.
         let order = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Buy)
@@ -251,6 +263,7 @@ mod tests {
         let instrument = test_inst_binance_btc_usdt_perp();
 
         let order = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Sell)
@@ -296,6 +309,7 @@ mod tests {
 
         // Create two orders with the same instrument...
         let order1 = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument_btc))
             .side(MarketSide::Buy)
@@ -303,6 +317,7 @@ mod tests {
             .quantity(dec!(3))
             .build();
         let order2 = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument_btc))
             .side(MarketSide::Sell)
@@ -311,6 +326,7 @@ mod tests {
             .build();
         // ...and one order with a different instrument.
         let order3 = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument_eth))
             .side(MarketSide::Buy)
@@ -364,6 +380,7 @@ mod tests {
         let instrument = test_inst_binance_btc_usdt_perp();
 
         let order1 = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Buy)
@@ -371,6 +388,7 @@ mod tests {
             .quantity(dec!(1))
             .build();
         let order2 = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Sell)
@@ -421,6 +439,7 @@ mod tests {
 
         // Build a market buy order.
         let buy_order = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Buy)
@@ -432,6 +451,7 @@ mod tests {
 
         // Build a market sell order.
         let sell_order = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Sell)
@@ -502,6 +522,7 @@ mod tests {
 
         // Build a limit buy order with a limit price of 105.
         let buy_order = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Buy)
@@ -513,6 +534,7 @@ mod tests {
 
         // Build a limit sell order with a limit price of 95.
         let sell_order = VenueOrder::builder()
+            .event_time(OffsetDateTime::now_utc())
             .strategy(Arc::clone(&strategy))
             .instrument(Arc::clone(&instrument))
             .side(MarketSide::Sell)
