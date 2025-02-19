@@ -3,9 +3,7 @@ use std::{sync::Arc, time::Duration};
 use arkin_core::prelude::*;
 
 use crate::{
-    allocation::MeanVarianceFeature,
     config::FeatureConfig,
-    forecast::CatBoostFeature,
     simple::{LogReturnFeature, OHLCVFeature, SignalStrengthFeature, StdDevFeature, SumFeature, TimeFeature},
     state::InsightsState,
     ta::{
@@ -157,37 +155,38 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::CatBoost(c) => Box::new(
-                        CatBoostFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .model_location(c.model_location.clone())
-                            .model_name(c.model_name.clone())
-                            .model_version(c.model_version.clone())
-                            .input_numerical(c.input_numerical.clone())
-                            .input_categorical(c.input_categorical.clone())
-                            .output(c.output.clone())
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::MeanVariance(c) => Box::new(
-                        MeanVarianceFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input_expected_returns(c.input_expected_returns.clone())
-                            .input_returns(c.input_returns.clone())
-                            .output(c.output.clone())
-                            .periods_returns(c.periods_returns)
-                            .risk_aversion(c.risk_aversion)
-                            .risk_free_rate(c.risk_free_rate)
-                            .max_exposure_long(c.max_exposure_long)
-                            .max_exposure_short(c.max_exposure_short)
-                            .max_exposure_long_per_asset(c.max_exposure_long_per_asset)
-                            .max_exposure_short_per_asset(c.max_exposure_short_per_asset)
-                            .transaction_cost(c.transaction_cost)
-                            .persist(c.persist)
-                            .build(),
-                    ),
+                    // FeatureConfig::CatBoost(c) => Box::new(
+                    //     CatBoostFeature::builder()
+                    //         .pipeline(pipeline.clone())
+                    //         .insight_state(state.clone())
+                    //         .model_location(c.model_location.clone())
+                    //         .model_name(c.model_name.clone())
+                    //         .model_version(c.model_version.clone())
+                    //         .input_numerical(c.input_numerical.clone())
+                    //         .input_categorical(c.input_categorical.clone())
+                    //         .output(c.output.clone())
+                    //         .persist(c.persist)
+                    //         .build(),
+                    // ),
+                    // FeatureConfig::MeanVariance(c) => Box::new(
+                    //     MeanVarianceFeature::builder()
+                    //         .pipeline(pipeline.clone())
+                    //         .insight_state(state.clone())
+                    //         .input_expected_returns(c.input_expected_returns.clone())
+                    //         .input_returns(c.input_returns.clone())
+                    //         .output(c.output.clone())
+                    //         .periods_returns(c.periods_returns)
+                    //         .risk_aversion(c.risk_aversion)
+                    //         .risk_free_rate(c.risk_free_rate)
+                    //         .max_exposure_long(c.max_exposure_long)
+                    //         .max_exposure_short(c.max_exposure_short)
+                    //         .max_exposure_long_per_asset(c.max_exposure_long_per_asset)
+                    //         .max_exposure_short_per_asset(c.max_exposure_short_per_asset)
+                    //         .transaction_cost(c.transaction_cost)
+                    //         .persist(c.persist)
+                    //         .build(),
+                    // ),
+                    _ => unimplemented!(),
                 };
                 feature
             })

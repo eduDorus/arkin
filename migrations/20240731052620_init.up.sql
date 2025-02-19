@@ -2,7 +2,7 @@ CREATE TYPE market_side AS ENUM ('buy', 'sell');
 
 
 
-CREATE TYPE instance_type AS ENUM ( 'live', 'simulation', 'backtest');
+CREATE TYPE instance_type AS ENUM ( 'live', 'simulation');
 CREATE TYPE instance_status AS ENUM ('new', 'running', 'stopped', 'completed', 'failed');
 CREATE TABLE IF NOT EXISTS instances (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),

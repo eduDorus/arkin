@@ -26,9 +26,10 @@ yata = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 typed-builder = { workspace = true }
-catboost-rs = { workspace = true }
-clarabel = { workspace = true }
 statrs = { workspace = true }
+
+# catboost-rs = { workspace = true }
+# clarabel = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }

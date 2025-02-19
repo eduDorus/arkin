@@ -66,6 +66,48 @@ pub struct InstanceRepo {
 }
 
 impl InstanceRepo {
+    pub async fn create_table(&self) -> Result<(), PersistenceError> {
+        // Create the instance_type enum if it does not exist
+        sqlx::query!(
+            r#"
+            DO $$
+            BEGIN
+              IF NOT EXISTS (
+                SELECT 1
+                FROM pg_type
+                WHERE typname = 'instance_type'
+              ) THEN
+                CREATE TYPE instance_type AS ENUM ('live', 'simulation');
+              END IF;
+            END
+            $$;
+            "#
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create the instance_status enum if it does not exist
+        sqlx::query!(
+            r#"
+            DO $$
+            BEGIN
+              IF NOT EXISTS (
+                SELECT 1
+                FROM pg_type
+                WHERE typname = 'instance_status'
+              ) THEN
+                CREATE TYPE instance_status AS ENUM ('new', 'running', 'stopped', 'completed', 'failed');
+              END IF;
+            END
+            $$;
+            "#
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn insert(&self, instance: InstanceDTO) -> Result<(), PersistenceError> {
         sqlx::query!(
             r#"

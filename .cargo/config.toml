@@ -1,7 +1,8 @@
 [env]
 RUST_LOG = "info"
-RUST_BACKTRACE = "1"
+RUST_BACKTRACE = "0"
 CONFIG_DIR = "/Users/dj/repos/arkin/configs"
+RUN_MODE = "dev"
 
 [build]
 rustflags = [ "-C", "target-cpu=native" ]

@@ -43,12 +43,12 @@ futures-util = { version = "0.3", features = [ "io" ] }
 tokio-util = { version = "0.7", features = [ "rt" ] }
 
 # HTTP & Websockets
-tokio-rustls = { version = "0.26" }
+tokio-rustls = { version = "0.26", features = [ "ring" ], default-features = false }
 async-tungstenite = { version = "0.28", features = [ "tokio-runtime", "tokio-rustls-webpki-roots" ], default-features = false }
 reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "http2", "gzip", "brotli", "zstd", "deflate", "socks", "hickory-dns" ], default-features = false }
 
 # Data Types
-rust_decimal = { version = "1.36", default-features = false, features = [ "borsh", "maths", "serde" ] }
+rust_decimal = { version = "1.36", features = [ "maths", "serde", "std" ], default-features = false }
 rust_decimal_macros = "1.36"
 bytes = "1.10"
 
@@ -60,7 +60,7 @@ serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0" }
 
 # Database
-sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-rustls", "postgres", "time", "rust_decimal", "uuid", "derive" ] }
+sqlx = { version = "0.8", features = [ "runtime-tokio", "postgres", "time", "rust_decimal", "uuid", "derive", "macros" ], default-features = false }
 clickhouse = { version = "0.13", features = [ "lz4", "uuid", "time" ] }
 
 # Time
@@ -91,13 +91,16 @@ moka2 = { version = "0.13.0", features = [ "future" ] }
 yata = "0.7"
 
 # Models & Optimisation
-catboost-rs = "0.1"
-clarabel = "0"
+# catboost-rs = "0.1"
+# clarabel = "0"
 
 # Testing
 # mockall = "0.13"
 # test-case = "3.3"
 test-log = { version = "0.2", features = [ "color", "trace" ], default-features = false }
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
 
 [profile.dev]
 split-debuginfo = "unpacked"

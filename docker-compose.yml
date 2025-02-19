@@ -12,7 +12,22 @@ services:
       - ./data/timescaledb/data:/var/lib/postgresql/data
       - ./data/timescaledb/logs:/var/logs
     networks:
-      - grafana_network
+      - network
+  
+  postgres:
+    image: postgres:17
+    container_name: arkin-postgres
+    environment:
+      POSTGRES_DB: arkin
+      POSTGRES_USER: arkin_admin
+      POSTGRES_PASSWORD: test1234
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./data/postgres/data:/var/lib/postgresql/data
+      - ./data/postgres/logs:/var/logs
+    networks:
+      - network
 
   grafana:
     image: grafana/grafana-oss
@@ -22,7 +37,7 @@ services:
     volumes:
       - ./data/grafana:/var/lib/grafana
     networks:
-      - grafana_network
+      - network
 
   clickhouse:
       image: clickhouse/clickhouse-server:25.1
@@ -48,8 +63,8 @@ services:
           soft: 262144
           hard: 262144
       networks:
-        - grafana_network
+        - network
 
 networks:
-  grafana_network:
+  network:
     driver: bridge

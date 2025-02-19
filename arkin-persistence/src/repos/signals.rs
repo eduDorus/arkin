@@ -16,8 +16,8 @@ const FIELD_COUNT: usize = 5;
 #[derive(Debug, FromRow)]
 pub struct SignalDTO {
     pub event_time: OffsetDateTime,
-    pub instrument_id: Uuid,
     pub strategy_id: Uuid,
+    pub instrument_id: Uuid,
     pub weight: Decimal,
 }
 
