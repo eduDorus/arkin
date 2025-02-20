@@ -41,11 +41,6 @@ impl Ledger {
         account
     }
 
-    pub fn get_account(&self, account_id: Uuid) -> Option<Arc<Account>> {
-        let lock = self.accounts.read();
-        lock.get(&account_id).cloned()
-    }
-
     pub fn find_account(&self, account_type: &AccountType, asset: &Tradable) -> Option<Arc<Account>> {
         let accounts = self.accounts.read();
         accounts
@@ -62,7 +57,17 @@ impl Ledger {
         }
     }
 
-    pub fn get_balance(&self, account_id: Uuid) -> Result<Decimal, AccountingError> {
+    pub fn get_account(&self, account_id: Uuid) -> Option<Arc<Account>> {
+        let lock = self.accounts.read();
+        lock.get(&account_id).cloned()
+    }
+
+    pub fn get_accounts(&self) -> Vec<Arc<Account>> {
+        let lock = self.accounts.read();
+        lock.values().cloned().collect()
+    }
+
+    pub fn get_balance(&self, account_id: Uuid) -> Decimal {
         let transfers = self.transfers.read();
         let mut balance = Decimal::ZERO;
         for t in transfers.iter() {
@@ -73,7 +78,26 @@ impl Ledger {
                 balance -= t.amount;
             }
         }
-        Ok(balance)
+        balance
+    }
+
+    pub fn get_position(&self, account_id: Uuid) -> Decimal {
+        let transfers = self.transfers.read();
+        let mut position = Decimal::ZERO;
+        for t in transfers.iter() {
+            if t.credit_account.id == account_id {
+                position += t.amount * t.unit_price;
+            }
+            if t.debit_account.id == account_id {
+                position -= t.amount * t.unit_price;
+            }
+        }
+        position
+    }
+
+    pub fn get_transfers(&self) -> Vec<Arc<Transfer>> {
+        let lock = self.transfers.read();
+        lock.iter().cloned().collect()
     }
 
     pub fn transfer(
@@ -88,6 +112,7 @@ impl Ledger {
                 .credit_account(credit_account)
                 .amount(amount)
                 .transfer_type(TransferType::Deposit)
+                .unit_price(Decimal::ONE)
                 .build(),
         );
         self.apply_transfers(&[transfer])
@@ -103,6 +128,8 @@ impl Ledger {
         credit_amount: Decimal,
     ) -> Result<(), AccountingError> {
         let transfer_group_id = Uuid::new_v4();
+        let debit_unit_price = debit_amount / credit_amount;
+        let credit_unit_price = credit_amount / debit_amount;
 
         let t1 = Arc::new(
             Transfer::builder()
@@ -111,6 +138,7 @@ impl Ledger {
                 .credit_account(venue_debit_account)
                 .amount(debit_amount)
                 .transfer_type(TransferType::Exchange)
+                .unit_price(debit_unit_price)
                 .build(),
         );
         let t2 = Arc::new(
@@ -120,6 +148,7 @@ impl Ledger {
                 .credit_account(credit_account)
                 .amount(credit_amount)
                 .transfer_type(TransferType::Exchange)
+                .unit_price(credit_unit_price)
                 .build(),
         );
 
@@ -136,6 +165,7 @@ impl Ledger {
         commission_credit_account: Arc<Account>,
         margin_amount: Decimal,
         instrument_amount: Decimal,
+        instrument_unit_price: Decimal,
         commission_amount: Decimal,
     ) -> Result<(), AccountingError> {
         let transfer_group_id = Uuid::new_v4();
@@ -147,6 +177,7 @@ impl Ledger {
                 .credit_account(margin_credit_account)
                 .amount(margin_amount)
                 .transfer_type(TransferType::Margin)
+                .unit_price(Decimal::ONE)
                 .build(),
         );
         let t2 = Arc::new(
@@ -156,6 +187,7 @@ impl Ledger {
                 .credit_account(commission_credit_account)
                 .amount(commission_amount)
                 .transfer_type(TransferType::Commission)
+                .unit_price(Decimal::ONE)
                 .build(),
         );
         let t3 = Arc::new(
@@ -165,6 +197,7 @@ impl Ledger {
                 .credit_account(instrument_credit_account)
                 .amount(instrument_amount)
                 .transfer_type(TransferType::Trade)
+                .unit_price(instrument_unit_price)
                 .build(),
         );
         self.apply_transfers(&[t1, t2, t3])
@@ -189,7 +222,7 @@ impl Ledger {
 
             // Check for insufficient balance on exchange wallets
             if matches!(t.debit_account.account_type, AccountType::VenueAccount(_)) {
-                if self.get_balance(t.debit_account.id)? < t.amount {
+                if self.get_balance(t.debit_account.id) < t.amount {
                     return Err(AccountingError::InsufficientBalance(t.clone()));
                 }
             }
@@ -211,3 +244,20 @@ impl Ledger {
         Ok(())
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use test_log::test;
+
+//     #[test(tokio::test)]
+//     async fn test_sample() {
+//         let ledger = Ledger::builder().build();
+
+//         let usdt = test_usdt_asset();
+//         let bnb = test_bnb_asset();
+//         let perp_btc_usdt = test_inst_binance_btc_usdt_perp();
+
+//         let strategy = test_strategy();
+//     }
+// }

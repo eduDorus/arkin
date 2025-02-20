@@ -13,53 +13,70 @@ pub trait AccountingService: RunnableService + Accounting {}
 
 #[async_trait]
 pub trait Accounting: std::fmt::Debug + Send + Sync {
-    /// Update the current balance of a given asset
-    /// This comes from the exchange and should be reconciled with the portfolio
+    // --- Update Methods ---
+    /// Reconciles an external balance update from a venue.
     async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), AccountingError>;
 
-    /// Update the current position of a given instrument
-    /// This comes from the exchange and should be reconciled with the portfolio
+    /// Reconciles an external position update from a venue.
     async fn position_update(&self, update: Arc<PositionUpdate>) -> Result<(), AccountingError>;
 
-    /// Provides the current price of a specific assets in the portfolio
-    async fn balance(&self, asset: &Arc<Asset>) -> Option<Arc<BalanceUpdate>>;
+    /// Processes an order fill and updates the ledger.
+    async fn order_update(&self, order: Arc<VenueOrder>) -> Result<(), AccountingError>;
 
-    /// Provides the total value of a given asset minus the liabilities. It's the the total net worth in this asset.
-    async fn available_balance(&self, asset: &Arc<Asset>) -> Decimal;
+    // --- Balance Queries ---
+    /// Returns the total balance of an asset on a venue.
+    async fn balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal;
 
-    /// Provide the current open position
-    async fn get_position_by_instrument(&self, instrument: &Arc<Instrument>) -> Option<Arc<PositionUpdate>>;
+    /// Returns the available balance of an asset on a venue.
+    async fn available_balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal;
 
-    /// Provies a list of all open positions
-    async fn get_positions(&self) -> HashMap<Arc<Instrument>, Arc<PositionUpdate>>;
+    // --- Position Queries (Global) ---
+    /// Returns the current position size for an instrument (e.g., +2 for long, -2 for short).
+    async fn get_position(&self, instrument: &Arc<Instrument>) -> Decimal;
 
-    /// Provides a list of all open positions with a given quote asset
-    async fn get_positions_by_quote_asset(&self, asset: &Arc<Asset>) -> HashMap<Arc<Instrument>, Arc<PositionUpdate>>;
+    /// Returns all open positions across instruments.
+    async fn get_positions(&self) -> HashMap<Arc<Instrument>, Decimal>;
 
-    // /// Provides the total value of all assets minus the liabilities. It's the the total net worth in the portfolio.
-    // async fn total_capital(&self) -> HashMap<Arc<Asset>, Decimal>;
+    // --- Strategy-Specific Queries ---
+    /// Returns the position size for an instrument under a specific strategy.
+    async fn get_strategy_position(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal;
 
-    // /// The amount of capital available to make new investments or trades.
-    // async fn buying_power(&self, asset: &Arc<Asset>) -> Decimal;
+    /// Returns all open positions for a specific strategy.
+    async fn get_strategy_positions(&self, strategy: &Arc<Strategy>) -> HashMap<Arc<Instrument>, Decimal>;
 
-    // /// Provies the total buying power available of all assets in the portfolio
-    // async fn total_buying_power(&self) -> HashMap<Arc<Asset>, Decimal>;
+    /// Returns the realized PnL for an instrument under a specific strategy.
+    async fn strategy_realized_pnl(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal;
 
-    // /// Provides the pnl of a given asset
-    // async fn pnl_asset(&self, asset: &Arc<Asset>) -> Decimal;
+    /// Returns the unrealized PnL for an instrument under a specific strategy.
+    async fn strategy_unrealized_pnl(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal;
 
-    // /// Provides the pnl of a given instrument
-    // async fn pnl_instrument(&self, instrument: &Arc<Instrument>) -> Decimal;
+    /// Returns the total PnL (realized + unrealized) for a strategy, grouped by asset.
+    async fn strategy_total_pnl(&self, strategy: &Arc<Strategy>) -> HashMap<Arc<Asset>, Decimal>;
 
-    // /// Provides the total pnl of all assets in the portfolio
-    // async fn total_pnl(&self) -> HashMap<Arc<Asset>, Decimal>;
+    // --- Capital and Buying Power ---
+    /// Returns the total capital (net worth) across all assets.
+    async fn total_capital(&self) -> HashMap<Arc<Asset>, Decimal>;
 
-    // /// Provides the commission of a given asset
-    // async fn commission_asset(&self, asset: &Arc<Asset>) -> Decimal;
+    /// Returns the buying power for an asset across all strategies/venues.
+    async fn buying_power(&self, asset: &Arc<Asset>) -> Decimal;
 
-    // /// Provides the commission of a given instrument
-    // async fn commission_instrument(&self, instrument: &Arc<Instrument>) -> Decimal;
+    /// Returns the buying power for an asset under a specific strategy.
+    async fn strategy_buying_power(&self, strategy: &Arc<Strategy>, asset: &Arc<Asset>) -> Decimal;
 
-    // /// Provides the total commission of all assets in the portfolio
-    // async fn total_commission(&self) -> HashMap<Arc<Asset>, Decimal>;
+    // --- PnL Queries (Global) ---
+    /// Returns the realized PnL for an instrument across all strategies.
+    async fn realized_pnl(&self, instrument: &Arc<Instrument>) -> Decimal;
+
+    /// Returns the unrealized PnL for an instrument across all strategies.
+    async fn unrealized_pnl(&self, instrument: &Arc<Instrument>) -> Decimal;
+
+    /// Returns the total PnL (realized + unrealized) across all instruments, grouped by asset.
+    async fn total_pnl(&self) -> HashMap<Arc<Asset>, Decimal>;
+
+    // --- Commission Queries ---
+    /// Returns the total commission paid for an instrument across all strategies.
+    async fn commission(&self, instrument: &Arc<Instrument>) -> Decimal;
+
+    /// Returns the total commission paid across all instruments, grouped by asset.
+    async fn total_commission(&self) -> HashMap<Arc<Asset>, Decimal>;
 }

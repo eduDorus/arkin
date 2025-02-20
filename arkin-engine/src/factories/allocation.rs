@@ -13,7 +13,7 @@ impl AllocationFactory {
     pub fn init(
         pubsub: Arc<PubSub>,
         persistance: Arc<PersistenceService>,
-        portfolio: Arc<dyn Accounting>,
+        accounting: Arc<dyn Accounting>,
     ) -> Arc<dyn AllocationService> {
         let config = load::<AllocationOptimConfig>();
         let allocation: Arc<dyn AllocationService> = match &config.allocation_optim {
@@ -21,7 +21,7 @@ impl AllocationFactory {
                 SignalAllocationOptim::builder()
                     .pubsub(pubsub.clone())
                     .persistence(persistance)
-                    .portfolio(portfolio)
+                    .accounting(accounting)
                     .leverage(c.leverage)
                     .min_trade_value(c.min_trade_value)
                     .allocation_feature_id(c.allocation_feature_id.clone())

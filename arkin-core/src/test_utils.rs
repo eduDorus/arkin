@@ -172,7 +172,7 @@ pub fn test_portfolio() -> Arc<Portfolio> {
 pub fn test_strategy() -> Arc<Strategy> {
     let strategy = Strategy::builder()
         .id(Uuid::from_str("a2d0951e-9bc6-47a4-b803-e4e0bb4e98a3").expect("Invalid UUID"))
-        .name("Test Strategy".into())
+        .name("sample".into())
         .description(Some("Test Description".into()))
         .build();
     Arc::new(strategy)
