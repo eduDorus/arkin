@@ -1,5 +1,5 @@
 [package]
-name = "arkin-portfolio"
+name = "arkin-accounting"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true

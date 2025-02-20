@@ -45,7 +45,7 @@ impl SimulationExecutor {
 
         let mut order = order.clone();
         order.add_fill(tick.event_time, price, quantity, commission);
-        self.pubsub.publish(Event::VenueOrderUpdate(order.clone().into())).await;
+        self.pubsub.publish(Event::VenueOrderFillUpdate(order.clone().into())).await;
 
         // If the order is partially filled we need to update the hashmap else remove it
         if order.status != VenueOrderStatus::Filled {

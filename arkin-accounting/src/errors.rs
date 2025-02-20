@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
+use rust_decimal::Decimal;
 use thiserror::Error;
 
 use arkin_core::prelude::*;
 
 #[derive(Error, Debug)]
-pub enum PortfolioError {
+pub enum AccountingError {
     #[error("Asset not found: {0}")]
     AssetNotFound(String),
 
@@ -14,6 +15,9 @@ pub enum PortfolioError {
 
     #[error("Insufficient balance in debit account: {0}")]
     InsufficientBalance(Arc<Transfer>),
+
+    #[error("Invalid balance: {0}")]
+    InvalidBalance(Decimal),
 
     #[error("Transfer amount must be > 0: {0}")]
     InvalidTransferAmount(Arc<Transfer>),
@@ -35,4 +39,10 @@ pub enum PortfolioError {
 
     #[error("Invalid exchange: {0}")]
     InvalidExchange(String),
+
+    #[error("Invalid instrument: {0}")]
+    UnsupportedInstrumentType(InstrumentType),
+
+    #[error("Same account found for transaction: {0}")]
+    SameAccount(Arc<Transfer>),
 }

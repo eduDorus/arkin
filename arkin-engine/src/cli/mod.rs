@@ -4,6 +4,8 @@ use time::OffsetDateTime;
 use arkin_core::prelude::*;
 use arkin_ingestors::prelude::*;
 
+use crate::prelude::AccountingServiceType;
+
 /// CLI application for X
 #[derive(Parser)]
 #[clap(
@@ -133,6 +135,10 @@ pub struct SimulationArgs {
     /// End datetime in "YYYY-MM-DD HH:MM" format
     #[arg(long, short, value_parser = parse_datetime)]
     pub end: OffsetDateTime,
+
+    /// Accounting
+    #[arg(long, short, default_value = "ledger")]
+    pub accounting_type: AccountingServiceType,
 
     /// Dry run
     #[arg(long)]

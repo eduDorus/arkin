@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arkin_portfolio::{PortfolioConfig, PortfolioFactory};
+use arkin_accounting::{PortfolioConfig, PortfolioFactory};
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 

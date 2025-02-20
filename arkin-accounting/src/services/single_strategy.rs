@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 use typed_builder::TypedBuilder;
 
-use crate::{Accounting, PortfolioError, PortfolioService};
+use crate::{Accounting, AccountingError, AccountingService};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct SingleStrategyPortfolio {
@@ -27,13 +27,13 @@ impl SingleStrategyPortfolio {
 
 #[async_trait]
 impl Accounting for SingleStrategyPortfolio {
-    async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), PortfolioError> {
+    async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), AccountingError> {
         info!("Portfolio processing balance update: {}", update);
         self.balances.insert(update.asset.clone(), update);
         Ok(())
     }
 
-    async fn position_update(&self, update: Arc<PositionUpdate>) -> Result<(), PortfolioError> {
+    async fn position_update(&self, update: Arc<PositionUpdate>) -> Result<(), AccountingError> {
         info!("Portfolio processing position update: {}", update);
         self.positions.insert(update.instrument.clone(), update);
         Ok(())
@@ -115,4 +115,4 @@ impl RunnableService for SingleStrategyPortfolio {
 }
 
 #[async_trait]
-impl PortfolioService for SingleStrategyPortfolio {}
+impl AccountingService for SingleStrategyPortfolio {}

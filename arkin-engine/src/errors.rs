@@ -6,7 +6,7 @@ pub enum TradingEngineError {
     PersistenceError(#[from] arkin_persistence::PersistenceError),
 
     #[error(transparent)]
-    PortfolioError(#[from] arkin_portfolio::PortfolioError),
+    AccountingError(#[from] arkin_accounting::AccountingError),
 
     #[error(transparent)]
     IngestorError(#[from] arkin_ingestors::IngestorError),

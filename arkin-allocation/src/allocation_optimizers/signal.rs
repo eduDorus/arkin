@@ -9,9 +9,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
+use arkin_accounting::prelude::*;
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
-use arkin_portfolio::prelude::*;
 use uuid::Uuid;
 
 use crate::{AllocationOptim, AllocationOptimError, AllocationService};

@@ -11,7 +11,7 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
-use arkin_portfolio::prelude::*;
+use arkin_accounting::prelude::*;
 use uuid::Uuid;
 
 use crate::{AllocationOptim, AllocationOptimError, AllocationService};

@@ -113,6 +113,7 @@ pub enum Event {
     VenueOrderCancel(VenueOrderId),
     // From the executor
     VenueOrderUpdate(Arc<VenueOrder>),
+    VenueOrderFillUpdate(Arc<VenueOrder>),
     Finished,
 }
 

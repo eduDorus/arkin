@@ -6,20 +6,20 @@ use rust_decimal::prelude::*;
 
 use arkin_core::prelude::*;
 
-use crate::PortfolioError;
+use crate::AccountingError;
 
 #[async_trait]
-pub trait PortfolioService: RunnableService + Accounting {}
+pub trait AccountingService: RunnableService + Accounting {}
 
 #[async_trait]
 pub trait Accounting: std::fmt::Debug + Send + Sync {
     /// Update the current balance of a given asset
     /// This comes from the exchange and should be reconciled with the portfolio
-    async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), PortfolioError>;
+    async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), AccountingError>;
 
     /// Update the current position of a given instrument
     /// This comes from the exchange and should be reconciled with the portfolio
-    async fn position_update(&self, update: Arc<PositionUpdate>) -> Result<(), PortfolioError>;
+    async fn position_update(&self, update: Arc<PositionUpdate>) -> Result<(), AccountingError>;
 
     /// Provides the current price of a specific assets in the portfolio
     async fn balance(&self, asset: &Arc<Asset>) -> Option<Arc<BalanceUpdate>>;

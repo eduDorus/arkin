@@ -1,15 +1,18 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PortfolioConfig {
-    pub portfolio: PortfolioType,
+pub struct AccountingConfig {
+    pub accounting: AccountingTypeConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum PortfolioType {
-    #[serde(rename = "single_strategy")]
-    SingleStrategy(SingleStrategyPortfolioConfig),
+pub struct AccountingTypeConfig {
+    single_strategy: Option<SingleStrategyPortfolioConfig>,
+    ledger: Option<LedgerPortfolioConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SingleStrategyPortfolioConfig {}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LedgerPortfolioConfig {}

@@ -147,13 +147,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "arkin-allocation"
+name = "arkin-accounting"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "arkin-core",
+ "async-trait",
+ "dashmap",
+ "parking_lot",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "strum",
+ "test-log",
+ "thiserror 2.0.11",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "typed-builder",
+ "uuid",
+]
+
+[[package]]
+name = "arkin-allocation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-accounting",
+ "arkin-core",
  "arkin-persistence",
- "arkin-portfolio",
  "async-trait",
  "dashmap",
  "rust_decimal",
@@ -221,6 +243,7 @@ dependencies = [
 name = "arkin-engine"
 version = "0.1.0"
 dependencies = [
+ "arkin-accounting",
  "arkin-allocation",
  "arkin-binance",
  "arkin-core",
@@ -229,12 +252,12 @@ dependencies = [
  "arkin-insights",
  "arkin-ordermanager",
  "arkin-persistence",
- "arkin-portfolio",
  "arkin-strategies",
  "clap",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
+ "strum",
  "test-log",
  "thiserror 2.0.11",
  "time",
@@ -358,28 +381,6 @@ dependencies = [
  "rust_decimal_macros",
  "serde",
  "sqlx",
- "test-log",
- "thiserror 2.0.11",
- "time",
- "tokio",
- "tokio-util",
- "tracing",
- "typed-builder",
- "uuid",
-]
-
-[[package]]
-name = "arkin-portfolio"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arkin-core",
- "async-trait",
- "dashmap",
- "parking_lot",
- "rust_decimal",
- "rust_decimal_macros",
- "strum",
  "test-log",
  "thiserror 2.0.11",
  "time",

@@ -7,7 +7,7 @@ license.workspace = true
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
-arkin-portfolio = { path = "../arkin-portfolio" }
+arkin-accounting = { path = "../arkin-accounting" }
 arkin-persistence = { path = "../arkin-persistence" }
 
 tokio = { workspace = true }

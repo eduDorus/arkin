@@ -12,7 +12,7 @@ use arkin_persistence::prelude::*;
 use crate::cli::{Cli, Commands, DownloadArgs, IngestorsArgs, InsightsArgs, SimulationArgs};
 use crate::config::EngineConfig;
 use crate::factories::{
-    AllocationFactory, ExecutorFactory, IngestorFactory, InsightsFactory, OrderManagerFactory, PortfolioFactory,
+    AccountingFactory, AllocationFactory, ExecutorFactory, IngestorFactory, InsightsFactory, OrderManagerFactory,
     StrategyFactory,
 };
 use crate::TradingEngineError;
@@ -116,14 +116,15 @@ impl DefaultEngine {
         // Init services
         let insights = InsightsFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.pipeline).await;
         let ingestor = IngestorFactory::init_simulation(self.pubsub.clone(), self.persistence.clone(), args).await;
-        let portfolio = PortfolioFactory::init(self.pubsub.clone(), self.persistence.clone()).await;
+        let accounting =
+            AccountingFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.accounting_type).await;
         let strategies = StrategyFactory::init(self.pubsub.clone(), self.persistence.clone()).await;
-        let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), portfolio.clone());
+        let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), accounting.clone());
         let order_manager = OrderManagerFactory::init(self.pubsub.clone());
         let execution = ExecutorFactory::init_simulation(self.pubsub.clone());
 
         let mut services: Vec<Arc<dyn RunnableService>> =
-            vec![insights, ingestor, portfolio, allocation, order_manager, execution];
+            vec![insights, ingestor, accounting, allocation, order_manager, execution];
         for strategy in strategies {
             services.push(strategy);
         }

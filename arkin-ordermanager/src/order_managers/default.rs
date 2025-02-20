@@ -75,6 +75,9 @@ impl RunnableService for DefaultOrderManager {
                     Event::VenueOrderUpdate(order) => {
                       info!("SimpleOrderManager received order update: {}", order);
                     }
+                    Event::VenueOrderFillUpdate(order) => {
+                      info!("SimpleOrderManager received order fill update: {}", order);
+                    }
                     _ => {}
                   }
                 }

@@ -6,7 +6,7 @@ pub enum AllocationOptimError {
     PersistenceError(#[from] arkin_persistence::PersistenceError),
 
     #[error(transparent)]
-    PortfolioError(#[from] arkin_portfolio::PortfolioError),
+    AccountingError(#[from] arkin_accounting::AccountingError),
 
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
