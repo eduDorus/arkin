@@ -57,7 +57,13 @@ impl AccountingFactory {
                     .await
                     .expect("Failed to read asset from DB");
                 accounting
-                    .deposit(&personal_venue, &binance_venue, &asset.into(), dec!(100_000))
+                    .deposit(
+                        &personal_venue,
+                        &binance_venue,
+                        &asset.into(),
+                        dec!(100_000),
+                        &AccountType::VenueMargin,
+                    )
                     .expect("Failed to deposit initial funds");
 
                 Arc::new(accounting)

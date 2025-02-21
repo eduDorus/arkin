@@ -1,5 +1,5 @@
 use parking_lot::RwLock;
-use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -23,119 +23,232 @@ pub struct Ledger {
 }
 
 impl Ledger {
-    /// Adds an account to the ledger, returns its ID.
-    pub fn add_account(
-        &self,
-        venue: Arc<Venue>,
-        asset: Tradable,
-        strategy: Option<Arc<Strategy>>,
-        account_type: AccountType,
-    ) -> Result<Arc<Account>, AccountingError> {
-        // Check if account already exists
-        if let Some(account) = self.find_account(&venue, &asset, strategy.as_ref(), &account_type) {
-            return Ok(account);
+    /// Adds an account to the ledger and returns it.
+    pub fn add_account(&self, venue: Arc<Venue>, asset: Tradable, account_type: AccountType) -> Arc<Account> {
+        match self.find_account(&venue, &asset, &account_type) {
+            Some(account) => account,
+            None => {
+                let account: Arc<Account> = Account::builder()
+                    .venue(venue)
+                    .asset(asset.clone())
+                    .account_type(account_type)
+                    .build()
+                    .into();
+                self.accounts.write().insert(account.id.clone(), account.clone());
+                account
+            }
         }
-
-        // Check if we make a strategy account that we have a strategy
-        if account_type == AccountType::Strategy && strategy.is_none() {
-            return Err(AccountingError::MissingStrategy);
-        }
-
-        // Create a new account and insert it into the HashMap
-        let account = Arc::new(
-            Account::builder()
-                .venue(venue)
-                .asset(asset.clone())
-                .strategy(strategy)
-                .account_type(account_type)
-                .build(),
-        );
-        let id = account.id;
-        self.accounts.write().insert(id, account.clone());
-        // Emit event for persistence
-        // self.pubsub.publish(Event::AccountAdded(account.clone()));
-        Ok(account)
     }
 
+    /// Finds an account by venue, asset, and account type.
     pub fn find_account(
         &self,
         venue: &Arc<Venue>,
         asset: &Tradable,
-        strategy: Option<&Arc<Strategy>>,
         account_type: &AccountType,
     ) -> Option<Arc<Account>> {
         let accounts = self.accounts.read();
         accounts
             .values()
-            .find(|a| {
-                a.venue == *venue
-                    && a.asset == *asset
-                    && a.account_type == *account_type
-                    && match strategy {
-                        Some(s) => a.strategy.as_ref() == Some(s),
-                        None => a.strategy.is_none(),
-                    }
-            })
+            .find(|a| a.venue == *venue && a.asset == *asset && a.account_type == *account_type)
             .cloned()
     }
 
-    pub fn find_or_create_account(
-        &self,
-        venue: &Arc<Venue>,
-        asset: &Tradable,
-        strategy: Option<&Arc<Strategy>>,
-        account_type: &AccountType,
-    ) -> Result<Arc<Account>, AccountingError> {
-        if let Some(acct) = self.find_account(venue, asset, strategy, account_type) {
-            Ok(acct)
-        } else {
-            self.add_account(venue.clone(), asset.clone(), strategy.cloned(), account_type.clone())
+    /// Finds an account by venue, asset, and account type, or creates it if it doesn't exist.
+    pub fn find_or_create(&self, venue: &Arc<Venue>, asset: &Tradable, account_type: &AccountType) -> Arc<Account> {
+        match self.find_account(venue, asset, account_type) {
+            Some(account) => account,
+            None => self.add_account(venue.clone(), asset.clone(), account_type.clone()),
         }
     }
 
+    /// Returns an account by ID.
     pub fn account(&self, account_id: Uuid) -> Option<Arc<Account>> {
         let lock = self.accounts.read();
         lock.get(&account_id).cloned()
     }
 
+    /// Returns all accounts in the ledger.
     pub fn accounts(&self) -> Vec<Arc<Account>> {
         let lock = self.accounts.read();
         lock.values().cloned().collect()
     }
 
+    /// Returns the global balance for an account.
+    /// This is the sum of all debit and credit transfers from the account.
     pub fn balance(&self, account_id: Uuid) -> Decimal {
         let transfers = self.transfers.read();
-        let mut balance = Decimal::ZERO;
-        for t in transfers.iter() {
+        transfers.iter().fold(Decimal::ZERO, |acc, t| {
             if t.credit_account.id == account_id {
-                balance += t.amount;
+                acc + t.amount
+            } else if t.debit_account.id == account_id {
+                acc - t.amount
+            } else {
+                acc
             }
-            if t.debit_account.id == account_id {
-                balance -= t.amount;
-            }
-        }
-        balance
+        })
     }
 
-    pub fn position(&self, account_id: Uuid) -> Decimal {
+    /// Returns the net position amount for an account and strategy.
+    pub fn position_amount(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
         let transfers = self.transfers.read();
-        let mut position = Decimal::ZERO;
-        for t in transfers.iter() {
-            if t.credit_account.id == account_id {
-                position += t.amount * t.unit_price;
-            }
-            if t.debit_account.id == account_id {
-                position -= t.amount * t.unit_price;
-            }
-        }
-        position
+        transfers
+            .iter()
+            .filter(|t| t.transfer_type == TransferType::Trade && t.strategy.as_ref() == Some(strategy))
+            .fold(Decimal::ZERO, |acc, t| {
+                if t.credit_account.id == account_id {
+                    acc + t.amount
+                } else if t.debit_account.id == account_id {
+                    acc - t.amount
+                } else {
+                    acc
+                }
+            })
     }
 
+    /// Returns the net PnL for an account and strategy.
+    pub fn pnl(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
+        let transfers = self.transfers.read();
+        transfers
+            .iter()
+            .filter(|t| t.transfer_type == TransferType::PnL && t.strategy.as_ref() == Some(strategy))
+            .fold(Decimal::ZERO, |acc, t| {
+                if t.credit_account.id == account_id {
+                    acc + t.amount
+                } else if t.debit_account.id == account_id {
+                    acc - t.amount
+                } else {
+                    acc
+                }
+            })
+    }
+
+    /// Returns the total cost basis for the current position.
+    /// Returns the average entry price per unit for the current position.
+    pub fn cost_basis(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
+        let current_position = self.position_amount(account_id, strategy);
+
+        // If the position is zero, return zero
+        if current_position == Decimal::ZERO {
+            return Decimal::ZERO;
+        }
+
+        let transfers = self.transfers.read();
+        let mut total_cost = Decimal::ZERO;
+        let mut total_amount = Decimal::ZERO;
+        let mut running_position = Decimal::ZERO;
+
+        for t in transfers
+            .iter()
+            .filter(|t| t.transfer_type == TransferType::Trade && t.strategy.as_ref() == Some(strategy))
+        {
+            let amount = t.amount; // Amount is always positive
+            let is_buy = t.debit_account.id == account_id; // Buy: debit to account
+            let tx_position_change = if is_buy { amount } else { -amount }; // Buy increases, sell decreases position
+
+            // Current position before this transaction
+            let position_before = running_position;
+            running_position += tx_position_change;
+
+            if position_before.is_zero() {
+                // Starting a new position
+                total_cost = amount * t.unit_price;
+                total_amount = amount;
+            } else if position_before.is_sign_positive() {
+                if is_buy {
+                    // Adding to long position
+                    total_cost += amount * t.unit_price;
+                    total_amount += amount;
+                } else {
+                    // Selling from long position
+                    if running_position.is_sign_positive() || running_position.is_zero() {
+                        // Still long or flat
+                        let avg_cost = total_cost / total_amount;
+                        total_cost -= amount * avg_cost;
+                        total_amount -= amount;
+                    } else {
+                        // Crossing from long to short
+                        let amount_to_close = position_before; // Amount to reduce to zero
+                        let excess_sell = amount - amount_to_close; // Amount that starts short
+                        let avg_cost = total_cost / total_amount;
+                        total_cost -= amount_to_close * avg_cost;
+                        total_amount -= amount_to_close;
+                        // Reset and start short position
+                        total_cost = excess_sell * t.unit_price;
+                        total_amount = excess_sell;
+                    }
+                }
+            } else {
+                // position_before is negative (short)
+                if !is_buy {
+                    // Adding to short position (sell)
+                    total_cost += amount * t.unit_price;
+                    total_amount += amount;
+                } else {
+                    // Buying to cover short position
+                    if running_position.is_sign_negative() || running_position.is_zero() {
+                        // Still short or flat
+                        let avg_cost = total_cost / total_amount;
+                        total_cost -= amount * avg_cost;
+                        total_amount -= amount;
+                    } else {
+                        // Crossing from short to long
+                        let amount_to_close = -position_before; // Amount to cover short
+                        let excess_buy = amount - amount_to_close; // Amount that starts long
+                        let avg_cost = total_cost / total_amount;
+                        total_cost -= amount_to_close * avg_cost;
+                        total_amount -= amount_to_close;
+                        // Reset and start long position
+                        total_cost = excess_buy * t.unit_price;
+                        total_amount = excess_buy;
+                    }
+                }
+            }
+
+            // Ensure total_amount doesn't go negative due to rounding
+            if total_amount < Decimal::ZERO {
+                total_cost = Decimal::ZERO;
+                total_amount = Decimal::ZERO;
+            }
+        }
+
+        info!("Total cost: {}, Total amount: {}", total_cost, total_amount);
+
+        if !total_amount.is_zero() {
+            total_cost / total_amount
+        } else {
+            Decimal::ZERO
+        }
+    }
+
+    /// Returns the total margin posted for the current position.
+    pub fn margin_posted(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
+        let transfers = self.transfers.read();
+        transfers
+            .iter()
+            .filter(|t| {
+                t.transfer_type == TransferType::Margin && t.strategy.as_ref().map(|s| s.id) == Some(strategy.id)
+            })
+            .fold(Decimal::ZERO, |acc, t| {
+                if t.credit_account.id == account_id {
+                    acc + t.amount // Margin posted to venue
+                } else if t.debit_account.id == account_id {
+                    acc - t.amount // Margin released from venue
+                } else {
+                    acc
+                }
+            })
+    }
+
+    /// Returns all transfers in the ledger.
+    /// This can be quite expensive and should only be used for debugging or reporting.
     pub fn get_transfers(&self) -> Vec<Arc<Transfer>> {
         let lock = self.transfers.read();
         lock.iter().cloned().collect()
     }
 
+    /// Performs a single same-currency transfer **atomically**:
+    /// This is a helper function since transfers are quite common.
     pub fn transfer(
         &self,
         debit_account: &Arc<Account>,
@@ -144,6 +257,8 @@ impl Ledger {
     ) -> Result<(), AccountingError> {
         let transfer = Arc::new(
             Transfer::builder()
+                .transfer_group_id(Uuid::new_v4())
+                .strategy(None)
                 .debit_account(debit_account.clone())
                 .credit_account(credit_account.clone())
                 .amount(amount)
@@ -154,126 +269,12 @@ impl Ledger {
         self.apply_transfers(&[transfer])
     }
 
-    pub fn exchange(
-        &self,
-        debit_account: &Arc<Account>,
-        credit_account: &Arc<Account>,
-        venue_debit_account: &Arc<Account>,
-        venue_credit_account: &Arc<Account>,
-        debit_amount: Decimal,
-        credit_amount: Decimal,
-    ) -> Result<(), AccountingError> {
-        let transfer_group_id = Uuid::new_v4();
-        let debit_unit_price = debit_amount / credit_amount;
-        let credit_unit_price = credit_amount / debit_amount;
-
-        let t1 = Arc::new(
-            Transfer::builder()
-                .transfer_group_id(transfer_group_id)
-                .debit_account(debit_account.clone())
-                .credit_account(venue_debit_account.clone())
-                .amount(debit_amount)
-                .transfer_type(TransferType::Exchange)
-                .unit_price(debit_unit_price)
-                .build(),
-        );
-        let t2 = Arc::new(
-            Transfer::builder()
-                .transfer_group_id(transfer_group_id)
-                .debit_account(venue_credit_account.clone())
-                .credit_account(credit_account.clone())
-                .amount(credit_amount)
-                .transfer_type(TransferType::Exchange)
-                .unit_price(credit_unit_price)
-                .build(),
-        );
-
-        self.apply_transfers(&[t1, t2])
-    }
-
-    pub fn margin_trade(
-        &self,
-        margin_debit_account: Arc<Account>,
-        margin_credit_account: Arc<Account>,
-        instrument_debit_account: Arc<Account>,
-        instrument_credit_account: Arc<Account>,
-        commission_debit_account: Arc<Account>,
-        commission_credit_account: Arc<Account>,
-        margin_amount: Decimal,
-        instrument_amount: Decimal,
-        instrument_unit_price: Decimal,
-        commission_amount: Decimal,
-        pnl: Decimal,
-    ) -> Result<(), AccountingError> {
-        let transfer_group_id = Uuid::new_v4();
-
-        let t1 = Arc::new(
-            Transfer::builder()
-                .transfer_group_id(transfer_group_id)
-                .debit_account(margin_debit_account.clone())
-                .credit_account(margin_credit_account.clone())
-                .amount(margin_amount)
-                .transfer_type(TransferType::Margin)
-                .unit_price(Decimal::ONE)
-                .build(),
-        );
-        let t2 = Arc::new(
-            Transfer::builder()
-                .transfer_group_id(transfer_group_id)
-                .debit_account(commission_debit_account)
-                .credit_account(commission_credit_account)
-                .amount(commission_amount)
-                .transfer_type(TransferType::Commission)
-                .unit_price(Decimal::ONE)
-                .build(),
-        );
-        let t3 = Arc::new(
-            Transfer::builder()
-                .transfer_group_id(transfer_group_id)
-                .debit_account(instrument_debit_account)
-                .credit_account(instrument_credit_account)
-                .amount(instrument_amount)
-                .transfer_type(TransferType::Trade)
-                .unit_price(instrument_unit_price)
-                .build(),
-        );
-        match pnl {
-            pnl if pnl > dec!(0) => {
-                let t4 = Arc::new(
-                    Transfer::builder()
-                        .transfer_group_id(transfer_group_id)
-                        .debit_account(margin_debit_account)
-                        .credit_account(margin_credit_account)
-                        .amount(pnl)
-                        .transfer_type(TransferType::PnL)
-                        .unit_price(Decimal::ONE)
-                        .build(),
-                );
-                self.apply_transfers(&[t1, t2, t3, t4])
-            }
-            pnl if pnl < dec!(0) => {
-                let t4 = Arc::new(
-                    Transfer::builder()
-                        .transfer_group_id(transfer_group_id)
-                        .debit_account(margin_credit_account)
-                        .credit_account(margin_debit_account)
-                        .amount(pnl.abs())
-                        .transfer_type(TransferType::PnL)
-                        .unit_price(Decimal::ONE)
-                        .build(),
-                );
-                self.apply_transfers(&[t1, t2, t3, t4])
-            }
-            _ => self.apply_transfers(&[t1, t2, t3]),
-        }
-    }
-
     /// Performs one or more same-currency transfers **atomically**:
     /// - All succeed or all fail if any validation fails (e.g. insufficient balance).
     /// - For double-entry: each Transfer has a `debit_account_id` and `credit_account_id`.
     ///
     /// Returns an error if any of the transfers are invalid.
-    fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<(), AccountingError> {
+    pub fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<(), AccountingError> {
         for t in transfers {
             // Check if it is not the same account
             if t.debit_account.id == t.credit_account.id {
@@ -328,17 +329,11 @@ mod tests {
         let usdt = test_usdt_asset();
 
         // Create Personal account for USD
-        let account_l = ledger
-            .add_account(personal_venue.clone(), usdt.clone().into(), None, AccountType::VenueSpot)
-            .unwrap();
+        let account_l = ledger.add_account(personal_venue.clone(), usdt.clone().into(), AccountType::VenueSpot);
 
         // Create two Strategy accounts for USD
-        let account_a = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::ClientSpot)
-            .unwrap();
-        let account_b = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::ClientMargin)
-            .unwrap();
+        let account_a = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
+        let account_b = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientMargin);
 
         let amount = dec!(100);
         ledger.transfer(&account_l, &account_a, amount).unwrap();
@@ -369,12 +364,8 @@ mod tests {
         let binance_venue = test_binance_venue();
         let usdt = test_usdt_asset();
 
-        let account_l = ledger
-            .add_account(personal_venue.clone(), usdt.clone().into(), None, AccountType::VenueSpot)
-            .unwrap();
-        let account_a = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::ClientSpot)
-            .unwrap();
+        let account_l = ledger.add_account(personal_venue.clone(), usdt.clone().into(), AccountType::VenueSpot);
+        let account_a = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
 
         ledger.transfer(&account_l, &account_a, dec!(1000)).unwrap();
         let result = ledger.transfer(&account_a, &account_l, dec!(1001));
@@ -390,12 +381,8 @@ mod tests {
         let binance_venue = test_binance_venue();
         let usdt = test_usdt_asset();
 
-        let account_a = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::ClientSpot)
-            .unwrap();
-        let account_b = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::ClientMargin)
-            .unwrap();
+        let account_a = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
+        let account_b = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientMargin);
 
         let result_zero = ledger.transfer(&account_a, &account_b, dec!(0));
         assert!(matches!(result_zero, Err(AccountingError::InvalidTransferAmount(_))));
@@ -411,12 +398,8 @@ mod tests {
         let usdt = test_usdt_asset();
         let btc = test_btc_asset();
 
-        let account_usd = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::ClientSpot)
-            .unwrap();
-        let account_btc = ledger
-            .add_account(binance_venue.clone(), btc.clone().into(), None, AccountType::ClientSpot)
-            .unwrap();
+        let account_usd = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
+        let account_btc = ledger.add_account(binance_venue.clone(), btc.clone().into(), AccountType::ClientSpot);
 
         let result = ledger.transfer(&account_usd, &account_btc, dec!(100));
         assert!(matches!(result, Err(AccountingError::CurrencyMismatch(_))));
@@ -428,163 +411,8 @@ mod tests {
         let binance_venue = test_binance_venue();
         let usdt = test_usdt_asset();
 
-        let account_a = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::ClientSpot)
-            .unwrap();
+        let account_a = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
         let result = ledger.transfer(&account_a, &account_a, dec!(100));
         assert!(matches!(result, Err(AccountingError::SameAccount(_))));
-    }
-
-    #[test]
-    fn test_successful_margin_trade() {
-        let ledger = Ledger::builder().build();
-        let personal_venue = test_personal_venue();
-        let binance_venue = test_binance_venue();
-        let usdt = test_usdt_asset();
-        let strategy = test_strategy();
-        let btc_usdt = test_inst_binance_btc_usdt_perp();
-
-        let personal_usdt = ledger
-            .add_account(personal_venue.clone(), usdt.clone().into(), None, AccountType::VenueSpot)
-            .unwrap();
-        let client_margin_usdt = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::ClientMargin)
-            .unwrap();
-        let client_strategy = ledger
-            .add_account(
-                binance_venue.clone(),
-                btc_usdt.clone().into(),
-                Some(strategy),
-                AccountType::Strategy,
-            )
-            .unwrap();
-        let venue_spot_usdt = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::VenueSpot)
-            .unwrap();
-        let venue_margin_usdt = ledger
-            .add_account(binance_venue.clone(), usdt.clone().into(), None, AccountType::VenueMargin)
-            .unwrap();
-        let venue_btc_usdt = ledger
-            .add_account(binance_venue.clone(), btc_usdt.clone().into(), None, AccountType::VenueSpot)
-            .unwrap();
-
-        let leverage = dec!(1);
-        let starting_amount = dec!(10000);
-        let t1_instrument_amount = dec!(1);
-        let t1_instrument_unit_price = dec!(5000);
-        let t1_position_amount = t1_instrument_amount * t1_instrument_unit_price;
-        let t1_margin_amount = t1_instrument_amount * t1_instrument_unit_price / leverage;
-        let t1_commission_amount = dec!(10);
-
-        ledger.transfer(&personal_usdt, &client_margin_usdt, starting_amount).unwrap();
-        ledger
-            .margin_trade(
-                client_margin_usdt.clone(),
-                venue_margin_usdt.clone(),
-                venue_btc_usdt.clone(),
-                client_strategy.clone(),
-                client_margin_usdt.clone(),
-                venue_spot_usdt.clone(),
-                t1_margin_amount,
-                t1_instrument_amount,
-                t1_instrument_unit_price,
-                t1_commission_amount,
-                dec!(0),
-            )
-            .unwrap();
-
-        assert_eq!(
-            ledger.balance(client_margin_usdt.id),
-            starting_amount - t1_margin_amount - t1_commission_amount
-        );
-        assert_eq!(ledger.balance(venue_margin_usdt.id), t1_margin_amount);
-        assert_eq!(ledger.balance(venue_spot_usdt.id), t1_commission_amount);
-        assert_eq!(ledger.balance(venue_btc_usdt.id), -t1_instrument_amount);
-        assert_eq!(ledger.balance(client_strategy.id), t1_instrument_amount);
-        assert_eq!(ledger.position(client_strategy.id), t1_position_amount);
-
-        let instrument_amount = dec!(0.5);
-        let instrument_unit_price = dec!(4500);
-        let commission_amount = dec!(10);
-
-        let current_margin_posted = ledger.position(venue_margin_usdt.id);
-        let current_instrument_amount = ledger.balance(client_strategy.id);
-        let diff_margin = current_margin_posted * (instrument_amount / current_instrument_amount);
-
-        let current_position = ledger.position(client_strategy.id);
-        let avg_price = current_position / current_instrument_amount;
-        let diff_price = instrument_unit_price - avg_price;
-        let pnl = diff_price * instrument_amount;
-        info!("Current PnL: {}", pnl);
-
-        ledger
-            .margin_trade(
-                venue_margin_usdt.clone(),
-                client_margin_usdt.clone(),
-                client_strategy.clone(),
-                venue_btc_usdt.clone(),
-                client_margin_usdt.clone(),
-                venue_spot_usdt.clone(),
-                diff_margin.abs(),
-                instrument_amount,
-                instrument_unit_price,
-                commission_amount,
-                pnl,
-            )
-            .unwrap();
-
-        // assert_eq!(ledger.balance(venue_margin_usdt.id), diff_margin);
-        assert_eq!(ledger.balance(venue_spot_usdt.id), dec!(20));
-        assert_eq!(ledger.balance(venue_btc_usdt.id), -dec!(0.5));
-        assert_eq!(ledger.balance(client_strategy.id), dec!(0.5));
-        // assert_eq!(ledger.position(client_strategy.id), dec!(500));
-
-        let instrument_amount = dec!(0.5);
-        let instrument_unit_price = dec!(4000);
-        let commission_amount = dec!(10);
-
-        let current_margin_posted = ledger.position(venue_margin_usdt.id);
-        let current_instrument_amount = ledger.balance(client_strategy.id);
-        let diff_margin = current_margin_posted * (instrument_amount / current_instrument_amount);
-
-        let current_position = ledger.position(client_strategy.id);
-        let avg_price = current_position / current_instrument_amount;
-        let diff_price = instrument_unit_price - avg_price;
-        let pnl = diff_price * instrument_amount;
-        info!("Current PnL: {}", pnl);
-
-        ledger
-            .margin_trade(
-                venue_margin_usdt.clone(),
-                client_margin_usdt.clone(),
-                client_strategy.clone(),
-                venue_btc_usdt.clone(),
-                client_margin_usdt.clone(),
-                venue_spot_usdt.clone(),
-                diff_margin.abs(),
-                instrument_amount,
-                instrument_unit_price,
-                commission_amount,
-                pnl,
-            )
-            .unwrap();
-
-        // assert_eq!(ledger.balance(venue_margin_usdt.id), diff_margin);
-        assert_eq!(ledger.balance(venue_spot_usdt.id), dec!(30));
-        assert_eq!(ledger.balance(venue_btc_usdt.id), dec!(0));
-        assert_eq!(ledger.balance(client_strategy.id), dec!(0));
-        // assert_eq!(ledger.position(client_strategy.id), dec!(500));
-
-        for account in ledger.accounts() {
-            info!(
-                "Account: {}, Balance: {}, Position: {}",
-                account,
-                ledger.balance(account.id),
-                ledger.position(account.id)
-            );
-        }
-
-        // let transfers = ledger.get_transfers();
-        // assert_eq!(transfers.len(), 10);
     }
 }
