@@ -72,7 +72,7 @@ impl SignalAllocationOptim {
         let instrument = &signal.instrument;
 
         // Get current position
-        let current_position = self.accounting.get_position(instrument).await;
+        let current_position = self.accounting.strategy_position_notional(&signal.strategy, instrument).await;
         info!("Current position for {}: {}", instrument, current_position);
 
         // Get current price

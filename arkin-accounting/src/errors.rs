@@ -7,6 +7,9 @@ use arkin_core::prelude::*;
 
 #[derive(Error, Debug)]
 pub enum AccountingError {
+    #[error("Missing strategy information on strategy account creation")]
+    MissingStrategy,
+
     #[error("Asset not found: {0}")]
     AssetNotFound(String),
 

@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use std::{collections::HashMap, sync::Arc};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -20,59 +21,75 @@ pub struct LedgerAccounting {
 impl LedgerAccounting {
     pub fn deposit(
         &self,
-        from_venue: &Arc<Venue>,
-        to_venue: &Arc<Venue>,
+        debit_venue: &Arc<Venue>,
+        credit_venue: &Arc<Venue>,
         asset: &Tradable,
         amount: Decimal,
     ) -> Result<(), AccountingError> {
-        let from_account_type = AccountType::Venue(from_venue.clone());
-        let to_account_type = AccountType::VenueAccount(to_venue.clone());
+        let debit_account_type = AccountType::VenueSpot;
+        let credit_account_type = AccountType::ClientSpot;
 
-        let from_account = self.ledger.find_or_create_account(&from_account_type, &asset);
-        let to_account = self.ledger.find_or_create_account(&to_account_type, &asset);
+        let debit_account = self
+            .ledger
+            .find_or_create_account(debit_venue, &asset, None, &debit_account_type)?;
+        let credit_account = self
+            .ledger
+            .find_or_create_account(credit_venue, &asset, None, &credit_account_type)?;
 
-        self.ledger.transfer(from_account, to_account, amount)
+        self.ledger.transfer(&debit_account, &credit_account, amount)
     }
 
     pub fn withdraw(
         &self,
-        from_venue: &Arc<Venue>,
-        to_venue: &Arc<Venue>,
+        debit_venue: &Arc<Venue>,
+        credit_venue: &Arc<Venue>,
         asset: &Tradable,
         amount: Decimal,
     ) -> Result<(), AccountingError> {
-        let from_account_type = AccountType::VenueAccount(from_venue.clone());
-        let to_account_type = AccountType::Venue(to_venue.clone());
+        let debit_account_type = AccountType::ClientSpot;
+        let credit_account_type = AccountType::VenueSpot;
 
-        let from_account = self.ledger.find_or_create_account(&from_account_type, &asset);
-        let to_account = self.ledger.find_or_create_account(&to_account_type, &asset);
+        let debit_account = self
+            .ledger
+            .find_or_create_account(debit_venue, asset, None, &debit_account_type)?;
+        let credit_account = self
+            .ledger
+            .find_or_create_account(credit_venue, asset, None, &credit_account_type)?;
 
-        self.ledger.transfer(from_account, to_account, amount)
+        self.ledger.transfer(&debit_account, &credit_account, amount)
     }
 
     pub fn exchange(
         &self,
         venue: Arc<Venue>,
-        from_asset: Tradable,
-        to_asset: Tradable,
-        from_amount: Decimal,
-        to_amount: Decimal,
+        debit_asset: Tradable,
+        credit_asset: Tradable,
+        debit_amount: Decimal,
+        credit_amount: Decimal,
     ) -> Result<(), AccountingError> {
-        let user_account_type = AccountType::VenueAccount(venue.clone());
-        let venue_account_type = AccountType::Venue(venue.clone());
+        let user_account_type = AccountType::ClientSpot;
+        let venue_account_type = AccountType::VenueSpot;
 
-        let from_account = self.ledger.find_or_create_account(&user_account_type, &from_asset);
-        let to_account = self.ledger.find_or_create_account(&user_account_type, &to_asset);
-        let venue_from_account = self.ledger.find_or_create_account(&venue_account_type, &from_asset);
-        let venue_to_account = self.ledger.find_or_create_account(&venue_account_type, &to_asset);
+        let debit_account = self
+            .ledger
+            .find_or_create_account(&venue, &debit_asset, None, &user_account_type)?;
+        let credit_account = self
+            .ledger
+            .find_or_create_account(&venue, &credit_asset, None, &user_account_type)?;
+        let venue_debit_account =
+            self.ledger
+                .find_or_create_account(&venue, &debit_asset, None, &venue_account_type)?;
+        let venue_credit_account =
+            self.ledger
+                .find_or_create_account(&venue, &credit_asset, None, &venue_account_type)?;
 
         self.ledger.exchange(
-            from_account,
-            to_account,
-            venue_from_account,
-            venue_to_account,
-            from_amount,
-            to_amount,
+            &debit_account,
+            &credit_account,
+            &venue_debit_account,
+            &venue_credit_account,
+            debit_amount,
+            credit_amount,
         )
     }
 
@@ -92,46 +109,30 @@ impl LedgerAccounting {
         let margin_asset = Tradable::Asset(instrument.margin_asset.clone());
         let commission_asset = Tradable::Asset(commission_asset.unwrap_or_else(|| instrument.margin_asset.clone()));
 
-        // Get account types
-        let asset_account_type = AccountType::VenueAccount(venue.clone());
-        let instrument_account_type = AccountType::Strategy(strategy.clone());
-        let venue_account_type = AccountType::Venue(venue.clone());
-
         // Get accounts
-        let user_margin_account = self.ledger.find_or_create_account(&asset_account_type, &margin_asset);
-        let venue_margin_account = self.ledger.find_or_create_account(&venue_account_type, &margin_asset);
+        let user_margin_account =
+            self.ledger
+                .find_or_create_account(&venue, &margin_asset, None, &AccountType::ClientMargin)?;
+        let venue_margin_account =
+            self.ledger
+                .find_or_create_account(&venue, &margin_asset, None, &AccountType::VenueMargin)?;
 
-        let user_instrument_account = self.ledger.find_or_create_account(&instrument_account_type, &instrument_asset);
-        let venue_instrument_account = self.ledger.find_or_create_account(&venue_account_type, &instrument_asset);
+        let user_instrument_account =
+            self.ledger
+                .find_or_create_account(&venue, &instrument_asset, Some(&strategy), &AccountType::Strategy)?;
+        let venue_instrument_account =
+            self.ledger
+                .find_or_create_account(&venue, &instrument_asset, None, &AccountType::VenueSpot)?;
 
         // Commission accounts
-        let commission_debit_account = self.ledger.find_or_create_account(&asset_account_type, &commission_asset);
-        let commission_credit_account = self.ledger.find_or_create_account(&venue_account_type, &commission_asset);
+        let commission_debit_account =
+            self.ledger
+                .find_or_create_account(&venue, &commission_asset, None, &AccountType::ClientSpot)?;
+        let commission_credit_account =
+            self.ledger
+                .find_or_create_account(&venue, &commission_asset, None, &AccountType::VenueSpot)?;
 
-        // Figure out if there is already a position and which side
-        // let user_instrument_account_balance = self.ledger.get_balance(user_instrument_account.id);
-        // let position_side = match user_instrument_account_balance {
-        //     balance if balance.is_zero() => None,
-        //     balance if balance > Decimal::ZERO => Some(PositionSide::Long),
-        //     balance if balance < Decimal::ZERO => Some(PositionSide::Short),
-        //     balance => return Err(AccountingError::InvalidBalance(balance)),
-        // };
-
-        // Now here comes the tricky part. If our order fills more then the current position we have two transfers
-        // The first is we sell back to the ex
-
-        // // Figure out if we need to post margin or we get margin back
-        // let margin_amount = match (position_side, side) {
-        //     (None, MarketSide::Buy) => margin_amount,
-        //     (None, MarketSide::Sell) => margin_amount,
-        //     (Some(PositionSide::Long), MarketSide::Buy) => margin_amount,
-        //     // If we sell more then
-        //     (Some(PositionSide::Long), MarketSide::Sell) => {
-
-        //     },
-        //     (Some(PositionSide::Short), MarketSide::Buy) => margin_amount,
-        //     (Some(PositionSide::Short), MarketSide::Sell) => -margin_amount,
-        // };
+        // Todo calculate margin amount
 
         // Not we figure out who to debit and who to credit
         let (margin_debit_account, margin_credit_account) = match side {
@@ -156,6 +157,7 @@ impl LedgerAccounting {
             instrument_amount,
             instrument_unit_price,
             commission_amount,
+            dec!(0),
         )
     }
 }
@@ -222,69 +224,105 @@ impl Accounting for LedgerAccounting {
     async fn balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal {
         let mut balance = Decimal::ZERO;
 
-        // Check how much we have on our account
-        let account_type = AccountType::VenueAccount(venue.clone());
-        if let Some(account) = self.ledger.find_account(&account_type, &asset.clone().into()) {
-            balance += self.ledger.get_balance(account.id);
+        if let Some(account) = self
+            .ledger
+            .find_account(&venue, &asset.clone().into(), None, &AccountType::ClientSpot)
+        {
+            balance += self.ledger.balance(account.id);
         }
 
-        // Check how much we have locked in positions
-        let accounts = self.ledger.get_accounts();
-        for account in accounts {
-            // Check if the account is a strategy account
-            if let AccountType::Strategy(_) = account.account_type {
-                // Check if the asset is the same as the one we are looking for
-                if let Tradable::Instrument(instrument) = &account.asset {
-                    // Check if the instrument is on the same venue
-                    if instrument.venue == *venue {
-                        // Check if the asset is the same as the one we are looking for
-                        if instrument.quote_asset == *asset {
-                            // Add the balance to the total balance
-                            balance += self.ledger.get_position(account.id);
-                        }
-                    }
-                }
-            }
-        }
         info!("Balance for {} on {}: {}", asset, venue, balance);
         balance
     }
 
-    /// Returns the available balance (free to use) of an asset on a specific venue.
-    /// Currently assumes no locked funds; extend this for margin/orders if needed.
-    async fn available_balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal {
-        let account_type = AccountType::VenueAccount(venue.clone());
-        if let Some(account) = self.ledger.find_account(&account_type, &asset.clone().into()) {
-            self.ledger.get_balance(account.id)
-        } else {
-            Decimal::ZERO
+    async fn margin_balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal {
+        let mut balance = Decimal::ZERO;
+
+        if let Some(account) = self
+            .ledger
+            .find_account(&venue, &asset.clone().into(), None, &AccountType::ClientMargin)
+        {
+            balance += self.ledger.balance(account.id);
         }
+
+        if let Some(account) = self
+            .ledger
+            .find_account(&venue, &asset.clone().into(), None, &AccountType::VenueMargin)
+        {
+            balance += self.ledger.balance(account.id);
+        }
+
+        info!("Margin Balance for {} on {}: {}", asset, venue, balance);
+        balance
+    }
+
+    async fn available_margin_balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal {
+        let mut balance = Decimal::ZERO;
+
+        if let Some(account) = self
+            .ledger
+            .find_account(&venue, &asset.clone().into(), None, &AccountType::ClientMargin)
+        {
+            balance += self.ledger.balance(account.id);
+        }
+
+        info!("Available Margin Balance for {} on {}: {}", asset, venue, balance);
+        balance
     }
 
     // --- Position Queries (Global) ---
 
     /// Returns the total position size for an instrument across all strategies.
-    async fn get_position(&self, instrument: &Arc<Instrument>) -> Decimal {
-        let accounts = self.ledger.get_accounts();
+    async fn position(&self, instrument: &Arc<Instrument>) -> Decimal {
+        let accounts = self.ledger.accounts();
         let mut total_position = Decimal::ZERO;
         for account in accounts {
-            if let AccountType::Strategy(_) = account.account_type {
-                if account.asset == Tradable::Instrument(instrument.clone()) {
-                    total_position += self.ledger.get_balance(account.id);
-                }
+            if AccountType::Strategy == account.account_type
+                && account.asset == Tradable::Instrument(instrument.clone())
+            {
+                total_position += self.ledger.balance(account.id);
+            }
+        }
+        total_position
+    }
+
+    /// Returns the total position notional value for an instrument
+    async fn position_notional(&self, instrument: &Arc<Instrument>) -> Decimal {
+        let accounts = self.ledger.accounts();
+        let mut total_position = Decimal::ZERO;
+        for account in accounts {
+            if AccountType::Strategy == account.account_type
+                && account.asset == Tradable::Instrument(instrument.clone())
+            {
+                total_position += self.ledger.position(account.id);
             }
         }
         total_position
     }
 
     /// Returns all open positions across all instruments globally.
-    async fn get_positions(&self) -> HashMap<Arc<Instrument>, Decimal> {
-        let accounts = self.ledger.get_accounts();
+    async fn positions(&self) -> HashMap<Arc<Instrument>, Decimal> {
+        let accounts = self.ledger.accounts();
         let mut positions = HashMap::new();
         for account in accounts {
-            if let AccountType::Strategy(_) = account.account_type {
+            if account.account_type == AccountType::Strategy {
                 if let Tradable::Instrument(instrument) = &account.asset {
-                    let balance = self.ledger.get_balance(account.id);
+                    let balance = self.ledger.balance(account.id);
+                    let entry = positions.entry(instrument.clone()).or_insert(Decimal::ZERO);
+                    *entry += balance;
+                }
+            }
+        }
+        positions
+    }
+
+    async fn positions_notional(&self) -> HashMap<Arc<Instrument>, Decimal> {
+        let accounts = self.ledger.accounts();
+        let mut positions = HashMap::new();
+        for account in accounts {
+            if account.account_type == AccountType::Strategy {
+                if let Tradable::Instrument(instrument) = &account.asset {
+                    let balance = self.ledger.position(account.id);
                     let entry = positions.entry(instrument.clone()).or_insert(Decimal::ZERO);
                     *entry += balance;
                 }
@@ -296,27 +334,58 @@ impl Accounting for LedgerAccounting {
     // --- Strategy-Specific Queries ---
 
     /// Returns the position size for an instrument under a specific strategy.
-    async fn get_strategy_position(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal {
-        let account_type = AccountType::Strategy(strategy.clone());
-        if let Some(account) = self
-            .ledger
-            .find_account(&account_type, &Tradable::Instrument(instrument.clone()))
-        {
-            self.ledger.get_balance(account.id)
+    async fn strategy_position(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal {
+        if let Some(account) = self.ledger.find_account(
+            &instrument.venue,
+            &instrument.clone().into(),
+            Some(strategy),
+            &AccountType::Strategy,
+        ) {
+            self.ledger.balance(account.id)
         } else {
             Decimal::ZERO
         }
     }
 
-    /// Returns all open positions for a specific strategy.
-    async fn get_strategy_positions(&self, strategy: &Arc<Strategy>) -> HashMap<Arc<Instrument>, Decimal> {
-        let accounts = self.ledger.get_accounts();
+    async fn strategy_position_notional(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal {
+        if let Some(account) = self.ledger.find_account(
+            &instrument.venue,
+            &instrument.clone().into(),
+            Some(strategy),
+            &AccountType::Strategy,
+        ) {
+            self.ledger.position(account.id)
+        } else {
+            Decimal::ZERO
+        }
+    }
+
+    async fn strategy_positions(&self, strategy: &Arc<Strategy>) -> HashMap<Arc<Instrument>, Decimal> {
+        let strategy = Some(strategy.clone());
+        let accounts = self.ledger.accounts();
         let mut positions = HashMap::new();
         for account in accounts {
-            if account.account_type == AccountType::Strategy(strategy.clone()) {
+            if account.account_type == AccountType::Strategy && account.strategy == strategy {
                 if let Tradable::Instrument(instrument) = &account.asset {
-                    let balance = self.ledger.get_balance(account.id);
-                    positions.insert(instrument.clone(), balance);
+                    let balance = self.ledger.balance(account.id);
+                    let entry = positions.entry(instrument.clone()).or_insert(Decimal::ZERO);
+                    *entry += balance;
+                }
+            }
+        }
+        positions
+    }
+
+    async fn strategy_positions_notional(&self, strategy: &Arc<Strategy>) -> HashMap<Arc<Instrument>, Decimal> {
+        let strategy = Some(strategy.clone());
+        let accounts = self.ledger.accounts();
+        let mut positions = HashMap::new();
+        for account in accounts {
+            if account.account_type == AccountType::Strategy && account.strategy == strategy {
+                if let Tradable::Instrument(instrument) = &account.asset {
+                    let balance = self.ledger.position(account.id);
+                    let entry = positions.entry(instrument.clone()).or_insert(Decimal::ZERO);
+                    *entry += balance;
                 }
             }
         }
@@ -339,98 +408,6 @@ impl Accounting for LedgerAccounting {
     async fn strategy_total_pnl(&self, _strategy: &Arc<Strategy>) -> HashMap<Arc<Asset>, Decimal> {
         // Placeholder: Sum realized and unrealized PnL per asset
         HashMap::new()
-    }
-
-    // --- Capital and Buying Power ---
-
-    /// Returns the total capital (net worth) across all assets.
-    async fn total_capital(&self) -> HashMap<Arc<Asset>, Decimal> {
-        let accounts = self.ledger.get_accounts();
-        let mut capital = HashMap::new();
-        for account in accounts {
-            if let AccountType::VenueAccount(_) = account.account_type {
-                if let Tradable::Asset(asset) = &account.asset {
-                    let balance = self.ledger.get_balance(account.id);
-                    let entry = capital.entry(asset.clone()).or_insert(Decimal::ZERO);
-                    *entry += balance;
-                }
-            }
-        }
-        capital
-    }
-
-    /// Returns the buying power for an asset across all venues.
-    /// Placeholder: Assumes buying power equals available balance; extend for leverage/margin.
-    async fn buying_power(&self, asset: &Arc<Asset>) -> Decimal {
-        let accounts = self.ledger.get_accounts();
-        let mut total = Decimal::ZERO;
-        for account in accounts {
-            if let AccountType::VenueAccount(_) = account.account_type {
-                if account.asset == Tradable::Asset(asset.clone()) {
-                    total += self.ledger.get_balance(account.id);
-                }
-            }
-        }
-        total
-    }
-
-    /// Placeholder: Returns the buying power for an asset under a specific strategy.
-    async fn strategy_buying_power(&self, _strategy: &Arc<Strategy>, _asset: &Arc<Asset>) -> Decimal {
-        // Placeholder: Define based on margin model (e.g., available margin)
-        Decimal::ZERO
-    }
-
-    // --- PnL Queries (Global) ---
-
-    /// Placeholder: Returns the realized PnL for an instrument globally.
-    async fn realized_pnl(&self, _instrument: &Arc<Instrument>) -> Decimal {
-        // Placeholder: Requires tracking realized gains/losses
-        Decimal::ZERO
-    }
-
-    /// Placeholder: Returns the unrealized PnL for an instrument globally.
-    async fn unrealized_pnl(&self, _instrument: &Arc<Instrument>) -> Decimal {
-        // Placeholder: Requires current market price
-        Decimal::ZERO
-    }
-
-    /// Placeholder: Returns the total PnL (realized + unrealized) globally by asset.
-    async fn total_pnl(&self) -> HashMap<Arc<Asset>, Decimal> {
-        // Placeholder: Sum realized and unrealized PnL
-        HashMap::new()
-    }
-
-    // --- Commission Queries ---
-
-    /// Returns the total commission paid for a specific instrument.
-    async fn commission(&self, instrument: &Arc<Instrument>) -> Decimal {
-        let transfers = self.ledger.get_transfers();
-        let mut total_commission = Decimal::ZERO;
-        for t in transfers.iter() {
-            if t.transfer_type == TransferType::Commission {
-                if let AccountType::Strategy(_) = t.debit_account.account_type {
-                    if t.debit_account.asset == Tradable::Instrument(instrument.clone()) {
-                        total_commission += t.amount;
-                    }
-                }
-            }
-        }
-        total_commission
-    }
-
-    /// Returns the total commission paid across all instruments, grouped by asset.
-    async fn total_commission(&self) -> HashMap<Arc<Asset>, Decimal> {
-        let transfers = self.ledger.get_transfers();
-        let mut commissions = HashMap::new();
-        for t in transfers.iter() {
-            if t.transfer_type == TransferType::Commission {
-                if let Tradable::Asset(asset) = &t.credit_account.asset {
-                    let entry = commissions.entry(asset.clone()).or_insert(Decimal::ZERO);
-                    *entry += t.amount;
-                }
-            }
-        }
-        commissions
     }
 }
 
@@ -460,14 +437,11 @@ impl RunnableService for LedgerAccounting {
                         info!(" - {}", t);
                     }
 
-                    let accounts = self.ledger.get_accounts();
+                    let accounts = self.ledger.accounts();
                     for account in accounts {
-                        info!("BALANCE {}: {}", account, self.ledger.get_balance(account.id));
-                        info!("POSITION {}: {}", account, self.ledger.get_position(account.id));
+                        info!("BALANCE {}: {}", account, self.ledger.balance(account.id));
+                        info!("POSITION {}: {}", account, self.ledger.position(account.id));
                     }
-
-                    info!("Final Balance: {}", self.get_position(&test_inst_binance_btc_usdt_perp()).await);
-
 
                     break;
                 }
