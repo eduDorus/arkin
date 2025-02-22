@@ -47,7 +47,7 @@ impl SignalAllocationOptim {
         // Get available capital for allocation
         let venue = &signal.instrument.venue;
         let margin_asset = &signal.instrument.margin_asset;
-        let capital = self.accounting.asset_balance(venue, &margin_asset).await;
+        let capital = self.accounting.asset_margin_balance(venue, margin_asset).await;
         info!("Available capital for {}: {}", signal.instrument, capital);
         if capital.is_zero() {
             warn!("No capital available for allocation");

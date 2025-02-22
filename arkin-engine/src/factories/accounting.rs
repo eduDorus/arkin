@@ -62,7 +62,7 @@ impl AccountingFactory {
                         &binance_venue,
                         &asset.into(),
                         dec!(100_000),
-                        &AccountType::VenueMargin,
+                        &AccountType::ClientMargin,
                     )
                     .expect("Failed to deposit initial funds");
 

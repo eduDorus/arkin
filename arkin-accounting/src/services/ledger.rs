@@ -4,7 +4,7 @@ use rust_decimal_macros::dec;
 use std::{collections::HashMap, sync::Arc};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::{debug, error};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -100,12 +100,12 @@ impl LedgerAccounting {
         margin_rate: Decimal,
         commission_rate: Decimal,
     ) -> Result<(), AccountingError> {
-        info!("Starting Margin Trade...");
-        info!("Side: {}", side);
-        info!("Price: {}", price);
-        info!("Amount: {}", amount);
-        info!("Margin Rate: {}", margin_rate);
-        info!("Commission Rate: {}", commission_rate);
+        debug!("Starting Margin Trade...");
+        debug!("Side: {}", side);
+        debug!("Price: {}", price);
+        debug!("Amount: {}", amount);
+        debug!("Margin Rate: {}", margin_rate);
+        debug!("Commission Rate: {}", commission_rate);
         let venue = instrument.venue.clone();
         let inst_asset = Tradable::Instrument(instrument.clone());
         let margin_asset = Tradable::Asset(instrument.margin_asset.clone());
@@ -119,39 +119,39 @@ impl LedgerAccounting {
         let venue_spot = self.ledger.find_or_create(&venue, &commission_asset, &AccountType::VenueSpot);
 
         let (cost_basis, current_position) = self.ledger.current_position(&strategy, Some(&instrument));
-        info!("Cost Basis: {}, Current Position {}", cost_basis, current_position);
+        debug!("Cost Basis: {}, Current Position {}", cost_basis, current_position);
         let new_position = match side {
             MarketSide::Buy => current_position + amount,
             MarketSide::Sell => current_position - amount,
         };
-        info!("New Position after {} will be: {}", side, new_position);
+        debug!("New Position after {} will be: {}", side, new_position);
 
         // Calculate amount closed and PnL
         let amount_closed = if (current_position > Decimal::ZERO && new_position <= Decimal::ZERO)
             || (current_position < Decimal::ZERO && new_position >= Decimal::ZERO)
         {
-            info!("Position will fully close: {} -> {}", current_position, new_position);
+            debug!("Position will fully close: {} -> {}", current_position, new_position);
             current_position.abs() // Full close before flip
         } else {
-            info!("Position will not close fully: {} -> {}", current_position, new_position);
+            debug!("Position will not close fully: {} -> {}", current_position, new_position);
             amount.min(current_position.abs()) // Partial close
         };
-        info!("Amount closed: {}", amount_closed);
+        debug!("Amount closed: {}", amount_closed);
 
         let entry_price = if !current_position.is_zero() {
             cost_basis / current_position.abs()
         } else {
             Decimal::ZERO
         };
-        info!("Entry price from ledger: {}", entry_price);
+        debug!("Entry price from ledger: {}", entry_price);
         let pnl = if current_position > Decimal::ZERO {
-            info!("Calculating PnL for long position");
+            debug!("Calculating PnL for long position");
             (price - entry_price) * amount_closed
         } else if current_position < Decimal::ZERO {
-            info!("Calculating PnL for short position");
+            debug!("Calculating PnL for short position");
             (entry_price - price) * amount_closed
         } else {
-            info!("No PnL for flat position");
+            debug!("No PnL for flat position");
             dec!(0)
         };
 
@@ -171,11 +171,11 @@ impl LedgerAccounting {
             let closing_margin = current_margin * (amount_closed / current_position.abs());
             posting - closing_margin
         };
-        info!("Margin delta: {}", margin_delta);
+        debug!("Margin delta: {}", margin_delta);
 
         //  Calculate commission
         let commission = amount * price * commission_rate;
-        info!("Commission: {}", commission);
+        debug!("Commission: {}", commission);
 
         // Step 7: Create transfers
         let transfer_group_id = Uuid::new_v4();
@@ -285,8 +285,8 @@ impl LedgerAccounting {
         }
 
         for t in &transfers {
-            info!("Transfers:");
-            info!(" - {}", t);
+            debug!("Transfers:");
+            debug!(" - {}", t);
         }
 
         // Apply transfers atomically
@@ -317,14 +317,13 @@ impl Accounting for LedgerAccounting {
     async fn order_update(&self, order: Arc<VenueOrder>) -> Result<(), AccountingError> {
         match order.instrument.instrument_type {
             InstrumentType::Spot => {
-                info!("Portfolio processing spot order: {}", order);
+                debug!("Portfolio processing spot order: {}", order);
                 // Placeholder: Implement spot order logic (e.g., transfer assets)
                 // For a buy: debit quote asset, credit base asset
                 // For a sell: debit base asset, credit quote asset
             }
             InstrumentType::Perpetual => {
-                info!("Portfolio processing perpetual order: {}", order);
-                let margin_amount = order.last_fill_price * order.last_fill_quantity;
+                debug!("Portfolio processing perpetual order: {}", order);
                 self.margin_trade(
                     order.side,
                     order.strategy.clone(),
@@ -332,12 +331,12 @@ impl Accounting for LedgerAccounting {
                     order.commission_asset.clone(),
                     order.last_fill_quantity,
                     order.last_fill_price,
-                    margin_amount,
-                    order.last_fill_commission,
+                    dec!(0.05),
+                    dec!(0.0002),
                 )?;
             }
             InstrumentType::Future => {
-                info!("Portfolio processing future order: {}", order);
+                debug!("Portfolio processing future order: {}", order);
                 // Placeholder: Handle future order (similar to perpetual but with expiry)
             }
             _ => {
@@ -546,15 +545,15 @@ impl RunnableService for LedgerAccounting {
                     }
                 }
                 _ = shutdown.cancelled() => {
-                    info!("Accounting shutting down...");
+                    debug!("Accounting shutting down...");
                     let transfers = self.ledger.get_transfers();
                     for t in transfers {
-                        info!(" - {}", t);
+                        debug!(" - {}", t);
                     }
 
                     let accounts = self.ledger.accounts();
                     for account in accounts {
-                        info!("BALANCE {}: {}", account, self.ledger.balance(account.id));
+                        debug!("BALANCE {}: {}", account, self.ledger.balance(account.id));
                     }
 
                     break;
