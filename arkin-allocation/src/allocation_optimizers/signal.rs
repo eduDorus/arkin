@@ -72,10 +72,7 @@ impl SignalAllocationOptim {
         let instrument = &signal.instrument;
 
         // Get current position
-        let current_position = self
-            .accounting
-            .strategy_instrument_position_value(&signal.strategy, instrument)
-            .await;
+        let current_position = self.accounting.strategy_instrument_position(&signal.strategy, instrument).await;
         info!("Current position for {}: {}", instrument, current_position);
 
         // Get current price
@@ -128,7 +125,7 @@ impl SignalAllocationOptim {
         let order = ExecutionOrder::builder()
             .id(Uuid::new_v4())
             .event_time(tick.event_time)
-            .strategy(Some(test_strategy()))
+            .strategy(Some(signal.strategy.clone()))
             .instrument(instrument.clone())
             .order_type(ExecutionOrderType::Taker)
             .side(side)

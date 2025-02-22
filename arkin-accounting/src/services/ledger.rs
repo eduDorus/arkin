@@ -4,7 +4,7 @@ use rust_decimal_macros::dec;
 use std::{collections::HashMap, sync::Arc};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -100,12 +100,12 @@ impl LedgerAccounting {
         margin_rate: Decimal,
         commission_rate: Decimal,
     ) -> Result<(), AccountingError> {
-        debug!("Starting Margin Trade...");
-        debug!("Side: {}", side);
-        debug!("Price: {}", price);
-        debug!("Amount: {}", amount);
-        debug!("Margin Rate: {}", margin_rate);
-        debug!("Commission Rate: {}", commission_rate);
+        info!("Starting Margin Trade...");
+        info!("Side: {}", side);
+        info!("Price: {}", price);
+        info!("Amount: {}", amount);
+        info!("Margin Rate: {}", margin_rate);
+        info!("Commission Rate: {}", commission_rate);
         let venue = instrument.venue.clone();
         let inst_asset = Tradable::Instrument(instrument.clone());
         let margin_asset = Tradable::Asset(instrument.margin_asset.clone());
@@ -119,39 +119,39 @@ impl LedgerAccounting {
         let venue_spot = self.ledger.find_or_create(&venue, &commission_asset, &AccountType::VenueSpot);
 
         let (cost_basis, current_position) = self.ledger.current_position(&strategy, Some(&instrument));
-        debug!("Cost Basis: {}, Current Position {}", cost_basis, current_position);
+        info!("Cost Basis: {}, Current Position {}", cost_basis, current_position);
         let new_position = match side {
             MarketSide::Buy => current_position + amount,
             MarketSide::Sell => current_position - amount,
         };
-        debug!("New Position after {} will be: {}", side, new_position);
+        info!("New Position after {} will be: {}", side, new_position);
 
         // Calculate amount closed and PnL
         let amount_closed = if (current_position > Decimal::ZERO && new_position <= Decimal::ZERO)
             || (current_position < Decimal::ZERO && new_position >= Decimal::ZERO)
         {
-            debug!("Position will fully close: {} -> {}", current_position, new_position);
+            info!("Position will fully close: {} -> {}", current_position, new_position);
             current_position.abs() // Full close before flip
         } else {
-            debug!("Position will not close fully: {} -> {}", current_position, new_position);
+            info!("Position will not close fully: {} -> {}", current_position, new_position);
             amount.min(current_position.abs()) // Partial close
         };
-        debug!("Amount closed: {}", amount_closed);
+        info!("Amount closed: {}", amount_closed);
 
         let entry_price = if !current_position.is_zero() {
             cost_basis / current_position.abs()
         } else {
             Decimal::ZERO
         };
-        debug!("Entry price from ledger: {}", entry_price);
+        info!("Entry price from ledger: {}", entry_price);
         let pnl = if current_position > Decimal::ZERO {
-            debug!("Calculating PnL for long position");
+            info!("Calculating PnL for long position");
             (price - entry_price) * amount_closed
         } else if current_position < Decimal::ZERO {
-            debug!("Calculating PnL for short position");
+            info!("Calculating PnL for short position");
             (entry_price - price) * amount_closed
         } else {
-            debug!("No PnL for flat position");
+            info!("No PnL for flat position");
             dec!(0)
         };
 
@@ -171,11 +171,11 @@ impl LedgerAccounting {
             let closing_margin = current_margin * (amount_closed / current_position.abs());
             posting - closing_margin
         };
-        debug!("Margin delta: {}", margin_delta);
+        info!("Margin delta: {}", margin_delta);
 
         //  Calculate commission
         let commission = amount * price * commission_rate;
-        debug!("Commission: {}", commission);
+        info!("Commission: {}", commission);
 
         // Step 7: Create transfers
         let transfer_group_id = Uuid::new_v4();
@@ -285,8 +285,8 @@ impl LedgerAccounting {
         }
 
         for t in &transfers {
-            debug!("Transfers:");
-            debug!(" - {}", t);
+            info!("Transfers:");
+            info!(" - {}", t);
         }
 
         // Apply transfers atomically
