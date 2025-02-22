@@ -47,7 +47,7 @@ impl SignalAllocationOptim {
         // Get available capital for allocation
         let venue = &signal.instrument.venue;
         let margin_asset = &signal.instrument.margin_asset;
-        let capital = self.accounting.balance(venue, &margin_asset).await;
+        let capital = self.accounting.asset_balance(venue, &margin_asset).await;
         info!("Available capital for {}: {}", signal.instrument, capital);
         if capital.is_zero() {
             warn!("No capital available for allocation");
@@ -72,7 +72,10 @@ impl SignalAllocationOptim {
         let instrument = &signal.instrument;
 
         // Get current position
-        let current_position = self.accounting.strategy_position_notional(&signal.strategy, instrument).await;
+        let current_position = self
+            .accounting
+            .strategy_instrument_position_value(&signal.strategy, instrument)
+            .await;
         info!("Current position for {}: {}", instrument, current_position);
 
         // Get current price

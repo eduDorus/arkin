@@ -1,6 +1,5 @@
 use parking_lot::RwLock;
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
@@ -89,8 +88,22 @@ impl Ledger {
         })
     }
 
+    /// Returns the global value of all positions for an account.
+    pub fn value(&self, account_id: Uuid) -> Decimal {
+        let transfers = self.transfers.read();
+        transfers.iter().fold(Decimal::ZERO, |acc, t| {
+            if t.credit_account.id == account_id {
+                acc + t.amount * t.unit_price
+            } else if t.debit_account.id == account_id {
+                acc - t.amount * t.unit_price
+            } else {
+                acc
+            }
+        })
+    }
+
     /// Returns the net position amount for an account and strategy.
-    pub fn position_amount(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
+    pub fn strategy_balance(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
         let transfers = self.transfers.read();
         transfers
             .iter()
@@ -100,6 +113,26 @@ impl Ledger {
                     acc + t.amount
                 } else if t.debit_account.id == account_id {
                     acc - t.amount
+                } else {
+                    acc
+                }
+            })
+    }
+
+    /// Returns the net position size for an account and strategy.
+    pub fn strategy_value(&self, _account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
+        let transfers = self.transfers.read();
+        transfers
+            .iter()
+            .filter(|t| {
+                t.strategy.as_ref() == Some(strategy)
+                    && (t.has_type(&TransferType::Trade) || t.has_type(&TransferType::PnL))
+            })
+            .fold(Decimal::ZERO, |acc, t| {
+                if t.credit_account.is_client_account() {
+                    acc + t.amount * t.unit_price
+                } else if t.debit_account.is_client_account() {
+                    acc - t.amount * t.unit_price
                 } else {
                     acc
                 }
@@ -107,43 +140,40 @@ impl Ledger {
     }
 
     /// Returns the net PnL for an account and strategy.
-    pub fn pnl(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
-        let transfers = self.transfers.read();
-        transfers
-            .iter()
-            .filter(|t| t.transfer_type == TransferType::PnL && t.strategy.as_ref() == Some(strategy))
-            .fold(Decimal::ZERO, |acc, t| {
-                if t.credit_account.id == account_id {
-                    acc + t.amount
-                } else if t.debit_account.id == account_id {
-                    acc - t.amount
-                } else {
-                    acc
+    pub fn strategy_pnl(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+        let filter = |t: &&Arc<Transfer>| {
+            t.has_type(&TransferType::PnL)
+                && t.has_strategy(strategy)
+                && match instrument {
+                    Some(i) => t.has_instrument(i),
+                    None => true,
                 }
-            })
+        };
+
+        let transfers = self.transfers.read();
+        transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
+            if t.credit_account.is_client_account() {
+                acc + t.amount
+            } else if t.debit_account.is_client_account() {
+                acc - t.amount
+            } else {
+                acc
+            }
+        })
     }
 
     /// Returns the total cost basis for the current position.
-    /// Returns the average entry price per unit for the current position.
-    pub fn cost_basis(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
-        let current_position = self.position_amount(account_id, strategy);
-
-        // If the position is zero, return zero
-        if current_position == Decimal::ZERO {
-            return Decimal::ZERO;
-        }
-
+    pub fn strategy_cost_basis(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal {
         let transfers = self.transfers.read();
         let mut total_cost = Decimal::ZERO;
         let mut total_amount = Decimal::ZERO;
         let mut running_position = Decimal::ZERO;
 
-        for t in transfers
-            .iter()
-            .filter(|t| t.transfer_type == TransferType::Trade && t.strategy.as_ref() == Some(strategy))
-        {
+        for t in transfers.iter().filter(|t| {
+            t.has_type(&TransferType::Trade) && t.strategy.as_ref() == Some(strategy) && t.has_instrument(instrument)
+        }) {
             let amount = t.amount; // Amount is always positive
-            let is_buy = t.debit_account.id == account_id; // Buy: debit to account
+            let is_buy = t.debit_account.is_client_account(); // Buy: debit to account
             let tx_position_change = if is_buy { amount } else { -amount }; // Buy increases, sell decreases position
 
             // Current position before this transaction
@@ -212,27 +242,38 @@ impl Ledger {
             }
         }
 
-        info!("Total cost: {}, Total amount: {}", total_cost, total_amount);
-
-        if !total_amount.is_zero() {
-            total_cost / total_amount
-        } else {
-            Decimal::ZERO
-        }
+        total_cost
     }
 
     /// Returns the total margin posted for the current position.
-    pub fn margin_posted(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
+    pub fn margin_posted(&self, strategy: &Arc<Strategy>) -> Decimal {
         let transfers = self.transfers.read();
         transfers
             .iter()
-            .filter(|t| {
-                t.transfer_type == TransferType::Margin && t.strategy.as_ref().map(|s| s.id) == Some(strategy.id)
-            })
+            .filter(|t| t.has_type(&TransferType::Margin) && t.has_strategy(strategy))
             .fold(Decimal::ZERO, |acc, t| {
-                if t.credit_account.id == account_id {
+                if t.debit_account.is_client_margin_account() {
                     acc + t.amount // Margin posted to venue
-                } else if t.debit_account.id == account_id {
+                } else if t.credit_account.is_client_margin_account() {
+                    acc - t.amount // Margin released from venue
+                } else {
+                    acc
+                }
+            })
+    }
+
+    pub fn margin_posted_instrument(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal {
+        let transfers = self.transfers.read();
+        transfers
+            .iter()
+            .filter(|t| t.has_type(&TransferType::Margin) && t.has_strategy(strategy) && t.has_instrument(instrument))
+            .fold(Decimal::ZERO, |acc, t| {
+                info!("Checking transfer: {}", t);
+                if t.debit_account.is_client_margin_account() {
+                    info!("Debit account is client margin account");
+                    acc + t.amount // Margin posted to venue
+                } else if t.credit_account.is_client_margin_account() {
+                    info!("Credit account is client margin account");
                     acc - t.amount // Margin released from venue
                 } else {
                     acc
@@ -257,12 +298,12 @@ impl Ledger {
     ) -> Result<(), AccountingError> {
         let transfer = Arc::new(
             Transfer::builder()
+                .transfer_type(TransferType::Deposit)
                 .transfer_group_id(Uuid::new_v4())
-                .strategy(None)
+                .asset(debit_account.asset.clone())
                 .debit_account(debit_account.clone())
                 .credit_account(credit_account.clone())
                 .amount(amount)
-                .transfer_type(TransferType::Deposit)
                 .unit_price(Decimal::ONE)
                 .build(),
         );
@@ -296,7 +337,7 @@ impl Ledger {
             }
 
             // Check for invalid transfer amount
-            if t.amount <= dec!(0) {
+            if t.amount <= Decimal::ZERO {
                 return Err(AccountingError::InvalidTransferAmount(t.clone()));
             }
         }
@@ -316,6 +357,7 @@ impl Ledger {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
     use test_log::test;
 
     #[test(tokio::test)]
