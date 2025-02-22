@@ -118,8 +118,8 @@ impl LedgerAccounting {
         let venue_inst = self.ledger.find_or_create(&venue, &inst_asset, &AccountType::VenueInstrument);
         let venue_spot = self.ledger.find_or_create(&venue, &commission_asset, &AccountType::VenueSpot);
 
-        let current_position = self.ledger.strategy_balance(user_inst.id, &strategy);
-        info!("Current position from ledger: {}", current_position);
+        let (cost_basis, current_position) = self.ledger.current_position(&strategy, Some(&instrument));
+        info!("Cost Basis: {}, Current Position {}", cost_basis, current_position);
         let new_position = match side {
             MarketSide::Buy => current_position + amount,
             MarketSide::Sell => current_position - amount,
@@ -139,7 +139,6 @@ impl LedgerAccounting {
         info!("Amount closed: {}", amount_closed);
 
         let entry_price = if !current_position.is_zero() {
-            let cost_basis = self.ledger.strategy_cost_basis(&strategy, &instrument); // Assume stored
             cost_basis / current_position.abs()
         } else {
             Decimal::ZERO
@@ -158,7 +157,7 @@ impl LedgerAccounting {
 
         // Margin adjustments
         let margin_delta = if amount_closed > Decimal::ZERO && current_position.signum() == new_position.signum() {
-            let current_margin = self.ledger.margin_posted_instrument(&strategy, &instrument);
+            let current_margin = self.ledger.margin_posted(&strategy, Some(&instrument));
             let closing_margin = current_margin * (amount_closed / current_position.abs());
             -closing_margin
         } else if amount_closed.is_zero()
@@ -168,7 +167,7 @@ impl LedgerAccounting {
             posting
         } else {
             let posting = new_position.abs() * price * margin_rate;
-            let current_margin = self.ledger.margin_posted_instrument(&strategy, &instrument);
+            let current_margin = self.ledger.margin_posted(&strategy, Some(&instrument));
             let closing_margin = current_margin * (amount_closed / current_position.abs());
             posting - closing_margin
         };
@@ -477,7 +476,7 @@ impl Accounting for LedgerAccounting {
         for account in accounts {
             if account.account_type == AccountType::ClientInstrument {
                 if let Tradable::Instrument(instrument) = &account.asset {
-                    let balance = self.ledger.strategy_balance(account.id, &strategy);
+                    let balance = self.ledger.strategy_balance(&strategy, Some(instrument));
                     let entry = positions.entry(instrument.clone()).or_insert(Decimal::ZERO);
                     *entry += balance;
                 }
@@ -503,11 +502,7 @@ impl Accounting for LedgerAccounting {
     }
 
     async fn strategy_instrument_position(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal {
-        let venue = instrument.venue.clone();
-        let tradable = Tradable::Instrument(instrument.clone());
-        let account = self.ledger.find_or_create(&venue, &tradable, &AccountType::ClientInstrument);
-
-        self.ledger.strategy_balance(account.id, strategy)
+        self.ledger.strategy_balance(strategy, Some(instrument))
     }
 
     async fn strategy_instrument_position_value(
@@ -515,11 +510,7 @@ impl Accounting for LedgerAccounting {
         strategy: &Arc<Strategy>,
         instrument: &Arc<Instrument>,
     ) -> Decimal {
-        let venue = instrument.venue.clone();
-        let tradable = Tradable::Instrument(instrument.clone());
-        let account = self.ledger.find_or_create(&venue, &tradable, &AccountType::ClientInstrument);
-
-        self.ledger.strategy_value(account.id, strategy)
+        self.ledger.strategy_net_value(strategy, Some(instrument))
     }
 
     async fn strategy_realized_pnl(&self, strategy: &Arc<Strategy>) -> Decimal {
@@ -598,16 +589,6 @@ mod tests {
             .unwrap();
 
         let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
-        let user_inst_btc = accounting.ledger.find_or_create(
-            &venue,
-            &Tradable::Instrument(inst_btc.clone()),
-            &AccountType::ClientInstrument,
-        );
-        let user_inst_eth = accounting.ledger.find_or_create(
-            &venue,
-            &Tradable::Instrument(inst_eth.clone()),
-            &AccountType::ClientInstrument,
-        );
 
         // Go long strategy 1: Buy 1 BTC at 1000 USDT
         accounting
@@ -637,16 +618,16 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_1), dec!(1));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_1), dec!(0));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_2), dec!(0));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_2), dec!(1));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_btc), dec!(1000));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_btc), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_eth), dec!(2000));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_1), dec!(50));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_2), dec!(100));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(2000));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(50));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(100));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9849.4));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(0));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(0));
@@ -679,16 +660,16 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_1), dec!(1));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_1), dec!(1));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_2), dec!(1));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_2), dec!(1));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_btc), dec!(1000));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_eth), dec!(2200));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_btc), dec!(1200));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_eth), dec!(2000));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_1), dec!(160));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_2), dec!(160));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(2200));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1200));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(2000));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(160));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(160));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9678.72));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(0));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(0));
@@ -721,16 +702,16 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_1), dec!(1));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_1), dec!(0));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_2), dec!(1));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_2), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_btc), dec!(1000));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_btc), dec!(1200));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_1), dec!(50));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_2), dec!(60));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1200));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(50));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(60));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9288.00));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(-400));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(-200));
@@ -763,16 +744,16 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_1), dec!(0.5));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_1), dec!(0));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_2), dec!(0.5));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_2), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_btc), dec!(500));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_btc), dec!(600));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_1), dec!(25));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_2), dec!(30));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(0.5));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0.5));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(500));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(600));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(25));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(30));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(11242.40));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(600));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(700));
@@ -805,16 +786,16 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_1), dec!(1));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_1), dec!(0));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_2), dec!(1));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_2), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_btc), dec!(1350));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_btc), dec!(1450));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_1), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_2), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1350));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1450));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(0));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(11897.06));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(950));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(950));
@@ -847,16 +828,16 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_1), dec!(0));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_1), dec!(0));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_btc.id, &strategy_2), dec!(0));
-        assert_eq!(accounting.ledger.strategy_balance(user_inst_eth.id, &strategy_2), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_btc), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_btc), dec!(0));
-        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, &inst_eth), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_1), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy_2), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(0));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(13096.26));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(1600.0));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(1500.0));
@@ -893,16 +874,11 @@ mod tests {
             .unwrap();
 
         let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
-        let user_inst = accounting.ledger.find_or_create(
-            &venue,
-            &Tradable::Instrument(instrument.clone()),
-            &AccountType::ClientInstrument,
-        );
         let venue_spot = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::VenueSpot);
 
         // Check balances from ledger
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(1));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(50)); // 1 * 1000 * 0.05
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50)); // 1 * 1000 * 0.05
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8)); // 10000 - 50 - 0.2
 
         // TODO: Move this to a separate test
@@ -946,8 +922,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10199.56));
         assert_eq!(accounting.ledger.balance(venue_spot.id), dec!(-199.5600));
@@ -1001,11 +977,6 @@ mod tests {
             .unwrap();
 
         let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
-        let user_inst = accounting.ledger.find_or_create(
-            &venue,
-            &Tradable::Instrument(instrument.clone()),
-            &AccountType::ClientInstrument,
-        );
 
         // Go long: Buy 1 BTC at 1000 USDT
         accounting
@@ -1014,16 +985,16 @@ mod tests {
                 strategy.clone(),
                 instrument.clone(),
                 None,
-                dec!(1),
+                dec!(2),
                 dec!(1000),
                 dec!(0.05),
                 dec!(0.0002),
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(1));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(50));
-        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(2));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(100));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9899.6));
 
         // Reduce: Sell 0.5 BTC at 1200 USDT
         accounting
@@ -1039,10 +1010,10 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(0.5));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(25));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1.5));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(75));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(100));
-        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10074.68));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10024.48));
 
         // Close: Sell 0.5 BTC at 800 USDT
         accounting
@@ -1051,17 +1022,17 @@ mod tests {
                 strategy.clone(),
                 instrument.clone(),
                 None,
-                dec!(0.5),
+                dec!(1.5),
                 dec!(800),
                 dec!(0.05),
                 dec!(0.0002),
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(0));
-        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(0)); // 100 - (1000 - 800) * 0.5
-        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9999.6)); // 10069.56 + 30 (freed) - 0.16 (comm) - 100 (PnL)
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(-200));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9799.24));
     }
 
     #[test]
@@ -1080,11 +1051,6 @@ mod tests {
             .unwrap();
 
         let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
-        let user_inst = accounting.ledger.find_or_create(
-            &venue,
-            &Tradable::Instrument(instrument.clone()),
-            &AccountType::ClientInstrument,
-        );
 
         // Go short: Sell 1 BTC at 1000 USDT
         accounting
@@ -1100,8 +1066,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(-1));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(50));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8));
 
         // Close: Buy 1 BTC at 800 USDT
@@ -1118,8 +1084,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200)); // (1000 - 800) * 1
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10199.64)); // 9949.8 + 50 (freed) - 0.16 (comm) + 200 (PnL)
     }
@@ -1140,11 +1106,6 @@ mod tests {
             .unwrap();
 
         let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
-        let user_inst = accounting.ledger.find_or_create(
-            &venue,
-            &Tradable::Instrument(instrument.clone()),
-            &AccountType::ClientInstrument,
-        );
 
         // Go short: Sell 1 BTC at 1000 USDT
         accounting
@@ -1160,8 +1121,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(-1));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(50));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8));
 
         // Reduce: Buy 0.5 BTC at 800 USDT
@@ -1178,8 +1139,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(-0.5));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(25.0)); // 0.5 * 800 * 0.05
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-0.5));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(25.0)); // 0.5 * 800 * 0.05
         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(100)); // (1000 - 800) * 0.5
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10074.72)); // 9949.8 + 30 (freed) - 0.16 (comm) + 100 (PnL)
 
@@ -1197,8 +1158,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(0)); // 100 - (1000 - 1200) * 0.5
         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9999.60)); // 10079.64 + 20 (freed) - 0.24 (comm) - 100 (PnL)
     }
@@ -1218,12 +1179,6 @@ mod tests {
             .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::ClientMargin)
             .unwrap();
 
-        let user_inst = accounting.ledger.find_or_create(
-            &venue,
-            &Tradable::Instrument(instrument.clone()),
-            &AccountType::ClientInstrument,
-        );
-
         // Go long: Buy 1 BTC at 1000 USDT
         accounting
             .margin_trade(
@@ -1238,8 +1193,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(1));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(50));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
 
         // Flip to short: Sell 2 BTC at 1200 USDT
         accounting
@@ -1255,8 +1210,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(-1));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(60)); // 1 * 1200 * 0.05
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(60)); // 1 * 1200 * 0.05
         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200)); // (1200 - 1000) * 1
 
         // Flip to long: Buy 2 BTC at 800 USDT
@@ -1273,8 +1228,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(1));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(40)); // 1 * 800 * 0.05
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(40)); // 1 * 800 * 0.05
         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(600)); // 200 - (1200 - 800) * 1
 
         // Close: Sell 1 BTC at 900 USDT
@@ -1291,8 +1246,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(accounting.ledger.strategy_balance(user_inst.id, &strategy), dec!(0));
-        assert_eq!(accounting.ledger.margin_posted(&strategy), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(700));
     }
 }

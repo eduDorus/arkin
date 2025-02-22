@@ -88,55 +88,27 @@ impl Ledger {
         })
     }
 
-    /// Returns the global value of all positions for an account.
-    pub fn value(&self, account_id: Uuid) -> Decimal {
+    /// Returns the net position amount for an account and strategy.
+    pub fn strategy_balance(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+        let filter = |t: &&Arc<Transfer>| {
+            t.has_type(&TransferType::Trade)
+                && t.has_strategy(strategy)
+                && match instrument {
+                    Some(i) => t.has_instrument(i),
+                    None => true,
+                }
+        };
+
         let transfers = self.transfers.read();
-        transfers.iter().fold(Decimal::ZERO, |acc, t| {
-            if t.credit_account.id == account_id {
-                acc + t.amount * t.unit_price
-            } else if t.debit_account.id == account_id {
-                acc - t.amount * t.unit_price
+        transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
+            if t.credit_account.is_user_account() {
+                acc + t.amount
+            } else if t.debit_account.is_user_account() {
+                acc - t.amount
             } else {
                 acc
             }
         })
-    }
-
-    /// Returns the net position amount for an account and strategy.
-    pub fn strategy_balance(&self, account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
-        let transfers = self.transfers.read();
-        transfers
-            .iter()
-            .filter(|t| t.transfer_type == TransferType::Trade && t.strategy.as_ref() == Some(strategy))
-            .fold(Decimal::ZERO, |acc, t| {
-                if t.credit_account.id == account_id {
-                    acc + t.amount
-                } else if t.debit_account.id == account_id {
-                    acc - t.amount
-                } else {
-                    acc
-                }
-            })
-    }
-
-    /// Returns the net position size for an account and strategy.
-    pub fn strategy_value(&self, _account_id: Uuid, strategy: &Arc<Strategy>) -> Decimal {
-        let transfers = self.transfers.read();
-        transfers
-            .iter()
-            .filter(|t| {
-                t.strategy.as_ref() == Some(strategy)
-                    && (t.has_type(&TransferType::Trade) || t.has_type(&TransferType::PnL))
-            })
-            .fold(Decimal::ZERO, |acc, t| {
-                if t.credit_account.is_client_account() {
-                    acc + t.amount * t.unit_price
-                } else if t.debit_account.is_client_account() {
-                    acc - t.amount * t.unit_price
-                } else {
-                    acc
-                }
-            })
     }
 
     /// Returns the net PnL for an account and strategy.
@@ -152,9 +124,9 @@ impl Ledger {
 
         let transfers = self.transfers.read();
         transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
-            if t.credit_account.is_client_account() {
+            if t.credit_account.is_user_account() {
                 acc + t.amount
-            } else if t.debit_account.is_client_account() {
+            } else if t.debit_account.is_user_account() {
                 acc - t.amount
             } else {
                 acc
@@ -162,19 +134,43 @@ impl Ledger {
         })
     }
 
-    /// Returns the total cost basis for the current position.
-    pub fn strategy_cost_basis(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal {
+    pub fn strategy_net_value(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+        let (total_cost, total_amount) = self.current_position(strategy, instrument);
+        total_cost * total_amount
+    }
+
+    pub fn strategy_cost_basis(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+        let (total_cost, _) = self.current_position(strategy, instrument);
+        total_cost
+    }
+
+    /// Returns the total cost basis and current amount.
+    pub fn current_position(
+        &self,
+        strategy: &Arc<Strategy>,
+        instrument: Option<&Arc<Instrument>>,
+    ) -> (Decimal, Decimal) {
+        let filter = |t: &&Arc<Transfer>| {
+            t.has_type(&TransferType::Trade)
+                && t.has_strategy(strategy)
+                && match instrument {
+                    Some(i) => t.has_instrument(i),
+                    None => true,
+                }
+        };
+
         let transfers = self.transfers.read();
         let mut total_cost = Decimal::ZERO;
         let mut total_amount = Decimal::ZERO;
         let mut running_position = Decimal::ZERO;
+        let mut total_amount_signed = Decimal::ZERO;
 
-        for t in transfers.iter().filter(|t| {
-            t.has_type(&TransferType::Trade) && t.strategy.as_ref() == Some(strategy) && t.has_instrument(instrument)
-        }) {
+        for t in transfers.iter().filter(filter) {
             let amount = t.amount; // Amount is always positive
-            let is_buy = t.debit_account.is_client_account(); // Buy: debit to account
+            let is_buy = t.debit_account.is_user_account(); // Buy: debit to account
             let tx_position_change = if is_buy { amount } else { -amount }; // Buy increases, sell decreases position
+
+            total_amount_signed += tx_position_change;
 
             // Current position before this transaction
             let position_before = running_position;
@@ -241,44 +237,32 @@ impl Ledger {
                 total_amount = Decimal::ZERO;
             }
         }
+        info!("Running position: {}", running_position);
 
-        total_cost
+        (total_cost, -total_amount_signed)
     }
 
     /// Returns the total margin posted for the current position.
-    pub fn margin_posted(&self, strategy: &Arc<Strategy>) -> Decimal {
-        let transfers = self.transfers.read();
-        transfers
-            .iter()
-            .filter(|t| t.has_type(&TransferType::Margin) && t.has_strategy(strategy))
-            .fold(Decimal::ZERO, |acc, t| {
-                if t.debit_account.is_client_margin_account() {
-                    acc + t.amount // Margin posted to venue
-                } else if t.credit_account.is_client_margin_account() {
-                    acc - t.amount // Margin released from venue
-                } else {
-                    acc
+    pub fn margin_posted(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+        let filter = |t: &&Arc<Transfer>| {
+            t.has_type(&TransferType::Margin)
+                && t.has_strategy(strategy)
+                && match instrument {
+                    Some(i) => t.has_instrument(i),
+                    None => true,
                 }
-            })
-    }
+        };
 
-    pub fn margin_posted_instrument(&self, strategy: &Arc<Strategy>, instrument: &Arc<Instrument>) -> Decimal {
         let transfers = self.transfers.read();
-        transfers
-            .iter()
-            .filter(|t| t.has_type(&TransferType::Margin) && t.has_strategy(strategy) && t.has_instrument(instrument))
-            .fold(Decimal::ZERO, |acc, t| {
-                info!("Checking transfer: {}", t);
-                if t.debit_account.is_client_margin_account() {
-                    info!("Debit account is client margin account");
-                    acc + t.amount // Margin posted to venue
-                } else if t.credit_account.is_client_margin_account() {
-                    info!("Credit account is client margin account");
-                    acc - t.amount // Margin released from venue
-                } else {
-                    acc
-                }
-            })
+        transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
+            if t.debit_account.is_user_margin_account() {
+                acc + t.amount // Margin posted to venue
+            } else if t.credit_account.is_user_margin_account() {
+                acc - t.amount // Margin released from venue
+            } else {
+                acc
+            }
+        })
     }
 
     /// Returns all transfers in the ledger.
