@@ -18,8 +18,8 @@ pub struct PersistenceService {
     pub dry_run: bool,
     pub auto_commit_interval: Duration,
     pub instance_store: Arc<InstanceStore>,
-    pub portfolio_store: Arc<PortfolioStore>,
-    pub transaction_store: Arc<TransactionStore>,
+    // pub portfolio_store: Arc<PortfolioStore>,
+    // pub transaction_store: Arc<TransactionStore>,
     pub venue_store: Arc<VenueStore>,
     pub asset_store: Arc<AssetStore>,
     pub instrument_store: Arc<InstrumentStore>,
@@ -27,7 +27,7 @@ pub struct PersistenceService {
     pub insights_store: Arc<InsightsStore>,
     pub strategy_store: Arc<StrategyStore>,
     pub signal_store: Arc<SignalStore>,
-    pub allocation_store: Arc<AllocationStore>,
+    // pub allocation_store: Arc<AllocationStore>,
     pub execution_order_store: Arc<ExecutionOrderStore>,
     pub venue_order_store: Arc<VenueOrderStore>,
     pub tick_store: Arc<TickStore>,
@@ -66,8 +66,8 @@ impl PersistenceService {
             instance
         };
 
-        let portfolio = PortfolioRepo::builder().pool(pool.clone()).build();
-        let transactions_repo = TransactionRepo::builder().pool(pool.clone()).build();
+        // let account_repo = AccountRepo::builder().pool(pool.clone()).build();
+        // let transfer_repo = TransferRepo::builder().pool(pool.clone()).build();
         let venue_repo = VenueRepo::builder().pool(pool.clone()).build();
         let asset_repo = AssetRepo::builder().pool(pool.clone()).build();
         let instrument_repo = InstrumentRepo::builder().pool(pool.clone()).build();
@@ -78,7 +78,7 @@ impl PersistenceService {
         insights_repo.create_table().await.unwrap();
         let strategy_repo = StrategyRepo::builder().pool(pool.clone()).build();
         let signal_repo = SignalRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
-        let allocation_repo = AllocationRepo::builder().pool(pool.clone()).build();
+        // let allocation_repo = AllocationRepo::builder().pool(pool.clone()).build();
         let execution_order_repo = ExecutionOrderRepo::builder()
             .pool(pool.clone())
             .instance(instance.clone())
@@ -95,13 +95,13 @@ impl PersistenceService {
 
         // Initialize stores
 
-        let portfolio_store = Arc::new(PortfolioStore::builder().portfolio_repo(portfolio.to_owned()).build());
-        let transaction_store = Arc::new(
-            TransactionStore::builder()
-                .transaction_repo(transactions_repo.to_owned())
-                .buffer_size(config.batch_size)
-                .build(),
-        );
+        // let portfolio_store = Arc::new(PortfolioStore::builder().portfolio_repo(account_repo.to_owned()).build());
+        // let transaction_store = Arc::new(
+        //     TransactionStore::builder()
+        //         .transaction_repo(transfer_repo.to_owned())
+        //         .buffer_size(config.batch_size)
+        //         .build(),
+        // );
         let venue_store = Arc::new(VenueStore::builder().venue_repo(venue_repo).build());
         let asset_store = Arc::new(AssetStore::builder().asset_repo(asset_repo.to_owned()).build());
         let instrument_store = Arc::new(
@@ -120,7 +120,7 @@ impl PersistenceService {
         );
         let strategy_store = Arc::new(StrategyStore::builder().strategy_repo(strategy_repo.to_owned()).build());
         let signal_store = Arc::new(SignalStore::builder().signal_repo(signal_repo.to_owned()).build());
-        let allocation_store = Arc::new(AllocationStore::builder().allocation_repo(allocation_repo.to_owned()).build());
+        // let allocation_store = Arc::new(AllocationStore::builder().allocation_repo(allocation_repo.to_owned()).build());
         let execution_order_store = Arc::new(
             ExecutionOrderStore::builder()
                 .execution_order_repo(execution_order_repo.to_owned())
@@ -148,8 +148,8 @@ impl PersistenceService {
             dry_run,
             auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
             instance_store,
-            portfolio_store,
-            transaction_store,
+            // portfolio_store,
+            // transaction_store,
             venue_store,
             asset_store,
             instrument_store,
@@ -157,7 +157,7 @@ impl PersistenceService {
             insights_store,
             strategy_store,
             signal_store,
-            allocation_store,
+            // allocation_store,
             execution_order_store,
             venue_order_store,
             tick_store,

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 use sqlx::{prelude::*, PgPool};
-use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -12,9 +11,7 @@ use crate::PersistenceError;
 pub struct PipelineDTO {
     pub id: Uuid,
     pub name: String,
-    pub description: String,
-    pub created_at: OffsetDateTime,
-    pub updated_at: OffsetDateTime,
+    pub description: Option<String>,
 }
 
 impl From<Arc<Pipeline>> for PipelineDTO {
@@ -22,21 +19,17 @@ impl From<Arc<Pipeline>> for PipelineDTO {
         Self {
             id: pipeline.id,
             name: pipeline.name.clone(),
-            description: pipeline.description.clone(),
-            created_at: pipeline.created_at,
-            updated_at: pipeline.updated_at,
+            description: pipeline.description.clone().into(),
         }
     }
 }
 
 impl From<PipelineDTO> for Arc<Pipeline> {
-    fn from(asset: PipelineDTO) -> Self {
+    fn from(pipeline: PipelineDTO) -> Self {
         let asset = Pipeline {
-            id: asset.id,
-            name: asset.name,
-            description: asset.description,
-            created_at: asset.created_at,
-            updated_at: asset.updated_at,
+            id: pipeline.id,
+            name: pipeline.name,
+            description: pipeline.description.unwrap_or_default(),
         };
         Arc::new(asset)
     }
@@ -56,16 +49,12 @@ impl PipelineRepo {
             (
                 id, 
                 name, 
-                description,
-                created_at,
-                updated_at
-            ) VALUES ($1, $2, $3, $4, $5)
+                description
+            ) VALUES ($1, $2, $3)
             "#,
             asset.id,
             asset.name,
-            asset.description,
-            asset.created_at,
-            asset.updated_at,
+            asset.description
         )
         .execute(&self.pool)
         .await?;
@@ -79,9 +68,7 @@ impl PipelineRepo {
             SELECT
                 id, 
                 name, 
-                description,
-                created_at,
-                updated_at
+                description
             FROM pipelines
             WHERE id = $1
             "#,
@@ -103,9 +90,7 @@ impl PipelineRepo {
             SELECT
                 id, 
                 name, 
-                description,
-                created_at,
-                updated_at
+                description
             FROM pipelines
             WHERE name = $1
             "#,

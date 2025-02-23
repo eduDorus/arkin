@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use sqlx::PgPool;
+use tracing::warn;
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -109,7 +110,10 @@ impl StrategyRepo {
         .await?;
         match strategy {
             Some(strategy) => Ok(strategy),
-            None => Err(PersistenceError::NotFound),
+            None => {
+                warn!("Strategy not found: {}", name);
+                Err(PersistenceError::NotFound)
+            }
         }
     }
 

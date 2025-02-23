@@ -6,8 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     Asset, AssetType, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceType, Instrument,
-    InstrumentStatus, InstrumentType, MarketSide, Pipeline, Portfolio, Price, Quantity, Strategy, Tick, Venue,
-    VenueType,
+    InstrumentStatus, InstrumentType, MarketSide, Pipeline, Price, Quantity, Strategy, Tick, Venue, VenueType,
 };
 
 pub fn test_btc_asset() -> Arc<Asset> {
@@ -71,7 +70,6 @@ pub fn test_personal_venue() -> Arc<Venue> {
 pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
     let instrument = Instrument::builder()
         .id(Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"))
-        .secondary_id(1)
         .venue(test_binance_venue())
         .symbol("perp-btc-usdt@binance".into())
         .venue_symbol("BTCUSDT".into())
@@ -97,7 +95,6 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
 pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
     let instrument = Instrument::builder()
         .id(Uuid::from_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").expect("Invalid UUID"))
-        .secondary_id(2)
         .venue(test_binance_venue())
         .symbol("perp-eth-usdt@binance".into())
         .venue_symbol("ETHUSDT".into())
@@ -122,11 +119,9 @@ pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
 
 pub fn test_pipeline() -> Arc<Pipeline> {
     let pipeline = Pipeline::builder()
-        .id(Uuid::from_str("f5dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"))
+        .id(Uuid::from_str("df5305b0-3e9b-4b7c-8a13-1406e93f5cc9").expect("Invalid UUID"))
         .name("Test Pipeline".into())
         .description("This Pipeline is for testing purposes".into())
-        .created_at(OffsetDateTime::now_utc())
-        .updated_at(OffsetDateTime::now_utc())
         .build();
     Arc::new(pipeline)
 }
@@ -158,55 +153,29 @@ pub fn test_instance() -> Arc<Instance> {
     Arc::new(instance)
 }
 
-pub fn test_portfolio() -> Arc<Portfolio> {
-    let portfolio = Portfolio::builder()
-        .id(Uuid::from_str("fcb8b709-325c-4cc8-8778-4ca4a7f3616b").expect("Invalid UUID"))
-        .name("Test Portfolio".into())
-        .description("This Portfolio is for testing purposes".into())
-        .created_at(OffsetDateTime::now_utc())
-        .updated_at(OffsetDateTime::now_utc())
-        .build();
-    Arc::new(portfolio)
-}
-
-pub fn test_strategy() -> Arc<Strategy> {
-    let strategy = Strategy::builder()
-        .id(Uuid::from_str("a2d0951e-9bc6-47a4-b803-e4e0bb4e98a3").expect("Invalid UUID"))
-        .name("sample".into())
-        .description(Some("Test Description".into()))
-        .build();
-    Arc::new(strategy)
-}
-
-pub fn test_strategy_crossover() -> Arc<Strategy> {
+pub fn test_strategy_1() -> Arc<Strategy> {
     let strategy = Strategy::builder()
         .id(Uuid::from_str("1fce35ce-1583-4334-a410-bc0f71c7469b").expect("Invalid UUID"))
-        .name("Test Crossover Strategy".into())
-        .description(Some("Test Description".into()))
+        .name("test_strategy_2".into())
+        .description(Some("This strategy is only for testing".into()))
         .build();
     Arc::new(strategy)
 }
 
-// pub fn test_venue_order() -> Arc<VenueOrder> {
-//     let order = VenueOrder::builder()
-//         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-//         .portfolio(test_portfolio())
-//         .instrument(test_inst_binance_btc_usdt_perp())
-//         .order_type(VenueOrderType::Market)
-//         .time_in_force(VenueOrderTimeInForce::Gtc)
-//         .side(MarketSide::Buy)
-//         .price(dec!(100))
-//         .quantity(dec!(1))
-//         .status(VenueOrderStatus::Placed)
-//         .build();
-//     Arc::new(order)
-// }
+pub fn test_strategy_2() -> Arc<Strategy> {
+    let strategy = Strategy::builder()
+        .id(Uuid::from_str("a2d0951e-9bc6-47a4-b803-e4e0bb4e98a3").expect("Invalid UUID"))
+        .name("test_strategy_2".into())
+        .description(Some("This strategy is only for testing".into()))
+        .build();
+    Arc::new(strategy)
+}
 
 pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
     let order = ExecutionOrder::builder()
         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
         .event_time(OffsetDateTime::now_utc())
-        .strategy(Some(test_strategy()))
+        .strategy(Some(test_strategy_1()))
         .instrument(test_inst_binance_btc_usdt_perp())
         .order_type(ExecutionOrderType::Maker)
         .side(MarketSide::Buy)
@@ -222,7 +191,7 @@ pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
     let order = ExecutionOrder::builder()
         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
         .event_time(OffsetDateTime::now_utc())
-        .strategy(Some(test_strategy()))
+        .strategy(Some(test_strategy_1()))
         .instrument(test_inst_binance_btc_usdt_perp())
         .order_type(ExecutionOrderType::Maker)
         .side(MarketSide::Buy)

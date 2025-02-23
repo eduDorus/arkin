@@ -14,7 +14,6 @@ use crate::PersistenceError;
 #[derive(FromRow)]
 pub struct InstrumentDTO {
     pub id: Uuid,
-    pub secondary_id: i64,
     pub venue_id: Uuid,
     pub symbol: String,
     pub venue_symbol: String,
@@ -39,7 +38,6 @@ impl From<Arc<Instrument>> for InstrumentDTO {
     fn from(instrument: Arc<Instrument>) -> Self {
         Self {
             id: instrument.id,
-            secondary_id: instrument.secondary_id,
             venue_id: instrument.venue.id,
             symbol: instrument.symbol.clone(),
             venue_symbol: instrument.venue_symbol.clone(),
@@ -74,14 +72,13 @@ impl InstrumentRepo {
         sqlx::query!(
             r#"
             INSERT INTO instruments (
-                id, secondary_id, venue_id, symbol, venue_symbol, instrument_type, base_asset_id, quote_asset_id, margin_asset_id, strike, maturity, option_type,
+                id, venue_id, symbol, venue_symbol, instrument_type, base_asset_id, quote_asset_id, margin_asset_id, strike, maturity, option_type,
                 contract_size, price_precision, quantity_precision, base_precision, quote_precision, lot_size, tick_size, status
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11, $12, $13, $14, $15, $16, $17, $18, $19
             )
             "#,
             instrument.id,
-            instrument.secondary_id,
             instrument.venue_id,
             instrument.symbol,
             instrument.venue_symbol,
@@ -112,7 +109,6 @@ impl InstrumentRepo {
             r#"
             SELECT
                 id,
-                secondary_id,
                 venue_id,
                 symbol,
                 venue_symbol,
@@ -152,7 +148,6 @@ impl InstrumentRepo {
             r#"
             SELECT
                 id,
-                secondary_id,
                 venue_id,
                 symbol,
                 venue_symbol,

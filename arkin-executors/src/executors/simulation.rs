@@ -91,14 +91,6 @@ impl SimulationExecutor {
 
 #[async_trait]
 impl Executor for SimulationExecutor {
-    async fn get_balances(&self, _portfolio: &Arc<Portfolio>) -> Result<Vec<Arc<Balance>>, ExecutorError> {
-        Ok(vec![])
-    }
-
-    async fn get_positions(&self, _portfolio: &Arc<Portfolio>) -> Result<Vec<Arc<Position>>, ExecutorError> {
-        Ok(vec![])
-    }
-
     async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError> {
         debug!("SimulationExecutor placing order: {}", order.id);
         let mut orders = self.orders.write().await;
@@ -210,7 +202,7 @@ mod tests {
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
         // Create dummy portfolio and instrument.
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         // Build an order.
@@ -259,7 +251,7 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         let order = VenueOrder::builder()
@@ -303,7 +295,7 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let instrument_btc = test_inst_binance_btc_usdt_perp();
         let instrument_eth = test_inst_binance_eth_usdt_perp();
 
@@ -376,7 +368,7 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         let order1 = VenueOrder::builder()
@@ -434,7 +426,7 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         // Build a market buy order.
@@ -517,7 +509,7 @@ mod tests {
         let pubsub = Arc::new(PubSub::new(1024));
         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
 
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let instrument = test_inst_binance_btc_usdt_perp();
 
         // Build a limit buy order with a limit price of 105.

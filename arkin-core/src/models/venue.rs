@@ -12,6 +12,7 @@ pub enum VenueType {
     Cex,
     Dex,
     Otc,
+    UserFunds,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]

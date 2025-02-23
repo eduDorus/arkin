@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity};
 
-use super::{Instrument, MarketSide, Portfolio};
+use super::{Instrument, MarketSide};
 
 #[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type)]
 #[strum(serialize_all = "snake_case")]
@@ -248,7 +248,6 @@ impl fmt::Display for Position {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct PositionUpdate {
     pub event_time: OffsetDateTime,
-    pub portfolio: Arc<Portfolio>,
     pub instrument: Arc<Instrument>,
     pub entry_price: Price,
     pub quantity: Quantity,

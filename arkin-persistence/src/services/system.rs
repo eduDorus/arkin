@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use arkin_core::{Allocation, Insight, Pipeline, Strategy, Venue};
+use arkin_core::{Insight, Pipeline, Strategy, Venue};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{
-    stores::{AllocationStore, InsightsStore, PipelineStore, StrategyStore, VenueStore},
+    stores::{InsightsStore, PipelineStore, StrategyStore, VenueStore},
     PersistenceError,
 };
 
@@ -16,7 +16,6 @@ pub struct SystemService {
     pub venue_store: VenueStore,
     pub insight_store: InsightsStore,
     pub strategy_store: StrategyStore,
-    pub allocation_store: AllocationStore,
 }
 
 impl SystemService {
@@ -72,7 +71,4 @@ impl SystemService {
     }
 
     // Allocation
-    pub async fn insert_allocation(&self, allocation: Arc<Allocation>) -> Result<(), PersistenceError> {
-        self.allocation_store.insert(allocation).await
-    }
 }

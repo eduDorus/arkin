@@ -11,9 +11,6 @@ pub trait ExecutorService: RunnableService + Executor {}
 
 #[async_trait]
 pub trait Executor: std::fmt::Debug + Send + Sync {
-    async fn get_balances(&self, portfolio: &Arc<Portfolio>) -> Result<Vec<Arc<Balance>>, ExecutorError>;
-    async fn get_positions(&self, portfolio: &Arc<Portfolio>) -> Result<Vec<Arc<Position>>, ExecutorError>;
-
     async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError>;
     // async fn place_orders(&self, orders: Vec<Arc<VenueOrder>>) -> Result<(), ExecutorError>;
 

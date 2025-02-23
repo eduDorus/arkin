@@ -32,7 +32,6 @@ impl AccountingFactory {
                 let asset = persistence.asset_store.read_by_symbol("USDT").await.unwrap();
                 let balance = BalanceUpdate::builder()
                     .event_time(OffsetDateTime::now_utc())
-                    .portfolio(test_portfolio())
                     .asset(asset)
                     .quantity(dec!(100_000))
                     .build();

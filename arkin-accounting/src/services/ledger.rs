@@ -573,8 +573,8 @@ mod tests {
     fn test_multi_strategy_multi_instrument() {
         let pubsub = PubSub::new(1024);
         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-        let strategy_1 = test_strategy();
-        let strategy_2 = test_strategy_crossover();
+        let strategy_1 = test_strategy_1();
+        let strategy_2 = test_strategy_2();
 
         let personal = test_personal_venue();
         let venue = test_binance_venue();
@@ -846,7 +846,7 @@ mod tests {
     async fn test_go_long_and_close() {
         let pubsub = PubSub::new(1024);
         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let personal = test_personal_venue();
         let venue = test_binance_venue();
         let instrument = test_inst_binance_btc_usdt_perp();
@@ -964,7 +964,7 @@ mod tests {
     fn test_go_long_reduce_then_close() {
         let pubsub = PubSub::new(1024);
         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let personal = test_personal_venue();
         let venue = test_binance_venue();
         let instrument = test_inst_binance_btc_usdt_perp();
@@ -1038,7 +1038,7 @@ mod tests {
     fn test_go_short_and_close() {
         let pubsub = PubSub::new(1024);
         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let personal = test_personal_venue();
         let venue = test_binance_venue();
         let instrument = test_inst_binance_btc_usdt_perp();
@@ -1093,7 +1093,7 @@ mod tests {
     fn test_go_short_reduce_then_close() {
         let pubsub = PubSub::new(1024);
         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let personal = test_personal_venue();
         let venue = test_binance_venue();
         let instrument = test_inst_binance_btc_usdt_perp();
@@ -1167,7 +1167,7 @@ mod tests {
     fn test_go_long_flip_short_flip_long_close() {
         let pubsub = PubSub::new(1024);
         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-        let strategy = test_strategy();
+        let strategy = test_strategy_1();
         let personal = test_personal_venue();
         let venue = test_binance_venue();
         let instrument = test_inst_binance_btc_usdt_perp();
