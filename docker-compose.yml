@@ -2,6 +2,7 @@ services:
   timescaledb:
     image: timescale/timescaledb:latest-pg16
     container_name: arkin-tsdb
+    hostname: timescaledb
     environment:
       POSTGRES_DB: arkin
       POSTGRES_USER: arkin_admin
@@ -14,9 +15,11 @@ services:
     networks:
       - network
   
+
   postgres:
     image: postgres:17
     container_name: arkin-postgres
+    hostname: postgres
     environment:
       POSTGRES_DB: arkin
       POSTGRES_USER: arkin_admin
@@ -29,19 +32,23 @@ services:
     networks:
       - network
 
+
   grafana:
-    image: grafana/grafana-oss
+    image: grafana/grafana-oss:11.3.4
     container_name: arkin-grafana
+    hostname: grafana
     ports:
       - "3000:3000"
     volumes:
       - ./data/grafana:/var/lib/grafana
     networks:
       - network
+  
 
   clickhouse:
       image: clickhouse/clickhouse-server:25.1
       container_name: arkin-clickhouse
+      hostname: clickhouse
       ports:
         - "8123:8123"   # HTTP interface
         - "9000:9000"   # Native client interface
@@ -64,6 +71,30 @@ services:
           hard: 262144
       networks:
         - network
+
+    # metabase:
+      #   image: metabase/metabase:latest
+      #   container_name: arkin-metabase
+      #   hostname: metabase
+      #   volumes:
+      #     - /dev/urandom:/dev/random:ro
+      #     - ./data/metabase/plugins:/plugins
+      #   ports:
+      #     - 3001:3000
+      #   environment:
+      #     MB_DB_TYPE: postgres
+      #     MB_DB_DBNAME: metabase
+      #     MB_DB_PORT: 5432
+      #     MB_DB_USER: arkin_admin
+      #     MB_DB_PASS: test1234
+      #     MB_DB_HOST: postgres
+      #   networks:
+      #     - network
+      #   healthcheck:
+      #     test: curl --fail -I http://localhost:3000/api/health || exit 1
+      #     interval: 15s
+      #     timeout: 5s
+      #     retries: 5
 
 networks:
   network:
