@@ -28,8 +28,12 @@ impl LedgerAccounting {
         amount: Decimal,
         account_type: &AccountType,
     ) -> Result<(), AccountingError> {
-        let debit_account = self.ledger.find_or_create(debit_venue, &asset, &AccountType::VenueSpot);
-        let credit_account = self.ledger.find_or_create(credit_venue, &asset, account_type);
+        let debit_account = self
+            .ledger
+            .find_or_create(debit_venue, &asset, &AccountOwner::Venue, &AccountType::Spot);
+        let credit_account = self
+            .ledger
+            .find_or_create(credit_venue, &asset, &AccountOwner::User, account_type);
 
         self.ledger.transfer(&debit_account, &credit_account, amount)
     }
@@ -42,8 +46,12 @@ impl LedgerAccounting {
         amount: Decimal,
         account_type: &AccountType,
     ) -> Result<(), AccountingError> {
-        let debit_account = self.ledger.find_or_create(debit_venue, asset, account_type);
-        let credit_account = self.ledger.find_or_create(credit_venue, asset, &AccountType::VenueSpot);
+        let debit_account = self
+            .ledger
+            .find_or_create(debit_venue, asset, &AccountOwner::User, account_type);
+        let credit_account = self
+            .ledger
+            .find_or_create(credit_venue, asset, &AccountOwner::Venue, &AccountType::Spot);
 
         self.ledger.transfer(&debit_account, &credit_account, amount)
     }
@@ -58,8 +66,12 @@ impl LedgerAccounting {
     ) -> Result<(), AccountingError> {
         let transfer_group_id = Uuid::new_v4();
 
-        let debit_account = self.ledger.find_or_create(&venue, &debit_asset, &AccountType::ClientSpot);
-        let venue_credit_account = self.ledger.find_or_create(&venue, &debit_asset, &AccountType::VenueSpot);
+        let debit_account = self
+            .ledger
+            .find_or_create(&venue, &debit_asset, &AccountOwner::User, &AccountType::Spot);
+        let venue_credit_account =
+            self.ledger
+                .find_or_create(&venue, &debit_asset, &AccountOwner::Venue, &AccountType::Spot);
 
         let t1 = Transfer::builder()
             .transfer_group_id(transfer_group_id)
@@ -72,8 +84,12 @@ impl LedgerAccounting {
             .build()
             .into();
 
-        let venue_debit_account = self.ledger.find_or_create(&venue, &credit_asset, &AccountType::VenueSpot);
-        let credit_account = self.ledger.find_or_create(&venue, &credit_asset, &AccountType::ClientSpot);
+        let venue_debit_account =
+            self.ledger
+                .find_or_create(&venue, &credit_asset, &AccountOwner::Venue, &AccountType::Spot);
+        let credit_account = self
+            .ledger
+            .find_or_create(&venue, &credit_asset, &AccountOwner::User, &AccountType::Spot);
 
         let t2 = Transfer::builder()
             .transfer_group_id(transfer_group_id)
@@ -112,11 +128,21 @@ impl LedgerAccounting {
         let commission_asset = Tradable::Asset(commission_asset.unwrap_or_else(|| instrument.margin_asset.clone()));
 
         //  Find or create necessary accounts
-        let user_margin = self.ledger.find_or_create(&venue, &margin_asset, &AccountType::ClientMargin);
-        let venue_margin = self.ledger.find_or_create(&venue, &margin_asset, &AccountType::VenueMargin);
-        let user_inst = self.ledger.find_or_create(&venue, &inst_asset, &AccountType::ClientInstrument);
-        let venue_inst = self.ledger.find_or_create(&venue, &inst_asset, &AccountType::VenueInstrument);
-        let venue_spot = self.ledger.find_or_create(&venue, &commission_asset, &AccountType::VenueSpot);
+        let user_margin = self
+            .ledger
+            .find_or_create(&venue, &margin_asset, &AccountOwner::User, &AccountType::Margin);
+        let venue_margin =
+            self.ledger
+                .find_or_create(&venue, &margin_asset, &AccountOwner::Venue, &AccountType::Margin);
+        let user_inst = self
+            .ledger
+            .find_or_create(&venue, &inst_asset, &AccountOwner::User, &AccountType::Instrument);
+        let venue_inst =
+            self.ledger
+                .find_or_create(&venue, &inst_asset, &AccountOwner::Venue, &AccountType::Instrument);
+        let venue_spot =
+            self.ledger
+                .find_or_create(&venue, &commission_asset, &AccountOwner::Venue, &AccountType::Spot);
 
         let (cost_basis, current_position) = self.ledger.current_position(&strategy, Some(&instrument));
         info!("Cost Basis: {}, Current Position {}", cost_basis, current_position);
@@ -354,7 +380,10 @@ impl Accounting for LedgerAccounting {
         let accounts = self.ledger.accounts();
         let mut balances = HashMap::new();
         for account in accounts {
-            if &account.venue == venue && account.account_type == AccountType::ClientSpot {
+            if &account.venue == venue
+                && account.account_type == AccountType::Spot
+                && account.owner == AccountOwner::User
+            {
                 if let Tradable::Asset(asset) = &account.asset {
                     let balance = self.ledger.balance(account.id);
                     let entry = balances.entry(asset.clone()).or_insert(Decimal::ZERO);
@@ -369,10 +398,7 @@ impl Accounting for LedgerAccounting {
         let accounts = self.ledger.accounts();
         let mut balances = HashMap::new();
         for account in accounts {
-            if &account.venue == venue
-                && (account.account_type == AccountType::ClientMargin
-                    || account.account_type == AccountType::VenueMargin)
-            {
+            if &account.venue == venue && account.account_type == AccountType::Margin {
                 if let Tradable::Asset(asset) = &account.asset {
                     let balance = self.ledger.balance(account.id);
                     let entry = balances.entry(asset.clone()).or_insert(Decimal::ZERO);
@@ -387,7 +413,10 @@ impl Accounting for LedgerAccounting {
         let accounts = self.ledger.accounts();
         let mut balances = HashMap::new();
         for account in accounts {
-            if &account.venue == venue && account.account_type == AccountType::ClientMargin {
+            if &account.venue == venue
+                && account.account_type == AccountType::Margin
+                && account.owner == AccountOwner::User
+            {
                 if let Tradable::Asset(asset) = &account.asset {
                     let balance = self.ledger.balance(account.id);
                     let entry = balances.entry(asset.clone()).or_insert(Decimal::ZERO);
@@ -401,15 +430,21 @@ impl Accounting for LedgerAccounting {
     /// Returns the total balance of an asset on a specific venue.
     async fn asset_balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal {
         let tradable = Tradable::Asset(asset.clone());
-        let account = self.ledger.find_or_create(&venue, &tradable, &AccountType::ClientSpot);
+        let account = self
+            .ledger
+            .find_or_create(&venue, &tradable, &AccountOwner::User, &AccountType::Spot);
 
         self.ledger.balance(account.id)
     }
 
     async fn asset_margin_balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal {
         let tradable = Tradable::Asset(asset.clone());
-        let client_margin = self.ledger.find_or_create(&venue, &tradable, &AccountType::ClientMargin);
-        let venue_margin = self.ledger.find_or_create(&venue, &tradable, &AccountType::VenueMargin);
+        let client_margin = self
+            .ledger
+            .find_or_create(&venue, &tradable, &AccountOwner::User, &AccountType::Margin);
+        let venue_margin = self
+            .ledger
+            .find_or_create(&venue, &tradable, &AccountOwner::Venue, &AccountType::Margin);
 
         let mut balance = Decimal::ZERO;
         balance += self.ledger.balance(client_margin.id);
@@ -419,7 +454,9 @@ impl Accounting for LedgerAccounting {
 
     async fn asset_available_margin_balance(&self, venue: &Arc<Venue>, asset: &Arc<Asset>) -> Decimal {
         let tradable = Tradable::Asset(asset.clone());
-        let account = self.ledger.find_or_create(&venue, &tradable, &AccountType::ClientMargin);
+        let account = self
+            .ledger
+            .find_or_create(&venue, &tradable, &AccountOwner::User, &AccountType::Margin);
 
         self.ledger.balance(account.id)
     }
@@ -431,7 +468,10 @@ impl Accounting for LedgerAccounting {
         let accounts = self.ledger.accounts();
         let mut positions = HashMap::new();
         for account in accounts {
-            if &account.venue == venue && account.account_type == AccountType::ClientInstrument {
+            if &account.venue == venue
+                && account.account_type == AccountType::Instrument
+                && account.owner == AccountOwner::User
+            {
                 if let Tradable::Instrument(instrument) = &account.asset {
                     let balance = self.ledger.balance(account.id);
                     let entry = positions.entry(instrument.clone()).or_insert(Decimal::ZERO);
@@ -462,7 +502,9 @@ impl Accounting for LedgerAccounting {
     async fn instrument_position(&self, instrument: &Arc<Instrument>) -> Decimal {
         let venue = instrument.venue.clone();
         let tradable = Tradable::Instrument(instrument.clone());
-        let account = self.ledger.find_or_create(&venue, &tradable, &AccountType::ClientInstrument);
+        let account = self
+            .ledger
+            .find_or_create(&venue, &tradable, &AccountOwner::User, &AccountType::Instrument);
 
         self.ledger.balance(account.id)
     }
@@ -473,7 +515,7 @@ impl Accounting for LedgerAccounting {
         let accounts = self.ledger.accounts();
         let mut positions = HashMap::new();
         for account in accounts {
-            if account.account_type == AccountType::ClientInstrument {
+            if account.account_type == AccountType::Instrument && account.owner == AccountOwner::User {
                 if let Tradable::Instrument(instrument) = &account.asset {
                     let balance = self.ledger.strategy_balance(&strategy, Some(instrument));
                     let entry = positions.entry(instrument.clone()).or_insert(Decimal::ZERO);
@@ -516,7 +558,9 @@ impl Accounting for LedgerAccounting {
         let accounts = self.ledger.accounts();
         let mut pnl = Decimal::ZERO;
         for account in accounts {
-            if account.account_type == AccountType::ClientMargin || account.account_type == AccountType::ClientSpot {
+            if account.owner == AccountOwner::User
+                && (account.account_type == AccountType::Margin || account.account_type == AccountType::Spot)
+            {
                 let balance = self.ledger.strategy_pnl(strategy, None);
                 pnl += balance;
             }
@@ -584,10 +628,12 @@ mod tests {
 
         // Initial deposit
         accounting
-            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::ClientMargin)
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
             .unwrap();
 
-        let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
 
         // Go long strategy 1: Buy 1 BTC at 1000 USDT
         accounting
@@ -855,7 +901,7 @@ mod tests {
 
         // Initial deposit
         accounting
-            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::ClientMargin)
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
             .unwrap();
 
         // Go long: Buy 1 BTC at 1000 USDT
@@ -872,8 +918,12 @@ mod tests {
             )
             .unwrap();
 
-        let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
-        let venue_spot = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::VenueSpot);
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
+        let venue_spot = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::Venue, &AccountType::Spot);
 
         // Check balances from ledger
         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
@@ -972,10 +1022,12 @@ mod tests {
 
         // Initial deposit
         accounting
-            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::ClientMargin)
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
             .unwrap();
 
-        let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
 
         // Go long: Buy 1 BTC at 1000 USDT
         accounting
@@ -1046,10 +1098,12 @@ mod tests {
 
         // Initial deposit
         accounting
-            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::ClientMargin)
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
             .unwrap();
 
-        let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
 
         // Go short: Sell 1 BTC at 1000 USDT
         accounting
@@ -1101,10 +1155,12 @@ mod tests {
 
         // Initial deposit
         accounting
-            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::ClientMargin)
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
             .unwrap();
 
-        let user_margin = accounting.ledger.find_or_create(&venue, &usdt, &AccountType::ClientMargin);
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
 
         // Go short: Sell 1 BTC at 1000 USDT
         accounting
@@ -1175,7 +1231,7 @@ mod tests {
 
         // Initial deposit
         accounting
-            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::ClientMargin)
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
             .unwrap();
 
         // Go long: Buy 1 BTC at 1000 USDT

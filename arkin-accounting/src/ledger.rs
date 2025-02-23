@@ -23,13 +23,20 @@ pub struct Ledger {
 
 impl Ledger {
     /// Adds an account to the ledger and returns it.
-    pub fn add_account(&self, venue: Arc<Venue>, asset: Tradable, account_type: AccountType) -> Arc<Account> {
-        match self.find_account(&venue, &asset, &account_type) {
+    pub fn add_account(
+        &self,
+        venue: Arc<Venue>,
+        asset: Tradable,
+        owner: AccountOwner,
+        account_type: AccountType,
+    ) -> Arc<Account> {
+        match self.find_account(&venue, &asset, &owner, &account_type) {
             Some(account) => account,
             None => {
                 let account: Arc<Account> = Account::builder()
                     .venue(venue)
                     .asset(asset.clone())
+                    .owner(owner)
                     .account_type(account_type)
                     .build()
                     .into();
@@ -44,20 +51,27 @@ impl Ledger {
         &self,
         venue: &Arc<Venue>,
         asset: &Tradable,
+        owner: &AccountOwner,
         account_type: &AccountType,
     ) -> Option<Arc<Account>> {
         let accounts = self.accounts.read();
         accounts
             .values()
-            .find(|a| a.venue == *venue && a.asset == *asset && a.account_type == *account_type)
+            .find(|a| a.venue == *venue && a.asset == *asset && a.owner == *owner && a.account_type == *account_type)
             .cloned()
     }
 
     /// Finds an account by venue, asset, and account type, or creates it if it doesn't exist.
-    pub fn find_or_create(&self, venue: &Arc<Venue>, asset: &Tradable, account_type: &AccountType) -> Arc<Account> {
-        match self.find_account(venue, asset, account_type) {
+    pub fn find_or_create(
+        &self,
+        venue: &Arc<Venue>,
+        asset: &Tradable,
+        owner: &AccountOwner,
+        account_type: &AccountType,
+    ) -> Arc<Account> {
+        match self.find_account(venue, asset, owner, account_type) {
             Some(account) => account,
-            None => self.add_account(venue.clone(), asset.clone(), account_type.clone()),
+            None => self.add_account(venue.clone(), asset.clone(), owner.clone(), account_type.clone()),
         }
     }
 
@@ -103,10 +117,8 @@ impl Ledger {
         transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
             if t.credit_account.is_user_account() {
                 acc + t.amount
-            } else if t.debit_account.is_user_account() {
-                acc - t.amount
             } else {
-                acc
+                acc - t.amount
             }
         })
     }
@@ -126,10 +138,8 @@ impl Ledger {
         transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
             if t.credit_account.is_user_account() {
                 acc + t.amount
-            } else if t.debit_account.is_user_account() {
-                acc - t.amount
             } else {
-                acc
+                acc - t.amount
             }
         })
     }
@@ -255,12 +265,10 @@ impl Ledger {
 
         let transfers = self.transfers.read();
         transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
-            if t.debit_account.is_user_margin_account() {
+            if t.debit_account.is_user_account() {
                 acc + t.amount // Margin posted to venue
-            } else if t.credit_account.is_user_margin_account() {
-                acc - t.amount // Margin released from venue
             } else {
-                acc
+                acc - t.amount // Margin released from venue
             }
         })
     }
@@ -312,8 +320,9 @@ impl Ledger {
             }
 
             // Check for insufficient balance on exchange wallets
-            if t.debit_account.account_type == AccountType::ClientSpot
-                || t.debit_account.account_type == AccountType::ClientMargin
+            if t.debit_account.is_user_account()
+                && (t.debit_account.account_type == AccountType::Spot
+                    || t.debit_account.account_type == AccountType::Margin)
             {
                 if self.balance(t.debit_account.id) < t.amount {
                     return Err(AccountingError::InsufficientBalance(t.clone()));
@@ -355,11 +364,26 @@ mod tests {
         let usdt = test_usdt_asset();
 
         // Create Personal account for USD
-        let account_l = ledger.add_account(personal_venue.clone(), usdt.clone().into(), AccountType::VenueSpot);
+        let account_l = ledger.add_account(
+            personal_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::Venue,
+            AccountType::Spot,
+        );
 
         // Create two Strategy accounts for USD
-        let account_a = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
-        let account_b = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientMargin);
+        let account_a = ledger.add_account(
+            binance_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::User,
+            AccountType::Spot,
+        );
+        let account_b = ledger.add_account(
+            binance_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::User,
+            AccountType::Margin,
+        );
 
         let amount = dec!(100);
         ledger.transfer(&account_l, &account_a, amount).unwrap();
@@ -390,8 +414,21 @@ mod tests {
         let binance_venue = test_binance_venue();
         let usdt = test_usdt_asset();
 
-        let account_l = ledger.add_account(personal_venue.clone(), usdt.clone().into(), AccountType::VenueSpot);
-        let account_a = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
+        // Create Personal account for USD
+        let account_l = ledger.add_account(
+            personal_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::Venue,
+            AccountType::Spot,
+        );
+
+        // Create two Strategy accounts for USD
+        let account_a = ledger.add_account(
+            binance_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::User,
+            AccountType::Spot,
+        );
 
         ledger.transfer(&account_l, &account_a, dec!(1000)).unwrap();
         let result = ledger.transfer(&account_a, &account_l, dec!(1001));
@@ -407,8 +444,19 @@ mod tests {
         let binance_venue = test_binance_venue();
         let usdt = test_usdt_asset();
 
-        let account_a = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
-        let account_b = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientMargin);
+        // Create two Strategy accounts for USD
+        let account_a = ledger.add_account(
+            binance_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::User,
+            AccountType::Spot,
+        );
+        let account_b = ledger.add_account(
+            binance_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::User,
+            AccountType::Margin,
+        );
 
         let result_zero = ledger.transfer(&account_a, &account_b, dec!(0));
         assert!(matches!(result_zero, Err(AccountingError::InvalidTransferAmount(_))));
@@ -424,8 +472,14 @@ mod tests {
         let usdt = test_usdt_asset();
         let btc = test_btc_asset();
 
-        let account_usd = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
-        let account_btc = ledger.add_account(binance_venue.clone(), btc.clone().into(), AccountType::ClientSpot);
+        let account_usd = ledger.add_account(
+            binance_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::User,
+            AccountType::Spot,
+        );
+        let account_btc =
+            ledger.add_account(binance_venue.clone(), btc.clone().into(), AccountOwner::User, AccountType::Spot);
 
         let result = ledger.transfer(&account_usd, &account_btc, dec!(100));
         assert!(matches!(result, Err(AccountingError::CurrencyMismatch(_))));
@@ -437,7 +491,12 @@ mod tests {
         let binance_venue = test_binance_venue();
         let usdt = test_usdt_asset();
 
-        let account_a = ledger.add_account(binance_venue.clone(), usdt.clone().into(), AccountType::ClientSpot);
+        let account_a = ledger.add_account(
+            binance_venue.clone(),
+            usdt.clone().into(),
+            AccountOwner::User,
+            AccountType::Spot,
+        );
         let result = ledger.transfer(&account_a, &account_a, dec!(100));
         assert!(matches!(result, Err(AccountingError::SameAccount(_))));
     }
