@@ -10,9 +10,9 @@ use crate::PersistenceError;
 #[derive(FromRow)]
 pub struct AccountDTO {
     pub id: Uuid,
-    pub instance_id: Uuid,
     pub asset_id: Uuid,
     pub venue_id: Uuid,
+    pub owner: AccountOwner,
     pub account_type: AccountType,
 }
 
@@ -22,7 +22,8 @@ impl From<Arc<Account>> for AccountDTO {
             id: account.id,
             asset_id: account.asset.id(),
             venue_id: account.venue.id,
-            account_type: account.account_type,
+            owner: account.owner.clone(),
+            account_type: account.account_type.clone(),
         }
     }
 }
@@ -31,6 +32,7 @@ impl From<Arc<Account>> for AccountDTO {
 
 pub struct AccountRepo {
     pool: PgPool,
+    instance: Arc<Instance>,
 }
 
 impl AccountRepo {
@@ -40,17 +42,19 @@ impl AccountRepo {
             INSERT INTO accounts 
             (
                 id, 
-                name, 
-                description,
-                created_at,
-                updated_at
-            ) VALUES ($1, $2, $3, $4, $5)
+                instance_id,
+                asset_id, 
+                venue_id,
+                owner,
+                account_type
+            ) VALUES ($1, $2, $3, $4, $5, $6)
             "#,
             account.id,
-            account.name,
-            account.description,
-            account.created_at,
-            account.updated_at,
+            self.instance.id,
+            account.asset_id,
+            account.venue_id,
+            account.owner as AccountOwner,
+            account.account_type as AccountType,
         )
         .execute(&self.pool)
         .await?;
@@ -63,10 +67,10 @@ impl AccountRepo {
             r#"
             SELECT
                 id, 
-                name, 
-                description,
-                created_at,
-                updated_at
+                asset_id, 
+                venue_id,
+                owner AS "owner:AccountOwner",
+                account_type AS "account_type:AccountType"
             FROM accounts
             WHERE id = $1
             "#,
@@ -81,20 +85,20 @@ impl AccountRepo {
         }
     }
 
-    pub async fn read_by_name(&self, name: &str) -> Result<AccountDTO, PersistenceError> {
+    pub async fn read_by_instance(&self) -> Result<AccountDTO, PersistenceError> {
         let account = sqlx::query_as!(
             AccountDTO,
             r#"
             SELECT
                 id, 
-                name, 
-                description,
-                created_at,
-                updated_at
+                asset_id, 
+                venue_id,
+                owner AS "owner:AccountOwner",
+                account_type AS "account_type:AccountType"
             FROM accounts
-            WHERE name = $1
+            WHERE instance_id = $1
             "#,
-            name,
+            self.instance.id,
         )
         .fetch_optional(&self.pool)
         .await?;

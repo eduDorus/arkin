@@ -48,4 +48,7 @@ pub enum AccountingError {
 
     #[error("Same account found for transaction: {0}")]
     SameAccount(Arc<Transfer>),
+
+    #[error(transparent)]
+    PersistenceError(#[from] arkin_persistence::PersistenceError),
 }

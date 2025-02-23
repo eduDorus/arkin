@@ -34,6 +34,7 @@ impl Ledger {
             Some(account) => account,
             None => {
                 let account: Arc<Account> = Account::builder()
+                    .id(Uuid::new_v4())
                     .venue(venue)
                     .asset(asset.clone())
                     .owner(owner)
@@ -41,6 +42,7 @@ impl Ledger {
                     .build()
                     .into();
                 self.accounts.write().insert(account.id.clone(), account.clone());
+                info!("Added account: {} {}", account.id, account);
                 account
             }
         }
@@ -126,7 +128,7 @@ impl Ledger {
     /// Returns the net PnL for an account and strategy.
     pub fn strategy_pnl(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
         let filter = |t: &&Arc<Transfer>| {
-            t.has_type(&TransferType::PnL)
+            t.has_type(&TransferType::Pnl)
                 && t.has_strategy(strategy)
                 && match instrument {
                     Some(i) => t.has_instrument(i),
@@ -287,7 +289,7 @@ impl Ledger {
         debit_account: &Arc<Account>,
         credit_account: &Arc<Account>,
         amount: Decimal,
-    ) -> Result<(), AccountingError> {
+    ) -> Result<Vec<Arc<Transfer>>, AccountingError> {
         let transfer = Arc::new(
             Transfer::builder()
                 .transfer_type(TransferType::Deposit)
@@ -299,7 +301,7 @@ impl Ledger {
                 .unit_price(Decimal::ONE)
                 .build(),
         );
-        self.apply_transfers(&[transfer])
+        self.apply_transfers(&[transfer.clone()])
     }
 
     /// Performs one or more same-currency transfers **atomically**:
@@ -307,7 +309,7 @@ impl Ledger {
     /// - For double-entry: each Transfer has a `debit_account_id` and `credit_account_id`.
     ///
     /// Returns an error if any of the transfers are invalid.
-    pub fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<(), AccountingError> {
+    pub fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<Vec<Arc<Transfer>>, AccountingError> {
         for t in transfers {
             // Check if it is not the same account
             if t.debit_account.id == t.credit_account.id {
@@ -343,7 +345,7 @@ impl Ledger {
             tx_log_lock.push(t.clone());
         }
 
-        Ok(())
+        Ok(transfers.to_vec())
     }
 }
 

@@ -152,6 +152,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arkin-core",
+ "arkin-persistence",
  "async-trait",
  "dashmap",
  "parking_lot",

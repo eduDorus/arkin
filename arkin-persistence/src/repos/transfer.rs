@@ -14,29 +14,33 @@ const FIELD_COUNT: usize = 9;
 
 #[derive(Debug, FromRow)]
 pub struct TransferDTO {
+    pub id: Uuid,
     pub event_time: OffsetDateTime,
     pub transfer_group_id: Uuid,
-    pub portfolio_id: Uuid,
-    pub asset_id: Option<Uuid>,
-    pub instrument_id: Option<Uuid>,
+    pub debit_account_id: Uuid,
+    pub credit_account_id: Uuid,
+    pub asset_id: Uuid,
+    pub amount: Decimal,
+    pub unit_price: Decimal,
     pub transfer_type: TransferType,
-    pub price: Option<Decimal>,
-    pub quantity: Decimal,
-    pub total_value: Decimal,
+    pub strategy_id: Option<Uuid>,
+    pub instrument_id: Option<Uuid>,
 }
 
 impl From<Arc<Transfer>> for TransferDTO {
     fn from(transfer: Arc<Transfer>) -> Self {
         Self {
+            id: transfer.id,
             event_time: transfer.event_time,
             transfer_group_id: transfer.transfer_group_id,
-            portfolio_id: transfer.portfolio.id,
-            asset_id: transfer.asset.as_ref().map(|a| a.id),
-            instrument_id: transfer.instrument.as_ref().map(|i| i.id),
+            debit_account_id: transfer.debit_account.id,
+            credit_account_id: transfer.credit_account.id,
+            asset_id: transfer.asset.id(),
+            amount: transfer.amount,
+            unit_price: transfer.unit_price,
             transfer_type: transfer.transfer_type.clone(),
-            price: transfer.price,
-            quantity: transfer.quantity,
-            total_value: transfer.total_value,
+            strategy_id: transfer.strategy.as_ref().map(|s| s.id),
+            instrument_id: transfer.instrument.as_ref().map(|i| i.id),
         }
     }
 }
@@ -45,6 +49,7 @@ impl From<Arc<Transfer>> for TransferDTO {
 
 pub struct TransferRepo {
     pool: PgPool,
+    instance: Arc<Instance>,
 }
 
 impl TransferRepo {
@@ -53,26 +58,32 @@ impl TransferRepo {
             r#"
             INSERT INTO transfers
             (
+                id, 
                 event_time, 
+                instance_id, 
                 transfer_group_id, 
-                portfolio_id, 
+                debit_account_id, 
+                credit_account_id, 
                 asset_id, 
-                instrument_id, 
+                amount, 
+                unit_price, 
                 transfer_type, 
-                price, 
-                quantity, 
-                total_value
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                strategy_id, 
+                instrument_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             "#,
+            transfer.id,
             transfer.event_time,
+            self.instance.id,
             transfer.transfer_group_id,
-            transfer.portfolio_id,
+            transfer.debit_account_id,
+            transfer.credit_account_id,
             transfer.asset_id,
-            transfer.instrument_id,
+            transfer.amount,
+            transfer.unit_price,
             transfer.transfer_type as TransferType,
-            transfer.price,
-            transfer.quantity,
-            transfer.total_value,
+            transfer.strategy_id,
+            transfer.instrument_id,
         )
         .execute(&self.pool)
         .await?;
@@ -87,30 +98,36 @@ impl TransferRepo {
                 r#"
                 INSERT INTO transfers
                 (
+                    id, 
                     event_time, 
+                    instance_id, 
                     transfer_group_id, 
-                    portfolio_id, 
+                    debit_account_id, 
+                    credit_account_id, 
                     asset_id, 
-                    instrument_id, 
+                    amount, 
+                    unit_price, 
                     transfer_type, 
-                    price, 
-                    quantity, 
-                    total_value
+                    strategy_id, 
+                    instrument_id
                 ) 
                 "#,
             );
 
             // Push the values into the query builder
-            query_builder.push_values(batch, |mut b, tick| {
-                b.push_bind(tick.event_time)
-                    .push_bind(tick.transfer_group_id)
-                    .push_bind(tick.portfolio_id)
-                    .push_bind(tick.asset_id)
-                    .push_bind(tick.instrument_id)
-                    .push_bind(tick.transfer_type)
-                    .push_bind(tick.price)
-                    .push_bind(tick.quantity)
-                    .push_bind(tick.total_value);
+            query_builder.push_values(batch, |mut b, t| {
+                b.push_bind(t.id)
+                    .push_bind(t.event_time)
+                    .push_bind(self.instance.id)
+                    .push_bind(t.transfer_group_id)
+                    .push_bind(t.debit_account_id)
+                    .push_bind(t.credit_account_id)
+                    .push_bind(t.asset_id)
+                    .push_bind(t.amount)
+                    .push_bind(t.unit_price)
+                    .push_bind(t.transfer_type.clone())
+                    .push_bind(t.strategy_id)
+                    .push_bind(t.instrument_id);
             });
 
             // Use ON CONFLICT for the composite primary key

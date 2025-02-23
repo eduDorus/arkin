@@ -18,8 +18,8 @@ pub struct PersistenceService {
     pub dry_run: bool,
     pub auto_commit_interval: Duration,
     pub instance_store: Arc<InstanceStore>,
-    // pub portfolio_store: Arc<PortfolioStore>,
-    // pub transaction_store: Arc<TransactionStore>,
+    pub account_store: Arc<AccountStore>,
+    pub transfer_store: Arc<TransferStore>,
     pub venue_store: Arc<VenueStore>,
     pub asset_store: Arc<AssetStore>,
     pub instrument_store: Arc<InstrumentStore>,
@@ -66,8 +66,8 @@ impl PersistenceService {
             instance
         };
 
-        // let account_repo = AccountRepo::builder().pool(pool.clone()).build();
-        // let transfer_repo = TransferRepo::builder().pool(pool.clone()).build();
+        let account_repo = AccountRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
+        let transfer_repo = TransferRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
         let venue_repo = VenueRepo::builder().pool(pool.clone()).build();
         let asset_repo = AssetRepo::builder().pool(pool.clone()).build();
         let instrument_repo = InstrumentRepo::builder().pool(pool.clone()).build();
@@ -95,13 +95,8 @@ impl PersistenceService {
 
         // Initialize stores
 
-        // let portfolio_store = Arc::new(PortfolioStore::builder().portfolio_repo(account_repo.to_owned()).build());
-        // let transaction_store = Arc::new(
-        //     TransactionStore::builder()
-        //         .transaction_repo(transfer_repo.to_owned())
-        //         .buffer_size(config.batch_size)
-        //         .build(),
-        // );
+        let account_store = Arc::new(AccountStore::builder().account_repo(account_repo.to_owned()).build());
+        let transfer_store = Arc::new(TransferStore::builder().transfer_repo(transfer_repo.to_owned()).build());
         let venue_store = Arc::new(VenueStore::builder().venue_repo(venue_repo).build());
         let asset_store = Arc::new(AssetStore::builder().asset_repo(asset_repo.to_owned()).build());
         let instrument_store = Arc::new(
@@ -148,8 +143,8 @@ impl PersistenceService {
             dry_run,
             auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
             instance_store,
-            // portfolio_store,
-            // transaction_store,
+            account_store,
+            transfer_store,
             venue_store,
             asset_store,
             instrument_store,
@@ -201,6 +196,9 @@ impl RunnableService for PersistenceService {
                             Event::Signal(signal) => self.signal_store.insert(signal).await ,
                             Event::ExecutionOrder(order) => self.execution_order_store.insert(order).await ,
                             Event::VenueOrderNew(order) => self.venue_order_store.insert(order).await ,
+                            Event::AccountNew(account) => self.account_store.insert(account).await,
+                            Event::Transfer(transfer) => self.transfer_store.insert(transfer).await,
+                            Event::TransferBatch(transfers) => self.transfer_store.insert_batch(transfers).await,
                             _ => {Ok(())}
                         };
                         if let Err(e) = res {

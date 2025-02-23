@@ -1,8 +1,7 @@
-CREATE TYPE market_side AS ENUM ('buy', 'sell');
 
-
--- CREATE INSTANCE TABLE
-CREATE TYPE instance_type AS ENUM ( 'live', 'simulation', 'other');
+-- METADATA
+-- INSTANCES
+CREATE TYPE instance_type AS ENUM ( 'live', 'simulation', 'utility');
 CREATE TABLE IF NOT EXISTS instances (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
@@ -10,37 +9,61 @@ CREATE TABLE IF NOT EXISTS instances (
 );
 
 
+-- STRATEGIES
 CREATE TABLE IF NOT EXISTS strategies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL
+    description TEXT
 );
+INSERT INTO public.strategies (id,"name",description) VALUES
+	 ('1fce35ce-1583-4334-a410-bc0f71c7469b'::uuid,'test_strategy_1','This strategy is only for testing'),
+	 ('a2d0951e-9bc6-47a4-b803-e4e0bb4e98a3'::uuid,'test_strategy_2','This strategy is only for testing');
 
-CREATE TYPE venue_type AS ENUM ('cex', 'dex', 'otc');
+
+-- VENUES
+CREATE TYPE venue_type AS ENUM ('cex', 'dex', 'otc', 'user_funds');
 CREATE TABLE IF NOT EXISTS venues (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
-    venue_type venue_type NOT NULL,
+    venue_type venue_type NOT NULL
 );
+INSERT INTO public.venues (id,"name","venue_type") VALUES
+	 ('48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'binance','cex'::public."venue_type"),
+	 ('b8b9dcf2-77ea-4d24-964e-8243bb7298ea'::uuid,'personal','user_funds'::public."venue_type");
 
 
-CREATE TYPE asset_type AS ENUM ('crypto', 'stock', 'forex', 'commodity');
+
+-- ASSETS
+CREATE TYPE asset_type AS ENUM ('crypto', 'stock', 'fiat', 'commodity');
 CREATE TABLE IF NOT EXISTS assets (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     symbol TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     asset_type asset_type NOT NULL
 );
+INSERT INTO public.assets (id,symbol,"name","asset_type") VALUES
+	 ('894ff9df-e76e-4b2e-aaec-49988de26a84'::uuid,'BTC','Bitcoin','crypto'::public."asset_type"),
+	 ('3091ac12-64a7-4824-9ea5-e1c27e10af6f'::uuid,'ETH','Ethereum','crypto'::public."asset_type"),
+	 ('97576805-9c3d-427f-82c4-09df0d796d44'::uuid,'SOL','Solana','crypto'::public."asset_type"),
+	 ('5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'USDT','Tether','crypto'::public."asset_type"),
+	 ('91e61c74-9e4c-4226-b848-8b96e1ec4941'::uuid,'BNB','Binance Coin','crypto'::public."asset_type");
 
+
+-- PIPELINES
 CREATE TABLE IF NOT EXISTS pipelines (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
+INSERT INTO public.pipelines (id,"name",description) VALUES
+	 ('df5305b0-3e9b-4b7c-8a13-1406e93f5cc9'::uuid,'test_pipeline','This pipeline is only for testing');
 
 
+
+-- INSTRUMENTS
 CREATE TYPE instrument_type AS ENUM ('spot', 'perpetual', 'future', 'option');
-CREATE TYPE instrument_status AS ENUM ('trading', 'halted');
+CREATE TYPE instrument_status AS ENUM ('trading', 'halted', 'setteled');
 CREATE TYPE instrument_option_type AS ENUM ('call', 'put');
 CREATE TABLE IF NOT EXISTS instruments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -48,8 +71,9 @@ CREATE TABLE IF NOT EXISTS instruments (
     symbol TEXT NOT NULL,
     venue_symbol TEXT NOT NULL,
     instrument_type instrument_type NOT NULL,
-    base_asset uuid NOT NULL REFERENCES assets(id),
-    quote_asset uuid NOT NULL REFERENCES assets(id),
+    base_asset_id uuid NOT NULL REFERENCES assets(id),
+    quote_asset_id uuid NOT NULL REFERENCES assets(id),
+    margin_asset_id uuid NOT NULL REFERENCES assets(id),
     strike DECIMAL,
     maturity TIMESTAMPTZ,
     option_type instrument_option_type,
@@ -61,91 +85,59 @@ CREATE TABLE IF NOT EXISTS instruments (
     lot_size DECIMAL NOT NULL,
     tick_size DECIMAL NOT NULL,
     status instrument_status NOT NULL
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 );
+INSERT INTO public.instruments (id,venue_id,symbol,venue_symbol,"instrument_type",base_asset_id,quote_asset_id,margin_asset_id,strike,maturity,"option_type",contract_size,price_precision,quantity_precision,base_precision,quote_precision,lot_size,tick_size,status) VALUES
+	 ('f5dd7db6-89da-4c68-b62e-6f80b763bef6'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-btc-usdt@binance','BTCUSDT','perpetual'::public."instrument_type",'894ff9df-e76e-4b2e-aaec-49988de26a84'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,2,3,8,8,0.001,0.1,'trading'::public."instrument_status"),
+	 ('0a6400f4-abb5-4ff3-8720-cf2eeebef26e'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-eth-usdt@binance','ETHUSDT','perpetual'::public."instrument_type",'3091ac12-64a7-4824-9ea5-e1c27e10af6f'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,2,3,8,8,0.001,0.01,'trading'::public."instrument_status"),
+	 ('461c915c-de28-40af-ad5a-cc2a46e6473d'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-sol-usdt@binance','SOLUSDT','perpetual'::public."instrument_type",'97576805-9c3d-427f-82c4-09df0d796d44'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,4,0,8,8,1,0.0100,'trading'::public."instrument_status");
 
-CREATE TABLE IF NOT EXISTS portfolios (
+
+
+-- ACCOUNTING
+-- ACCOUNTS
+CREATE TYPE account_owner AS ENUM ('user', 'venue');
+CREATE TYPE account_type AS ENUM ('spot', 'margin', 'instrument');
+CREATE TABLE IF NOT EXISTS accounts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    name TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL,
-    created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    instance_id uuid NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    asset_id uuid NOT,
+    venue_id uuid NOT NULL REFERENCES venues(id),
+    owner account_owner NOT null,
+    account_type account_type NOT NULL
 );
 
-CREATE TYPE transaction_type AS ENUM (
-    'deposit',
-    'withdrawal',
-    'buy',
-    'sell',
-    'collateral',
-    'dividend',
-    'fee',
-    'settlement',
-    'interest',
-    'funding',
-    'liquidation',
-    'transfer'
-    'rebate',
-    'adjustment',
-    'other'
-);
--- Transactions Table (Enhanced)
-CREATE TABLE IF NOT EXISTS transactions (
+-- TRANSFERS
+CREATE TYPE transfer_type AS ENUM ('deposit', 'withdrawal', 'trade', 'pnl', 'exchange', 'margin', 'commission', 'interest', 'funding', 'settlement', 'liquidation', 'rebate', 'adjustment');
+CREATE TABLE IF NOT EXISTS transfers (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    group_id uuid NOT NULL,
-    portfolio_id uuid NOT NULL REFERENCES portfolios(id),
-    asset_id uuid REFERENCES assets(id),
-    instrument_id uuid REFERENCES instruments(id),
-    transaction_type transaction_type NOT NULL,
-    price NUMERIC,
-    quantity NUMERIC NOT NULL,
-    total_value NUMERIC
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    instance_id uuid NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    transfer_group_id uuid NOT NULL,
+    debit_account_id uuid NOT NULL REFERENCES accounts(id),
+    credit_account_id uuid NOT NULL REFERENCES accounts(id),
+    asset_id uuid NOT NULL,
+    amount NUMERIC NOT NULL,
+    unit_price NUMERIC NOT NULL,
+    transfer_type transfer_type NOT null,
+    strategy_id uuid,
+    instrument_id uuid
 );
 
--- CREATE TABLE IF NOT EXISTS holdings (
---     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
---     instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
---     asset_id uuid NOT NULL REFERENCES assets(id),
---     quantity NUMERIC NOT NULL,
---     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
---     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
--- );
+-- EVENTS
+-- SIGNALS
+CREATE TABLE IF NOT EXISTS signals (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
+    instance_id uuid NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    strategy_id uuid NOT NULL REFERENCES strategies(id),
+    instrument_id uuid NOT NULL REFERENCES instruments(id),
+    weight NUMERIC NOT NULL
+);
+CREATE INDEX signals_idx ON signals (instance_id, instrument_id, strategy_id, event_time);
 
--- CREATE TYPE position_side AS ENUM ('long', 'short');
--- CREATE TYPE position_status AS ENUM ('open', 'closed');
--- CREATE TABLE IF NOT EXISTS positions (
---     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
---     instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
---     strategy_id uuid NOT NULL REFERENCES strategies(id), -- strategy_id
---     instrument_id uuid NOT NULL REFERENCES instruments(id),
---     side position_side NOT NULL,
---     open_price NUMERIC NOT NULL,
---     open_quantity NUMERIC NOT NULL,
---     close_price NUMERIC NOT NULL,
---     close_quantity DECIMAL NOT NULL,
---     realized_pnl DECIMAL NOT NULL,
---     total_commission DECIMAL NOT NULL,
---     status position_status NOT NULL,
---     created_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
---     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
--- );
 
--- CREATE TABLE IF NOT EXISTS venue_order_fills (
---     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
---     instance_id uuid NOT NULL REFERENCES instances(id), -- instance_id
---     venue_order_id uuid NOT NULL REFERENCES venue_orders(id),
---     instrument_id uuid NOT NULL REFERENCES instruments(id),
---     side market_side NOT NULL,
---     price NUMERIC NOT NULL,
---     quantity NUMERIC NOT NULL,
---     commission NUMERIC NOT NULL,
---     PRIMARY KEY (venue_order_id, instrument_id, instance_id, event_time)
--- );
--- SELECT create_hypertable('venue_order_fills', by_range('event_time', interval '1 day'));
--- SELECT add_dimension('venue_order_fills', by_hash('instrument_id', 4));
-
+-- EXECUTION ORDERS
+CREATE TYPE market_side AS ENUM ('buy', 'sell');
 CREATE TYPE execution_order_type AS ENUM ('maker', 'taker', 'vwap', 'twap', 'algo');
 CREATE TYPE execution_order_status AS ENUM (
     'new',
@@ -155,7 +147,7 @@ CREATE TYPE execution_order_status AS ENUM (
     'partially_filled_cancelled',
     'filled',
     'cancelling',
-    'cancelled',
+    'cancelled'
 );
 CREATE TABLE IF NOT EXISTS execution_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -173,13 +165,16 @@ CREATE TABLE IF NOT EXISTS execution_orders (
     status execution_order_status NOT NULL,
     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
+CREATE INDEX execution_orders_idx ON execution_orders (instance_id, instrument_id, strategy_id, event_time);
 
 
+
+-- VENUE ORDERS
 CREATE TYPE venue_order_type AS ENUM (
     'market', 
-    'limit'
-    'stop',
+    'limit',
     'stop_market',
+    'stop_limit',
     'take_profit',
     'take_profit_market',
     'trailing_stop_market'
@@ -206,7 +201,7 @@ CREATE TABLE IF NOT EXISTS venue_orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     instance_id uuid REFERENCES instances(id) ON DELETE CASCADE,
-    strategy_id uuid REFERENCES portfolios(id),
+    strategy_id uuid REFERENCES strategies(id),
     instrument_id uuid NOT NULL REFERENCES instruments(id),
     side market_side NOT NULL,
     order_type venue_order_type NOT NULL,
@@ -223,170 +218,4 @@ CREATE TABLE IF NOT EXISTS venue_orders (
     status venue_order_status NOT NULL,
     updated_at TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
-
-
-CREATE TABLE IF NOT EXISTS insights (
-    id uuid DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    pipeline_id uuid NOT NULL REFERENCES pipelines(id),
-    instrument_id uuid REFERENCES instruments(id),
-    feature_id TEXT NOT NULL,
-    value NUMERIC NOT NULL,
-    PRIMARY KEY (pipeline_id, instrument_id, feature_id, event_time)
-);
-SELECT create_hypertable('insights', by_range('event_time', interval '1 day'));
-SELECT add_dimension('insights', by_hash('pipeline_id', 4));
-
-
-
-CREATE TABLE IF NOT EXISTS signals (
-    id uuid DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL,
-    instance_id uuid NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
-    strategy_id uuid NOT NULL REFERENCES strategies(id),
-    instrument_id uuid NOT NULL REFERENCES instruments(id),
-    weight NUMERIC NOT NULL,
-    PRIMARY KEY (instance_id, instrument_id, strategy_id, event_time)
-);
-
-CREATE TABLE IF NOT EXISTS allocations (
-    id uuid DEFAULT gen_random_uuid (),
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    group_id uuid NOT NULL,
-    portfolio_id uuid NOT NULL REFERENCES portfolios(id),
-    strategy_id uuid NOT NULL REFERENCES strategies(id), 
-    instrument_id uuid NOT NULL REFERENCES instruments(id),
-    signal_id uuid NOT NULL, -- Can't reference hypertable table
-    allocation_weight NUMERIC NOT NULL,
-    weight NUMERIC NOT NULL
-    PRIMARY KEY (instrument_id, strategy_id, group_id, event_time)
-)
-SELECT create_hypertable('allocations', by_range('event_time', interval '1 day'));
-
-
-CREATE TABLE IF NOT EXISTS ticks (
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    instrument_id uuid NOT NULL REFERENCES instruments(id),
-    tick_id BIGINT NOT NULL,
-    bid_price NUMERIC NOT NULL,
-    bid_quantity NUMERIC NOT NULL,
-    ask_price NUMERIC NOT NULL,
-    ask_quantity NUMERIC NOT NULL,
-    PRIMARY KEY (instrument_id, tick_id, event_time)
-);
-SELECT create_hypertable('ticks', by_range('event_time', interval '1 day'));
-SELECT add_dimension('ticks', by_hash('instrument_id', 4));
-
-
-
-CREATE TABLE IF NOT EXISTS trade (
-    event_time TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    instrument_id uuid NOT NULL REFERENCES instruments(id),
-    trade_id BIGINT NOT NULL,
-    side market_side NOT NULL,
-    price NUMERIC NOT NULL,
-    quantity NUMERIC NOT NULL
-    PRIMARY KEY (instrument_id, trade_id, event_time)
-);
-SELECT create_hypertable('trades', by_range('event_time', interval '1 day'));
-SELECT add_dimension('trades', by_hash('instrument_id', 4));
-
-
-
-
-
--- INITIAL DATA
-INSERT INTO
-    venues (id, name, venue_type)
-VALUES
-    (
-        '48adfe42-29fb-4402-888a-0204bf417e32',
-        'binance',
-        'exchange'
-    );
-
-INSERT INTO
-    instruments (
-        id,
-        venue_id,
-        symbol,
-        venue_symbol,
-        instrument_type,
-        base_asset,
-        quote_asset,
-        strike,
-        maturity,
-        option_type,
-        contract_size,
-        price_precision,
-        quantity_precision,
-        base_precision,
-        quote_precision,
-        lot_size,
-        tick_size,
-        status
-    )
-VALUES
-    (
-        'f5dd7db6-89da-4c68-b62e-6f80b763bef6',
-        '48adfe42-29fb-4402-888a-0204bf417e32',
-        'perp-btc-usdt@binance',
-        'BTCUSDT',
-        'perpetual',
-        'btc',
-        'usdt',
-        null,
-        null,
-        null,
-        1,
-        2,
-        3,
-        8,
-        8,
-        0.001,
-        0.1,
-        'trading'
-    );
-
-INSERT INTO
-    instruments (
-        id,
-        venue_id,
-        symbol,
-        venue_symbol,
-        instrument_type,
-        base_asset,
-        quote_asset,
-        strike,
-        maturity,
-        option_type,
-        contract_size,
-        price_precision,
-        quantity_precision,
-        base_precision,
-        quote_precision,
-        lot_size,
-        tick_size,
-        status
-    )
-VALUES
-    (
-        '0a6400f4-abb5-4ff3-8720-cf2eeebef26e',
-        '48adfe42-29fb-4402-888a-0204bf417e32',
-        'perp-eth-usdt@binance',
-        'ETHUSDT',
-        'perpetual',
-        'eth',
-        'usdt',
-        null,
-        null,
-        null,
-        1,
-        2,
-        3,
-        8,
-        8,
-        0.001,
-        0.01,
-        'trading'
-    );
+CREATE INDEX venue_orders_idx ON venue_orders (instance_id, instrument_id, strategy_id, event_time);

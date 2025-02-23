@@ -39,7 +39,6 @@ impl AccountingFactory {
                 Arc::new(portfolio)
             }
             AccountingServiceType::Ledger => {
-                let accounting = LedgerAccounting::builder().pubsub(pubsub.clone()).build();
                 let personal_venue = persistence
                     .venue_store
                     .read_by_id(&Uuid::parse_str("b8b9dcf2-77ea-4d24-964e-8243bb7298ea").expect("Failed to parse UUID"))
@@ -55,6 +54,8 @@ impl AccountingFactory {
                     .read_by_symbol("USDT")
                     .await
                     .expect("Failed to read asset from DB");
+
+                let accounting = LedgerAccounting::builder().pubsub(pubsub).persistence(persistence).build();
                 accounting
                     .deposit(
                         &personal_venue,
@@ -63,6 +64,7 @@ impl AccountingFactory {
                         dec!(100_000),
                         &AccountType::Margin,
                     )
+                    .await
                     .expect("Failed to deposit initial funds");
 
                 Arc::new(accounting)
