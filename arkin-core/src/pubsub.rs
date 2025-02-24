@@ -108,6 +108,8 @@ pub enum Event {
     Signal(Arc<Signal>),
     AllocationTick(Arc<AllocationTick>),
     ExecutionOrder(Arc<ExecutionOrder>),
+    ExecutionOrderUpdate(Arc<ExecutionOrder>),
+    ExecutionOrderFillUpdate(Arc<ExecutionOrder>),
     // To the executor
     VenueOrderNew(Arc<VenueOrder>),
     VenueOrderCancel(VenueOrderId),

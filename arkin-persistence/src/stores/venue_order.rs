@@ -15,4 +15,8 @@ impl VenueOrderStore {
     pub async fn insert(&self, order: Arc<VenueOrder>) -> Result<(), PersistenceError> {
         self.venue_order_repo.insert(order.into()).await
     }
+
+    pub async fn update(&self, order: Arc<VenueOrder>) -> Result<(), PersistenceError> {
+        self.venue_order_repo.update(order.into()).await
+    }
 }

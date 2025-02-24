@@ -118,6 +118,10 @@ impl VenueOrder {
         }
     }
 
+    pub fn update_commision_asset(&mut self, asset: Arc<Asset>) {
+        self.commission_asset = Some(asset);
+    }
+
     pub fn cancel(&mut self) {
         match self.status {
             VenueOrderStatus::New => self.status = VenueOrderStatus::Cancelled,

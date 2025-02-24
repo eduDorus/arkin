@@ -150,9 +150,10 @@ impl VenueOrderRepo {
                 last_fill_commission = $4,
                 filled_price = $5,
                 filled_quantity = $6,
-                commission = $7,
-                status = $8,
-                updated_at = $9
+                commission_asset_id = $7,
+                commission = $8,
+                status = $9,
+                updated_at = $10
             WHERE id = $1
             "#,
             order.id,
@@ -161,6 +162,7 @@ impl VenueOrderRepo {
             order.last_fill_commission,
             order.filled_price,
             order.filled_quantity,
+            order.commission_asset_id,
             order.commission,
             order.status as VenueOrderStatus,
             order.updated_at,

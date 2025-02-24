@@ -20,9 +20,11 @@ impl OrderManagerService for DefaultOrderManager {}
 #[async_trait]
 impl OrderManager for DefaultOrderManager {
     async fn place_order(&self, order: Arc<ExecutionOrder>) -> Result<(), OrderManagerError> {
+        info!("DefaultOrderManager received order: {}", order);
+
         match order.order_type {
             ExecutionOrderType::Taker => {
-                info!("Placing market order: {}", order);
+                info!("DefaultOrderManager placing market order: {}", order);
                 let venue_order = VenueOrder::builder()
                     .id(order.id)
                     .event_time(order.event_time)
@@ -36,7 +38,7 @@ impl OrderManager for DefaultOrderManager {
                 self.pubsub.publish(Event::VenueOrderNew(venue_order.into())).await;
             }
             ExecutionOrderType::Maker => {
-                info!("Placing limit order: {}", order);
+                info!("DefaultOrderManager placing limit order: {}", order);
                 let venue_order = VenueOrder::builder()
                     .id(order.id)
                     .event_time(order.event_time)
@@ -55,6 +57,16 @@ impl OrderManager for DefaultOrderManager {
         }
         Ok(())
     }
+
+    async fn order_update(&self, _fill: Arc<VenueOrder>) -> Result<(), OrderManagerError> {
+        info!("DefaultOrderManager received order update: {}", _fill);
+        Ok(())
+    }
+
+    async fn order_fill(&self, _fill: Arc<VenueOrder>) -> Result<(), OrderManagerError> {
+        info!("DefaultOrderManager received order fill: {}", _fill);
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -68,16 +80,9 @@ impl RunnableService for DefaultOrderManager {
             tokio::select! {
                 Ok(event) = rx.recv() => {
                   match event {
-                    Event::ExecutionOrder(order) => {
-                      info!("SimpleOrderManager received order: {}", order);
-                      self.place_order(order).await.unwrap();
-                    }
-                    Event::VenueOrderUpdate(order) => {
-                      info!("SimpleOrderManager received order update: {}", order);
-                    }
-                    Event::VenueOrderFillUpdate(order) => {
-                      info!("SimpleOrderManager received order fill update: {}", order);
-                    }
+                    Event::ExecutionOrder(order) => self.place_order(order).await?,
+                    Event::VenueOrderUpdate(order) => self.order_update(order).await?,
+                    Event::VenueOrderFillUpdate(order) => self.order_fill(order).await?,
                     _ => {}
                   }
                 }
