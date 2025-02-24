@@ -85,7 +85,6 @@ pub struct VenueOrder {
     pub commission: Commission,
     #[builder(default = VenueOrderStatus::New)]
     pub status: VenueOrderStatus,
-    #[builder(default = OffsetDateTime::now_utc())]
     pub updated_at: OffsetDateTime,
 }
 

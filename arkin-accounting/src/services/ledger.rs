@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use std::{collections::HashMap, sync::Arc};
+use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
@@ -24,6 +25,7 @@ pub struct LedgerAccounting {
 impl LedgerAccounting {
     pub async fn deposit(
         &self,
+        event_time: OffsetDateTime,
         debit_venue: &Arc<Venue>,
         credit_venue: &Arc<Venue>,
         asset: &Tradable,
@@ -37,13 +39,14 @@ impl LedgerAccounting {
             .find_or_create_account(credit_venue, &asset, &AccountOwner::User, account_type)
             .await;
 
-        let transfers = self.ledger.transfer(&debit_account, &credit_account, amount)?;
+        let transfers = self.ledger.transfer(event_time, &debit_account, &credit_account, amount)?;
         self.persistence.transfer_store.insert_batch(transfers).await?;
         Ok(())
     }
 
     pub async fn withdraw(
         &self,
+        event_time: OffsetDateTime,
         debit_venue: &Arc<Venue>,
         credit_venue: &Arc<Venue>,
         asset: &Tradable,
@@ -57,13 +60,14 @@ impl LedgerAccounting {
             .find_or_create_account(credit_venue, asset, &AccountOwner::Venue, &AccountType::Spot)
             .await;
 
-        let transfers = self.ledger.transfer(&debit_account, &credit_account, amount)?;
+        let transfers = self.ledger.transfer(event_time, &debit_account, &credit_account, amount)?;
         self.persistence.transfer_store.insert_batch(transfers).await?;
         Ok(())
     }
 
     pub async fn exchange(
         &self,
+        event_time: OffsetDateTime,
         venue: Arc<Venue>,
         debit_asset: Tradable,
         credit_asset: Tradable,
@@ -80,6 +84,7 @@ impl LedgerAccounting {
             .await;
 
         let t1 = Transfer::builder()
+            .event_time(event_time)
             .transfer_group_id(transfer_group_id)
             .asset(debit_asset)
             .debit_account(debit_account)
@@ -98,6 +103,7 @@ impl LedgerAccounting {
             .await;
 
         let t2 = Transfer::builder()
+            .event_time(event_time)
             .transfer_group_id(transfer_group_id)
             .asset(credit_asset)
             .debit_account(venue_debit_account)
@@ -115,6 +121,7 @@ impl LedgerAccounting {
 
     pub async fn margin_trade(
         &self,
+        event_time: OffsetDateTime,
         side: MarketSide,
         strategy: Arc<Strategy>,
         instrument: Arc<Instrument>,
@@ -220,6 +227,7 @@ impl LedgerAccounting {
             // Post additional margin
             transfers.push(Arc::new(
                 Transfer::builder()
+                    .event_time(event_time)
                     .transfer_group_id(transfer_group_id)
                     .asset(user_margin.asset.clone())
                     .strategy(Some(strategy.clone()))
@@ -235,6 +243,7 @@ impl LedgerAccounting {
             // Free margin
             transfers.push(Arc::new(
                 Transfer::builder()
+                    .event_time(event_time)
                     .transfer_group_id(transfer_group_id)
                     .asset(venue_margin.asset.clone())
                     .strategy(Some(strategy.clone()))
@@ -251,6 +260,7 @@ impl LedgerAccounting {
         // Commission payment
         transfers.push(Arc::new(
             Transfer::builder()
+                .event_time(event_time)
                 .transfer_group_id(transfer_group_id)
                 .asset(user_margin.asset.clone())
                 .strategy(Some(strategy.clone()))
@@ -271,6 +281,7 @@ impl LedgerAccounting {
         };
         transfers.push(Arc::new(
             Transfer::builder()
+                .event_time(event_time)
                 .transfer_group_id(transfer_group_id)
                 .asset(debit_inst.asset.clone())
                 .strategy(Some(strategy.clone()))
@@ -289,6 +300,7 @@ impl LedgerAccounting {
                 // Profit: venue_spot -> user_margin
                 transfers.push(Arc::new(
                     Transfer::builder()
+                        .event_time(event_time)
                         .transfer_group_id(transfer_group_id)
                         .asset(venue_spot.asset.clone())
                         .strategy(Some(strategy.clone()))
@@ -304,6 +316,7 @@ impl LedgerAccounting {
                 // Loss: user_margin -> venue_spot
                 transfers.push(Arc::new(
                     Transfer::builder()
+                        .event_time(event_time)
                         .transfer_group_id(transfer_group_id)
                         .asset(user_margin.asset.clone())
                         .strategy(Some(strategy.clone()))
@@ -377,6 +390,7 @@ impl Accounting for LedgerAccounting {
             InstrumentType::Perpetual => {
                 debug!("Portfolio processing perpetual order: {}", order);
                 self.margin_trade(
+                    order.updated_at,
                     order.side,
                     order.strategy.clone(),
                     order.instrument.clone(),

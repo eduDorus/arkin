@@ -208,6 +208,7 @@ mod tests {
             .side(MarketSide::Buy)
             .price(dec!(100))
             .quantity(dec!(1))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         let order_id = order.id.clone();
         let order_arc = Arc::new(order);
@@ -256,6 +257,7 @@ mod tests {
             .side(MarketSide::Sell)
             .price(dec!(200))
             .quantity(dec!(2))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         let order_id = order.id.clone();
 
@@ -302,6 +304,7 @@ mod tests {
             .side(MarketSide::Buy)
             .price(dec!(150))
             .quantity(dec!(3))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         let order2 = VenueOrder::builder()
             .event_time(OffsetDateTime::now_utc())
@@ -310,6 +313,7 @@ mod tests {
             .side(MarketSide::Sell)
             .price(dec!(155))
             .quantity(dec!(1))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         // ...and one order with a different instrument.
         let order3 = VenueOrder::builder()
@@ -319,6 +323,7 @@ mod tests {
             .side(MarketSide::Buy)
             .price(dec!(160))
             .quantity(dec!(2))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
 
         {
@@ -373,6 +378,7 @@ mod tests {
             .side(MarketSide::Buy)
             .price(dec!(100))
             .quantity(dec!(1))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         let order2 = VenueOrder::builder()
             .event_time(OffsetDateTime::now_utc())
@@ -381,6 +387,7 @@ mod tests {
             .side(MarketSide::Sell)
             .price(dec!(110))
             .quantity(dec!(2))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
 
         {
@@ -433,6 +440,7 @@ mod tests {
             .order_type(VenueOrderType::Market)
             .price(dec!(100)) // Price may be ignored for market orders.
             .quantity(dec!(1))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         let buy_order_id = buy_order.id.clone();
 
@@ -445,6 +453,7 @@ mod tests {
             .order_type(VenueOrderType::Market)
             .price(dec!(100))
             .quantity(dec!(1))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         let sell_order_id = sell_order.id.clone();
 
@@ -514,6 +523,7 @@ mod tests {
             .order_type(VenueOrderType::Limit)
             .price(dec!(105))
             .quantity(dec!(1))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         let buy_order_id = buy_order.id.clone();
 
@@ -526,6 +536,7 @@ mod tests {
             .order_type(VenueOrderType::Limit)
             .price(dec!(95))
             .quantity(dec!(1))
+            .updated_at(OffsetDateTime::now_utc())
             .build();
         let sell_order_id = sell_order.id.clone();
 

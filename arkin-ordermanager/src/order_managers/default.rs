@@ -34,6 +34,7 @@ impl OrderManager for DefaultOrderManager {
                     .quantity(order.quantity)
                     .price(order.price)
                     .order_type(VenueOrderType::Market)
+                    .updated_at(order.event_time)
                     .build();
                 self.pubsub.publish(Event::VenueOrderNew(venue_order.into())).await;
             }
@@ -48,6 +49,7 @@ impl OrderManager for DefaultOrderManager {
                     .quantity(order.quantity)
                     .price(order.price)
                     .order_type(VenueOrderType::Limit)
+                    .updated_at(order.event_time)
                     .build();
                 self.pubsub.publish(Event::VenueOrderNew(venue_order.into())).await;
             }

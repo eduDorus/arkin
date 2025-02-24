@@ -58,6 +58,7 @@ impl AccountingFactory {
                 let accounting = LedgerAccounting::builder().pubsub(pubsub).persistence(persistence).build();
                 accounting
                     .deposit(
+                        OffsetDateTime::UNIX_EPOCH,
                         &personal_venue,
                         &binance_venue,
                         &asset.into(),
