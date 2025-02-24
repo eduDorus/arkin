@@ -55,7 +55,7 @@ impl AccountingFactory {
                     .await
                     .expect("Failed to read asset from DB");
 
-                let accounting = LedgerAccounting::builder().pubsub(pubsub).persistence(persistence).build();
+                let accounting = LedgerAccounting::builder().pubsub(pubsub)._persistence(persistence).build();
                 accounting
                     .deposit(
                         OffsetDateTime::UNIX_EPOCH,

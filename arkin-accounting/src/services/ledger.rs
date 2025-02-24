@@ -17,7 +17,7 @@ use crate::{ledger::Ledger, Accounting, AccountingError, AccountingService};
 #[derive(Debug, TypedBuilder)]
 pub struct LedgerAccounting {
     pubsub: Arc<PubSub>,
-    persistence: Arc<PersistenceService>,
+    _persistence: Arc<PersistenceService>,
     #[builder(default = Ledger::builder().build())]
     ledger: Ledger,
 }
@@ -40,7 +40,7 @@ impl LedgerAccounting {
             .await;
 
         let transfers = self.ledger.transfer(event_time, &debit_account, &credit_account, amount)?;
-        self.persistence.transfer_store.insert_batch(transfers).await?;
+        self.pubsub.publish(transfers).await;
         Ok(())
     }
 
@@ -61,7 +61,7 @@ impl LedgerAccounting {
             .await;
 
         let transfers = self.ledger.transfer(event_time, &debit_account, &credit_account, amount)?;
-        self.persistence.transfer_store.insert_batch(transfers).await?;
+        self.pubsub.publish(transfers).await;
         Ok(())
     }
 
@@ -115,7 +115,7 @@ impl LedgerAccounting {
             .into();
 
         let transfers = self.ledger.apply_transfers(&[t1, t2])?;
-        self.persistence.transfer_store.insert_batch(transfers).await?;
+        self.pubsub.publish(transfers).await;
         Ok(())
     }
 
@@ -338,7 +338,7 @@ impl LedgerAccounting {
 
         // Apply transfers atomically
         let transfers = self.ledger.apply_transfers(&transfers)?;
-        self.persistence.transfer_store.insert_batch(transfers).await?;
+        self.pubsub.publish(transfers).await;
         Ok(())
     }
 
@@ -355,11 +355,7 @@ impl LedgerAccounting {
             let account = self
                 .ledger
                 .add_account(venue.clone(), asset.clone(), owner.clone(), account_type.clone());
-            self.persistence
-                .account_store
-                .insert(account.clone())
-                .await
-                .expect("Failed to insert account");
+            self.pubsub.publish(account.clone()).await;
             account
         }
     }
