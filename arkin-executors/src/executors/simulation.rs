@@ -5,7 +5,7 @@ use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use tokio::{select, sync::RwLock};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -58,6 +58,7 @@ impl SimulationExecutor {
     }
 
     pub async fn tick_update(&self, tick: Arc<Tick>) {
+        // info!("SimulationExecutor tick_update: {}", tick.instrument);
         // Check if orders is empty
         let lock = self.orders.read().await;
         if lock.is_empty() {
@@ -92,7 +93,7 @@ impl SimulationExecutor {
 #[async_trait]
 impl Executor for SimulationExecutor {
     async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError> {
-        debug!("SimulationExecutor placing order: {}", order.id);
+        info!("SimulationExecutor placing order: {}", order);
         let mut orders = self.orders.write().await;
 
         if !orders.contains_key(&order.id) {
@@ -107,6 +108,7 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_order(&self, id: VenueOrderId) -> Result<(), ExecutorError> {
+        info!("SimulationExecutor cancelling order: {}", id);
         let mut orders = self.orders.write().await;
 
         if let Some(mut order) = orders.remove(&id) {
@@ -119,6 +121,7 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_orders_by_instrument(&self, instrument: Arc<Instrument>) -> Result<(), ExecutorError> {
+        info!("SimulationExecutor cancelling orders by instrument: {}", instrument);
         let mut orders = self.orders.write().await;
         let mut to_cancel = vec![];
 
@@ -137,6 +140,7 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_all_orders(&self) -> Result<(), ExecutorError> {
+        info!("SimulationExecutor cancelling all orders");
         let mut orders = self.orders.write().await;
 
         for (_id, mut order) in orders.drain() {
@@ -157,18 +161,9 @@ impl RunnableService for SimulationExecutor {
             select! {
                 Ok(event) = rx.recv() => {
                     match event {
-                       Event::VenueOrderNew(order) => {
-                           debug!("SimulationExecutor received order: {}", order);
-                           self.place_order(order).await?;
-                       }
-                       Event::VenueOrderCancel(id) => {
-                           debug!("SimulationExecutor received order cancel: {}", id);
-                           self.cancel_order(id).await?;
-                       }
-                       Event::Tick(tick) => {
-                           debug!("SimulationExecutor received tick: {}", tick.instrument);
-                           self.tick_update(tick).await;
-                       }
+                       Event::VenueOrderNew(order) => self.place_order(order).await?,
+                       Event::VenueOrderCancel(id) => self.cancel_order(id).await?,
+                       Event::Tick(tick) => self.tick_update(tick).await,
                        _ => {}
 
                     }
@@ -475,18 +470,16 @@ mod tests {
             .build();
         let tick_arc = Arc::new(tick);
 
-        info!("Updating tick");
         executor.tick_update(Arc::clone(&tick_arc)).await;
 
         // Collect two events (one for each order).
-        info!("Checking");
         let mut events_received = 0;
         let mut updated_buy_order: Option<Arc<VenueOrder>> = None;
         let mut updated_sell_order: Option<Arc<VenueOrder>> = None;
         while events_received < 2 {
             info!("Waiting for event...");
             let event = rx.recv().await.expect("Channel closed");
-            if let Event::VenueOrderUpdate(updated_order) = event {
+            if let Event::VenueOrderFillUpdate(updated_order) = event {
                 if updated_order.id == buy_order_id {
                     updated_buy_order = Some(updated_order);
                 } else if updated_order.id == sell_order_id {
@@ -584,7 +577,7 @@ mod tests {
                 .await
                 .expect("Timeout waiting for event")
                 .expect("Channel closed");
-            if let Event::VenueOrderUpdate(updated_order) = event {
+            if let Event::VenueOrderFillUpdate(updated_order) = event {
                 if updated_order.id == buy_order_id {
                     updated_buy_order = Some(updated_order);
                 } else if updated_order.id == sell_order_id {

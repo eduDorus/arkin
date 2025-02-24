@@ -57,21 +57,3 @@ impl TickHelper {
         (ts, frequency)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use test_log::test;
-    use tracing::info;
-
-    #[test(tokio::test)]
-    async fn test_create_interval() {
-        let mut interval = TickHelper::new(Duration::from_secs(5));
-
-        // I get the instant of the tick
-        loop {
-            let tick = interval.tick().await;
-            info!("Tick: {:?}", tick);
-        }
-    }
-}
