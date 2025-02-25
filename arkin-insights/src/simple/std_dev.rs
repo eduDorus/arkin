@@ -49,8 +49,8 @@ impl Computation for StdDevFeature {
                 }
 
                 // Calculate StdDev
-                let sum = data.iter().sum::<Decimal>();
-                let count = Decimal::from(data.len());
+                let sum = data.iter().sum::<f64>();
+                let count = data.len() as f64;
                 let mean = match count.is_zero() {
                     true => {
                         warn!("Count should not be zero!");
@@ -58,24 +58,19 @@ impl Computation for StdDevFeature {
                     }
                     false => sum / count,
                 };
-                let variance =
-                    (Decimal::ONE / (count - Decimal::ONE)) * data.iter().map(|v| (v - mean).powi(2)).sum::<Decimal>();
-                if let Some(std_dev) = variance.sqrt() {
-                    Some(
-                        Insight::builder()
-                            .event_time(event_time)
-                            .pipeline(self.pipeline.clone())
-                            .instrument(Some(instrument.clone()))
-                            .feature_id(self.output.clone())
-                            .value(std_dev)
-                            .persist(self.persist)
-                            .build()
-                            .into(),
-                    )
-                } else {
-                    warn!("Failed to calculate StdDev: mean: {}, variance: {}", mean, variance);
-                    None
-                }
+                let variance = (1. / (count - 1.)) * data.iter().map(|v| (v - mean).powi(2)).sum::<f64>();
+                let std_dev = variance.sqrt();
+                Some(
+                    Insight::builder()
+                        .event_time(event_time)
+                        .pipeline(self.pipeline.clone())
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(self.output.clone())
+                        .value(std_dev)
+                        .persist(self.persist)
+                        .build()
+                        .into(),
+                )
             })
             .collect::<Vec<_>>();
 

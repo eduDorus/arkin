@@ -16,7 +16,7 @@ use yata::core::Candle;
 
 #[derive(Debug)]
 struct BoundedBuffer {
-    data: VecDeque<(OffsetDateTime, Decimal)>,
+    data: VecDeque<(OffsetDateTime, f64)>,
     capacity: usize,
 }
 
@@ -32,10 +32,10 @@ impl BoundedBuffer {
         self.data.len()
     }
 
-    /// Insert new (CompositeIndex, Decimal). Assume mostly ascending timestamps.
+    /// Insert new (CompositeIndex, f64). Assume mostly ascending timestamps.
     /// If there's already an item at exactly the same CompositeIndex,
     /// we increment sub_index. Then push_back. If we exceed capacity, pop_front.
-    fn push(&mut self, idx: OffsetDateTime, val: Decimal) {
+    fn push(&mut self, idx: OffsetDateTime, val: f64) {
         // Iterate from the back and find the first item whose time <= timestamp.
 
         let insert_idx = self.data.iter().rev().position(|(i, _)| i <= &idx);
@@ -62,7 +62,7 @@ impl BoundedBuffer {
 
     /// Return the last value <= timestamp.
     /// That is, from the back, find the first item whose time <= timestamp.
-    fn last_inclusive(&self, timestamp: OffsetDateTime) -> Option<Decimal> {
+    fn last_inclusive(&self, timestamp: OffsetDateTime) -> Option<f64> {
         for &(idx, val) in self.data.iter().rev() {
             if idx <= timestamp {
                 return Some(val);
@@ -73,7 +73,7 @@ impl BoundedBuffer {
 
     /// Return the last value <= timestamp.
     /// That is, from the back, find the first item whose time <= timestamp.
-    fn last_exclusive(&self, timestamp: OffsetDateTime) -> Option<Decimal> {
+    fn last_exclusive(&self, timestamp: OffsetDateTime) -> Option<f64> {
         for &(idx, val) in self.data.iter().rev() {
             if idx < timestamp {
                 return Some(val);
@@ -84,7 +84,7 @@ impl BoundedBuffer {
 
     /// Return a window of values in [start_time..end_time).
     /// We can do a quick linear scan. If capacity is only 100k, that might be okay.
-    fn window(&self, start_time: OffsetDateTime, end_time: OffsetDateTime) -> Vec<Decimal> {
+    fn window(&self, start_time: OffsetDateTime, end_time: OffsetDateTime) -> Vec<f64> {
         // We'll just collect all entries with timestamp in [start..end).
         // If you want to be a bit more efficient, you could break early if you see timestamps >= end_time.
         let mut result = Vec::new();
@@ -102,7 +102,7 @@ impl BoundedBuffer {
     }
 
     /// Return the last `periods` values up to `timestamp`.
-    fn periods(&self, timestamp: OffsetDateTime, periods: usize) -> Vec<Decimal> {
+    fn periods(&self, timestamp: OffsetDateTime, periods: usize) -> Vec<f64> {
         let mut result = Vec::new();
         // Go from the back and pick up to `periods` items with time <= timestamp
         for &(idx, val) in self.data.iter().rev() {
@@ -182,7 +182,7 @@ impl InsightsState {
         instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
-    ) -> Option<Decimal> {
+    ) -> Option<f64> {
         let start = Instant::now();
         let key = (instrument, feature_id);
         let lock = self.features.read();
@@ -197,7 +197,7 @@ impl InsightsState {
         instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
-    ) -> Option<Decimal> {
+    ) -> Option<f64> {
         let start = Instant::now();
         let key = (instrument, feature_id);
         let lock = self.features.read();
@@ -213,7 +213,7 @@ impl InsightsState {
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
         window: Duration,
-    ) -> Vec<Decimal> {
+    ) -> Vec<f64> {
         let start = Instant::now();
         let start_time = timestamp - window;
         let key = (instrument, feature_id);
@@ -230,7 +230,7 @@ impl InsightsState {
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
         periods: usize,
-    ) -> Vec<Decimal> {
+    ) -> Vec<f64> {
         let key = (instrument, feature_id);
         let lock = self.features.read();
         lock.get(&key).map(|buf| buf.periods(timestamp, periods)).unwrap_or_default()
@@ -240,7 +240,6 @@ impl InsightsState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal_macros::dec;
     use test_log::test;
     use time::OffsetDateTime;
 
@@ -261,21 +260,21 @@ mod tests {
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
-            .value(dec!(1.1))
+            .value(1.1)
             .build();
         let insight2 = Insight::builder()
             .event_time(t2)
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
-            .value(dec!(1.0))
+            .value(1.0)
             .build();
         let insight3 = Insight::builder()
             .event_time(t3)
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
-            .value(dec!(1.2))
+            .value(1.2)
             .build();
         state.insert(insight1.into());
         state.insert(insight3.into());
@@ -283,20 +282,20 @@ mod tests {
 
         // "last" at time=now should find the inserted value
         let last = state.last(Some(instrument.clone()), feature_id.clone(), now);
-        assert_eq!(last, Some(dec!(1.2)));
+        assert_eq!(last, Some(1.2));
 
         let last_exclusive = state.last_exclusive(Some(instrument.clone()), feature_id.clone(), now);
-        assert_eq!(last_exclusive, Some(dec!(1.0)));
+        assert_eq!(last_exclusive, Some(1.0));
 
         let last = state.last(Some(instrument.clone()), feature_id.clone(), now - Duration::from_secs(5));
-        assert_eq!(last, Some(dec!(1.0)));
+        assert_eq!(last, Some(1.0));
 
         let last_exclusive =
             state.last_exclusive(Some(instrument.clone()), feature_id.clone(), now - Duration::from_secs(5));
-        assert_eq!(last_exclusive, Some(dec!(1.1)));
+        assert_eq!(last_exclusive, Some(1.1));
 
         let last = state.last(Some(instrument.clone()), feature_id.clone(), now - Duration::from_secs(10));
-        assert_eq!(last, Some(dec!(1.1)));
+        assert_eq!(last, Some(1.1));
 
         let last_exclusive =
             state.last_exclusive(Some(instrument.clone()), feature_id.clone(), now - Duration::from_secs(10));
@@ -322,21 +321,21 @@ mod tests {
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
-            .value(dec!(1.0))
+            .value(1.0)
             .build();
         let insight2 = Insight::builder()
             .event_time(t2)
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
-            .value(dec!(2.0))
+            .value(2.0)
             .build();
         let insight3 = Insight::builder()
             .event_time(t3)
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
-            .value(dec!(3.0))
+            .value(3.0)
             .build();
 
         state.insert(insight1.into());
@@ -349,7 +348,7 @@ mod tests {
         let duration = Duration::from_secs(10);
         let results = state.window(Some(instrument), feature_id, t3, duration);
         assert_eq!(results.len(), 2);
-        assert_eq!(results, vec![dec!(1.0), dec!(2.0)]);
+        assert_eq!(results, vec![1.0, 2.0]);
 
         // If we want to confirm that t1 is included:
         // results = [1.0, 2.0] => yes, t1 is included.
@@ -375,7 +374,7 @@ mod tests {
         ];
         for (idx, t) in times.iter().enumerate() {
             let num = idx as f64;
-            let val = Decimal::from_f64(num).unwrap();
+            let val = f64::from_f64(num).unwrap();
             let i = Insight::builder()
                 .event_time(*t)
                 .pipeline(pipeline.clone())
@@ -391,7 +390,7 @@ mod tests {
         // times => -10s(10), -8s(11), -6s(12), -4s(13), -2s(14)
         // the last 3 => 12, 13, 14
         let p = state.periods(Some(instrument), feature_id, now, 3);
-        assert_eq!(p, vec![dec!(3), dec!(4), dec!(5)]);
+        assert_eq!(p, vec![3., 4., 5.]);
     }
 
     #[test]
@@ -407,35 +406,35 @@ mod tests {
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("open".into()))
-            .value(dec!(1.0))
+            .value(1.0)
             .build();
         let high_insight = Insight::builder()
             .event_time(now)
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("high".into()))
-            .value(dec!(5.0))
+            .value(5.0)
             .build();
         let low_insight = Insight::builder()
             .event_time(now)
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("low".into()))
-            .value(dec!(0.0))
+            .value(0.0)
             .build();
         let close_insight = Insight::builder()
             .event_time(now)
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("close".into()))
-            .value(dec!(3.0))
+            .value(3.0)
             .build();
         let volume_insight = Insight::builder()
             .event_time(now)
             .pipeline(pipeline.clone())
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("volume".into()))
-            .value(dec!(100.0))
+            .value(100.)
             .build();
 
         state.insert(open_insight.into());

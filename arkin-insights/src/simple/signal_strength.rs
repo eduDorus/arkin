@@ -47,13 +47,13 @@ impl Computation for SignalStrengthFeature {
                         .last(Some(instrument.clone()), self.input_second.clone(), event_time)?;
 
                 // Check if we don't have a total of 0
-                if first + second == Decimal::zero() {
+                if (first + second).is_zero() {
                     warn!("Total of 0 for Signal Strength calculation");
                     return None;
                 }
 
                 // Check that they are positive values
-                if first < Decimal::zero() || second < Decimal::zero() {
+                if first < 0. || second < 0. {
                     warn!(
                         "Negative values for Signal Strength calculation: {} with values {} and {}",
                         self.output, first, second

@@ -1,6 +1,5 @@
 use std::{fmt, sync::Arc};
 
-use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 
@@ -15,7 +14,7 @@ pub struct Insight {
     pub pipeline: Arc<Pipeline>,
     pub instrument: Option<Arc<Instrument>>,
     pub feature_id: FeatureId,
-    pub value: Decimal,
+    pub value: f64,
     #[builder(default = false)]
     pub persist: bool,
 }

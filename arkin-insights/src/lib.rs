@@ -18,5 +18,6 @@ pub mod prelude {
     pub use crate::config::*;
     pub use crate::errors::*;
     pub use crate::service::InsightsService;
+    pub use crate::state::*;
     pub use crate::traits::*;
 }

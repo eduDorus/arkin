@@ -2,7 +2,6 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use rayon::prelude::*;
-use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
@@ -90,29 +89,29 @@ impl Computation for OHLCVFeature {
 
                 // Calculate OHLC
                 let open = prices.first().expect("Should have at least one value").to_owned();
-                let high = prices.iter().max().expect("Should have at least one value").to_owned();
-                let low = prices.iter().min().expect("Should have at least one value").to_owned();
+                let high = prices.iter().max_by(|a, b| a.total_cmp(b))?.to_owned();
+                let low = prices.iter().min_by(|a, b| a.total_cmp(b))?.to_owned();
                 let close = prices.last().expect("Should have at least one value").to_owned();
-                let typical_price = (high + low + close) / Decimal::from(3);
+                let typical_price = (high + low + close) / 3.;
 
                 // Calculate volume
-                let (volume, buy_volume, sell_volume) = quantities.iter().fold(
-                    (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO),
-                    |(volume, buy_volume, sell_volume), quantity| {
-                        if quantity > &Decimal::ZERO {
-                            (volume + quantity, buy_volume + quantity, sell_volume)
-                        } else {
-                            (volume + quantity.abs(), buy_volume, sell_volume + quantity.abs())
-                        }
-                    },
-                );
+                let (volume, buy_volume, sell_volume) =
+                    quantities
+                        .iter()
+                        .fold((0., 0., 0.), |(volume, buy_volume, sell_volume), quantity| {
+                            if quantity >= &0. {
+                                (volume + quantity, buy_volume + quantity, sell_volume)
+                            } else {
+                                (volume + quantity.abs(), buy_volume, sell_volume + quantity.abs())
+                            }
+                        });
 
                 // Calculate notional volume
                 let (notional_volume, buy_notional_volume, sell_notional_volume) =
                     prices.iter().zip(quantities.iter()).fold(
-                        (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO),
+                        (0., 0., 0.),
                         |(notional_volume, notional_buy_volume, notional_sell_volume), (price, quantity)| {
-                            if quantity > &Decimal::ZERO {
+                            if quantity >= &0. {
                                 (
                                     notional_volume + price * quantity,
                                     notional_buy_volume + price * quantity,
@@ -132,16 +131,16 @@ impl Computation for OHLCVFeature {
                 let vwap = notional_volume / volume;
 
                 // Calculate trade count
-                let (trade_count, buy_trade_count, sell_trade_count) = quantities.iter().fold(
-                    (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO),
-                    |(trade_count, buy_trade_count, sell_trade_count), quantity| {
-                        if quantity > &Decimal::ZERO {
-                            (trade_count + Decimal::ONE, buy_trade_count + Decimal::ONE, sell_trade_count)
-                        } else {
-                            (trade_count + Decimal::ONE, buy_trade_count, sell_trade_count + Decimal::ONE)
-                        }
-                    },
-                );
+                let (trade_count, buy_trade_count, sell_trade_count) =
+                    quantities
+                        .iter()
+                        .fold((0, 0, 0), |(trade_count, buy_trade_count, sell_trade_count), quantity| {
+                            if quantity >= &0. {
+                                (trade_count + 1, buy_trade_count + 1, sell_trade_count)
+                            } else {
+                                (trade_count + 1, buy_trade_count, sell_trade_count + 1)
+                            }
+                        });
 
                 // Create insights
                 let mut insights = Vec::with_capacity(self.outputs().len());
@@ -284,7 +283,7 @@ impl Computation for OHLCVFeature {
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_trade_count.clone())
-                        .value(trade_count)
+                        .value(trade_count as f64)
                         .persist(self.persist)
                         .build()
                         .into(),
@@ -295,7 +294,7 @@ impl Computation for OHLCVFeature {
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_buy_trade_count.clone())
-                        .value(buy_trade_count)
+                        .value(buy_trade_count as f64)
                         .persist(self.persist)
                         .build()
                         .into(),
@@ -306,7 +305,7 @@ impl Computation for OHLCVFeature {
                         .pipeline(self.pipeline.clone())
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output_sell_trade_count.clone())
-                        .value(sell_trade_count)
+                        .value(sell_trade_count as f64)
                         .persist(self.persist)
                         .build()
                         .into(),

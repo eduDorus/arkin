@@ -10,6 +10,15 @@ pub enum MarketSide {
     Sell,
 }
 
+impl From<MarketSide> for f64 {
+    fn from(side: MarketSide) -> f64 {
+        match side {
+            MarketSide::Buy => 1.0,
+            MarketSide::Sell => -1.0,
+        }
+    }
+}
+
 impl From<MarketSide> for Decimal {
     fn from(side: MarketSide) -> Decimal {
         match side {

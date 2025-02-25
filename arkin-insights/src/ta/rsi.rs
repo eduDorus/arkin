@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use dashmap::DashMap;
 use rayon::prelude::*;
-use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
@@ -54,7 +53,7 @@ impl Computation for RelativeStrengthIndexFeature {
                     if values.is_empty() {
                         return None;
                     }
-                    let rsi_value = Decimal::from_f64(values[0])?;
+                    let rsi_value = values[0];
                     let insight = Insight::builder()
                         .event_time(timestamp)
                         .pipeline(self.pipeline.clone())

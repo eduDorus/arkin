@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use rayon::prelude::*;
-use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
@@ -49,7 +48,7 @@ impl Computation for SumFeature {
                 }
 
                 // Calculate StdDev
-                let sum = data.iter().sum::<Decimal>();
+                let sum = data.iter().sum::<f64>();
 
                 Some(
                     Insight::builder()

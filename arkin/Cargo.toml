@@ -18,3 +18,11 @@ arkin-engine = { path = "../arkin-engine" }
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
 tracing = { workspace = true }
+
+time = { workspace = true }
+arkin-insights = { path = "../arkin-insights" }
+statrs.workspace = true
+rust_decimal.workspace = true
+rust_decimal_macros.workspace = true
+fastrand = "2.3.0"
+rayon.workspace = true

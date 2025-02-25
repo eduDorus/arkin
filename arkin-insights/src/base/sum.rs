@@ -11,6 +11,19 @@ use crate::{
     state::{DataRequest, DataResponse},
 };
 
+#[derive(Clone)]
+pub struct SumComputation;
+
+impl SingleVecComputation for SumComputation {
+    fn compute(&self, data: &[Decimal]) -> Option<f64> {
+        if data.is_empty() {
+            None
+        } else {
+            Some(data.iter().sum())
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SumFeature {
     id: FeatureId,

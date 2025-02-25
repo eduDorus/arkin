@@ -11,7 +11,7 @@ use uuid::Uuid;
 pub enum InstanceType {
     Live,
     Simulation,
-    Other,
+    Utility,
 }
 
 #[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]

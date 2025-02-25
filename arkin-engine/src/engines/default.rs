@@ -50,7 +50,7 @@ impl DefaultEngine {
                 .build(),
             _ => Instance::builder()
                 .name("other".to_string())
-                .instance_type(InstanceType::Other)
+                .instance_type(InstanceType::Utility)
                 .build(),
         };
         let dry_run = match &args.command {

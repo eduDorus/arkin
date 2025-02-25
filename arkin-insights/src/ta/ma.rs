@@ -61,7 +61,6 @@ impl Computation for MovingAverageFeature {
                     "SMA" => {
                         if let Some(mut sma) = self.sma_store.get_mut(instrument) {
                             let sma_value = sma.next(&value_f64);
-                            let sma_value = Decimal::from_f64(sma_value)?;
                             let insight = Insight::builder()
                                 .event_time(timestamp)
                                 .pipeline(self.pipeline.clone())
@@ -80,7 +79,6 @@ impl Computation for MovingAverageFeature {
                     "EMA" => {
                         if let Some(mut ema) = self.ema_store.get_mut(instrument) {
                             let ema_value = ema.next(&value_f64);
-                            let ema_value = Decimal::from_f64(ema_value)?;
                             let insight = Insight::builder()
                                 .event_time(timestamp)
                                 .pipeline(self.pipeline.clone())
@@ -99,7 +97,6 @@ impl Computation for MovingAverageFeature {
                     "DMA" => {
                         if let Some(mut dma) = self.dma_store.get_mut(instrument) {
                             let dma_value = dma.next(&value_f64);
-                            let dma_value = Decimal::from_f64(dma_value)?;
                             let insight = Insight::builder()
                                 .event_time(timestamp)
                                 .pipeline(self.pipeline.clone())
@@ -118,7 +115,6 @@ impl Computation for MovingAverageFeature {
                     "TMA" => {
                         if let Some(mut tma) = self.tma_store.get_mut(instrument) {
                             let tma_value = tma.next(&value_f64);
-                            let tma_value = Decimal::from_f64(tma_value)?;
                             let insight = Insight::builder()
                                 .event_time(timestamp)
                                 .pipeline(self.pipeline.clone())

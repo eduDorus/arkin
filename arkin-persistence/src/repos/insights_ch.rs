@@ -3,13 +3,10 @@ use std::sync::Arc;
 
 use arkin_core::Insight;
 use clickhouse::{sql::Identifier, Client, Row};
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
-
-use arkin_core::prelude::*;
 
 use crate::PersistenceError;
 
@@ -22,8 +19,7 @@ pub struct InsightClickhouseDTO {
     #[serde(with = "clickhouse::serde::uuid")]
     pub instrument_id: Uuid,
     pub feature_id: String,
-    #[serde(with = "custom_serde::decimal128")]
-    pub value: Decimal,
+    pub value: f64,
 }
 
 impl From<Arc<Insight>> for InsightClickhouseDTO {
@@ -77,7 +73,7 @@ impl InsightsClickhouseRepo {
                     pipeline_id     UUID CODEC(ZSTD(3)),
                     instrument_id   UUID CODEC(ZSTD(3)),
                     feature_id      LowCardinality(String) CODEC(ZSTD(3)),
-                    value           Decimal(28, 8) CODEC(ZSTD(3))
+                    value           Float64 CODEC(ZSTD(3))
                 )
                 ENGINE = ReplacingMergeTree
                 PARTITION BY toYYYYMMDD(event_time)

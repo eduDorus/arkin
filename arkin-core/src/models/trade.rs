@@ -50,14 +50,14 @@ impl Trade {
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TRADE_PRICE_FEATURE_ID.clone())
-                .value(self.price)
+                .value(self.price.to_f64().unwrap_or(f64::NAN))
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TRADE_QUANTITY_FEATURE_ID.clone())
-                .value(self.quantity * Decimal::from(self.side))
+                .value(self.quantity.to_f64().unwrap_or(f64::NAN) * self.side as i64 as f64)
                 .build(),
         ];
         insights.into_iter().map(Arc::new).collect()

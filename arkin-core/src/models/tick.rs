@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, fmt, sync::Arc};
 
-use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
@@ -56,28 +56,28 @@ impl Tick {
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_BID_PRICE_FEATURE_ID.clone())
-                .value(self.bid_price)
+                .value(self.bid_price.to_f64().unwrap_or(f64::NAN))
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_BID_QUANTITY_FEATURE_ID.clone())
-                .value(self.bid_quantity)
+                .value(self.bid_quantity.to_f64().unwrap_or(f64::NAN))
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_ASK_PRICE_FEATURE_ID.clone())
-                .value(self.ask_price)
+                .value(self.ask_price.to_f64().unwrap_or(f64::NAN))
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
                 .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_ASK_QUANTITY_FEATURE_ID.clone())
-                .value(self.ask_quantity)
+                .value(self.ask_quantity.to_f64().unwrap_or(f64::NAN))
                 .build(),
         ];
         insights.into_iter().map(Arc::new).collect::<Vec<_>>()

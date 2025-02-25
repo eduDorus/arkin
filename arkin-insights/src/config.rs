@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +15,6 @@ pub struct InsightsServiceConfig {
     pub pipeline: PipelineConfig,
     pub state_lookback: u64,
     pub frequency_secs: u64,
-    pub scale_periods: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -58,6 +59,13 @@ pub enum FeatureConfig {
     // Portfolio Optimization
     #[serde(rename = "mean_variance")]
     MeanVariance(MeanVarianceConfig),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum DataLoaderConfig {
+    Periods(usize),   // Load the last N periods (e.g., 10 data points)
+    Window(Duration), // Load data within a time window (e.g., 5 minutes)
+    LastValue,        // Load only the most recent value
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
