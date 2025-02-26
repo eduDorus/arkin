@@ -62,7 +62,7 @@ impl Computation for MeanVarianceFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
         info!("Calculating Mean Variance Portfolio at {}", event_time);
 
         let mut w_prev = instruments
@@ -144,7 +144,7 @@ impl Computation for MeanVarianceFeature {
             .map(|(i, w)| {
                 Insight::builder()
                     .event_time(event_time)
-                    .pipeline(self.pipeline.clone())
+                    .pipeline(Some(self.pipeline.clone()))
                     .instrument(Some(i.clone()))
                     .feature_id(self.output.clone())
                     .value(Decimal::from_f64(*w).expect("Failed to convert to Decimal"))

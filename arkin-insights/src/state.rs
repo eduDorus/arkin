@@ -1,16 +1,10 @@
 #![allow(dead_code)]
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 
-use parking_lot::RwLock;
-use rust_decimal::prelude::*;
+use dashmap::DashMap;
 use time::OffsetDateTime;
 
 use arkin_core::prelude::*;
-use tracing::debug;
 use typed_builder::TypedBuilder;
 use yata::core::Candle;
 
@@ -117,56 +111,53 @@ impl BoundedBuffer {
         result.reverse();
         result
     }
+
+    /// Returns the last value + lag periods.
+    fn lag(&self, timestamp: OffsetDateTime, lag: usize) -> Option<f64> {
+        // Get the index of the first value of the timestamp and then advance back by `lag` periods.
+        let mut lag_counter = lag;
+        for &(idx, val) in self.data.iter().rev() {
+            if idx <= timestamp {
+                lag_counter -= 1;
+            }
+            if lag_counter == 0 {
+                return Some(val);
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, TypedBuilder)]
 pub struct InsightsState {
     #[builder(default)]
-    features: RwLock<HashMap<(Option<Arc<Instrument>>, FeatureId), BoundedBuffer>>,
+    features: DashMap<(Option<Arc<Instrument>>, FeatureId), BoundedBuffer>,
     #[builder(default = 100_000)]
     capacity: usize,
 }
 
 impl InsightsState {
     pub fn insert(&self, event: Arc<Insight>) {
-        let start = Instant::now();
         let key = (event.instrument.clone(), event.feature_id.clone());
-        let mut lock = self.features.write();
-        let entry = lock.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));
+        let mut entry = self.features.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));
         entry.push(event.event_time, event.value);
-        debug!("Insert took {:?}", start.elapsed());
     }
 
     pub fn insert_batch(&self, events: &[Arc<Insight>]) {
-        let start = Instant::now();
-        let mut lock = self.features.write();
         for event in events {
             let key = (event.instrument.clone(), event.feature_id.clone());
-            let entry = lock.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));
+            let mut entry = self.features.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));
             entry.push(event.event_time, event.value);
         }
-        debug!("Insert batch took {:?}", start.elapsed());
     }
 
     pub fn last_candle(&self, instrument: Arc<Instrument>, timestamp: OffsetDateTime) -> Option<Candle> {
-        let start = Instant::now();
-        let open = self
-            .last(Some(instrument.clone()), FeatureId::new("open".into()), timestamp)?
-            .to_f64()?;
-        let high = self
-            .last(Some(instrument.clone()), FeatureId::new("high".into()), timestamp)?
-            .to_f64()?;
-        let low = self
-            .last(Some(instrument.clone()), FeatureId::new("low".into()), timestamp)?
-            .to_f64()?;
-        let close = self
-            .last(Some(instrument.clone()), FeatureId::new("close".into()), timestamp)?
-            .to_f64()?;
-        let volume = self
-            .last(Some(instrument.clone()), FeatureId::new("volume".into()), timestamp)?
-            .to_f64()?;
+        let open = self.last(Some(instrument.clone()), FeatureId::new("open".into()), timestamp)?;
+        let high = self.last(Some(instrument.clone()), FeatureId::new("high".into()), timestamp)?;
+        let low = self.last(Some(instrument.clone()), FeatureId::new("low".into()), timestamp)?;
+        let close = self.last(Some(instrument.clone()), FeatureId::new("close".into()), timestamp)?;
+        let volume = self.last(Some(instrument.clone()), FeatureId::new("volume".into()), timestamp)?;
 
-        debug!("Last candle took {:?}", start.elapsed());
         Some(Candle {
             open,
             high,
@@ -183,11 +174,21 @@ impl InsightsState {
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
     ) -> Option<f64> {
-        let start = Instant::now();
         let key = (instrument, feature_id);
-        let lock = self.features.read();
-        let val = lock.get(&key).and_then(|buf| buf.last_inclusive(timestamp));
-        debug!("Last took {:?}", start.elapsed());
+        let val = self.features.get(&key).and_then(|buf| buf.last_inclusive(timestamp));
+        val
+    }
+
+    /// Return a last value <= timestamp.
+    pub fn lag(
+        &self,
+        instrument: Option<Arc<Instrument>>,
+        feature_id: FeatureId,
+        timestamp: OffsetDateTime,
+        lag: usize,
+    ) -> Option<f64> {
+        let key = (instrument, feature_id);
+        let val = self.features.get(&key).and_then(|buf| buf.lag(timestamp, lag));
         val
     }
 
@@ -198,11 +199,8 @@ impl InsightsState {
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
     ) -> Option<f64> {
-        let start = Instant::now();
         let key = (instrument, feature_id);
-        let lock = self.features.read();
-        let val = lock.get(&key).and_then(|buf| buf.last_exclusive(timestamp));
-        debug!("Last exclusive took {:?}", start.elapsed());
+        let val = self.features.get(&key).and_then(|buf| buf.last_exclusive(timestamp));
         val
     }
 
@@ -214,12 +212,13 @@ impl InsightsState {
         timestamp: OffsetDateTime,
         window: Duration,
     ) -> Vec<f64> {
-        let start = Instant::now();
         let start_time = timestamp - window;
         let key = (instrument, feature_id);
-        let lock = self.features.read();
-        let vals = lock.get(&key).map(|buf| buf.window(start_time, timestamp)).unwrap_or_default();
-        debug!("Window took {:?}", start.elapsed());
+        let vals = self
+            .features
+            .get(&key)
+            .map(|buf| buf.window(start_time, timestamp))
+            .unwrap_or_default();
         vals
     }
 
@@ -232,8 +231,10 @@ impl InsightsState {
         periods: usize,
     ) -> Vec<f64> {
         let key = (instrument, feature_id);
-        let lock = self.features.read();
-        lock.get(&key).map(|buf| buf.periods(timestamp, periods)).unwrap_or_default()
+        self.features
+            .get(&key)
+            .map(|buf| buf.periods(timestamp, periods))
+            .unwrap_or_default()
     }
 }
 
@@ -257,21 +258,21 @@ mod tests {
 
         let insight1 = Insight::builder()
             .event_time(t1)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(1.1)
             .build();
         let insight2 = Insight::builder()
             .event_time(t2)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(1.0)
             .build();
         let insight3 = Insight::builder()
             .event_time(t3)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(1.2)
@@ -318,21 +319,21 @@ mod tests {
         let t3 = now; // boundary
         let insight1 = Insight::builder()
             .event_time(t1)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(1.0)
             .build();
         let insight2 = Insight::builder()
             .event_time(t2)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(2.0)
             .build();
         let insight3 = Insight::builder()
             .event_time(t3)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(3.0)
@@ -374,13 +375,12 @@ mod tests {
         ];
         for (idx, t) in times.iter().enumerate() {
             let num = idx as f64;
-            let val = f64::from_f64(num).unwrap();
             let i = Insight::builder()
                 .event_time(*t)
-                .pipeline(pipeline.clone())
+                .pipeline(Some(pipeline.clone()))
                 .instrument(Some(instrument.clone()))
                 .feature_id(feature_id.clone())
-                .value(val)
+                .value(num)
                 .build();
             state.insert(i.into());
         }
@@ -403,35 +403,35 @@ mod tests {
         // Suppose we have open=1, high=5, low=0, close=3, volume=100
         let open_insight = Insight::builder()
             .event_time(now)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("open".into()))
             .value(1.0)
             .build();
         let high_insight = Insight::builder()
             .event_time(now)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("high".into()))
             .value(5.0)
             .build();
         let low_insight = Insight::builder()
             .event_time(now)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("low".into()))
             .value(0.0)
             .build();
         let close_insight = Insight::builder()
             .event_time(now)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("close".into()))
             .value(3.0)
             .build();
         let volume_insight = Insight::builder()
             .event_time(now)
-            .pipeline(pipeline.clone())
+            .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("volume".into()))
             .value(100.)

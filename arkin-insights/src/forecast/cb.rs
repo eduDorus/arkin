@@ -52,7 +52,7 @@ impl Computation for CatBoostFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating forecast...");
 
         // Retrieve the values for the feature over the window period
@@ -120,7 +120,7 @@ impl Computation for CatBoostFeature {
                 Some(
                     Insight::builder()
                         .event_time(event_time)
-                        .pipeline(self.pipeline.clone())
+                        .pipeline(Some(self.pipeline.clone()))
                         .instrument(Some(instrument.clone()))
                         .feature_id(self.output.clone())
                         .value(prediction)

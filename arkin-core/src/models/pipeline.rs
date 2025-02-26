@@ -4,7 +4,6 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
-
 pub struct Pipeline {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

@@ -9,21 +9,27 @@ use petgraph::{
     dot::{Config, Dot},
     graph::DiGraph,
 };
+use rayon::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use time::OffsetDateTime;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
-use crate::Computation;
+use crate::config::PipelineConfig;
+use crate::feature_factory::FeatureFactory;
+use crate::state::InsightsState;
+use crate::Feature;
 
 #[derive(Debug)]
 pub struct PipelineGraph {
-    graph: Arc<DiGraph<Box<dyn Computation>, ()>>,
+    state: Arc<InsightsState>,
+    graph: Arc<DiGraph<Arc<dyn Feature>, ()>>,
     order: Vec<NodeIndex>,
     pool: ThreadPool,
 }
 
 impl PipelineGraph {
-    pub fn from_config(features: Vec<Box<dyn Computation>>) -> Self {
+    pub fn from_config(pipeline: Arc<Pipeline>, state: Arc<InsightsState>, features: &PipelineConfig) -> Self {
+        let features = FeatureFactory::from_config(pipeline.clone(), state.clone(), &features.features);
         let mut graph = DiGraph::new();
 
         // Create a mapping from Node IDs to Node Indices
@@ -72,7 +78,8 @@ impl PipelineGraph {
         info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
 
         PipelineGraph {
-            graph: Arc::new(graph),
+            state,
+            graph: graph.into(),
             order,
             pool: ThreadPoolBuilder::default().build().expect("Failed to create thread pool"),
         }
@@ -105,17 +112,20 @@ impl PipelineGraph {
                 let in_degrees = Arc::clone(&in_degrees);
                 let queue_tx = queue_tx.clone();
                 let pipeline_result = Arc::clone(&pipeline_result);
+                let state = Arc::clone(&self.state);
 
                 s.spawn(move |_| {
                     // Process the node
                     let feature = &graph[node];
 
                     // Calculate the feature
-                    let res = feature.calculate(instruments, timestamp);
-                    match res {
-                        Ok(data) => pipeline_result.lock().extend(data),
-                        Err(e) => error!("Failed to calculate: {:?}", e),
-                    }
+                    let insights = instruments
+                        .par_iter()
+                        .filter_map(|instrument| feature.calculate(instrument, timestamp))
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    state.insert_batch(&insights);
+                    pipeline_result.lock().extend(insights);
 
                     // Update in-degrees of neighbors and enqueue new zero in-degree nodes
                     for neighbor in graph.neighbors_directed(node, petgraph::Outgoing) {

@@ -14,7 +14,7 @@ use crate::{
     Event, EventType, EventTypeOf, Price, Quantity,
 };
 
-use super::{Insight, Instrument, Pipeline};
+use super::{Insight, Instrument};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct Tick {
@@ -49,32 +49,28 @@ impl Tick {
         }
     }
 
-    pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Arc<Insight>> {
+    pub fn to_insights(self) -> Vec<Arc<Insight>> {
         let insights = vec![
             Insight::builder()
                 .event_time(self.event_time)
-                .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_BID_PRICE_FEATURE_ID.clone())
                 .value(self.bid_price.to_f64().unwrap_or(f64::NAN))
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
-                .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_BID_QUANTITY_FEATURE_ID.clone())
                 .value(self.bid_quantity.to_f64().unwrap_or(f64::NAN))
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
-                .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_ASK_PRICE_FEATURE_ID.clone())
                 .value(self.ask_price.to_f64().unwrap_or(f64::NAN))
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
-                .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_ASK_QUANTITY_FEATURE_ID.clone())
                 .value(self.ask_quantity.to_f64().unwrap_or(f64::NAN))

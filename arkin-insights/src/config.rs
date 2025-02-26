@@ -62,10 +62,42 @@ pub enum FeatureConfig {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DataLoaderConfig {
     Periods(usize),   // Load the last N periods (e.g., 10 data points)
     Window(Duration), // Load data within a time window (e.g., 5 minutes)
-    LastValue,        // Load only the most recent value
+    Lag(usize),       // Load the value N periods ago (e.g., 1 period ago) 0 is the current period
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NewFeatureConfig {
+    StdDev(SingleVecFeatureConfig),
+    Ratio(TwoValueFeatureConfig),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TwoValueFeatureConfig {
+    pub input1: FeatureId,
+    pub input1_data: DataLoaderConfig,
+    pub input2: FeatureId,
+    pub input2_data: DataLoaderConfig,
+    pub output: FeatureId,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SingleVecFeatureConfig {
+    pub input: FeatureId,
+    pub data_loader: DataLoaderConfig,
+    pub output: FeatureId,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TwoVecFeatureConfig {
+    pub input1: FeatureId,
+    pub input2: FeatureId,
+    pub data_loader: DataLoaderConfig,
+    pub output: FeatureId,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

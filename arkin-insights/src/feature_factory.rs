@@ -4,29 +4,29 @@ use arkin_core::prelude::*;
 
 use crate::{
     config::FeatureConfig,
-    simple::{LogReturnFeature, OHLCVFeature, SignalStrengthFeature, StdDevFeature, SumFeature, TimeFeature},
+    simple::{LogChange, OHLCVFeature, SignalStrengthFeature, StdDevFeature, SumFeature, TimeFeature},
     state::InsightsState,
     ta::{
         AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
         RelativeStrengthIndexFeature,
     },
-    Computation,
+    Feature,
 };
 
 pub struct FeatureFactory {}
 
 impl FeatureFactory {
     pub fn from_config(
-        configs: &[FeatureConfig],
         pipeline: Arc<Pipeline>,
         state: Arc<InsightsState>,
-    ) -> Vec<Box<dyn Computation>> {
+        configs: &[FeatureConfig],
+    ) -> Vec<Arc<dyn Feature>> {
         // Create nodes
         configs
             .iter()
             .map(|config| {
-                let feature: Box<dyn Computation> = match config {
-                    FeatureConfig::OHLCV(c) => Box::new(
+                let feature: Arc<dyn Feature> = match config {
+                    FeatureConfig::OHLCV(c) => Arc::new(
                         OHLCVFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -51,10 +51,9 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::Time(c) => Box::new(
+                    FeatureConfig::Time(c) => Arc::new(
                         TimeFeature::builder()
                             .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
                             .input(c.input.clone())
                             .output_day_of_week(c.output_day_of_week.clone())
                             .output_hour_of_day(c.output_hour_of_day.clone())
@@ -63,8 +62,8 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::LogReturn(c) => Box::new(
-                        LogReturnFeature::builder()
+                    FeatureConfig::LogReturn(c) => Arc::new(
+                        LogChange::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
                             .input(c.input.clone())
@@ -73,7 +72,7 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::StdDev(c) => Box::new(
+                    FeatureConfig::StdDev(c) => Arc::new(
                         StdDevFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -83,7 +82,7 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::Sum(c) => Box::new(
+                    FeatureConfig::Sum(c) => Arc::new(
                         SumFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -93,7 +92,7 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::SignalStrength(c) => Box::new(
+                    FeatureConfig::SignalStrength(c) => Arc::new(
                         SignalStrengthFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -103,7 +102,7 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::MA(c) => Box::new(
+                    FeatureConfig::MA(c) => Arc::new(
                         MovingAverageFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -114,7 +113,7 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::RSI(c) => Box::new(
+                    FeatureConfig::RSI(c) => Arc::new(
                         RelativeStrengthIndexFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -124,7 +123,7 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::ADX(c) => Box::new(
+                    FeatureConfig::ADX(c) => Arc::new(
                         AverageDirectionalIndexFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -134,7 +133,7 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::CMF(c) => Box::new(
+                    FeatureConfig::CMF(c) => Arc::new(
                         ChaikinMoneyFlowFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -144,7 +143,7 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::CO(c) => Box::new(
+                    FeatureConfig::CO(c) => Arc::new(
                         ChaikinOscillatorFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
@@ -155,9 +154,8 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    // FeatureConfig::CatBoost(c) => Box::new(
+                    // FeatureConfig::CatBoost(c) => Arc::new(
                     //     CatBoostFeature::builder()
-                    //         .pipeline(pipeline.clone())
                     //         .insight_state(state.clone())
                     //         .model_location(c.model_location.clone())
                     //         .model_name(c.model_name.clone())
@@ -168,9 +166,8 @@ impl FeatureFactory {
                     //         .persist(c.persist)
                     //         .build(),
                     // ),
-                    // FeatureConfig::MeanVariance(c) => Box::new(
+                    // FeatureConfig::MeanVariance(c) => Arc::new(
                     //     MeanVarianceFeature::builder()
-                    //         .pipeline(pipeline.clone())
                     //         .insight_state(state.clone())
                     //         .input_expected_returns(c.input_expected_returns.clone())
                     //         .input_returns(c.input_returns.clone())

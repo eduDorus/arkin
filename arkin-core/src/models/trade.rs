@@ -11,7 +11,7 @@ use crate::{
     Event, EventType, EventTypeOf, Price, Quantity,
 };
 
-use super::{Instrument, MarketSide, Pipeline};
+use super::{Instrument, MarketSide};
 
 #[derive(Debug, Clone, TypedBuilder)]
 
@@ -43,18 +43,16 @@ impl Trade {
         }
     }
 
-    pub fn to_insights(self, pipeline: Arc<Pipeline>) -> Vec<Arc<Insight>> {
+    pub fn to_insights(self) -> Vec<Arc<Insight>> {
         let insights = vec![
             Insight::builder()
                 .event_time(self.event_time)
-                .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TRADE_PRICE_FEATURE_ID.clone())
                 .value(self.price.to_f64().unwrap_or(f64::NAN))
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
-                .pipeline(pipeline.clone())
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TRADE_QUANTITY_FEATURE_ID.clone())
                 .value(self.quantity.to_f64().unwrap_or(f64::NAN) * self.side as i64 as f64)

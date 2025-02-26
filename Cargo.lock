@@ -141,13 +141,6 @@ version = "0.1.0"
 dependencies = [
  "arkin-core",
  "arkin-engine",
- "arkin-insights",
- "fastrand",
- "rayon",
- "rust_decimal",
- "rust_decimal_macros",
- "statrs",
- "time",
  "tokio",
  "tokio-rustls",
  "tracing",

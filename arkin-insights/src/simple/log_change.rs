@@ -10,7 +10,7 @@ use arkin_core::prelude::*;
 use crate::{state::InsightsState, Feature};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct StdDevFeature {
+pub struct LogChange {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
     input: FeatureId,
@@ -19,7 +19,7 @@ pub struct StdDevFeature {
     persist: bool,
 }
 
-impl Feature for StdDevFeature {
+impl Feature for LogChange {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
@@ -29,38 +29,40 @@ impl Feature for StdDevFeature {
     }
 
     fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
-        debug!("Calculating StdDev...");
+        debug!("Calculating Log Returns...");
 
-        // Get data from state
-        let data = self
-            .insight_state
-            .periods(Some(instrument.clone()), self.input.clone(), event_time, self.periods);
+        //  Get data
+        let data =
+            self.insight_state
+                .periods(Some(instrument.clone()), self.input.clone(), event_time, self.periods + 1);
 
         // Check if we have enough data
-        if data.len() < self.periods {
-            warn!("Not enough data for StdDev calculation");
+        if data.len() < self.periods + 1 {
+            warn!("Not enough data to calculate log return");
             return None;
         }
 
-        // Calculate StdDev
-        let sum = data.iter().sum::<f64>();
-        let count = data.len() as f64;
-        let mean = match count.is_zero() {
-            true => {
-                warn!("Count should not be zero!");
-                return None;
-            }
-            false => sum / count,
-        };
-        let variance = (1. / (count - 1.)) * data.iter().map(|v| (v - mean).powi(2)).sum::<f64>();
-        let std_dev = variance.sqrt();
+        // Get values change
+        let prev_value = data
+            .first()
+            .expect("Could not get first value, unexpected empty vector, should have been caught earlier");
+        let last_value = data
+            .last()
+            .expect("Could not get last value, unexpected empty vector, should have been caught earlier");
 
+        let log_return = if prev_value.is_zero() {
+            return None;
+        } else {
+            (last_value / prev_value).ln()
+        };
+
+        // Return insight
         let insight = Insight::builder()
             .event_time(event_time)
             .pipeline(Some(self.pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(self.output.clone())
-            .value(std_dev)
+            .value(log_return)
             .persist(self.persist)
             .build()
             .into();

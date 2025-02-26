@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
+use tokio_util::task::TaskTracker;
 use tracing::{debug, error};
 use typed_builder::TypedBuilder;
 
@@ -15,6 +16,8 @@ pub struct InsightsStore {
     #[builder(default)]
     insights_buffer: Arc<Mutex<Vec<Arc<Insight>>>>,
     buffer_size: usize,
+    #[builder(default)]
+    flush_tracker: TaskTracker,
 }
 
 impl InsightsStore {
@@ -34,7 +37,7 @@ impl InsightsStore {
         let repo = self.insights_repo.clone();
         let insights = insights.into_iter().map(|t| t.into()).collect::<Vec<_>>();
 
-        tokio::spawn(async move {
+        self.flush_tracker.spawn(async move {
             debug!("Flushing {} insights", insights.len());
 
             // Insert the insights into the database
@@ -67,6 +70,8 @@ impl InsightsStore {
     }
 
     pub async fn close(&self) -> Result<(), PersistenceError> {
+        self.flush_tracker.close();
+        self.flush_tracker.wait().await;
         self.insights_repo.close().await
     }
 

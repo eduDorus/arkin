@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
-use anyhow::Result;
-use rayon::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{state::InsightsState, Computation};
+use crate::{state::InsightsState, Feature};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct SumFeature {
@@ -20,7 +18,7 @@ pub struct SumFeature {
     persist: bool,
 }
 
-impl Computation for SumFeature {
+impl Feature for SumFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
@@ -29,42 +27,33 @@ impl Computation for SumFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instruments: &[Arc<Instrument>], event_time: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating Sum...");
 
-        // Calculate the mean (StdDev)
-        let insights = instruments
-            .par_iter()
-            .filter_map(|instrument| {
-                // Get data from state
-                let data =
-                    self.insight_state
-                        .periods(Some(instrument.clone()), self.input.clone(), event_time, self.periods);
+        // Get data from state
+        let data = self
+            .insight_state
+            .periods(Some(instrument.clone()), self.input.clone(), event_time, self.periods);
 
-                // Check if we have enough data
-                if data.len() < self.periods {
-                    warn!("Not enough data for Sum calculation");
-                    return None;
-                }
+        // Check if we have enough data
+        if data.len() < self.periods {
+            warn!("Not enough data for Sum calculation");
+            return None;
+        }
 
-                // Calculate StdDev
-                let sum = data.iter().sum::<f64>();
+        // Calculate StdDev
+        let sum = data.iter().sum::<f64>();
 
-                Some(
-                    Insight::builder()
-                        .event_time(event_time)
-                        .pipeline(self.pipeline.clone())
-                        .instrument(Some(instrument.clone()))
-                        .feature_id(self.output.clone())
-                        .value(sum)
-                        .persist(self.persist)
-                        .build()
-                        .into(),
-                )
-            })
-            .collect::<Vec<_>>();
+        let insight = Insight::builder()
+            .event_time(event_time)
+            .pipeline(Some(self.pipeline.clone()))
+            .instrument(Some(instrument.clone()))
+            .feature_id(self.output.clone())
+            .value(sum)
+            .persist(self.persist)
+            .build()
+            .into();
 
-        self.insight_state.insert_batch(&insights);
-        Ok(insights)
+        Some(vec![insight])
     }
 }

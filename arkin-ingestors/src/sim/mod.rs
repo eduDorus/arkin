@@ -38,7 +38,7 @@ impl RunnableService for SimIngestor {
         let tick_stream = self
             .persistence
             .tick_store
-            .stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, Frequency::Daily)
+            .stream_range_buffered(&self.instruments, self.start, self.start, self.buffer_size, Frequency::Daily)
             .await;
 
         let trade_stream = self

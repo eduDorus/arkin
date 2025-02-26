@@ -11,7 +11,9 @@ use super::{Instrument, Pipeline};
 
 pub struct Insight {
     pub event_time: OffsetDateTime,
-    pub pipeline: Arc<Pipeline>,
+    #[builder(default)]
+    pub pipeline: Option<Arc<Pipeline>>,
+    #[builder(default)]
     pub instrument: Option<Arc<Instrument>>,
     pub feature_id: FeatureId,
     pub value: f64,

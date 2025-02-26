@@ -26,7 +26,7 @@ impl From<Arc<Insight>> for InsightClickhouseDTO {
     fn from(insight: Arc<Insight>) -> Self {
         Self {
             event_time: insight.event_time,
-            pipeline_id: insight.pipeline.id,
+            pipeline_id: insight.pipeline.as_ref().map(|p| p.id).unwrap(),
             instrument_id: insight.instrument.as_ref().map(|i| i.id).unwrap(),
             feature_id: insight.feature_id.to_string(),
             value: insight.value,

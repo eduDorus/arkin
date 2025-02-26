@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use dashmap::DashMap;
-use rayon::prelude::*;
 use rust_decimal::prelude::*;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
@@ -14,7 +12,7 @@ use yata::{
 
 use arkin_core::prelude::*;
 
-use crate::{state::InsightsState, Computation};
+use crate::{state::InsightsState, Feature};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct MovingAverageFeature {
@@ -35,7 +33,7 @@ pub struct MovingAverageFeature {
     persist: bool,
 }
 
-impl Computation for MovingAverageFeature {
+impl Feature for MovingAverageFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
@@ -44,101 +42,76 @@ impl Computation for MovingAverageFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instruments: &[Arc<Instrument>], timestamp: OffsetDateTime) -> Result<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating {}...", self.ma_type);
 
-        let insights = instruments
-            .par_iter()
-            .filter_map(|instrument| {
-                // Get data from state
-                let value = self
-                    .insight_state
-                    .last(Some(instrument.clone()), self.input.clone(), timestamp)?;
-                let value_f64 = value.to_f64()?;
+        // Get data from state
+        let value = self
+            .insight_state
+            .last(Some(instrument.clone()), self.input.clone(), timestamp)?;
+        let value_f64 = value.to_f64()?;
 
-                // I know this is horrible but I have no time to do this in a optimal way. If you see this and have some time, please refactor this.
-                match self.ma_type.as_str() {
-                    "SMA" => {
-                        if let Some(mut sma) = self.sma_store.get_mut(instrument) {
-                            let sma_value = sma.next(&value_f64);
-                            let insight = Insight::builder()
-                                .event_time(timestamp)
-                                .pipeline(self.pipeline.clone())
-                                .instrument(Some(instrument.clone()))
-                                .feature_id(self.output.clone())
-                                .persist(self.persist)
-                                .value(sma_value)
-                                .build();
-                            Some(Arc::new(insight))
-                        } else {
-                            let sma = SMA::new(self.periods as u8, &value_f64).ok()?;
-                            self.sma_store.insert(instrument.clone(), sma);
-                            None
-                        }
-                    }
-                    "EMA" => {
-                        if let Some(mut ema) = self.ema_store.get_mut(instrument) {
-                            let ema_value = ema.next(&value_f64);
-                            let insight = Insight::builder()
-                                .event_time(timestamp)
-                                .pipeline(self.pipeline.clone())
-                                .instrument(Some(instrument.clone()))
-                                .feature_id(self.output.clone())
-                                .value(ema_value)
-                                .persist(self.persist)
-                                .build();
-                            Some(Arc::new(insight))
-                        } else {
-                            let ema = EMA::new(self.periods as u8, &value_f64).ok()?;
-                            self.ema_store.insert(instrument.clone(), ema);
-                            None
-                        }
-                    }
-                    "DMA" => {
-                        if let Some(mut dma) = self.dma_store.get_mut(instrument) {
-                            let dma_value = dma.next(&value_f64);
-                            let insight = Insight::builder()
-                                .event_time(timestamp)
-                                .pipeline(self.pipeline.clone())
-                                .instrument(Some(instrument.clone()))
-                                .feature_id(self.output.clone())
-                                .value(dma_value)
-                                .persist(self.persist)
-                                .build();
-                            Some(Arc::new(insight))
-                        } else {
-                            let dma = DMA::new(self.periods as u8, &value_f64).ok()?;
-                            self.dma_store.insert(instrument.clone(), dma);
-                            None
-                        }
-                    }
-                    "TMA" => {
-                        if let Some(mut tma) = self.tma_store.get_mut(instrument) {
-                            let tma_value = tma.next(&value_f64);
-                            let insight = Insight::builder()
-                                .event_time(timestamp)
-                                .pipeline(self.pipeline.clone())
-                                .instrument(Some(instrument.clone()))
-                                .feature_id(self.output.clone())
-                                .value(tma_value)
-                                .persist(self.persist)
-                                .build();
-                            Some(Arc::new(insight))
-                        } else {
-                            let tma = TMA::new(self.periods as u8, &value_f64).ok()?;
-                            self.tma_store.insert(instrument.clone(), tma);
-                            None
-                        }
-                    }
-                    _ => {
-                        warn!("Unknown MA type {} from [SMA, EMA, TMA]", self.ma_type);
-                        None
-                    }
+        // I know this is horrible but I have no time to do this in a optimal way. If you see this and have some time, please refactor this.
+        let value = match self.ma_type.as_str() {
+            "SMA" => {
+                if let Some(mut sma) = self.sma_store.get_mut(instrument) {
+                    let sma_value = sma.next(&value_f64);
+                    Some(sma_value)
+                } else {
+                    let sma = SMA::new(self.periods as u8, &value_f64).ok()?;
+                    self.sma_store.insert(instrument.clone(), sma);
+                    None
                 }
-            })
-            .collect::<Vec<_>>();
+            }
+            "EMA" => {
+                if let Some(mut ema) = self.ema_store.get_mut(instrument) {
+                    let ema_value = ema.next(&value_f64);
+                    Some(ema_value)
+                } else {
+                    let ema = EMA::new(self.periods as u8, &value_f64).ok()?;
+                    self.ema_store.insert(instrument.clone(), ema);
+                    None
+                }
+            }
+            "DMA" => {
+                if let Some(mut dma) = self.dma_store.get_mut(instrument) {
+                    let dma_value = dma.next(&value_f64);
+                    Some(dma_value)
+                } else {
+                    let dma = DMA::new(self.periods as u8, &value_f64).ok()?;
+                    self.dma_store.insert(instrument.clone(), dma);
+                    None
+                }
+            }
+            "TMA" => {
+                if let Some(mut tma) = self.tma_store.get_mut(instrument) {
+                    let tma_value = tma.next(&value_f64);
+                    Some(tma_value)
+                } else {
+                    let tma = TMA::new(self.periods as u8, &value_f64).ok()?;
+                    self.tma_store.insert(instrument.clone(), tma);
+                    None
+                }
+            }
+            _ => {
+                warn!("Unknown MA type {} from [SMA, EMA, TMA]", self.ma_type);
+                None
+            }
+        };
 
-        self.insight_state.insert_batch(&insights);
-        Ok(insights)
+        if let Some(value) = value {
+            let insight = Insight::builder()
+                .event_time(timestamp)
+                .pipeline(Some(self.pipeline.clone()))
+                .instrument(Some(instrument.clone()))
+                .feature_id(self.output.clone())
+                .persist(self.persist)
+                .value(value)
+                .build()
+                .into();
+            Some(vec![insight])
+        } else {
+            None
+        }
     }
 }

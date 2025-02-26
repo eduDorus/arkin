@@ -224,8 +224,6 @@ impl RunnableService for PersistenceService {
                         if let Err(e) = self.close().await {
                             error!("Failed to close persistence service on shutdown: {}", e);
                         }
-                        // wait 5 seconds
-                        tokio::time::sleep(Duration::from_secs(5)).await;
                         break;
                     }
             }
