@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -35,13 +35,13 @@ impl InsightsStore {
         let insights = insights.into_iter().map(|t| t.into()).collect::<Vec<_>>();
 
         tokio::spawn(async move {
-            info!("Flushing {} insights", insights.len());
+            debug!("Flushing {} insights", insights.len());
 
             // Insert the insights into the database
             loop {
                 match repo.insert_batch(&insights).await {
                     Ok(_) => {
-                        info!("Successfully flushed {} insights", insights.len());
+                        debug!("Successfully flushed {} insights", insights.len());
                         break;
                     }
                     Err(e) => {

@@ -125,14 +125,14 @@ impl PersistenceService {
             Arc::new(VenueOrderStore::builder().venue_order_repo(venue_order_repo.to_owned()).build());
         let tick_store = Arc::new(
             TickStore::builder()
-                .tick_repo(tick_repo)
+                .tick_repo(tick_repo.into())
                 .instrument_store(instrument_store.to_owned())
                 .buffer_size(config.batch_size)
                 .build(),
         );
         let trade_store = Arc::new(
             TradeStore::builder()
-                .trade_repo(trade_repo)
+                .trade_repo(trade_repo.into())
                 .instrument_store(instrument_store.to_owned())
                 .buffer_size(config.batch_size)
                 .build(),
@@ -186,6 +186,10 @@ impl RunnableService for PersistenceService {
             tokio::select! {
                     Ok(event) = rx.recv() => {
                         if self.dry_run {
+                          // Still need to update price cache
+                            if let Event::Tick(t) = event {
+                              self.tick_store.update_tick_cache(t).await;
+                            }
                             continue;
                         }
                         let res = match event {
@@ -220,6 +224,8 @@ impl RunnableService for PersistenceService {
                         if let Err(e) = self.close().await {
                             error!("Failed to close persistence service on shutdown: {}", e);
                         }
+                        // wait 5 seconds
+                        tokio::time::sleep(Duration::from_secs(5)).await;
                         break;
                     }
             }

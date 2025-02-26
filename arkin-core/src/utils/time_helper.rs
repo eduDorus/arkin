@@ -1,6 +1,74 @@
 use anyhow::Result;
 use time::{Duration, OffsetDateTime, Time};
 
+pub enum Frequency {
+    Hourly,
+    HalfDaily,
+    Daily,
+    Weekly,
+}
+
+fn next_boundary(dt: OffsetDateTime, frequency: &Frequency) -> OffsetDateTime {
+    match frequency {
+        Frequency::Daily => {
+            // Get the date and move to the next day at midnight
+            let next_date = dt.date() + Duration::days(1);
+            next_date.midnight().assume_offset(dt.offset())
+        }
+        Frequency::HalfDaily => {
+            // If before noon, move to noon; otherwise, move to the next day at midnight
+            if dt.hour() < 12 {
+                dt.replace_time(Time::from_hms(12, 0, 0).unwrap())
+            } else {
+                let next_date = dt.date() + Duration::days(1);
+                next_date.midnight().assume_offset(dt.offset())
+            }
+        }
+        Frequency::Hourly => {
+            // If exactly on the hour, move to the next hour
+            if dt.minute() == 0 && dt.second() == 0 && dt.nanosecond() == 0 {
+                dt + Duration::hours(1)
+            } else {
+                // Otherwise, truncate to the current hour and add one
+                let truncated = dt.replace_time(Time::from_hms(dt.hour(), 0, 0).unwrap());
+                truncated + Duration::hours(1)
+            }
+        }
+        Frequency::Weekly => {
+            // Placeholder: next Monday at midnight (to be implemented if needed)
+            unimplemented!("Weekly frequency not yet implemented");
+        }
+    }
+}
+
+pub fn datetime_chunks(
+    start: OffsetDateTime,
+    end: OffsetDateTime,
+    frequency: Frequency,
+) -> Result<Vec<(OffsetDateTime, OffsetDateTime)>, anyhow::Error> {
+    if start > end {
+        anyhow::bail!("Start date cannot be greater than end date");
+    }
+
+    let mut chunks = Vec::new();
+    let mut current = start;
+
+    while current < end {
+        let next = next_boundary(current, &frequency);
+        // If next is at or before end, use it as the chunk end; otherwise, use end
+        let chunk_end = if next <= end { next } else { end };
+        chunks.push((current, chunk_end));
+        current = next;
+        // Break if we've reached the end to avoid adding an empty chunk
+        if chunk_end == end {
+            break;
+        }
+    }
+
+    // If start == end, the loop won't run, returning an empty Vec, which is reasonable
+    Ok(chunks)
+}
+
 pub fn datetime_range_minute(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
@@ -160,5 +228,32 @@ mod tests {
         let datetime = datetime!(2023 - 06 - 09 12:23:03.430239483).assume_utc();
         let rounded = round_to_minute(datetime).unwrap();
         assert_eq!(rounded, datetime!(2023 - 06 - 09 12:23:00).assume_utc());
+    }
+
+    #[test]
+    fn test_datetime_range_chunker() {
+        let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
+        let end = datetime!(2023 - 06 - 11 22:23:03).assume_utc();
+
+        let dates = datetime_chunks(start, end, Frequency::Hourly).unwrap();
+        assert_eq!(dates.len(), 59);
+        assert_eq!(dates[0].0, start);
+        assert_eq!(dates[0].1, datetime!(2023 - 06 - 09 13:00:00).assume_utc());
+        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 22:00:00).assume_utc());
+        assert_eq!(dates[dates.len() - 1].1, end);
+
+        let dates = datetime_chunks(start, end, Frequency::HalfDaily).unwrap();
+        assert_eq!(dates.len(), 5);
+        assert_eq!(dates[0].0, start);
+        assert_eq!(dates[0].1, datetime!(2023 - 06 - 10 00:00:00).assume_utc());
+        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 12:00:00).assume_utc());
+        assert_eq!(dates[dates.len() - 1].1, end);
+
+        let dates = datetime_chunks(start, end, Frequency::Daily).unwrap();
+        assert_eq!(dates.len(), 3);
+        assert_eq!(dates[0].0, start);
+        assert_eq!(dates[0].1, datetime!(2023 - 06 - 10 00:00:00).assume_utc());
+        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 00:00:00).assume_utc());
+        assert_eq!(dates[dates.len() - 1].1, end);
     }
 }

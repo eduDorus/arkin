@@ -165,4 +165,34 @@ impl TradeClickhouseRepo {
             .fetch::<TradeClickhouseDTO>()?;
         Ok(cursor)
     }
+
+    pub async fn fetch_batch(
+        &self,
+        instrument_ids: &[Uuid],
+        day_start: OffsetDateTime,
+        day_end: OffsetDateTime,
+    ) -> Result<Vec<TradeClickhouseDTO>, PersistenceError> {
+        let rows = self
+            .client
+            .query(
+                r#"
+            SELECT 
+                ?fields 
+            FROM 
+                ? FINAL
+            WHERE 
+                event_time BETWEEN ? AND ? 
+                AND instrument_id IN (?)
+            ORDER BY 
+                event_time, trade_id ASC
+            "#,
+            )
+            .bind(Identifier(&self.table_name))
+            .bind(day_start.unix_timestamp())
+            .bind(day_end.unix_timestamp())
+            .bind(instrument_ids)
+            .fetch_all::<TradeClickhouseDTO>()
+            .await?;
+        Ok(rows)
+    }
 }

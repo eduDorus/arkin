@@ -1,15 +1,15 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_stream::try_stream;
-use futures_util::Stream;
+use futures_util::{stream, Stream, StreamExt};
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_core::{Instrument, Trade};
+use arkin_core::prelude::*;
 
 use crate::{repos::TradeClickhouseRepo, PersistenceError};
 
@@ -19,7 +19,7 @@ use super::instrument::InstrumentStore;
 
 pub struct TradeStore {
     instrument_store: Arc<InstrumentStore>,
-    trade_repo: TradeClickhouseRepo,
+    trade_repo: Arc<TradeClickhouseRepo>,
     #[builder(default)]
     trade_buffer: Arc<Mutex<Vec<Arc<Trade>>>>,
     #[builder(default = Cache::new(1000))]
@@ -158,5 +158,58 @@ impl TradeStore {
             }
         };
         Ok(stream)
+    }
+
+    pub async fn stream_range_buffered(
+        &self,
+        instruments: &[Arc<Instrument>],
+        start: OffsetDateTime,
+        end: OffsetDateTime,
+        buffer_size: usize,
+        frequency: Frequency,
+    ) -> impl Stream<Item = Arc<Trade>> + 'static {
+        // Split the range into daily chunks
+        let time_chunks = datetime_chunks(start, end, frequency).unwrap();
+        let instrument_ids = Arc::new(instruments.iter().map(|i| i.id).collect::<Vec<_>>());
+        let local_instrument_lookup =
+            Arc::new(instruments.iter().map(|i| (i.id, Arc::clone(i))).collect::<HashMap<_, _>>());
+
+        // Clone the repository for use in async closures
+        let repo = Arc::clone(&self.trade_repo);
+
+        // Create a stream of futures for each daily chunk
+        let fetch_stream = stream::iter(time_chunks).map(move |(start_batch, end_batch)| {
+            let repo = Arc::clone(&repo);
+            let instrument_ids = instrument_ids.clone();
+            let local_instrument_lookup = local_instrument_lookup.clone();
+
+            async move {
+                info!("Fetching trades for batch: {} - {}", start_batch, end_batch);
+
+                // Fetch with retries
+                let res = retry(
+                    || repo.fetch_batch(&instrument_ids, start_batch, end_batch),
+                    5, // Max retries
+                )
+                .await;
+
+                let batch = res.expect("Failed to fetch batch, abort mission");
+                let mut trades = Vec::with_capacity(batch.len());
+                for dto in batch {
+                    let instrument = local_instrument_lookup.get(&dto.instrument_id).cloned().unwrap();
+                    let trade = Trade::builder()
+                        .event_time(dto.event_time)
+                        .instrument(instrument)
+                        .trade_id(dto.trade_id as u64)
+                        .side(dto.side.into())
+                        .price(dto.price)
+                        .quantity(dto.quantity)
+                        .build();
+                    trades.push(Arc::new(trade));
+                }
+                trades
+            }
+        });
+        fetch_stream.buffered(buffer_size).flat_map(|x| stream::iter(x))
     }
 }

@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use async_trait::async_trait;
 use futures_util::StreamExt;
@@ -17,6 +20,8 @@ pub struct SimIngestor {
     persistence: Arc<PersistenceService>,
     instruments: Vec<Arc<Instrument>>,
     tick_frequency: Duration,
+    #[builder(default = 3)]
+    buffer_size: usize,
     start: OffsetDateTime,
     end: OffsetDateTime,
 }
@@ -33,14 +38,14 @@ impl RunnableService for SimIngestor {
         let tick_stream = self
             .persistence
             .tick_store
-            .stream_range(&self.instruments, self.start, self.end)
-            .await?;
+            .stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, Frequency::Daily)
+            .await;
 
         let trade_stream = self
             .persistence
             .trade_store
-            .stream_range(&self.instruments, self.start, self.end)
-            .await?;
+            .stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, Frequency::Daily)
+            .await;
 
         pin!(tick_stream);
         pin!(trade_stream);
@@ -52,13 +57,11 @@ impl RunnableService for SimIngestor {
             // Convert the `Option<Result<Arc<Tick>, PersistenceError>>` to an Option of the timestamp,
             // to decide which is earlier *by reference only*.
             let tick_ts = match &next_tick {
-                Some(Ok(t)) => Some(t.event_time),
-                Some(Err(e)) => return Err(anyhow::anyhow!(e.to_string())),
+                Some(t) => Some(t.event_time),
                 None => None,
             };
             let trade_ts = match &next_trade {
-                Some(Ok(t)) => Some(t.event_time),
-                Some(Err(e)) => return Err(anyhow::anyhow!(e.to_string())),
+                Some(t) => Some(t.event_time),
                 None => None,
             };
 
@@ -67,13 +70,13 @@ impl RunnableService for SimIngestor {
                 (Some(tick_ts), Some(trade_ts)) => {
                     if tick_ts <= trade_ts {
                         // "take" the tick out of `next_tick`
-                        let tick = next_tick.take().unwrap().unwrap();
+                        let tick = next_tick.take().unwrap();
                         self.pubsub.publish(tick).await;
                         // replace it with the next item from the stream
                         next_tick = tick_stream.next().await;
                         tick_ts
                     } else {
-                        let trade = next_trade.take().unwrap().unwrap();
+                        let trade = next_trade.take().unwrap();
                         self.pubsub.publish(trade).await;
                         next_trade = trade_stream.next().await;
                         trade_ts
@@ -81,14 +84,14 @@ impl RunnableService for SimIngestor {
                 }
                 (Some(ts), None) => {
                     // only ticks left
-                    let tick = next_tick.take().unwrap().unwrap();
+                    let tick = next_tick.take().unwrap();
                     self.pubsub.publish(tick).await;
                     next_tick = tick_stream.next().await;
                     ts
                 }
                 (None, Some(ts)) => {
                     // only trades left
-                    let trade = next_trade.take().unwrap().unwrap();
+                    let trade = next_trade.take().unwrap();
                     self.pubsub.publish(trade).await;
                     next_trade = trade_stream.next().await;
                     ts
@@ -97,7 +100,7 @@ impl RunnableService for SimIngestor {
             };
 
             if current_time >= next_tick_time {
-                // info!("SimIngestor: Publishing IntervalTick at {}", next_tick_time);
+                info!("SimIngestor: Publishing IntervalTick at {}", next_tick_time);
                 let interval_tick = IntervalTick::builder()
                     .event_time(next_tick_time)
                     .instruments(self.instruments.clone())
@@ -107,12 +110,14 @@ impl RunnableService for SimIngestor {
                 next_tick_time += self.tick_frequency;
 
                 // Wait for insight tick to be processed
+                let timer = Instant::now();
                 while let Ok(event) = rx.recv().await {
                     match event {
                         Event::InsightTick(_) => break,
                         _ => {}
                     }
                 }
+                info!("SimIngestor: InsightTick processed in {:?}", timer.elapsed());
             }
         }
 

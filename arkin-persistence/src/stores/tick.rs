@@ -1,15 +1,15 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_stream::try_stream;
-use futures_util::Stream;
+use futures_util::{stream, Stream, StreamExt};
 use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_core::{Instrument, Tick};
+use arkin_core::prelude::*;
 
 use crate::{repos::TickClickhouseRepo, PersistenceError};
 
@@ -19,7 +19,7 @@ use super::instrument::InstrumentStore;
 
 pub struct TickStore {
     instrument_store: Arc<InstrumentStore>,
-    tick_repo: TickClickhouseRepo,
+    tick_repo: Arc<TickClickhouseRepo>,
     #[builder(default)]
     tick_buffer: Arc<Mutex<Vec<Arc<Tick>>>>,
     #[builder(default = Cache::new(1000))]
@@ -57,7 +57,7 @@ impl TickStore {
         Ok(())
     }
 
-    async fn update_tick_cache(&self, tick: Arc<Tick>) {
+    pub async fn update_tick_cache(&self, tick: Arc<Tick>) {
         if let Some(cached_tick) = self.last_tick_cache.get(&tick.instrument).await {
             if cached_tick.tick_id < tick.tick_id {
                 self.last_tick_cache.insert(tick.instrument.clone(), tick.clone()).await;
@@ -162,5 +162,59 @@ impl TickStore {
             }
         };
         Ok(stream)
+    }
+
+    pub async fn stream_range_buffered(
+        &self,
+        instruments: &[Arc<Instrument>],
+        start: OffsetDateTime,
+        end: OffsetDateTime,
+        buffer_size: usize,
+        frequency: Frequency,
+    ) -> impl Stream<Item = Arc<Tick>> + 'static {
+        // Split the range into daily chunks
+        let time_chunks = datetime_chunks(start, end, frequency).unwrap();
+        let instrument_ids = Arc::new(instruments.iter().map(|i| i.id).collect::<Vec<_>>());
+        let local_instrument_lookup =
+            Arc::new(instruments.iter().map(|i| (i.id, Arc::clone(i))).collect::<HashMap<_, _>>());
+
+        // Clone the repository for use in async closures
+        let tick_repo = Arc::clone(&self.tick_repo);
+
+        // Create a stream of futures for each daily chunk
+        let fetch_stream = stream::iter(time_chunks).map(move |(start_batch, end_batch)| {
+            let tick_repo = Arc::clone(&tick_repo);
+            let instrument_ids = instrument_ids.clone();
+            let local_instrument_lookup = local_instrument_lookup.clone();
+
+            async move {
+                info!("Fetching ticks for batch: {} - {}", start_batch, end_batch);
+
+                // Fetch with retries
+                let res = retry(
+                    || tick_repo.fetch_batch(&instrument_ids, start_batch, end_batch),
+                    5, // Max retries
+                )
+                .await;
+
+                let batch = res.expect("Failed to fetch batch, abort mission");
+                let mut ticks = Vec::with_capacity(batch.len());
+                for dto in batch {
+                    let instrument = local_instrument_lookup.get(&dto.instrument_id).cloned().unwrap();
+                    let tick = Tick::builder()
+                        .event_time(dto.event_time)
+                        .instrument(instrument)
+                        .tick_id(dto.tick_id as u64)
+                        .bid_price(dto.bid_price)
+                        .bid_quantity(dto.bid_quantity)
+                        .ask_price(dto.ask_price)
+                        .ask_quantity(dto.ask_quantity)
+                        .build();
+                    ticks.push(Arc::new(tick));
+                }
+                ticks
+            }
+        });
+        fetch_stream.buffered(buffer_size).flat_map(|x| stream::iter(x))
     }
 }
