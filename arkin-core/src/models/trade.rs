@@ -55,7 +55,7 @@ impl Trade {
                 .event_time(self.event_time)
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TRADE_QUANTITY_FEATURE_ID.clone())
-                .value(self.quantity.to_f64().unwrap_or(f64::NAN) * self.side as i64 as f64)
+                .value(self.quantity.to_f64().unwrap_or(f64::NAN) * f64::from(self.side))
                 .build(),
         ];
         insights.into_iter().map(Arc::new).collect()

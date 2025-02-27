@@ -93,6 +93,7 @@ impl Feature for OHLCVFeature {
                         (volume + quantity.abs(), buy_volume, sell_volume + quantity.abs())
                     }
                 });
+        debug!("Volume: {}, Buy Volume: {}, Sell Volume: {}", volume, buy_volume, sell_volume);
 
         // Calculate notional volume
         let (notional_volume, buy_notional_volume, sell_notional_volume) = prices.iter().zip(quantities.iter()).fold(
@@ -113,9 +114,14 @@ impl Feature for OHLCVFeature {
                 }
             },
         );
+        debug!(
+            "Notional Volume: {}, Buy Notional Volume: {}, Sell Notional Volume: {}",
+            notional_volume, buy_notional_volume, sell_notional_volume
+        );
 
         // Calculate VWAP
         let vwap = notional_volume / volume;
+        debug!("VWAP: {}", vwap);
 
         // Calculate trade count
         let (trade_count, buy_trade_count, sell_trade_count) =
@@ -128,6 +134,10 @@ impl Feature for OHLCVFeature {
                         (trade_count + 1, buy_trade_count, sell_trade_count + 1)
                     }
                 });
+        debug!(
+            "Trade Count: {}, Buy Trade Count: {}, Sell Trade Count: {}",
+            trade_count, buy_trade_count, sell_trade_count
+        );
 
         // Create insights
         let mut insights = Vec::with_capacity(self.outputs().len());
