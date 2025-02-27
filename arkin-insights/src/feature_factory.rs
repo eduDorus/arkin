@@ -1,9 +1,11 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
+use tracing::info;
 
 use crate::{
     config::FeatureConfig,
+    scaler::{RobustScaler, ScalerData},
     simple::{LogChange, OHLCVFeature, SignalStrengthFeature, StdDevFeature, SumFeature, TimeFeature},
     state::InsightsState,
     ta::{
@@ -154,6 +156,37 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
+                    FeatureConfig::RobustScaler(c) => {
+                        // Read the json scaler file
+                        let file = File::open(&c.scaler_data_location).expect("Failed to open scaler file at location");
+                        let reader = BufReader::new(file);
+
+                        // Deserialize into a Vec<ScalerData>
+                        let scaler_data: Vec<ScalerData> =
+                            serde_json::from_reader(reader).expect("Failed to deserialize scaler data");
+
+                        let map = scaler_data
+                            .into_iter()
+                            .map(|data| (data.feature_id.clone(), data))
+                            .collect::<HashMap<_, _>>();
+
+                        for (k, v) in &map {
+                            info!("Scaler data: {} -> {:?}", k, v);
+                        }
+
+                        let inputs = map.keys().cloned().collect();
+
+                        Arc::new(
+                            RobustScaler::builder()
+                                .pipeline(pipeline.clone())
+                                .insight_state(state.clone())
+                                .scalers(map)
+                                .input(inputs)
+                                .output(c.output.clone())
+                                .persist(c.persist)
+                                .build(),
+                        )
+                    }
                     // FeatureConfig::CatBoost(c) => Arc::new(
                     //     CatBoostFeature::builder()
                     //         .insight_state(state.clone())

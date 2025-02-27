@@ -80,7 +80,7 @@ impl InsightsClickhouseRepo {
                 )
                 ENGINE = ReplacingMergeTree
                 PARTITION BY toYYYYMMDD(event_time)
-                ORDER BY (pipeline_id, instrument_id, feature_id, event_time)
+                ORDER BY (pipeline_id, instrument_id, feature_id, insight_type, event_time)
                 SETTINGS index_granularity = 8192;
                 ",
             )

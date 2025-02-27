@@ -52,6 +52,10 @@ pub enum FeatureConfig {
     #[serde(rename = "co")]
     CO(ChaikinOscillatorConfig),
 
+    // Scalers
+    #[serde(rename = "robust_scaler")]
+    RobustScaler(RobustScalerConfig),
+
     // Forecasting
     #[serde(rename = "catboost")]
     CatBoost(CatBoostConfig),
@@ -262,6 +266,15 @@ pub struct ChaikinOscillatorConfig {
     pub output: FeatureId,
     pub periods_fast: usize,
     pub periods_slow: usize,
+    #[serde(default)]
+    pub persist: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RobustScalerConfig {
+    // pub input: Vec<FeatureId>,
+    pub output: FeatureId,
+    pub scaler_data_location: String,
     #[serde(default)]
     pub persist: bool,
 }

@@ -338,6 +338,7 @@ dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
+ "serde_json",
  "statrs",
  "test-log",
  "thiserror 2.0.11",
