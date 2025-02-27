@@ -54,6 +54,7 @@ impl Feature for ChaikinMoneyFlowFeature {
                 .feature_id(self.output.clone())
                 .value(value)
                 .persist(self.persist)
+                .insight_type(InsightType::Continuous)
                 .build()
                 .into();
             Some(vec![insight])

@@ -61,7 +61,6 @@ impl From<Arc<Instrument>> for InstrumentDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct InstrumentRepo {
     pool: PgPool,
 }

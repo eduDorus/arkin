@@ -107,6 +107,7 @@ impl Feature for MovingAverageFeature {
                 .feature_id(self.output.clone())
                 .persist(self.persist)
                 .value(value)
+                .insight_type(InsightType::Continuous)
                 .build()
                 .into();
             Some(vec![insight])

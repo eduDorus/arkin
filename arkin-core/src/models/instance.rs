@@ -15,7 +15,6 @@ pub enum InstanceType {
 }
 
 #[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
-
 pub struct Instance {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

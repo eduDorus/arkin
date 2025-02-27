@@ -13,7 +13,6 @@ use crate::{
 use super::{Instrument, MarketSide, VenueOrder};
 
 #[derive(Debug, Clone, TypedBuilder, FromRow)]
-
 pub struct VenueOrderFill {
     #[builder(default = OffsetDateTime::now_utc())]
     pub event_time: OffsetDateTime,

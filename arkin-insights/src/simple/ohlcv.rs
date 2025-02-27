@@ -149,6 +149,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_open.clone())
                 .value(open)
+                .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -160,6 +161,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_high.clone())
                 .value(high)
+                .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -171,6 +173,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_low.clone())
                 .value(low)
+                .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -182,6 +185,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_close.clone())
                 .value(close)
+                .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -193,6 +197,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_typical_price.clone())
                 .value(typical_price)
+                .insight_type(InsightType::Price)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -204,6 +209,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_vwap.clone())
                 .value(vwap)
+                .insight_type(InsightType::Price)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -215,6 +221,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_volume.clone())
                 .value(volume)
+                .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -226,6 +233,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_buy_volume.clone())
                 .value(buy_volume)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -237,6 +245,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_sell_volume.clone())
                 .value(sell_volume)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -248,6 +257,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_notional_volume.clone())
                 .value(notional_volume)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -259,6 +269,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_buy_notional_volume.clone())
                 .value(buy_notional_volume)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -270,6 +281,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_sell_notional_volume.clone())
                 .value(sell_notional_volume)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -281,6 +293,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_trade_count.clone())
                 .value(trade_count as f64)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -292,6 +305,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_buy_trade_count.clone())
                 .value(buy_trade_count as f64)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -303,6 +317,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_sell_trade_count.clone())
                 .value(sell_trade_count as f64)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),

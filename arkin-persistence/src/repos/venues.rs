@@ -36,7 +36,6 @@ impl From<VenueDTO> for Venue {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct VenueRepo {
     pool: PgPool,
 }

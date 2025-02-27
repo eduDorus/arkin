@@ -20,7 +20,6 @@ pub trait EventTypeOf: fmt::Debug + Send + Sync + Clone + 'static {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct IntervalTick {
     pub event_time: OffsetDateTime,
     pub instruments: Vec<Arc<Instrument>>,
@@ -46,7 +45,6 @@ impl From<Arc<IntervalTick>> for Event {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct InsightTick {
     pub event_time: OffsetDateTime,
     pub instruments: Vec<Arc<Instrument>>,
@@ -73,7 +71,6 @@ pub struct AllocationWeight {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct AllocationTick {
     pub event_time: OffsetDateTime,
     pub allocations: Vec<Arc<AllocationWeight>>,

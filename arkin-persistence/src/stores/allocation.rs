@@ -6,7 +6,6 @@ use typed_builder::TypedBuilder;
 use crate::{repos::AllocationRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct AllocationStore {
     allocation_repo: AllocationRepo,
 }

@@ -11,7 +11,6 @@ use crate::{
 };
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct TradeService {
     pub signal_store: SignalStore,
     pub execution_order_store: ExecutionOrderStore,

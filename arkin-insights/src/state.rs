@@ -262,12 +262,14 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(1.1)
+            .insight_type(InsightType::Raw)
             .build();
         let insight2 = Insight::builder()
             .event_time(t2)
             .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
+            .insight_type(InsightType::Raw)
             .value(1.0)
             .build();
         let insight3 = Insight::builder()
@@ -275,6 +277,7 @@ mod tests {
             .pipeline(Some(pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
+            .insight_type(InsightType::Raw)
             .value(1.2)
             .build();
         state.insert(insight1.into());
@@ -323,6 +326,7 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(1.0)
+            .insight_type(InsightType::Raw)
             .build();
         let insight2 = Insight::builder()
             .event_time(t2)
@@ -330,6 +334,7 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(2.0)
+            .insight_type(InsightType::Raw)
             .build();
         let insight3 = Insight::builder()
             .event_time(t3)
@@ -337,6 +342,7 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(feature_id.clone())
             .value(3.0)
+            .insight_type(InsightType::Raw)
             .build();
 
         state.insert(insight1.into());
@@ -381,6 +387,7 @@ mod tests {
                 .instrument(Some(instrument.clone()))
                 .feature_id(feature_id.clone())
                 .value(num)
+                .insight_type(InsightType::Raw)
                 .build();
             state.insert(i.into());
         }
@@ -407,6 +414,7 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("open".into()))
             .value(1.0)
+            .insight_type(InsightType::Ohlcv)
             .build();
         let high_insight = Insight::builder()
             .event_time(now)
@@ -414,6 +422,7 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("high".into()))
             .value(5.0)
+            .insight_type(InsightType::Ohlcv)
             .build();
         let low_insight = Insight::builder()
             .event_time(now)
@@ -421,6 +430,7 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("low".into()))
             .value(0.0)
+            .insight_type(InsightType::Ohlcv)
             .build();
         let close_insight = Insight::builder()
             .event_time(now)
@@ -428,6 +438,7 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("close".into()))
             .value(3.0)
+            .insight_type(InsightType::Ohlcv)
             .build();
         let volume_insight = Insight::builder()
             .event_time(now)
@@ -435,6 +446,7 @@ mod tests {
             .instrument(Some(instrument.clone()))
             .feature_id(FeatureId::new("volume".into()))
             .value(100.)
+            .insight_type(InsightType::Ohlcv)
             .build();
 
         state.insert(open_insight.into());

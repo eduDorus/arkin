@@ -10,7 +10,6 @@ use crate::{
 };
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct SystemService {
     pub pipeline_store: PipelineStore,
     pub venue_store: VenueStore,

@@ -68,7 +68,6 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct ExecutionOrderRepo {
     pool: PgPool,
     instance: Arc<Instance>,

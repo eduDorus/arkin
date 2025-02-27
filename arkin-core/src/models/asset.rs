@@ -16,7 +16,6 @@ pub enum AssetType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]
-
 pub struct Asset {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

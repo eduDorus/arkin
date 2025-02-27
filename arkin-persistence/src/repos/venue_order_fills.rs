@@ -1,14 +1,13 @@
 use anyhow::Result;
-use typed_builder::TypedBuilder;
 use sqlx::PgPool;
 use tracing::debug;
+use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
 use crate::BIND_LIMIT;
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct VenueOrderFillsRepo {
     pool: PgPool,
 }

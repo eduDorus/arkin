@@ -16,7 +16,6 @@ use crate::{repos::TradeClickhouseRepo, PersistenceError};
 use super::instrument::InstrumentStore;
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct TradeStore {
     instrument_store: Arc<InstrumentStore>,
     trade_repo: Arc<TradeClickhouseRepo>,

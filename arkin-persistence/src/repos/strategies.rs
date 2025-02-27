@@ -47,7 +47,6 @@ impl From<StrategyDTO> for Strategy {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct StrategyRepo {
     pool: PgPool,
 }

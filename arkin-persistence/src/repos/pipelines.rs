@@ -36,7 +36,6 @@ impl From<PipelineDTO> for Arc<Pipeline> {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct PipelineRepo {
     pool: PgPool,
 }

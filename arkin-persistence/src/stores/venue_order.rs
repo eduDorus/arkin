@@ -6,7 +6,6 @@ use typed_builder::TypedBuilder;
 use crate::{repos::VenueOrderRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct VenueOrderStore {
     venue_order_repo: VenueOrderRepo,
 }

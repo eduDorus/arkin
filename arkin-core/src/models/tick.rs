@@ -14,7 +14,7 @@ use crate::{
     Event, EventType, EventTypeOf, Price, Quantity,
 };
 
-use super::{Insight, Instrument};
+use super::{Insight, InsightType, Instrument};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct Tick {
@@ -56,24 +56,28 @@ impl Tick {
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_BID_PRICE_FEATURE_ID.clone())
                 .value(self.bid_price.to_f64().unwrap_or(f64::NAN))
+                .insight_type(InsightType::Raw)
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_BID_QUANTITY_FEATURE_ID.clone())
                 .value(self.bid_quantity.to_f64().unwrap_or(f64::NAN))
+                .insight_type(InsightType::Raw)
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_ASK_PRICE_FEATURE_ID.clone())
                 .value(self.ask_price.to_f64().unwrap_or(f64::NAN))
+                .insight_type(InsightType::Raw)
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TICK_ASK_QUANTITY_FEATURE_ID.clone())
                 .value(self.ask_quantity.to_f64().unwrap_or(f64::NAN))
+                .insight_type(InsightType::Raw)
                 .build(),
         ];
         insights.into_iter().map(Arc::new).collect::<Vec<_>>()

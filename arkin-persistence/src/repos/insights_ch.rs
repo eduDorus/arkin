@@ -20,6 +20,7 @@ pub struct InsightClickhouseDTO {
     pub instrument_id: Uuid,
     pub feature_id: String,
     pub value: f64,
+    pub insight_type: String,
 }
 
 impl From<Arc<Insight>> for InsightClickhouseDTO {
@@ -30,6 +31,7 @@ impl From<Arc<Insight>> for InsightClickhouseDTO {
             instrument_id: insight.instrument.as_ref().map(|i| i.id).unwrap(),
             feature_id: insight.feature_id.to_string(),
             value: insight.value,
+            insight_type: insight.insight_type.to_string(),
         }
     }
 }
@@ -73,7 +75,8 @@ impl InsightsClickhouseRepo {
                     pipeline_id     UUID CODEC(ZSTD(3)),
                     instrument_id   UUID CODEC(ZSTD(3)),
                     feature_id      LowCardinality(String) CODEC(ZSTD(3)),
-                    value           Float64 CODEC(ZSTD(3))
+                    value           Float64 CODEC(ZSTD(3)),
+                    insight_type    LowCardinality(String) CODEC(ZSTD(3))
                 )
                 ENGINE = ReplacingMergeTree
                 PARTITION BY toYYYYMMDD(event_time)

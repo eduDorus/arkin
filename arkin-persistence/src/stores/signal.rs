@@ -6,7 +6,6 @@ use typed_builder::TypedBuilder;
 use crate::{repos::SignalRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct SignalStore {
     signal_repo: SignalRepo,
 }

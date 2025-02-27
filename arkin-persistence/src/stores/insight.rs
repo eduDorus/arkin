@@ -10,7 +10,6 @@ use arkin_core::prelude::*;
 use crate::{repos::InsightsClickhouseRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct InsightsStore {
     insights_repo: InsightsClickhouseRepo,
     #[builder(default)]

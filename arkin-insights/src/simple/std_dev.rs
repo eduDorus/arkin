@@ -61,6 +61,7 @@ impl Feature for StdDevFeature {
             .instrument(Some(instrument.clone()))
             .feature_id(self.output.clone())
             .value(std_dev)
+            .insight_type(InsightType::Continuous)
             .persist(self.persist)
             .build()
             .into();

@@ -1,5 +1,6 @@
 use std::{fmt, sync::Arc};
 
+use strum::Display;
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 
@@ -7,8 +8,19 @@ use crate::{Event, EventType, EventTypeOf, FeatureId};
 
 use super::{Instrument, Pipeline};
 
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Display, Clone)]
+#[strum(serialize_all = "snake_case")]
+pub enum InsightType {
+    Raw,
+    Ohlcv,
+    Price,
+    MovingAverage,
+    Continuous,
+    Categorical,
+    Scaled,
+}
 
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct Insight {
     pub event_time: OffsetDateTime,
     #[builder(default)]
@@ -17,6 +29,7 @@ pub struct Insight {
     pub instrument: Option<Arc<Instrument>>,
     pub feature_id: FeatureId,
     pub value: f64,
+    pub insight_type: InsightType,
     #[builder(default = false)]
     pub persist: bool,
 }

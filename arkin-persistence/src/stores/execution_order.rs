@@ -7,7 +7,6 @@ use uuid::Uuid;
 use crate::{repos::ExecutionOrderRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct ExecutionOrderStore {
     execution_order_repo: ExecutionOrderRepo,
 }

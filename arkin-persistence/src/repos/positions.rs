@@ -6,7 +6,6 @@ use uuid::Uuid;
 use arkin_core::prelude::*;
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct PositionsRepo {
     pool: PgPool,
 }

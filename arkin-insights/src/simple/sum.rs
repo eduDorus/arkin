@@ -50,6 +50,7 @@ impl Feature for SumFeature {
             .instrument(Some(instrument.clone()))
             .feature_id(self.output.clone())
             .value(sum)
+            .insight_type(InsightType::Continuous)
             .persist(self.persist)
             .build()
             .into();

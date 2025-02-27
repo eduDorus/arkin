@@ -29,7 +29,6 @@ impl From<Arc<Account>> for AccountDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct AccountRepo {
     pool: PgPool,
     instance: Arc<Instance>,

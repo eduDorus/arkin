@@ -39,7 +39,6 @@ impl From<AssetDTO> for Arc<Asset> {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct AssetRepo {
     pool: PgPool,
 }

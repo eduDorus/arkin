@@ -37,7 +37,6 @@ impl From<Arc<Tick>> for TickDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct TickRepo {
     pool: PgPool,
 }

@@ -46,7 +46,6 @@ impl From<Arc<Transfer>> for TransferDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct TransferRepo {
     pool: PgPool,
     instance: Arc<Instance>,

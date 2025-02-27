@@ -12,7 +12,6 @@ use crate::{repos::InstrumentRepo, PersistenceError};
 use super::{asset::AssetStore, venue::VenueStore};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct InstrumentStore {
     venue_store: Arc<VenueStore>,
     asset_store: Arc<AssetStore>,

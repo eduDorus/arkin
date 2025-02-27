@@ -39,7 +39,6 @@ impl From<Arc<Trade>> for TradeClickhouseDTO {
 }
 
 #[derive(Clone, TypedBuilder)]
-
 pub struct TradeClickhouseRepo {
     client: Client,
     table_name: String,

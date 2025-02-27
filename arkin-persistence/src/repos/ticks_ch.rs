@@ -43,7 +43,6 @@ impl From<Arc<Tick>> for TickClickhouseDTO {
 }
 
 #[derive(Clone, TypedBuilder)]
-
 pub struct TickClickhouseRepo {
     client: Client,
     table_name: String,

@@ -48,6 +48,7 @@ impl Feature for TimeFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_day_of_week.clone())
                 .value(day_of_week as f64)
+                .insight_type(InsightType::Categorical)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -57,6 +58,7 @@ impl Feature for TimeFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_hour_of_day.clone())
                 .value(hour_of_day as f64)
+                .insight_type(InsightType::Categorical)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -66,6 +68,7 @@ impl Feature for TimeFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_minute_of_day.clone())
                 .value(minute_of_day as f64)
+                .insight_type(InsightType::Categorical)
                 .persist(self.persist)
                 .build()
                 .into(),
@@ -75,6 +78,7 @@ impl Feature for TimeFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_minute_of_hour.clone())
                 .value(minute_of_hour as f64)
+                .insight_type(InsightType::Categorical)
                 .persist(self.persist)
                 .build()
                 .into(),

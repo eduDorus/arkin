@@ -16,7 +16,6 @@ use crate::{repos::TickClickhouseRepo, PersistenceError};
 use super::instrument::InstrumentStore;
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct TickStore {
     instrument_store: Arc<InstrumentStore>,
     tick_repo: Arc<TickClickhouseRepo>,

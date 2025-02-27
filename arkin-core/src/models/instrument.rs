@@ -34,7 +34,6 @@ pub enum InstrumentStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]
-
 pub struct Instrument {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

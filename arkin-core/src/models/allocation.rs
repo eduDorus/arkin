@@ -8,7 +8,6 @@ use uuid::Uuid;
 use super::{Instrument, Portfolio, Signal, Strategy};
 
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
-
 pub struct Allocation {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

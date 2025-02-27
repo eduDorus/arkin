@@ -8,7 +8,6 @@ use arkin_core::Instance;
 use crate::{repos::InstanceRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct InstanceStore {
     instance_repo: InstanceRepo,
 }

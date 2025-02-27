@@ -7,7 +7,6 @@ use uuid::Uuid;
 use crate::{repos::PipelineRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct PipelineStore {
     pipeline_repo: PipelineRepo,
 }

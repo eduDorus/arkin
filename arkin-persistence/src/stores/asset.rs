@@ -9,7 +9,6 @@ use arkin_core::Asset;
 use crate::{repos::AssetRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct AssetStore {
     asset_repo: AssetRepo,
     #[builder(default = Cache::new(1000))]

@@ -12,7 +12,6 @@ use crate::{
 };
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct MarketService {
     pub asset_store: AssetStore,
     pub instrument_store: InstrumentStore,

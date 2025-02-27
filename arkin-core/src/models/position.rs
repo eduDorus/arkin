@@ -38,7 +38,6 @@ pub enum PositionStatus {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct Position {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

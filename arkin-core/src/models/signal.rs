@@ -9,7 +9,6 @@ use crate::{EventType, EventTypeOf, Weight};
 use super::{Instrument, Strategy};
 
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
-
 pub struct Signal {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,

@@ -63,6 +63,7 @@ impl Feature for SignalStrengthFeature {
             .instrument(Some(instrument.clone()))
             .feature_id(self.output.clone())
             .value(signal_strength)
+            .insight_type(InsightType::Continuous)
             .persist(self.persist)
             .build()
             .into();

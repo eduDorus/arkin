@@ -47,7 +47,6 @@ impl From<InstanceDTO> for Arc<Instance> {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct InstanceRepo {
     pool: PgPool,
 }

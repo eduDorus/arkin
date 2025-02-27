@@ -36,7 +36,6 @@ impl From<Arc<Trade>> for TradeDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct TradeRepo {
     pool: PgPool,
 }

@@ -64,6 +64,7 @@ impl Feature for LogChange {
             .feature_id(self.output.clone())
             .value(log_return)
             .persist(self.persist)
+            .insight_type(InsightType::Continuous)
             .build()
             .into();
 

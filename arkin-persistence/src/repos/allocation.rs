@@ -39,7 +39,6 @@ impl From<Arc<Allocation>> for AllocationDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct AllocationRepo {
     pool: PgPool,
 }

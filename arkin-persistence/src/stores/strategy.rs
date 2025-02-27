@@ -7,7 +7,6 @@ use uuid::Uuid;
 use crate::{repos::StrategyRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct StrategyStore {
     strategy_repo: StrategyRepo,
 }

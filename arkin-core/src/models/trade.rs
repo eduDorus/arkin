@@ -11,10 +11,9 @@ use crate::{
     Event, EventType, EventTypeOf, Price, Quantity,
 };
 
-use super::{Instrument, MarketSide};
+use super::{InsightType, Instrument, MarketSide};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct Trade {
     pub event_time: OffsetDateTime,
     pub instrument: Arc<Instrument>,
@@ -50,12 +49,14 @@ impl Trade {
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TRADE_PRICE_FEATURE_ID.clone())
                 .value(self.price.to_f64().unwrap_or(f64::NAN))
+                .insight_type(InsightType::Raw)
                 .build(),
             Insight::builder()
                 .event_time(self.event_time)
                 .instrument(Some(self.instrument.clone()))
                 .feature_id(TRADE_QUANTITY_FEATURE_ID.clone())
                 .value(self.quantity.to_f64().unwrap_or(f64::NAN) * f64::from(self.side))
+                .insight_type(InsightType::Raw)
                 .build(),
         ];
         insights.into_iter().map(Arc::new).collect()

@@ -36,7 +36,6 @@ impl From<Arc<Insight>> for InsightDTO {
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct InsightsRepo {
     pool: PgPool,
 }

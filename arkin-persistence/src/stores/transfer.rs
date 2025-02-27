@@ -7,7 +7,6 @@ use arkin_core::prelude::*;
 use crate::{repos::TransferRepo, PersistenceError};
 
 #[derive(Debug, Clone, TypedBuilder)]
-
 pub struct TransferStore {
     transfer_repo: TransferRepo,
 }
