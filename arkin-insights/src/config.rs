@@ -177,6 +177,7 @@ pub struct StdDevConfig {
     pub periods: usize,
     #[serde(default)]
     pub persist: bool,
+    pub annualize_multiplier: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

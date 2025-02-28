@@ -17,6 +17,7 @@ pub struct StdDevFeature {
     output: FeatureId,
     periods: usize,
     persist: bool,
+    annualize_multiplier: f64,
 }
 
 impl Feature for StdDevFeature {
@@ -29,7 +30,7 @@ impl Feature for StdDevFeature {
     }
 
     fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
-        debug!("Calculating StdDev...");
+        debug!("Calculating Volatility...");
 
         // Get data from state
         let data = self
@@ -54,13 +55,14 @@ impl Feature for StdDevFeature {
         };
         let variance = (1. / (count - 1.)) * data.iter().map(|v| (v - mean).powi(2)).sum::<f64>();
         let std_dev = variance.sqrt();
+        let annualized = std_dev * self.annualize_multiplier;
 
         let insight = Insight::builder()
             .event_time(event_time)
             .pipeline(Some(self.pipeline.clone()))
             .instrument(Some(instrument.clone()))
             .feature_id(self.output.clone())
-            .value(std_dev)
+            .value(annualized)
             .insight_type(InsightType::Continuous)
             .persist(self.persist)
             .build()

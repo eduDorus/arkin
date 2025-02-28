@@ -82,6 +82,7 @@ impl FeatureFactory {
                             .output(c.output.clone())
                             .periods(c.periods)
                             .persist(c.persist)
+                            .annualize_multiplier(c.annualize_multiplier)
                             .build(),
                     ),
                     FeatureConfig::Sum(c) => Arc::new(
