@@ -28,7 +28,8 @@ thiserror = { workspace = true }
 async-trait = { workspace = true }
 typed-builder = { workspace = true }
 statrs = { workspace = true }
-
+rustfft = "6.2.0"
+hdbscan = "0.10.0"
 # catboost-rs = { workspace = true }
 # clarabel = { workspace = true }
 
