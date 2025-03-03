@@ -70,12 +70,13 @@ impl Feature for RobustScaler {
                     // Clip the value to the 1st and 99th percentiles
                     let value = value.max(scaler.percentile_01).min(scaler.percentile_99);
 
-                    let scaled_value = if scaler.is_skewed == 1 {
-                        let transformed_value = (value + scaler.skew_offset).ln();
-                        (transformed_value - scaler.median) / scaler.iqr
-                    } else {
-                        (value - scaler.median) / scaler.iqr
-                    };
+                    // let scaled_value = if scaler.is_skewed == 1 {
+                    //     let transformed_value = (value + scaler.skew_offset).ln();
+                    //     (transformed_value - scaler.median) / scaler.iqr
+                    // } else {
+                    //     (value - scaler.median) / scaler.iqr
+                    // };
+                    let scaled_value = (value - scaler.median) / scaler.iqr;
 
                     // Create Insight
                     Some(
