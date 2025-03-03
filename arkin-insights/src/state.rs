@@ -117,11 +117,11 @@ impl BoundedBuffer {
         // Get the index of the first value of the timestamp and then advance back by `lag` periods.
         let mut lag_counter = lag;
         for &(idx, val) in self.data.iter().rev() {
-            if idx <= timestamp {
-                lag_counter -= 1;
-            }
             if lag_counter == 0 {
                 return Some(val);
+            }
+            if idx <= timestamp {
+                lag_counter -= 1;
             }
         }
         None

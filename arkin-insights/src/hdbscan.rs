@@ -174,7 +174,7 @@ mod tests {
 
         // Run clustering with reasonable hyperparameters
         let min_cluster_size = 10; // At least 5 points per cluster
-        let min_samples = 2; // Sensitivity to noise
+        let min_samples = 1; // Sensitivity to noise
         let dist_metric = DistanceMetric::Euclidean;
         let clusters = compute_clusters(data.clone(), min_cluster_size, min_samples, dist_metric);
 

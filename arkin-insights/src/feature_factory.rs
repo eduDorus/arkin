@@ -4,9 +4,9 @@ use arkin_core::prelude::*;
 use tracing::info;
 
 use crate::{
-    config::FeatureConfig,
+    config::{FeatureConfig, WindowFeature},
+    features::{OHLCVFeature, TimeFeature},
     scaler::{RobustScaler, ScalerData},
-    simple::{LogChange, OHLCVFeature, SignalStrengthFeature, StdDevFeature, SumFeature, TimeFeature},
     state::InsightsState,
     ta::{
         AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
@@ -64,44 +64,13 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::LogReturn(c) => Arc::new(
-                        LogChange::builder()
+                    FeatureConfig::Window(c) => Arc::new(
+                        WindowFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .periods(c.periods)
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::StdDev(c) => Arc::new(
-                        StdDevFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .periods(c.periods)
-                            .persist(c.persist)
-                            .annualize_multiplier(c.annualize_multiplier)
-                            .build(),
-                    ),
-                    FeatureConfig::Sum(c) => Arc::new(
-                        SumFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .periods(c.periods)
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::SignalStrength(c) => Arc::new(
-                        SignalStrengthFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input_first(c.input_first.clone())
-                            .input_second(c.input_second.clone())
-                            .output(c.output.clone())
+                            .window(Duration::from_secs(c.periods))
                             .persist(c.persist)
                             .build(),
                     ),

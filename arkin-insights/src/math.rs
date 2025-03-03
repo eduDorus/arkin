@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use rayon::prelude::*;
+use tracing::error;
 
 /// Basic statistical functions
 pub fn min(data: &[f64]) -> f64 {
@@ -53,6 +54,7 @@ pub fn mode(data: &[f64]) -> Vec<f64> {
         .collect()
 }
 
+/// Distribution Metrics
 pub fn variance(data: &[f64]) -> f64 {
     let mean = mean(data);
     let sum_sq_diff: f64 = data.par_iter().map(|x| (x - mean).powi(2)).sum();
@@ -60,7 +62,6 @@ pub fn variance(data: &[f64]) -> f64 {
     sum_sq_diff / n
 }
 
-/// Distribution Metrics
 pub fn std_dev(data: &[f64]) -> f64 {
     variance(data).sqrt()
 }
@@ -103,6 +104,10 @@ pub fn iqr(data: &[f64]) -> f64 {
 }
 
 /// Change Metrics
+pub fn abs_change(value: f64, prev_value: f64) -> f64 {
+    value - prev_value
+}
+
 pub fn pct_change(value: f64, prev_value: f64) -> f64 {
     (value / prev_value) - 1.0
 }
@@ -111,12 +116,8 @@ pub fn log_change(value: f64, prev_value: f64) -> f64 {
     value.ln() - prev_value.ln()
 }
 
-pub fn acceleration(change: f64, prev_change: f64) -> f64 {
-    change - prev_change
-}
-
-pub fn jerk(accel: f64, prev_accel: f64) -> f64 {
-    accel - prev_accel
+pub fn difference(value: f64, prev_value: f64) -> f64 {
+    value - prev_value
 }
 
 /// Relationship Metrics
@@ -151,14 +152,16 @@ pub fn ema(data: &[f64], alpha: f64) -> Vec<f64> {
 }
 
 /// Custom Metrics
-pub fn inbalance(value_1: f64, value_2: f64) -> f64 {
+/// This can be used to compare dominance of one or another. Mostly used for quantities but could also be used on prices.
+pub fn imbalance(value_1: f64, value_2: f64) -> f64 {
     (value_1 - value_2) / (value_1 + value_2)
 }
 
-pub fn coef_variation(data: &[f64]) -> f64 {
+pub fn variation_coef(data: &[f64]) -> f64 {
     let mean_val = mean(data);
     if mean_val == 0.0 {
-        panic!("Mean is zero, coefficient of variation is undefined");
+        error!("Mean is zero, coefficient of variation is undefined");
+        return f64::NAN;
     }
     std_dev(data) / mean_val
 }
@@ -214,13 +217,10 @@ mod tests {
         assert!((log_change(5.0, 4.0) - 0.2231435513).abs() < 1e-10, "log_change failed");
 
         // Test acceleration
-        assert_eq!(acceleration(1.0, 0.5), 0.5, "acceleration failed");
-
-        // Test jerk
-        assert_eq!(jerk(1.0, 0.5), 0.5, "jerk failed");
+        assert_eq!(difference(1.0, 0.5), 0.5, "difference failed");
 
         // Test inbalance
-        assert!((inbalance(10.0, 5.0) - 0.3333333333).abs() < 1e-10, "inbalance failed");
+        assert!((imbalance(10.0, 5.0) - 0.3333333333).abs() < 1e-10, "inbalance failed");
 
         // Test quantile (median)
         assert_eq!(quantile(&data, 0.5), 3.0, "quantile failed");
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(iqr(&data), 2.0, "iqr failed");
 
         // Test coefficient of variation
-        assert!((coef_variation(&data) - 0.5270462767).abs() < 1e-10, "coef_variation failed");
+        assert!((variation_coef(&data) - 0.5270462767).abs() < 1e-10, "coef_variation failed");
 
         // Test covariance
         assert!((covariance(&data1, &data2) - 1.0).abs() < 1e-10, "covariance failed");

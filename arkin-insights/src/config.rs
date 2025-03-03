@@ -1,44 +1,39 @@
 use std::time::Duration;
 
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use arkin_core::prelude::*;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+use crate::features::WindowMethod;
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct InsightsConfig {
     pub insights_service: InsightsServiceConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct InsightsServiceConfig {
     pub pipeline: PipelineConfig,
     pub state_lookback: u64,
     pub frequency_secs: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PipelineConfig {
     pub name: String,
     pub features: Vec<FeatureConfig>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub enum FeatureConfig {
     #[serde(rename = "ohlcv")]
     OHLCV(OHLCVConfig),
     #[serde(rename = "time")]
     Time(TimeConfig),
 
-    // Mathematical
-    #[serde(rename = "log_return")]
-    LogReturn(LogReturnConfig),
-    #[serde(rename = "std_dev")]
-    StdDev(StdDevConfig),
-    #[serde(rename = "sum")]
-    Sum(SumConfig),
-    #[serde(rename = "signal")]
-    SignalStrength(SignalStrengthConfig),
+    #[serde(rename = "window")]
+    Window(WindowFeature),
 
     // Technical Analysis
     #[serde(rename = "ma")]
@@ -65,7 +60,7 @@ pub enum FeatureConfig {
     MeanVariance(MeanVarianceConfig),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DataLoaderConfig {
     Periods(usize),   // Load the last N periods (e.g., 10 data points)
@@ -73,14 +68,14 @@ pub enum DataLoaderConfig {
     Lag(usize),       // Load the value N periods ago (e.g., 1 period ago) 0 is the current period
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NewFeatureConfig {
     StdDev(SingleVecFeatureConfig),
     Ratio(TwoValueFeatureConfig),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct TwoValueFeatureConfig {
     pub input1: FeatureId,
     pub input1_data: DataLoaderConfig,
@@ -89,14 +84,14 @@ pub struct TwoValueFeatureConfig {
     pub output: FeatureId,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct SingleVecFeatureConfig {
     pub input: FeatureId,
     pub data_loader: DataLoaderConfig,
     pub output: FeatureId,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct TwoVecFeatureConfig {
     pub input1: FeatureId,
     pub input2: FeatureId,
@@ -104,7 +99,7 @@ pub struct TwoVecFeatureConfig {
     pub output: FeatureId,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct OHLCVConfig {
     pub input_price: FeatureId,
     pub input_quantity: FeatureId,
@@ -128,7 +123,7 @@ pub struct OHLCVConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TimeConfig {
     pub input: FeatureId,
     pub output_day_of_week: FeatureId,
@@ -139,17 +134,17 @@ pub struct TimeConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VWAPConfig {
-    pub input_price: FeatureId,
-    pub input_quantity: FeatureId,
+#[derive(Debug, Deserialize, Clone)]
+pub struct WindowFeature {
+    pub input: FeatureId,
     pub output: FeatureId,
-    pub window: u64,
+    pub window: Duration,
+    pub method: WindowMethod,
     #[serde(default)]
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TradeCountConfig {
     pub input_side: FeatureId,
     pub output_buy: FeatureId,
@@ -161,7 +156,7 @@ pub struct TradeCountConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct LogReturnConfig {
     pub input: FeatureId,
     pub output: FeatureId,
@@ -170,7 +165,7 @@ pub struct LogReturnConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct StdDevConfig {
     pub input: FeatureId,
     pub output: FeatureId,
@@ -180,7 +175,7 @@ pub struct StdDevConfig {
     pub annualize_multiplier: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct SumConfig {
     pub input: FeatureId,
     pub output: FeatureId,
@@ -189,7 +184,7 @@ pub struct SumConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct MovingAverageConfig {
     pub ma_type: String,
     pub input: FeatureId,
@@ -199,7 +194,7 @@ pub struct MovingAverageConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct SignalStrengthConfig {
     pub input_first: FeatureId,
     pub input_second: FeatureId,
@@ -208,7 +203,7 @@ pub struct SignalStrengthConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct MACDConfig {
     pub input_fast: FeatureId,
     pub input_slow: FeatureId,
@@ -220,7 +215,7 @@ pub struct MACDConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct BollingerBandsConfig {
     pub input_price: FeatureId,
     pub input_sma: FeatureId,
@@ -234,7 +229,7 @@ pub struct BollingerBandsConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct RelativeStrengthIndexConfig {
     pub input: FeatureId,
     pub output: FeatureId,
@@ -243,7 +238,7 @@ pub struct RelativeStrengthIndexConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct AverageDirectionalIndexConfig {
     pub input: FeatureId,
     pub output: FeatureId,
@@ -252,7 +247,7 @@ pub struct AverageDirectionalIndexConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ChaikinMoneyFlowConfig {
     pub input: FeatureId,
     pub output: FeatureId,
@@ -261,7 +256,7 @@ pub struct ChaikinMoneyFlowConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ChaikinOscillatorConfig {
     pub input: FeatureId,
     pub output: FeatureId,
@@ -271,7 +266,7 @@ pub struct ChaikinOscillatorConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct RobustScalerConfig {
     // pub input: Vec<FeatureId>,
     pub output: FeatureId,
@@ -280,7 +275,7 @@ pub struct RobustScalerConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CatBoostConfig {
     pub model_location: String,
     pub model_name: String,
@@ -292,7 +287,7 @@ pub struct CatBoostConfig {
     pub persist: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct MeanVarianceConfig {
     pub input_expected_returns: FeatureId,
     pub input_returns: FeatureId,

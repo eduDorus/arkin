@@ -1,13 +1,13 @@
 mod config;
 mod errors;
 mod feature_factory;
+mod features;
 mod fft;
 mod hdbscan;
 mod math;
 mod pipeline;
 mod scaler;
 mod service;
-mod simple;
 mod state;
 mod ta;
 mod traits;
