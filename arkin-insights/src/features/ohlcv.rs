@@ -221,7 +221,7 @@ impl Feature for OHLCVFeature {
                 .instrument(Some(instrument.clone()))
                 .feature_id(self.output_volume.clone())
                 .value(volume)
-                .insight_type(InsightType::Ohlcv)
+                .insight_type(InsightType::Continuous)
                 .persist(self.persist)
                 .build()
                 .into(),

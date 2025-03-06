@@ -12,7 +12,16 @@ use crate::{math::*, state::InsightsState, Feature};
 
 #[derive(Debug, Display, Clone, Deserialize)]
 #[strum(serialize_all = "snake_case")]
-pub enum WindowMethod {
+#[serde(rename_all = "snake_case")]
+pub enum RangeData {
+    Window(u64),
+    Interval(usize),
+}
+
+#[derive(Debug, Display, Clone, Deserialize)]
+#[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum RangeAlgo {
     // Basic
     Count,
     Sum,
@@ -20,11 +29,13 @@ pub enum WindowMethod {
     Median,
     Min,
     Max,
-    Range,
+    AbsolutRange,
+    RelativeRange,
+    RelativePosition,
 
     // Distribution
     Variance,
-    StdDev,
+    StandardDeviation,
     Skew,
     Kurtosis,
     Quantile(f64),
@@ -34,21 +45,21 @@ pub enum WindowMethod {
     Autocorrelation(usize),
 
     // Other
-    VariationCoef,
+    CoefOfVariation,
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct SlidingWindowFeature {
+pub struct RangeFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
     input: FeatureId,
     output: FeatureId,
-    window: Duration,
-    method: WindowMethod,
+    method: RangeAlgo,
+    data: RangeData,
     persist: bool,
 }
 
-impl Feature for SlidingWindowFeature {
+impl Feature for RangeFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
     }
@@ -58,12 +69,21 @@ impl Feature for SlidingWindowFeature {
     }
 
     fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
-        debug!("Calculating {} distribution...", self.method);
+        debug!("Calculating {}...", self.method);
 
         // Get data
-        let data = self
-            .insight_state
-            .window(Some(instrument.clone()), self.input.clone(), event_time, self.window);
+        let data = match self.data {
+            RangeData::Interval(i) => {
+                self.insight_state
+                    .intervals(Some(instrument.clone()), self.input.clone(), event_time, i)
+            }
+            RangeData::Window(w) => self.insight_state.window(
+                Some(instrument.clone()),
+                self.input.clone(),
+                event_time,
+                Duration::from_secs(w),
+            ),
+        };
 
         // Check if we have enough data
         if data.len() < 2 {
@@ -74,31 +94,33 @@ impl Feature for SlidingWindowFeature {
         // Calculate distribution
         let value = match self.method {
             // Basic
-            WindowMethod::Count => data.len() as f64,
-            WindowMethod::Sum => sum(&data),
-            WindowMethod::Mean => mean(&data),
-            WindowMethod::Median => median(&data),
-            WindowMethod::Min => min(&data),
-            WindowMethod::Max => max(&data),
-            WindowMethod::Range => range(&data),
+            RangeAlgo::Count => data.len() as f64,
+            RangeAlgo::Sum => sum(&data),
+            RangeAlgo::Mean => mean(&data),
+            RangeAlgo::Median => median(&data),
+            RangeAlgo::Min => min(&data),
+            RangeAlgo::Max => max(&data),
+            RangeAlgo::AbsolutRange => absolut_range(&data),
+            RangeAlgo::RelativeRange => relative_range(&data),
+            RangeAlgo::RelativePosition => relative_position(&data),
 
             // Distribution
-            WindowMethod::Variance => variance(&data),
-            WindowMethod::StdDev => std_dev(&data),
-            WindowMethod::Skew => skew(&data),
-            WindowMethod::Kurtosis => kurtosis(&data),
-            WindowMethod::Quantile(q) => quantile(&data, q),
-            WindowMethod::Iqr => iqr(&data),
+            RangeAlgo::Variance => variance(&data),
+            RangeAlgo::StandardDeviation => std_dev(&data),
+            RangeAlgo::Skew => skew(&data),
+            RangeAlgo::Kurtosis => kurtosis(&data),
+            RangeAlgo::Quantile(q) => quantile(&data, q),
+            RangeAlgo::Iqr => iqr(&data),
 
             // Relationship
-            WindowMethod::Autocorrelation(lag) => autocorrelation(&data, lag),
+            RangeAlgo::Autocorrelation(lag) => autocorrelation(&data, lag),
 
             // Other
-            WindowMethod::VariationCoef => variation_coef(&data),
+            RangeAlgo::CoefOfVariation => coefficient_of_variation(&data),
         };
 
         // Check if we have a value
-        if value == f64::NAN {
+        if value.is_nan() {
             warn!(
                 "NaN value for distribution calculation for feature {} with method {}",
                 self.output, self.method

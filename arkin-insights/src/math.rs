@@ -15,8 +15,23 @@ pub fn max(data: &[f64]) -> f64 {
         .reduce(|| f64::MIN, f64::max)
 }
 
-pub fn range(data: &[f64]) -> f64 {
+pub fn absolut_range(data: &[f64]) -> f64 {
     max(data) - min(data)
+}
+
+pub fn relative_range(data: &[f64]) -> f64 {
+    absolut_range(data) / mean(data)
+}
+
+pub fn relative_position(data: &[f64]) -> f64 {
+    let value = if let Some(last) = data.last() {
+        *last
+    } else {
+        return f64::NAN;
+    };
+    let min = min(data);
+    let max = max(data);
+    (value - min) / (max - min)
 }
 
 pub fn sum(data: &[f64]) -> f64 {
@@ -124,13 +139,42 @@ pub fn difference(value: f64, prev_value: f64) -> f64 {
 pub fn covariance(data1: &[f64], data2: &[f64]) -> f64 {
     let mean1 = mean(data1);
     let mean2 = mean(data2);
-    let sum: f64 = data1.par_iter().zip(data2).map(|(&x, &y)| (x - mean1) * (y - mean2)).sum();
+    let sum = data1
+        .par_iter()
+        .zip(data2)
+        .map(|(&x, &y)| (x - mean1) * (y - mean2))
+        .sum::<f64>();
     sum / (data1.len() as f64 - 1.0)
 }
 
 pub fn correlation(data1: &[f64], data2: &[f64]) -> f64 {
     covariance(data1, data2) / (std_dev(data1) * std_dev(data2))
 }
+
+pub fn cosine_similarity(data1: &[f64], data2: &[f64]) -> f64 {
+    let dot_product: f64 = data1.par_iter().zip(data2).map(|(&x, &y)| x * y).sum();
+    let norm1: f64 = data1.par_iter().map(|&x| x.powi(2)).sum::<f64>().sqrt();
+    let norm2: f64 = data2.par_iter().map(|&x| x.powi(2)).sum::<f64>().sqrt();
+    dot_product / (norm1 * norm2)
+}
+
+pub fn beta(data1: &[f64], data2: &[f64]) -> f64 {
+    let cov = covariance(data1, data2);
+    let var = variance(data2);
+    cov / var
+}
+
+/// Elasticity
+/// It shows how responsive delta value 1 is to delta value 2 in percentage terms, which is great for comparing across different scales or contexts.
+/// Elasticity = % change in data1 / % change in data2
+pub fn elasticity(data1: f64, data2: f64) -> f64 {
+    data1 / data2
+}
+
+/// Regression Analysis
+/// Here we do a simple regression between data1 dependent vs data2 independent variable
+/// Returns beta the regression coefficient
+// pub fn regression_analysis(data1: &[f64], data2: &[f64]) -> f64 {}
 
 pub fn autocorrelation(data: &[f64], k: usize) -> f64 {
     let mean = mean(data);
@@ -157,7 +201,7 @@ pub fn imbalance(value_1: f64, value_2: f64) -> f64 {
     (value_1 - value_2) / (value_1 + value_2)
 }
 
-pub fn variation_coef(data: &[f64]) -> f64 {
+pub fn coefficient_of_variation(data: &[f64]) -> f64 {
     let mean_val = mean(data);
     if mean_val == 0.0 {
         error!("Mean is zero, coefficient of variation is undefined");
@@ -183,7 +227,7 @@ mod tests {
         assert_eq!(max(&data), 5.0, "max failed");
 
         // Test range
-        assert_eq!(range(&data), 4.0, "range failed");
+        assert_eq!(absolut_range(&data), 4.0, "range failed");
 
         // Test sum
         assert_eq!(sum(&data), 15.0, "sum failed");
@@ -229,7 +273,10 @@ mod tests {
         assert_eq!(iqr(&data), 2.0, "iqr failed");
 
         // Test coefficient of variation
-        assert!((variation_coef(&data) - 0.5270462767).abs() < 1e-10, "coef_variation failed");
+        assert!(
+            (coefficient_of_variation(&data) - 0.5270462767).abs() < 1e-10,
+            "coef_variation failed"
+        );
 
         // Test covariance
         assert!((covariance(&data1, &data2) - 1.0).abs() < 1e-10, "covariance failed");

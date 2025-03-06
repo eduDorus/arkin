@@ -30,11 +30,17 @@ impl BoundedBuffer {
     /// If there's already an item at exactly the same CompositeIndex,
     /// we increment sub_index. Then push_back. If we exceed capacity, pop_front.
     fn push(&mut self, idx: OffsetDateTime, val: f64) {
-        // Iterate from the back and find the first item whose time <= timestamp.
-
-        let insert_idx = self.data.iter().rev().position(|(i, _)| i <= &idx);
-        if let Some(insert_idx) = insert_idx {
-            self.data.insert(self.data.len() - insert_idx, (idx, val));
+        if let Some(last) = self.data.back() {
+            if idx >= last.0 {
+                self.data.push_back((idx, val));
+            } else {
+                let insert_idx = self.data.iter().rev().position(|(i, _)| i <= &idx);
+                if let Some(insert_idx) = insert_idx {
+                    self.data.insert(self.data.len() - insert_idx, (idx, val));
+                } else {
+                    self.data.push_front((idx, val));
+                }
+            }
         } else {
             self.data.push_back((idx, val));
         }
@@ -76,11 +82,8 @@ impl BoundedBuffer {
         None
     }
 
-    /// Return a window of values in [start_time..end_time).
-    /// We can do a quick linear scan. If capacity is only 100k, that might be okay.
+    /// Return a window of values in [start_time=..end_time).
     fn window(&self, start_time: OffsetDateTime, end_time: OffsetDateTime) -> Vec<f64> {
-        // We'll just collect all entries with timestamp in [start..end).
-        // If you want to be a bit more efficient, you could break early if you see timestamps >= end_time.
         let mut result = Vec::new();
         for &(idx, val) in self.data.iter().rev() {
             if idx >= start_time && idx < end_time {
@@ -95,14 +98,14 @@ impl BoundedBuffer {
         result
     }
 
-    /// Return the last `periods` values up to `timestamp`.
-    fn periods(&self, timestamp: OffsetDateTime, periods: usize) -> Vec<f64> {
+    /// Return the last `intervals` values up to `timestamp`.
+    fn intervals(&self, timestamp: OffsetDateTime, intervals: usize) -> Vec<f64> {
         let mut result = Vec::new();
         // Go from the back and pick up to `periods` items with time <= timestamp
         for &(idx, val) in self.data.iter().rev() {
             if idx <= timestamp {
                 result.push(val);
-                if result.len() == periods {
+                if result.len() == intervals {
                     break;
                 }
             }
@@ -114,14 +117,13 @@ impl BoundedBuffer {
 
     /// Returns the last value + lag periods.
     fn lag(&self, timestamp: OffsetDateTime, lag: usize) -> Option<f64> {
-        // Get the index of the first value of the timestamp and then advance back by `lag` periods.
-        let mut lag_counter = lag;
+        let mut count = 0;
         for &(idx, val) in self.data.iter().rev() {
-            if lag_counter == 0 {
-                return Some(val);
-            }
             if idx <= timestamp {
-                lag_counter -= 1;
+                if count == lag {
+                    return Some(val);
+                }
+                count += 1;
             }
         }
         None
@@ -222,18 +224,18 @@ impl InsightsState {
         vals
     }
 
-    /// Return the last `periods` values up to `timestamp`.
-    pub fn periods(
+    /// Return the last `intervals` values up to `timestamp`.
+    pub fn intervals(
         &self,
         instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
         timestamp: OffsetDateTime,
-        periods: usize,
+        intervals: usize,
     ) -> Vec<f64> {
         let key = (instrument, feature_id);
         self.features
             .get(&key)
-            .map(|buf| buf.periods(timestamp, periods))
+            .map(|buf| buf.intervals(timestamp, intervals))
             .unwrap_or_default()
     }
 }
@@ -243,6 +245,104 @@ mod tests {
     use super::*;
     use test_log::test;
     use time::OffsetDateTime;
+
+    #[test]
+    fn test_push_out_of_order() {
+        let mut buffer = BoundedBuffer::new(5);
+        let now = OffsetDateTime::now_utc();
+        buffer.push(now, 1.0);
+        buffer.push(now - Duration::from_secs(1), 0.5); // older
+        buffer.push(now + Duration::from_secs(1), 1.5); // newer
+        buffer.push(now - Duration::from_secs(2), 0.0); // oldest
+        buffer.push(now + Duration::from_secs(2), 2.0); // newest
+
+        let times: Vec<_> = buffer.data.iter().map(|(t, _)| *t).collect();
+        assert_eq!(
+            times,
+            vec![
+                now - Duration::from_secs(2),
+                now - Duration::from_secs(1),
+                now,
+                now + Duration::from_secs(1),
+                now + Duration::from_secs(2),
+            ]
+        );
+        let values: Vec<_> = buffer.data.iter().map(|(_, v)| *v).collect();
+        assert_eq!(values, vec![0.0, 0.5, 1.0, 1.5, 2.0]);
+    }
+
+    #[test]
+    fn test_capacity_limit() {
+        let mut buffer = BoundedBuffer::new(3);
+        let now = OffsetDateTime::now_utc();
+        buffer.push(now - Duration::from_secs(3), 0.0);
+        buffer.push(now - Duration::from_secs(2), 1.0);
+        buffer.push(now - Duration::from_secs(1), 2.0);
+        buffer.push(now, 3.0); // Exceeds capacity
+
+        let values: Vec<_> = buffer.data.iter().map(|(_, v)| *v).collect();
+        assert_eq!(values, vec![1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn test_last_inclusive() {
+        let mut buffer = BoundedBuffer::new(5);
+        let now = OffsetDateTime::now_utc();
+        buffer.push(now - Duration::from_secs(2), 0.0);
+        buffer.push(now - Duration::from_secs(1), 1.0);
+        buffer.push(now, 2.0);
+
+        assert_eq!(buffer.last_inclusive(now), Some(2.0));
+        assert_eq!(buffer.last_inclusive(now - Duration::from_secs(1)), Some(1.0));
+        assert_eq!(buffer.last_inclusive(now - Duration::from_secs(3)), None);
+    }
+
+    #[test]
+    fn test_window() {
+        let mut buffer = BoundedBuffer::new(5);
+        let now = OffsetDateTime::now_utc();
+        buffer.push(now - Duration::from_secs(4), 0.0);
+        buffer.push(now - Duration::from_secs(3), 1.0);
+        buffer.push(now - Duration::from_secs(2), 2.0);
+        buffer.push(now - Duration::from_secs(1), 3.0);
+        buffer.push(now, 4.0);
+
+        let window = buffer.window(now - Duration::from_secs(3), now - Duration::from_secs(1));
+        assert_eq!(window, vec![1.0, 2.0]);
+    }
+
+    #[test]
+    fn test_intervals() {
+        let mut buffer = BoundedBuffer::new(5);
+        let now = OffsetDateTime::now_utc();
+        buffer.push(now - Duration::from_secs(4), 0.0);
+        buffer.push(now - Duration::from_secs(3), 1.0);
+        buffer.push(now - Duration::from_secs(2), 2.0);
+        buffer.push(now - Duration::from_secs(1), 3.0);
+        buffer.push(now, 4.0);
+
+        let intervals = buffer.intervals(now, 3);
+        assert_eq!(intervals, vec![2.0, 3.0, 4.0]);
+        let past_intervals = buffer.intervals(now - Duration::from_secs(2), 2);
+        assert_eq!(past_intervals, vec![1.0, 2.0]);
+    }
+
+    #[test]
+    fn test_lag() {
+        let mut buffer = BoundedBuffer::new(5);
+        let now = OffsetDateTime::now_utc();
+        buffer.push(now - Duration::from_secs(4), 0.0);
+        buffer.push(now - Duration::from_secs(3), 1.0);
+        buffer.push(now - Duration::from_secs(2), 2.0);
+        buffer.push(now - Duration::from_secs(1), 3.0);
+        buffer.push(now, 4.0);
+
+        assert_eq!(buffer.lag(now, 0), Some(4.0));
+        assert_eq!(buffer.lag(now, 1), Some(3.0));
+        assert_eq!(buffer.lag(now - Duration::from_secs(2), 0), Some(2.0));
+        assert_eq!(buffer.lag(now - Duration::from_secs(2), 1), Some(1.0));
+        assert_eq!(buffer.lag(now, 5), None);
+    }
 
     #[test(test)]
     fn test_insert_and_last() {
@@ -396,7 +496,7 @@ mod tests {
         // => it should give us the last 3 values before 'now':
         // times => -10s(10), -8s(11), -6s(12), -4s(13), -2s(14)
         // the last 3 => 12, 13, 14
-        let p = state.periods(Some(instrument), feature_id, now, 3);
+        let p = state.intervals(Some(instrument), feature_id, now, 3);
         assert_eq!(p, vec![3., 4., 5.]);
     }
 

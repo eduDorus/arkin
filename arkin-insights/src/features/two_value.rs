@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use serde::Deserialize;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
@@ -9,10 +10,13 @@ use arkin_core::prelude::*;
 
 use crate::{math::*, state::InsightsState, Feature};
 
-#[derive(Debug, Display, Clone, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Deserialize, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
-pub enum TwoValueMethod {
+#[serde(rename_all = "snake_case")]
+pub enum TwoValueAlgo {
     Imbalance,
+    Elasticity,
+    Division,
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
@@ -22,8 +26,7 @@ pub struct TwoValueFeature {
     input_1: FeatureId,
     input_2: FeatureId,
     output: FeatureId,
-    lag: usize,
-    method: TwoValueMethod,
+    method: TwoValueAlgo,
     persist: bool,
 }
 
@@ -37,7 +40,7 @@ impl Feature for TwoValueFeature {
     }
 
     fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
-        debug!("Calculating {} change...", self.method);
+        debug!("Calculating {}...", self.method);
 
         //  Get data
         let value_1 = self
@@ -60,7 +63,7 @@ impl Feature for TwoValueFeature {
         let value_2 = value_2.expect("Value 2 should not be None");
 
         // If our method is imbalance we need to make sure the values are positve
-        if self.method == TwoValueMethod::Imbalance {
+        if self.method == TwoValueAlgo::Imbalance {
             if value_1 < 0.0 || value_2 < 0.0 {
                 warn!("Imbalance values must be positive");
                 return None;
@@ -70,7 +73,9 @@ impl Feature for TwoValueFeature {
         // Unwrap values
 
         let change = match self.method {
-            TwoValueMethod::Imbalance => imbalance(value_1, value_2),
+            TwoValueAlgo::Imbalance => imbalance(value_1, value_2),
+            TwoValueAlgo::Elasticity => elasticity(value_1, value_2),
+            TwoValueAlgo::Division => value_1 / value_2,
         };
 
         // Return insight

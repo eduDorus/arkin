@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use serde::Deserialize;
 use strum::Display;
 use time::OffsetDateTime;
 use tracing::{debug, warn};
@@ -9,13 +10,14 @@ use arkin_core::prelude::*;
 
 use crate::{math::*, state::InsightsState, Feature};
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Display, Clone, Deserialize)]
 #[strum(serialize_all = "snake_case")]
-pub enum LagMethod {
+#[serde(rename_all = "snake_case")]
+pub enum LagAlgo {
     // Change
-    Absolute,
-    Percent,
-    Log,
+    AbsoluteChange,
+    PercentChange,
+    LogChange,
     Difference,
 }
 
@@ -26,7 +28,7 @@ pub struct LagFeature {
     input: FeatureId,
     output: FeatureId,
     lag: usize,
-    method: LagMethod,
+    method: LagAlgo,
     persist: bool,
 }
 
@@ -64,10 +66,10 @@ impl Feature for LagFeature {
         let value = value.expect("Value should not be None");
 
         let change = match self.method {
-            LagMethod::Absolute => abs_change(value, prev_value),
-            LagMethod::Percent => pct_change(value, prev_value),
-            LagMethod::Log => log_change(value, prev_value),
-            LagMethod::Difference => difference(value, prev_value),
+            LagAlgo::AbsoluteChange => abs_change(value, prev_value),
+            LagAlgo::PercentChange => pct_change(value, prev_value),
+            LagAlgo::LogChange => log_change(value, prev_value),
+            LagAlgo::Difference => difference(value, prev_value),
         };
 
         // Return insight

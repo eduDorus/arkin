@@ -4,8 +4,8 @@ use arkin_core::prelude::*;
 use tracing::info;
 
 use crate::{
-    config::{FeatureConfig, WindowFeature},
-    features::{OHLCVFeature, TimeFeature},
+    config::FeatureConfig,
+    features::{DualRangeFeature, LagFeature, OHLCVFeature, RangeFeature, TimeFeature, TwoValueFeature},
     scaler::{RobustScaler, ScalerData},
     state::InsightsState,
     ta::{
@@ -64,13 +64,49 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::Window(c) => Arc::new(
-                        WindowFeature::builder()
+                    FeatureConfig::Lag(c) => Arc::new(
+                        LagFeature::builder()
                             .pipeline(pipeline.clone())
                             .insight_state(state.clone())
                             .input(c.input.clone())
                             .output(c.output.clone())
-                            .window(Duration::from_secs(c.periods))
+                            .lag(c.lag)
+                            .method(c.method.clone())
+                            .persist(c.persist)
+                            .build(),
+                    ),
+                    FeatureConfig::Range(c) => Arc::new(
+                        RangeFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input(c.input.clone())
+                            .output(c.output.clone())
+                            .data(c.data.clone())
+                            .method(c.method.clone())
+                            .persist(c.persist)
+                            .build(),
+                    ),
+                    FeatureConfig::DualRange(c) => Arc::new(
+                        DualRangeFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input_1(c.input_1.clone())
+                            .input_2(c.input_2.clone())
+                            .output(c.output.clone())
+                            .data(c.data.clone())
+                            .method(c.method.clone())
+                            .persist(c.persist)
+                            .build(),
+                    ),
+
+                    FeatureConfig::TwoValue(c) => Arc::new(
+                        TwoValueFeature::builder()
+                            .pipeline(pipeline.clone())
+                            .insight_state(state.clone())
+                            .input_1(c.input_1.clone())
+                            .input_2(c.input_2.clone())
+                            .output(c.output.clone())
+                            .method(c.method.clone())
                             .persist(c.persist)
                             .build(),
                     ),
