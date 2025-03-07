@@ -130,11 +130,15 @@ dependencies = [
  "anyhow",
  "arkin-core",
  "arkin-engine",
+ "clickhouse",
  "ndarray",
  "ort",
+ "serde",
+ "statrs",
  "tokio",
  "tokio-rustls",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
