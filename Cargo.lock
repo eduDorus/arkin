@@ -134,6 +134,7 @@ dependencies = [
  "ndarray",
  "ort",
  "serde",
+ "serde_json",
  "statrs",
  "tokio",
  "tokio-rustls",

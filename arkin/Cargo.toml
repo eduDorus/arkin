@@ -23,5 +23,6 @@ clickhouse = { workspace = true }
 ort = { version = "=2.0.0-rc.9" }
 ndarray = "0.16.1"
 serde = { workspace = true }
+serde_json = { workspace = true }
 uuid = { workspace = true }
 statrs = { workspace = true }
