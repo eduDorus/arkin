@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
         .with_option("wait_end_of_query", "1");
 
     let n_quantiles = 1000;
-    let levels: Vec<f64> = (1..n_quantiles).map(|i| i as f64 / n_quantiles as f64).collect();
+    let levels: Vec<f64> = (0..=n_quantiles).map(|i| i as f64 / n_quantiles as f64).collect();
     println!("Levels: {:?}", levels);
     let levels_str = levels.iter().map(|&l| format!("{:.4}", l)).collect::<Vec<_>>().join(", ");
     let query = format!(
@@ -94,7 +94,7 @@ struct QuantileTransformer {
 impl QuantileTransformer {
     /// Create a new transformer with a specified number of quantiles and output distribution
     fn new(n_quantiles: usize, output_distribution: &str) -> Self {
-        let references = (0..n_quantiles).map(|i| i as f64 / n_quantiles as f64).collect();
+        let references = (0..=n_quantiles).map(|i| i as f64 / n_quantiles as f64).collect();
         QuantileTransformer {
             feature_quantiles: HashMap::new(),
             references,
