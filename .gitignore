@@ -1,13 +1,13 @@
 .DS_Store
-target
+/target
 
 # Environment Configs and Secrets
-configs
+/configs
 
 # Evironment file
 .env
 
-data
+/data
 
 # Models
 /models

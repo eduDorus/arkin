@@ -150,7 +150,7 @@ impl InsightsState {
         // TODO: Probably need a better solution than this.
         let events: Vec<_> = events
             .iter()
-            .filter(|event| event.insight_type != InsightType::Transformed && event.insight_type != InsightType::Scaled)
+            .filter(|event| event.insight_type != InsightType::Normalized)
             .cloned()
             .collect();
         for event in events {

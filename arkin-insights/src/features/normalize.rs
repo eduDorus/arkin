@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
+use serde::{Deserialize, Serialize};
 use statrs::distribution::{ContinuousCDF, Normal};
+use strum::Display;
 use time::OffsetDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
@@ -10,7 +12,70 @@ use arkin_core::prelude::*;
 
 use crate::{math::interp, state::InsightsState, Feature};
 
-use super::QuantileData;
+#[derive(Clone, Serialize, Deserialize)]
+pub struct QuantileData {
+    levels: Vec<f64>,
+    data: Vec<QuantileEntryData>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuantileEntryData {
+    instrument_id: Uuid,
+    feature_id: String,
+    quantiles: Vec<f64>,
+    median: f64,
+    iqr: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct RobustScaler {
+    feature_data: HashMap<(Uuid, FeatureId), (f64, f64)>,
+}
+
+impl RobustScaler {
+    pub fn load(file_path: &str) -> Self {
+        let file = std::fs::File::open(file_path).expect("Failed to open file");
+        let scaler_data: QuantileData = serde_json::from_reader(file).expect("Failed to parse JSON");
+        RobustScaler::new(scaler_data)
+    }
+
+    pub fn features(&self) -> Vec<FeatureId> {
+        self.feature_data.keys().map(|(_, f)| f.clone()).collect()
+    }
+
+    pub fn new(scaler_data: QuantileData) -> Self {
+        let feature_data = scaler_data
+            .data
+            .into_iter()
+            .map(|q| {
+                let key = (q.instrument_id, q.feature_id.into());
+                let value = (q.median, q.iqr);
+                (key, value)
+            })
+            .collect();
+        RobustScaler { feature_data }
+    }
+
+    pub fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
+        let key = (instrument_id, feature_id.clone());
+        let (median, iqr) = self.feature_data.get(&key).expect("Feature ID not found");
+        (x - median) / iqr
+    }
+
+    pub fn transform_normal(&self, x: f64) -> f64 {
+        x / 1.349
+    }
+
+    pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
+        let key = (instrument_id, feature_id.clone());
+        let (median, iqr) = self.feature_data.get(&key).expect("Feature ID not found");
+        x * iqr + median
+    }
+
+    pub fn inverse_transform_normal(&self, x: f64) -> f64 {
+        x * 1.349
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DistributionType {
@@ -53,7 +118,7 @@ impl QuantileTransformer {
     }
 
     /// Transform a value x for a given feature_id
-    fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
+    pub fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
         let key = (instrument_id, feature_id.clone());
         let quantiles = self.feature_quantiles.get(&key).expect("Feature ID not found in quantiles");
         // Forward interpolation
@@ -98,17 +163,28 @@ impl QuantileTransformer {
     }
 }
 
+#[derive(Debug, Display, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum NormalizeFeatureType {
+    Quantile,
+    Robust,
+    QuantileRobust,
+}
+
 #[derive(Debug, TypedBuilder)]
-pub struct QuantileTransformerFeature {
+pub struct NormalizeFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
     transformer: QuantileTransformer,
+    scaler: RobustScaler,
     input: Vec<FeatureId>,
     output: FeatureId,
+    method: NormalizeFeatureType,
     persist: bool,
 }
 
-impl Feature for QuantileTransformerFeature {
+impl Feature for NormalizeFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         self.input.clone()
     }
@@ -122,15 +198,20 @@ impl Feature for QuantileTransformerFeature {
 
         //  Get data
         let insights = self
-            .transformer
-            .features()
+            .input
             .iter()
             .filter_map(|id| {
                 // Get the value
                 let value = self.insight_state.last(Some(instrument.clone()), id.clone(), event_time)?;
 
-                // Calculate scaled values
-                let transformed_value = self.transformer.transform(instrument.id, id, value);
+                let altered_value = match self.method {
+                    NormalizeFeatureType::Quantile => self.transformer.transform(instrument.id, id, value),
+                    NormalizeFeatureType::Robust => self.scaler.transform(instrument.id, id, value),
+                    NormalizeFeatureType::QuantileRobust => {
+                        let transformed_value = self.transformer.transform(instrument.id, id, value);
+                        self.scaler.transform_normal(transformed_value)
+                    }
+                };
 
                 // Create Insight
                 Some(
@@ -139,8 +220,8 @@ impl Feature for QuantileTransformerFeature {
                         .pipeline(Some(self.pipeline.clone()))
                         .instrument(Some(instrument.clone()))
                         .feature_id(id.clone())
-                        .value(transformed_value)
-                        .insight_type(InsightType::Transformed)
+                        .value(altered_value)
+                        .insight_type(InsightType::Normalized)
                         .persist(self.persist)
                         .build()
                         .into(),

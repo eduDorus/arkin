@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
           feature_id,
           quantilesExact({})(value) AS quantiles,
           quantileExact(0.5)(value) AS median,
-          (quantileExact(0.75)(value) - quantileExact(0.025)(value)) as iqr
+          (quantileExact(0.75)(value) - quantileExact(0.25)(value)) as iqr
         FROM
           insights FINAL
         WHERE

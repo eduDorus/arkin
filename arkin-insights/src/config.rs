@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use arkin_core::prelude::*;
 
-use crate::features::{DualRangeAlgo, LagAlgo, RangeAlgo, RangeData, TwoValueAlgo};
+use crate::features::{DualRangeAlgo, LagAlgo, NormalizeFeatureType, RangeAlgo, RangeData, TwoValueAlgo};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct InsightsConfig {
@@ -54,16 +54,15 @@ pub enum FeatureConfig {
     CO(ChaikinOscillatorConfig),
 
     // Transformers
-    #[serde(rename = "quantile_transformer")]
-    QuantileTransformer(QuantileTransformerConfig),
-
-    // Scalers
-    #[serde(rename = "robust_scaler")]
-    RobustScaler(RobustScalerConfig),
+    #[serde(rename = "normalize")]
+    Normalize(NormalizeConfig),
 
     // Forecasting
     #[serde(rename = "catboost")]
     CatBoost(CatBoostConfig),
+
+    #[serde(rename = "onnx")]
+    Onnx(OnnxConfig),
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -190,19 +189,11 @@ pub struct ChaikinOscillatorConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct QuantileTransformerConfig {
-    pub input: Option<FeatureId>,
+pub struct NormalizeConfig {
+    pub input: Vec<FeatureId>,
     pub output: FeatureId,
     pub data_location: String,
-    #[serde(default)]
-    pub persist: bool,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct RobustScalerConfig {
-    pub input: Option<FeatureId>,
-    pub output: FeatureId,
-    pub data_location: String,
+    pub method: NormalizeFeatureType,
     #[serde(default)]
     pub persist: bool,
 }
@@ -215,6 +206,20 @@ pub struct CatBoostConfig {
     pub input_numerical: Vec<FeatureId>,
     pub input_categorical: Vec<FeatureId>,
     pub output: FeatureId,
+    #[serde(default)]
+    pub persist: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct OnnxConfig {
+    pub model_location: String,
+    pub model_name: String,
+    pub model_version: String,
+    pub input: Vec<FeatureId>,
+    pub output: FeatureId,
+    pub sequence_length: usize,
+    pub output_feature: FeatureId,
+    pub quantile_data_location: String,
     #[serde(default)]
     pub persist: bool,
 }

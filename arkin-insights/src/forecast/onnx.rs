@@ -9,7 +9,11 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{state::InsightsState, Feature};
+use crate::{
+    features::{QuantileTransformer, RobustScaler},
+    state::InsightsState,
+    Feature,
+};
 
 #[derive(Debug, TypedBuilder)]
 pub struct OnnxFeature {
@@ -23,6 +27,9 @@ pub struct OnnxFeature {
     input: Vec<FeatureId>,
     output: FeatureId,
     sequence_length: usize,
+    output_feature: FeatureId,
+    quantile_transformer: QuantileTransformer,
+    robust_scaler: RobustScaler,
     persist: bool,
 }
 
@@ -47,7 +54,7 @@ impl Feature for OnnxFeature {
             info!("Initializing model for {}", instrument);
             let filename = format!(
                 "{}/{}_{}_{}.onnx",
-                self.model_location, instrument.id, self.model_name, self.model_version
+                self.model_location, self.model_name, self.model_version, instrument.id
             );
 
             let model = Session::builder()
@@ -67,8 +74,24 @@ impl Feature for OnnxFeature {
             .input
             .iter()
             .map(|id| {
-                self.insight_state
-                    .intervals(Some(instrument.clone()), id.clone(), event_time, self.sequence_length)
+                let values = self.insight_state.intervals(
+                    Some(instrument.clone()),
+                    id.clone(),
+                    event_time,
+                    self.sequence_length,
+                );
+                // info!("Values for {}: {:?}", id, values);
+                let transformed_values = values
+                    .into_iter()
+                    .map(|v| self.quantile_transformer.transform(instrument.id, id, v))
+                    .collect::<Vec<_>>();
+                // info!("Transformed Values for {}: {:?}", id, transformed_values);
+                let scaled_values = transformed_values
+                    .into_iter()
+                    .map(|v| self.robust_scaler.transform_normal(v))
+                    .collect::<Vec<_>>();
+                // info!("Scaled Values for {}: {:?}", id, scaled_values);
+                scaled_values
             })
             .collect::<Vec<Vec<_>>>();
 
@@ -79,30 +102,43 @@ impl Feature for OnnxFeature {
         }
 
         // let input_array = Array::from_elem((1, SEQ_LEN, INPUTS_LEN), 1.0f32);
-        let input_array = Array::from_shape_fn((1, self.sequence_length, self.input.len()), |(i, j, k)| data[k][i + j]);
+        let input_array =
+            Array::from_shape_fn((1, self.sequence_length, self.input.len()), |(i, j, k)| data[k][i + j] as f32);
+        // info!("Input Array: {:?}", input_array);
 
         // Apply the model
         let input = ort::value::Tensor::from_array(input_array.clone().into_dyn()).expect("Failed to create tensor");
         let outputs = model.run(ort::inputs!["input" => input].unwrap()).expect("Failed to run model");
         if let Some(predictions) = outputs["output"].try_extract_tensor::<f32>().ok() {
-            println!("ORT Predictions: {:?}", predictions.as_slice());
+            let predication = predictions.as_slice().unwrap();
+            info!("ORT Predictions: {:?}", predication);
+            // Inverse scale the predictions
+            let scaled_prediction = self
+                .robust_scaler
+                .inverse_transform_normal(predication.first().unwrap().clone() as f64);
+            info!("Inverse Scaled Prediction: {:?}", scaled_prediction);
+            // Inverse transform the predictions
+            let prediction =
+                self.quantile_transformer
+                    .inverse_transform(instrument.id, &self.output_feature, scaled_prediction);
+            info!("Inverse Transformed Prediction: {}", prediction);
+
+            // // Return insight
+            let insight = Insight::builder()
+                .event_time(event_time)
+                .pipeline(Some(self.pipeline.clone()))
+                .instrument(Some(instrument.clone()))
+                .feature_id(self.output.clone())
+                .value(prediction)
+                .insight_type(InsightType::Prediction)
+                .persist(self.persist)
+                .build()
+                .into();
+
+            Some(vec![insight])
         } else {
             warn!("Failed to extract predictions");
+            return None;
         }
-
-        // // Return insight
-        // let insight = Insight::builder()
-        //     .event_time(event_time)
-        //     .pipeline(Some(self.pipeline.clone()))
-        //     .instrument(Some(instrument.clone()))
-        //     .feature_id(self.output.clone())
-        //     .value(prediction)
-        //     .insight_type(InsightType::Prediction)
-        //     .persist(self.persist)
-        //     .build()
-        //     .into();
-
-        // Some(vec![insights])
-        None
     }
 }

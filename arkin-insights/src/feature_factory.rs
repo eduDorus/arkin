@@ -4,8 +4,11 @@ use arkin_core::prelude::*;
 
 use crate::{
     config::FeatureConfig,
-    features::{DualRangeFeature, LagFeature, OHLCVFeature, RangeFeature, TimeFeature, TwoValueFeature},
-    scaler::{DistributionType, QuantileTransformer, QuantileTransformerFeature, RobustScaler, RobustScalerFeature},
+    features::{
+        DistributionType, DualRangeFeature, LagFeature, NormalizeFeature, OHLCVFeature, QuantileTransformer,
+        RangeFeature, RobustScaler, TimeFeature, TwoValueFeature,
+    },
+    prelude::OnnxFeature,
     state::InsightsState,
     ta::{
         AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
@@ -161,40 +164,41 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::QuantileTransformer(c) => {
+                    FeatureConfig::Normalize(c) => {
                         let transformer = QuantileTransformer::load(&c.data_location, DistributionType::Normal);
-
-                        let input = match &c.input {
-                            Some(input) => vec![input.clone()],
-                            None => transformer.features(),
-                        };
+                        let scaler = RobustScaler::load(&c.data_location);
 
                         Arc::new(
-                            QuantileTransformerFeature::builder()
+                            NormalizeFeature::builder()
                                 .pipeline(pipeline.clone())
                                 .insight_state(state.clone())
-                                .input(input)
+                                .input(c.input.clone())
                                 .output(c.output.clone())
                                 .transformer(transformer)
+                                .scaler(scaler)
+                                .method(c.method.clone())
                                 .persist(c.persist)
                                 .build(),
                         )
                     }
-                    FeatureConfig::RobustScaler(c) => {
-                        let scaler = RobustScaler::load(&c.data_location);
-
-                        let input = match &c.input {
-                            Some(input) => vec![input.clone()],
-                            None => scaler.features(),
-                        };
+                    FeatureConfig::Onnx(c) => {
+                        let transformer =
+                            QuantileTransformer::load(&c.quantile_data_location, DistributionType::Normal);
+                        let scaler = RobustScaler::load(&c.quantile_data_location);
 
                         Arc::new(
-                            RobustScalerFeature::builder()
+                            OnnxFeature::builder()
                                 .pipeline(pipeline.clone())
                                 .insight_state(state.clone())
-                                .input(input)
+                                .model_location(c.model_location.clone())
+                                .model_name(c.model_name.clone())
+                                .model_version(c.model_version.clone())
+                                .input(c.input.clone())
                                 .output(c.output.clone())
-                                .scaler(scaler)
+                                .sequence_length(c.sequence_length)
+                                .output_feature(c.output_feature.clone())
+                                .quantile_transformer(transformer)
+                                .robust_scaler(scaler)
                                 .persist(c.persist)
                                 .build(),
                         )

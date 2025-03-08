@@ -17,8 +17,7 @@ pub enum InsightType {
     MovingAverage,
     Continuous,
     Categorical,
-    Transformed,
-    Scaled,
+    Normalized,
     Prediction,
 }
 
