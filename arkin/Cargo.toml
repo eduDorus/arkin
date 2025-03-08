@@ -25,4 +25,3 @@ ndarray = "0.16.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
-statrs = { workspace = true }

@@ -1,45 +1,69 @@
-use std::{collections::HashMap, fmt, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use serde::Deserialize;
 use time::OffsetDateTime;
-use tracing::{debug, warn};
+use tracing::debug;
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
+use uuid::Uuid;
 
 use crate::{state::InsightsState, Feature};
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct ScalerData {
-    pub feature_id: FeatureId,
-    pub median: f64,
-    pub iqr: f64,
-    pub percentile_01: f64,
-    pub percentile_99: f64,
-    pub is_skewed: u8,
-    pub skew: f64,
-    pub skew_offset: f64,
-    pub kurtosis: f64,
+use super::QuantileData;
+
+#[derive(Debug, Clone)]
+pub struct RobustScaler {
+    feature_data: HashMap<(Uuid, FeatureId), (f64, f64)>,
 }
 
-#[derive(TypedBuilder)]
-pub struct RobustScaler {
+impl RobustScaler {
+    pub fn load(file_path: &str) -> Self {
+        let file = std::fs::File::open(file_path).expect("Failed to open file");
+        let scaler_data: QuantileData = serde_json::from_reader(file).expect("Failed to parse JSON");
+        RobustScaler::new(scaler_data)
+    }
+
+    pub fn features(&self) -> Vec<FeatureId> {
+        self.feature_data.keys().map(|(_, f)| f.clone()).collect()
+    }
+
+    pub fn new(scaler_data: QuantileData) -> Self {
+        let feature_data = scaler_data
+            .data
+            .into_iter()
+            .map(|q| {
+                let key = (q.instrument_id, q.feature_id.into());
+                let value = (q.median, q.iqr);
+                (key, value)
+            })
+            .collect();
+        RobustScaler { feature_data }
+    }
+
+    pub fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
+        let key = (instrument_id, feature_id.clone());
+        let (median, iqr) = self.feature_data.get(&key).expect("Feature ID not found");
+        (x - median) / iqr
+    }
+
+    pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
+        let key = (instrument_id, feature_id.clone());
+        let (median, iqr) = self.feature_data.get(&key).expect("Feature ID not found");
+        x * iqr + median
+    }
+}
+
+#[derive(Debug, TypedBuilder)]
+pub struct RobustScalerFeature {
     pipeline: Arc<Pipeline>,
     insight_state: Arc<InsightsState>,
-    #[builder(default)]
-    scalers: HashMap<FeatureId, ScalerData>,
+    scaler: RobustScaler,
     input: Vec<FeatureId>,
     output: FeatureId,
     persist: bool,
 }
 
-impl fmt::Debug for RobustScaler {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RobustScaler ").field("pipeline", &self.pipeline).finish()
-    }
-}
-
-impl Feature for RobustScaler {
+impl Feature for RobustScalerFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         self.input.clone()
     }
@@ -53,48 +77,29 @@ impl Feature for RobustScaler {
 
         //  Get data
         let insights = self
-            .input
+            .scaler
+            .features()
             .iter()
             .filter_map(|id| {
                 // Get the value
                 let value = self.insight_state.last(Some(instrument.clone()), id.clone(), event_time)?;
 
                 // Calculate scaled values
-                if let Some(scaler) = self.scalers.get(id) {
-                    // Quick check to avoid division by zero
-                    if scaler.iqr == 0.0 {
-                        warn!("Scaler IQR is zero for {}, please check!", id);
-                        return None;
-                    }
+                let scaled_value = self.scaler.transform(instrument.id, id, value);
 
-                    // Clip the value to the 1st and 99th percentiles
-                    let value = value.max(scaler.percentile_01).min(scaler.percentile_99);
-
-                    // let scaled_value = if scaler.is_skewed == 1 {
-                    //     let transformed_value = (value + scaler.skew_offset).ln();
-                    //     (transformed_value - scaler.median) / scaler.iqr
-                    // } else {
-                    //     (value - scaler.median) / scaler.iqr
-                    // };
-                    let scaled_value = (value - scaler.median) / scaler.iqr;
-
-                    // Create Insight
-                    Some(
-                        Insight::builder()
-                            .event_time(event_time)
-                            .pipeline(Some(self.pipeline.clone()))
-                            .instrument(Some(instrument.clone()))
-                            .feature_id(id.clone())
-                            .value(scaled_value)
-                            .insight_type(InsightType::Scaled)
-                            .persist(self.persist)
-                            .build()
-                            .into(),
-                    )
-                } else {
-                    warn!("No scaler data found for {}", id);
-                    None
-                }
+                // Create Insight
+                Some(
+                    Insight::builder()
+                        .event_time(event_time)
+                        .pipeline(Some(self.pipeline.clone()))
+                        .instrument(Some(instrument.clone()))
+                        .feature_id(id.clone())
+                        .value(scaled_value)
+                        .insight_type(InsightType::Scaled)
+                        .persist(self.persist)
+                        .build()
+                        .into(),
+                )
             })
             .collect::<Vec<_>>();
 

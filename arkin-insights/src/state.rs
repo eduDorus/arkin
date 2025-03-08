@@ -146,6 +146,13 @@ impl InsightsState {
     }
 
     pub fn insert_batch(&self, events: &[Arc<Insight>]) {
+        // Filter out InsightTypes Transformed and Scaled
+        // TODO: Probably need a better solution than this.
+        let events: Vec<_> = events
+            .iter()
+            .filter(|event| event.insight_type != InsightType::Transformed && event.insight_type != InsightType::Scaled)
+            .cloned()
+            .collect();
         for event in events {
             let key = (event.instrument.clone(), event.feature_id.clone());
             let mut entry = self.features.entry(key).or_insert_with(|| BoundedBuffer::new(self.capacity));

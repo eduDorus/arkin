@@ -210,6 +210,26 @@ pub fn coefficient_of_variation(data: &[f64]) -> f64 {
     std_dev(data) / mean_val
 }
 
+// Linear interpolation function
+pub fn interp(x: f64, xp: &[f64], fp: &[f64]) -> f64 {
+    assert!(
+        xp.len() == fp.len() && xp.len() >= 2,
+        "xp and fp must have same length and at least 2 elements"
+    );
+    if x <= xp[0] {
+        fp[0] // Return the lower bound if x is below the smallest quantile
+    } else if x >= xp[xp.len() - 1] {
+        fp[fp.len() - 1] // Return the upper bound if x is above the largest quantile
+    } else {
+        let i = xp.iter().position(|&v| v > x).unwrap() - 1;
+        let x0 = xp[i];
+        let x1 = xp[i + 1];
+        let f0 = fp[i];
+        let f1 = fp[i + 1];
+        f0 + (x - x0) * (f1 - f0) / (x1 - x0) // Linear interpolation
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

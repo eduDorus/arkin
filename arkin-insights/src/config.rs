@@ -53,6 +53,10 @@ pub enum FeatureConfig {
     #[serde(rename = "co")]
     CO(ChaikinOscillatorConfig),
 
+    // Transformers
+    #[serde(rename = "quantile_transformer")]
+    QuantileTransformer(QuantileTransformerConfig),
+
     // Scalers
     #[serde(rename = "robust_scaler")]
     RobustScaler(RobustScalerConfig),
@@ -186,10 +190,19 @@ pub struct ChaikinOscillatorConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct RobustScalerConfig {
-    // pub input: Vec<FeatureId>,
+pub struct QuantileTransformerConfig {
+    pub input: Option<FeatureId>,
     pub output: FeatureId,
-    pub scaler_data_location: String,
+    pub data_location: String,
+    #[serde(default)]
+    pub persist: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct RobustScalerConfig {
+    pub input: Option<FeatureId>,
+    pub output: FeatureId,
+    pub data_location: String,
     #[serde(default)]
     pub persist: bool,
 }

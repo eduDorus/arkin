@@ -8,7 +8,7 @@ use crate::{Event, EventType, EventTypeOf, FeatureId};
 
 use super::{Instrument, Pipeline};
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Display, Clone, PartialEq, Eq, Hash)]
 #[strum(serialize_all = "snake_case")]
 pub enum InsightType {
     Raw,
@@ -17,7 +17,9 @@ pub enum InsightType {
     MovingAverage,
     Continuous,
     Categorical,
+    Transformed,
     Scaled,
+    Prediction,
 }
 
 #[derive(Debug, Clone, TypedBuilder)]

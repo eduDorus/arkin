@@ -1,12 +1,11 @@
-use std::{collections::HashMap, fs::File, io::BufReader, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
-use tracing::info;
 
 use crate::{
     config::FeatureConfig,
     features::{DualRangeFeature, LagFeature, OHLCVFeature, RangeFeature, TimeFeature, TwoValueFeature},
-    scaler::{RobustScaler, ScalerData},
+    scaler::{DistributionType, QuantileTransformer, QuantileTransformerFeature, RobustScaler, RobustScalerFeature},
     state::InsightsState,
     ta::{
         AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
@@ -162,33 +161,40 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::RobustScaler(c) => {
-                        // Read the json scaler file
-                        let file = File::open(&c.scaler_data_location).expect("Failed to open scaler file at location");
-                        let reader = BufReader::new(file);
+                    FeatureConfig::QuantileTransformer(c) => {
+                        let transformer = QuantileTransformer::load(&c.data_location, DistributionType::Normal);
 
-                        // Deserialize into a Vec<ScalerData>
-                        let scaler_data: Vec<ScalerData> =
-                            serde_json::from_reader(reader).expect("Failed to deserialize scaler data");
-
-                        let map = scaler_data
-                            .into_iter()
-                            .map(|data| (data.feature_id.clone(), data))
-                            .collect::<HashMap<_, _>>();
-
-                        for (k, v) in &map {
-                            info!("Scaler data: {} -> {:?}", k, v);
-                        }
-
-                        let inputs = map.keys().cloned().collect();
+                        let input = match &c.input {
+                            Some(input) => vec![input.clone()],
+                            None => transformer.features(),
+                        };
 
                         Arc::new(
-                            RobustScaler::builder()
+                            QuantileTransformerFeature::builder()
                                 .pipeline(pipeline.clone())
                                 .insight_state(state.clone())
-                                .scalers(map)
-                                .input(inputs)
+                                .input(input)
                                 .output(c.output.clone())
+                                .transformer(transformer)
+                                .persist(c.persist)
+                                .build(),
+                        )
+                    }
+                    FeatureConfig::RobustScaler(c) => {
+                        let scaler = RobustScaler::load(&c.data_location);
+
+                        let input = match &c.input {
+                            Some(input) => vec![input.clone()],
+                            None => scaler.features(),
+                        };
+
+                        Arc::new(
+                            RobustScalerFeature::builder()
+                                .pipeline(pipeline.clone())
+                                .insight_state(state.clone())
+                                .input(input)
+                                .output(c.output.clone())
+                                .scaler(scaler)
                                 .persist(c.persist)
                                 .build(),
                         )
