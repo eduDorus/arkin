@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use rayon::prelude::*;
-use tracing::error;
+use tracing::{error, warn};
 
 /// Basic statistical functions
 pub fn min(data: &[f64]) -> f64 {
@@ -216,6 +216,10 @@ pub fn interp(x: f64, xp: &[f64], fp: &[f64]) -> f64 {
         xp.len() == fp.len() && xp.len() >= 2,
         "xp and fp must have same length and at least 2 elements"
     );
+    if x.is_nan() {
+        warn!("Input to interpolation is NaN, returning NaN");
+        return f64::NAN; // Return NaN if input is NaN
+    }
     if x <= xp[0] {
         fp[0] // Return the lower bound if x is below the smallest quantile
     } else if x >= xp[xp.len() - 1] {

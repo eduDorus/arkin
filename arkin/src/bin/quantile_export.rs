@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clickhouse::{Client, Row};
 use serde::{Deserialize, Serialize};
+use statrs::distribution::{ContinuousCDF, Normal};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -14,7 +15,7 @@ async fn main() -> Result<()> {
         .with_option("wait_end_of_query", "1");
 
     let n_quantiles = 1000;
-    let levels: Vec<f64> = (0..=n_quantiles).map(|i| i as f64 / n_quantiles as f64).collect();
+    let levels: Vec<f64> = (1..n_quantiles).map(|i| i as f64 / n_quantiles as f64).collect();
 
     let levels_str = levels.iter().map(|&l| format!("{:.4}", l)).collect::<Vec<_>>().join(", ");
     let query = format!(
@@ -28,7 +29,7 @@ async fn main() -> Result<()> {
         FROM
           insights FINAL
         WHERE
-          event_time BETWEEN '2024-01-01 00:00:00' AND '2025-01-01 00:00:00'
+          event_time BETWEEN '2021-01-02 00:00:00' AND '2025-01-01 00:00:00'
           AND pipeline_id = 'd0e2617c-3682-4d6d-8f6e-d499a772dec6'
           AND insight_type = 'continuous'
         GROUP BY
@@ -57,6 +58,13 @@ async fn main() -> Result<()> {
     // let scaler_data: QuantileData = serde_json::from_reader(file)?;
 
     Ok(())
+}
+
+fn _get_exact_iqr() -> f64 {
+    let normal = Normal::new(0.0, 1.0).expect("Failed to create normal distribution");
+    let q1 = normal.inverse_cdf(0.25);
+    let q3 = normal.inverse_cdf(0.75);
+    q3 - q1
 }
 
 #[derive(Debug, Clone, Row, Serialize, Deserialize)]

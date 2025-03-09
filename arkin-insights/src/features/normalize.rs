@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use statrs::distribution::{ContinuousCDF, Normal};
 use strum::Display;
 use time::OffsetDateTime;
-use tracing::debug;
+use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -63,7 +63,7 @@ impl RobustScaler {
     }
 
     pub fn transform_normal(&self, x: f64) -> f64 {
-        x / 1.349
+        x / 1.3489795003921636
     }
 
     pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
@@ -73,7 +73,7 @@ impl RobustScaler {
     }
 
     pub fn inverse_transform_normal(&self, x: f64) -> f64 {
-        x * 1.349
+        x * 1.3489795003921636
     }
 }
 
@@ -119,8 +119,13 @@ impl QuantileTransformer {
 
     /// Transform a value x for a given feature_id
     pub fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
+        if x.is_nan() {
+            warn!("NaN value detected in transform");
+            return x;
+        }
         let key = (instrument_id, feature_id.clone());
         let quantiles = self.feature_quantiles.get(&key).expect("Feature ID not found in quantiles");
+
         // Forward interpolation
         let forward = interp(x, quantiles, &self.references);
 
@@ -203,6 +208,12 @@ impl Feature for NormalizeFeature {
             .filter_map(|id| {
                 // Get the value
                 let value = self.insight_state.last(Some(instrument.clone()), id.clone(), event_time)?;
+
+                // Check if value is nan
+                if value.is_nan() {
+                    warn!("NaN value detected in normalization");
+                    return None;
+                }
 
                 let altered_value = match self.method {
                     NormalizeFeatureType::Quantile => self.transformer.transform(instrument.id, id, value),
