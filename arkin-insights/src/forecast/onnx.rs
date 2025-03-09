@@ -111,17 +111,17 @@ impl Feature for OnnxFeature {
         let outputs = model.run(ort::inputs!["input" => input].unwrap()).expect("Failed to run model");
         if let Some(predictions) = outputs["output"].try_extract_tensor::<f32>().ok() {
             let predication = predictions.as_slice().unwrap();
-            info!("ORT Predictions: {:?}", predication);
+            debug!("ORT Predictions: {:?}", predication);
             // Inverse scale the predictions
             let scaled_prediction = self
                 .robust_scaler
                 .inverse_transform_normal(predication.first().unwrap().clone() as f64);
-            info!("Inverse Scaled Prediction: {:?}", scaled_prediction);
+            debug!("Inverse Scaled Prediction: {:?}", scaled_prediction);
             // Inverse transform the predictions
             let prediction =
                 self.quantile_transformer
                     .inverse_transform(instrument.id, &self.output_feature, scaled_prediction);
-            info!("Inverse Transformed Prediction: {}", prediction);
+            debug!("Inverse Transformed Prediction: {}", prediction);
 
             // // Return insight
             let insight = Insight::builder()

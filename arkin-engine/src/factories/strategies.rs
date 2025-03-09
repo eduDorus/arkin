@@ -31,6 +31,22 @@ impl StrategyFactory {
                     )
                 }
                 StrategyAlgorithmConfig::Spreader(_c) => unimplemented!(),
+                StrategyAlgorithmConfig::Forecast(c) => {
+                    let strategy = persistence
+                        .strategy_store
+                        .read_by_name_or_create(&c.name)
+                        .await
+                        .expect("Failed to read or create strategy");
+
+                    Arc::new(
+                        ForecastStrategy::builder()
+                            .pubsub(pubsub.clone())
+                            .strategy(strategy)
+                            .inputs(c.inputs.clone())
+                            .threshold(c.threshold)
+                            .build(),
+                    )
+                }
             };
             strategies.push(algo);
         }

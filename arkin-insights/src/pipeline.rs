@@ -12,7 +12,7 @@ use petgraph::{
 use rayon::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use time::OffsetDateTime;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::config::PipelineConfig;
 use crate::feature_factory::FeatureFactory;
@@ -45,7 +45,7 @@ impl PipelineGraph {
         }
 
         for (id, index) in &id_to_index {
-            info!("Node ID: {:?}, Node Index: {:?}", id, index);
+            debug!("Node ID: {:?}, Node Index: {:?}", id, index);
         }
 
         // Add edges automatically
@@ -64,7 +64,7 @@ impl PipelineGraph {
             }
         }
         for (source, target) in &edges_to_add {
-            info!("Edge: {:?} -> {:?}", source, target);
+            debug!("Edge: {:?} -> {:?}", source, target);
         }
 
         // Add edges to the graph
@@ -75,7 +75,7 @@ impl PipelineGraph {
         // Save the topological order for parallel processing
         let order = toposort(&graph, None).expect("Cycle detected in graph");
 
-        info!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
+        debug!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
 
         PipelineGraph {
             state,
