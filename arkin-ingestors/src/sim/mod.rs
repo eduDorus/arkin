@@ -38,7 +38,7 @@ impl RunnableService for SimIngestor {
         let tick_stream = self
             .persistence
             .tick_store
-            .stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, Frequency::Daily)
+            .stream_range_buffered(&self.instruments, self.start, self.start, self.buffer_size, Frequency::Daily)
             .await;
 
         let trade_stream = self
@@ -117,7 +117,7 @@ impl RunnableService for SimIngestor {
                         _ => {}
                     }
                 }
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                // tokio::time::sleep(Duration::from_millis(100)).await;
                 info!("SimIngestor: InsightTick processed in {:?}", timer.elapsed());
             }
         }

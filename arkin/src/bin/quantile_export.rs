@@ -29,8 +29,8 @@ async fn main() -> Result<()> {
         FROM
           insights FINAL
         WHERE
-          event_time BETWEEN '2021-01-02 00:00:00' AND '2025-01-01 00:00:00'
-          AND pipeline_id = 'd0e2617c-3682-4d6d-8f6e-d499a772dec6'
+          event_time BETWEEN '2023-01-01 00:00:00' AND '2025-02-01 00:00:00'
+          AND pipeline_id = '3d94c39e-3b39-4617-8852-ab02810690ff'
           AND insight_type = 'continuous'
         GROUP BY
           instrument_id,

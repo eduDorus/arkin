@@ -105,6 +105,10 @@ pub struct InsightsArgs {
     #[arg(long, short, value_parser = parse_datetime)]
     pub end: OffsetDateTime,
 
+    /// Only normalized insights to save down
+    #[arg(long, short)]
+    pub only_normalized: bool,
+
     /// Dry run
     #[arg(long)]
     pub dry_run: bool,

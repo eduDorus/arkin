@@ -16,6 +16,7 @@ use crate::{PersistenceConfig, PersistenceError};
 pub struct PersistenceService {
     pub pubsub: Arc<PubSub>,
     pub dry_run: bool,
+    pub only_normalized: bool,
     pub auto_commit_interval: Duration,
     pub instance_store: Arc<InstanceStore>,
     pub account_store: Arc<AccountStore>,
@@ -35,7 +36,13 @@ pub struct PersistenceService {
 }
 
 impl PersistenceService {
-    pub async fn new(pubsub: Arc<PubSub>, config: &PersistenceConfig, instance: Instance, dry_run: bool) -> Arc<Self> {
+    pub async fn new(
+        pubsub: Arc<PubSub>,
+        config: &PersistenceConfig,
+        instance: Instance,
+        only_normalized: bool,
+        dry_run: bool,
+    ) -> Arc<Self> {
         let db_config = config.database.clone();
         let conn_options = PgConnectOptions::new()
             .host(&db_config.host)
@@ -141,6 +148,7 @@ impl PersistenceService {
         let service = Self {
             pubsub,
             dry_run,
+            only_normalized,
             auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
             instance_store,
             account_store,
@@ -184,7 +192,8 @@ impl RunnableService for PersistenceService {
 
         loop {
             tokio::select! {
-                    Ok(event) = rx.recv() => {
+                    Ok(mut event) = rx.recv() => {
+                        // If we do a dry run we don't save any data
                         if self.dry_run {
                           // Still need to update price cache
                             if let Event::Tick(t) = event {
@@ -192,6 +201,15 @@ impl RunnableService for PersistenceService {
                             }
                             continue;
                         }
+
+                        // Filter out non normalized insights from insight tick
+                        if self.only_normalized {
+                            if let Event::InsightTick(t) = event {
+                                let insights = t.insights.iter().filter(|i| i.insight_type == InsightType::Normalized).cloned().collect::<Vec<_>>();
+                                event = Event::InsightTick(InsightTick::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
+                            }
+                        }
+
                         let res = match event {
                             Event::Tick(tick) => self.tick_store.insert_buffered(tick).await,
                             Event::Trade(trade) =>self.trade_store.insert_buffered(trade).await,
