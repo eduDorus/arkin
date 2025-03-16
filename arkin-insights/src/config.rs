@@ -218,7 +218,7 @@ pub struct OnnxConfig {
     pub input: Vec<FeatureId>,
     pub output: FeatureId,
     pub sequence_length: usize,
-    pub output_feature: FeatureId,
+    pub target_feature: FeatureId,
     pub quantile_data_location: String,
     #[serde(default)]
     pub persist: bool,

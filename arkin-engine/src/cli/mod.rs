@@ -106,8 +106,12 @@ pub struct InsightsArgs {
     pub end: OffsetDateTime,
 
     /// Only normalized insights to save down
-    #[arg(long, short)]
+    #[arg(long)]
     pub only_normalized: bool,
+
+    /// Only prediction insights to save down
+    #[arg(long)]
+    pub only_predictions: bool,
 
     /// Dry run
     #[arg(long)]

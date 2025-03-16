@@ -27,7 +27,7 @@ pub struct OnnxFeature {
     input: Vec<FeatureId>,
     output: FeatureId,
     sequence_length: usize,
-    output_feature: FeatureId,
+    target_feature: FeatureId,
     quantile_transformer: QuantileTransformer,
     robust_scaler: RobustScaler,
     persist: bool,
@@ -53,8 +53,8 @@ impl Feature for OnnxFeature {
         if !self.models.contains_key(instrument) {
             info!("Initializing model for {}", instrument);
             let filename = format!(
-                "{}/{}_{}_{}.onnx",
-                self.model_location, self.model_name, self.model_version, instrument.id
+                "{}/{}_{}_{}_{}.onnx",
+                self.model_location, self.model_name, self.target_feature, self.model_version, instrument.id
             );
 
             let model = Session::builder()
@@ -110,32 +110,56 @@ impl Feature for OnnxFeature {
         let input = ort::value::Tensor::from_array(input_array.clone().into_dyn()).expect("Failed to create tensor");
         let outputs = model.run(ort::inputs!["input" => input].unwrap()).expect("Failed to run model");
         if let Some(predictions) = outputs["output"].try_extract_tensor::<f32>().ok() {
-            let predication = predictions.as_slice().unwrap();
-            debug!("ORT Predictions: {:?}", predication);
-            // Inverse scale the predictions
-            let scaled_prediction = self
-                .robust_scaler
-                .inverse_transform_normal(predication.first().unwrap().clone() as f64);
-            debug!("Inverse Scaled Prediction: {:?}", scaled_prediction);
-            // Inverse transform the predictions
-            let prediction =
-                self.quantile_transformer
-                    .inverse_transform(instrument.id, &self.output_feature, scaled_prediction);
-            debug!("Inverse Transformed Prediction: {}", prediction);
+            let predications = predictions.as_slice().unwrap();
+            debug!("ORT Predictions: {:?}", predications);
+            if predications.is_empty() {
+                warn!("Predictions is empty");
+                return None;
+            }
+            // Get the third prediction
+            let mut insights = Vec::with_capacity(predications.len());
+            for (idx, prediction) in predications.iter().enumerate() {
+                // Inverse scale the predictions
+                let scaled_prediction = self.robust_scaler.inverse_transform_normal(*prediction as f64);
+                debug!("Inverse Scaled Prediction: {:?}", scaled_prediction);
 
-            // // Return insight
-            let insight = Insight::builder()
-                .event_time(event_time)
-                .pipeline(Some(self.pipeline.clone()))
-                .instrument(Some(instrument.clone()))
-                .feature_id(self.output.clone())
-                .value(prediction)
-                .insight_type(InsightType::Prediction)
-                .persist(self.persist)
-                .build()
-                .into();
+                // Inverse transform the predictions
+                // The prediction is that the first three values are 5min (3 quantiles) next three are 15min, etc.
+                let postfix = match idx {
+                    0..=2 => "5min",
+                    3..=5 => "15min",
+                    6..=8 => "60min",
+                    _ => {
+                        warn!("Invalid index: {}", idx);
+                        return None;
+                    }
+                };
+                let feature_id_with_min = format!("{}_{}", self.target_feature, postfix);
+                let prediction = self.quantile_transformer.inverse_transform(
+                    instrument.id,
+                    &feature_id_with_min.into(),
+                    scaled_prediction,
+                );
+                debug!("Inverse Transformed Prediction: {}", prediction);
 
-            Some(vec![insight])
+                // Let's just make a new feature_id with the
+                let feature_id = format!("{}_{}", self.output, idx);
+
+                // // Return insight
+                let insight = Insight::builder()
+                    .event_time(event_time)
+                    .pipeline(Some(self.pipeline.clone()))
+                    .instrument(Some(instrument.clone()))
+                    .feature_id(feature_id.into())
+                    .value(prediction)
+                    .insight_type(InsightType::Prediction)
+                    .persist(self.persist)
+                    .build()
+                    .into();
+                insights.push(insight);
+            }
+
+            Some(insights)
         } else {
             warn!("Failed to extract predictions");
             return None;

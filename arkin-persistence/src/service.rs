@@ -17,6 +17,7 @@ pub struct PersistenceService {
     pub pubsub: Arc<PubSub>,
     pub dry_run: bool,
     pub only_normalized: bool,
+    pub only_predictions: bool,
     pub auto_commit_interval: Duration,
     pub instance_store: Arc<InstanceStore>,
     pub account_store: Arc<AccountStore>,
@@ -41,6 +42,7 @@ impl PersistenceService {
         config: &PersistenceConfig,
         instance: Instance,
         only_normalized: bool,
+        only_predictions: bool,
         dry_run: bool,
     ) -> Arc<Self> {
         let db_config = config.database.clone();
@@ -149,6 +151,7 @@ impl PersistenceService {
             pubsub,
             dry_run,
             only_normalized,
+            only_predictions,
             auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
             instance_store,
             account_store,
@@ -209,6 +212,14 @@ impl RunnableService for PersistenceService {
                                 event = Event::InsightTick(InsightTick::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
                             }
                         }
+
+                        // Filter out non prediction insights from insight tick
+                        if self.only_normalized {
+                          if let Event::InsightTick(t) = event {
+                              let insights = t.insights.iter().filter(|i| i.insight_type == InsightType::Prediction).cloned().collect::<Vec<_>>();
+                              event = Event::InsightTick(InsightTick::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
+                          }
+                      }
 
                         let res = match event {
                             Event::Tick(tick) => self.tick_store.insert_buffered(tick).await,

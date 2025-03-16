@@ -53,6 +53,15 @@ impl DefaultEngine {
                 .instance_type(InstanceType::Utility)
                 .build(),
         };
+
+        let only_predictions = match &args.command {
+            Commands::Download(_args) => false,
+            Commands::Ingestor(_args) => false,
+            Commands::Insights(args) => args.only_predictions,
+            Commands::Simulation(_args) => false,
+            Commands::Live(_args) => false,
+        };
+
         let only_normalized = match &args.command {
             Commands::Download(_args) => false,
             Commands::Ingestor(_args) => false,
@@ -68,7 +77,9 @@ impl DefaultEngine {
             Commands::Simulation(args) => args.dry_run,
             Commands::Live(_args) => false,
         };
-        let persistence = PersistenceService::new(pubsub.clone(), &config, instance, only_normalized, dry_run).await;
+        let persistence =
+            PersistenceService::new(pubsub.clone(), &config, instance, only_normalized, only_predictions, dry_run)
+                .await;
 
         let engine = Self {
             timer: Instant::now(),

@@ -196,7 +196,7 @@ impl FeatureFactory {
                                 .input(c.input.clone())
                                 .output(c.output.clone())
                                 .sequence_length(c.sequence_length)
-                                .output_feature(c.output_feature.clone())
+                                .target_feature(c.target_feature.clone())
                                 .quantile_transformer(transformer)
                                 .robust_scaler(scaler)
                                 .persist(c.persist)
