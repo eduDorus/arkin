@@ -132,15 +132,24 @@ impl DefaultEngine {
     }
 
     pub async fn run_simulation(&self, args: &SimulationArgs) -> Result<(), TradingEngineError> {
+        info!("Running simulation...");
         // Init services
+        info!("Initializing services...");
         let insights = InsightsFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.pipeline).await;
+        info!("Insights initialized");
         let ingestor = IngestorFactory::init_simulation(self.pubsub.clone(), self.persistence.clone(), args).await;
         let accounting =
             AccountingFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.accounting_type).await;
+        info!("Accounting initialized");
         let strategies = StrategyFactory::init(self.pubsub.clone(), self.persistence.clone()).await;
+        info!("Strategies initialized");
         let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), accounting.clone());
+        info!("Allocation initialized");
         let order_manager = OrderManagerFactory::init(self.pubsub.clone());
+        info!("Order Manager initialized");
         let execution = ExecutorFactory::init_simulation(self.pubsub.clone());
+        info!("Execution initialized");
+        info!("strategy count: {}", strategies.len());
 
         let mut services: Vec<Arc<dyn RunnableService>> =
             vec![insights, ingestor, accounting, allocation, order_manager, execution];

@@ -15,6 +15,8 @@ pub enum StrategyAlgorithmConfig {
     Spreader(SpreaderConfig),
     #[serde(rename = "forecast")]
     Forecast(ForecastConfig),
+    #[serde(rename = "agent")]
+    Agent(AgentConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -37,4 +39,15 @@ pub struct ForecastConfig {
     pub name: String,
     pub inputs: Vec<FeatureId>,
     pub threshold: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AgentConfig {
+    pub name: String,
+    pub model_location: String,
+    pub model_name: String,
+    pub model_version: String,
+    pub n_layers: usize,
+    pub hidden_size: usize,
+    pub inputs: Vec<FeatureId>,
 }

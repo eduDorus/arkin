@@ -29,10 +29,10 @@ async-trait = { workspace = true }
 typed-builder = { workspace = true }
 statrs = { workspace = true }
 strum = { workspace = true }
+ort = { workspace = true }
+ndarray = { workspace = true }
 rustfft = "6.2.0"
 hdbscan = "0.10.0"
-ort = { version = "=2.0.0-rc.9" }
-ndarray = "0.16.1"
 # catboost-rs = { workspace = true }
 # clarabel = { workspace = true }
 

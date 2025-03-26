@@ -48,8 +48,8 @@ async-tungstenite = { version = "0.28", features = [ "tokio-runtime", "tokio-rus
 reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "http2", "gzip", "brotli", "zstd", "deflate", "socks", "hickory-dns" ], default-features = false }
 
 # Data Types
-rust_decimal = { version = "1.36", features = [ "maths", "serde", "std" ], default-features = false }
-rust_decimal_macros = "1.36"
+rust_decimal = { version = "1.37", features = [ "maths", "serde", "std" ], default-features = false }
+rust_decimal_macros = "1.37"
 bytes = "1.10"
 
 # Data Structures
@@ -90,6 +90,9 @@ moka2 = { version = "0.13.0", features = [ "future" ] }
 # TA
 yata = "0.7"
 
+# Ort
+ort = { version = "=2.0.0-rc.9" }
+ndarray = { version = "0.16.1" }
 # Models & Optimisation
 # catboost-rs = "0.1"
 # clarabel = "0"

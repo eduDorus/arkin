@@ -46,6 +46,26 @@ impl StrategyFactory {
                             .threshold(c.threshold)
                             .build(),
                     )
+                },
+                StrategyAlgorithmConfig::Agent(c) => {
+                    let strategy = persistence
+                        .strategy_store
+                        .read_by_name_or_create(&c.name)
+                        .await
+                        .expect("Failed to read or create strategy");
+
+                    Arc::new(
+                        AgentStrategy::builder()
+                            .pubsub(pubsub.clone())
+                            .strategy(strategy)
+                            .model_location(c.model_location.clone())
+                            .model_name(c.model_name.clone())
+                            .model_version(c.model_version.clone())
+                            .n_layers(c.n_layers)
+                            .hidden_size(c.hidden_size)
+                            .inputs(c.inputs.clone())
+                            .build(),
+                    )
                 }
             };
             strategies.push(algo);
