@@ -12,9 +12,8 @@ use crate::repos::*;
 use crate::stores::*;
 use crate::{PersistenceConfig, PersistenceError};
 
-#[derive(Debug)]
 pub struct PersistenceService {
-    pub pubsub: Arc<PubSub>,
+    pub pubsub: PubSubSubscriber,
     pub dry_run: bool,
     pub only_normalized: bool,
     pub only_predictions: bool,
@@ -38,7 +37,7 @@ pub struct PersistenceService {
 
 impl PersistenceService {
     pub async fn new(
-        pubsub: Arc<PubSub>,
+        pubsub: PubSubSubscriber,
         config: &PersistenceConfig,
         instance: Instance,
         only_normalized: bool,
@@ -191,54 +190,66 @@ impl RunnableService for PersistenceService {
         info!("Starting persistence service...");
 
         let mut interval = tokio::time::interval(self.auto_commit_interval);
-        let mut rx = self.pubsub.subscribe();
 
         loop {
             tokio::select! {
-                    Ok(mut event) = rx.recv() => {
+                    Ok((mut event, barrier)) = self.pubsub.rx.recv() => {
+                        info!("Persistence service received event");
                         // If we do a dry run we don't save any data
                         if self.dry_run {
                           // Still need to update price cache
-                            if let Event::Tick(t) = event {
-                              self.tick_store.update_tick_cache(t).await;
-                            }
+                            // if let Event::TickUpdate(t) = event {
+                            //   self.tick_store.update_tick_cache(t).await;
+                            // }
+                            info!("Dry run mode, skipping event");
+                            barrier.wait().await;
                             continue;
                         }
 
                         // Filter out non normalized insights from insight tick
                         if self.only_normalized {
-                            if let Event::InsightTick(t) = event {
+                            if let Event::InsightsUpdate(t) = event {
                                 let insights = t.insights.iter().filter(|i| i.insight_type == InsightType::Normalized).cloned().collect::<Vec<_>>();
-                                event = Event::InsightTick(InsightTick::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
+                                event = Event::InsightsUpdate(InsightsUpdate::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
                             }
                         }
 
                         // Filter out non prediction insights from insight tick
                         if self.only_normalized {
-                          if let Event::InsightTick(t) = event {
+                          if let Event::InsightsUpdate(t) = event {
                               let insights = t.insights.iter().filter(|i| i.insight_type == InsightType::Prediction).cloned().collect::<Vec<_>>();
-                              event = Event::InsightTick(InsightTick::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
+                              event = Event::InsightsUpdate(InsightsUpdate::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
                           }
                       }
 
                         let res = match event {
-                            Event::Tick(tick) => self.tick_store.insert_buffered(tick).await,
-                            Event::Trade(trade) =>self.trade_store.insert_buffered(trade).await,
-                            Event::Insight(insight) => self.insights_store.insert_buffered(insight).await,
-                            Event::InsightTick(tick) => self.insights_store.insert_buffered_vec(tick.insights.clone()).await,
-                            Event::Signal(signal) => self.signal_store.insert(signal).await,
-                            Event::ExecutionOrder(order) => self.execution_order_store.insert(order).await ,
-                            Event::ExecutionOrderUpdate(order) => self.execution_order_store.update(order).await,
+                            // Event::TickUpdate(tick) => self.tick_store.insert_buffered(tick).await,
+                            // Event::TradeUpdate(trade) =>self.trade_store.insert_buffered(trade).await,
+                            // Event::InsightsUpdate(tick) => self.insights_store.insert_buffered_vec(tick.insights.clone()).await,
+                            Event::SignalUpdate(signal) => self.signal_store.insert(signal).await,
+                            Event::ExecutionOrderNew(order) => self.execution_order_store.insert(order).await ,
+                            Event::ExecutionOrderStatusUpdate(order) => self.execution_order_store.update(order).await,
                             Event::VenueOrderNew(order) => self.venue_order_store.insert(order).await,
                             Event::VenueOrderFillUpdate(order) => self.venue_order_store.update(order).await,
                             Event::AccountNew(account) => self.account_store.insert(account).await,
-                            Event::Transfer(transfer) => self.transfer_store.insert(transfer).await,
-                            Event::TransferBatch(transfers) => self.transfer_store.insert_batch(transfers).await,
+                            Event::TransferNew(transfer) => self.transfer_store.insert_batch(transfer).await,
+                            Event::Finished => {
+                              if let Err(e) = self.flush().await {
+                                error!("Failed to commit persistence service on shutdown: {}", e);
+                            }
+                            if let Err(e) = self.close().await {
+                                error!("Failed to close persistence service on shutdown: {}", e);
+                            }
+                              barrier.wait().await;
+                              break;
+                          }
                             _ => {Ok(())}
                         };
                         if let Err(e) = res {
                             error!("Failed to insert event: {:?}", e);
                         }
+                        info!("Persistence service event processed");
+                        barrier.wait().await;
                     }
                     _ = interval.tick() => {
                         debug!("Auto commit persistence service...");
@@ -257,8 +268,7 @@ impl RunnableService for PersistenceService {
                     }
             }
         }
-
-        info!("Persistence service shutdown...");
+        info!("Persistence service stopped.");
         Ok(())
     }
 }

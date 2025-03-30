@@ -10,8 +10,8 @@ use crate::StrategyError;
 pub trait StrategyService: RunnableService + Algorithm {}
 
 #[async_trait]
-pub trait Algorithm: std::fmt::Debug + Send + Sync {
-    async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError>;
+pub trait Algorithm: Send + Sync {
+    async fn insight_tick(&self, tick: Arc<InsightsUpdate>) -> Result<(), StrategyError>;
     // async fn on_tick(&self, tick: Tick) -> Result<(), StrategyError>;
     // async fn on_order(&self, order: Order) -> Result<(), StrategyError>;
     // async fn on_trade(&self, trade: Trade) -> Result<(), StrategyError>;

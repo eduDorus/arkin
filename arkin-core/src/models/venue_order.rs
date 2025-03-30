@@ -7,7 +7,7 @@ use tracing::error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, EventType, EventTypeOf, Price, Quantity};
+use crate::{types::Commission, Event, Price, Quantity};
 
 use super::{Asset, Instrument, MarketSide, Strategy};
 
@@ -176,12 +176,6 @@ impl VenueOrder {
 
     pub fn total_value(&self) -> Price {
         self.price * self.quantity * self.instrument.contract_size
-    }
-}
-
-impl EventTypeOf for VenueOrder {
-    fn event_type() -> EventType {
-        EventType::VenueOrderNew
     }
 }
 

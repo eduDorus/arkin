@@ -3,7 +3,6 @@ use std::sync::Arc;
 use clap::ValueEnum;
 use rust_decimal_macros::dec;
 use strum::Display;
-use time::OffsetDateTime;
 
 use arkin_accounting::prelude::*;
 use arkin_core::prelude::*;
@@ -12,7 +11,6 @@ use uuid::Uuid;
 
 #[derive(Debug, Display, Clone, ValueEnum)]
 pub enum AccountingServiceType {
-    SingleStrategy,
     Ledger,
 }
 
@@ -26,18 +24,6 @@ impl AccountingFactory {
     ) -> Arc<dyn AccountingService> {
         // let config = load::<AccountingConfig>();
         let portfolio: Arc<dyn AccountingService> = match accouting_type {
-            AccountingServiceType::SingleStrategy => {
-                let portfolio = SingleStrategyPortfolio::builder().pubsub(pubsub.clone()).build();
-
-                let asset = persistence.asset_store.read_by_symbol("USDT").await.unwrap();
-                let balance = BalanceUpdate::builder()
-                    .event_time(OffsetDateTime::now_utc())
-                    .asset(asset)
-                    .quantity(dec!(100_000))
-                    .build();
-                portfolio.add_balance(balance.into());
-                Arc::new(portfolio)
-            }
             AccountingServiceType::Ledger => {
                 let personal_venue = persistence
                     .venue_store
@@ -55,10 +41,9 @@ impl AccountingFactory {
                     .await
                     .expect("Failed to read asset from DB");
 
-                let accounting = LedgerAccounting::builder().pubsub(pubsub)._persistence(persistence).build();
+                let accounting = LedgerAccounting::builder().pubsub(pubsub.handle().await).build();
                 accounting
                     .deposit(
-                        OffsetDateTime::UNIX_EPOCH,
                         &personal_venue,
                         &binance_venue,
                         &asset.into(),

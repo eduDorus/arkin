@@ -23,7 +23,7 @@ impl StrategyFactory {
 
                     Arc::new(
                         CrossoverStrategy::builder()
-                            .pubsub(pubsub.clone())
+                            .pubsub(pubsub.handle().await)
                             .strategy(strategy)
                             .fast_ma(c.fast_ma.clone())
                             .slow_ma(c.slow_ma.clone())
@@ -40,13 +40,13 @@ impl StrategyFactory {
 
                     Arc::new(
                         ForecastStrategy::builder()
-                            .pubsub(pubsub.clone())
+                            .pubsub(pubsub.handle().await)
                             .strategy(strategy)
                             .inputs(c.inputs.clone())
                             .threshold(c.threshold)
                             .build(),
                     )
-                },
+                }
                 StrategyAlgorithmConfig::Agent(c) => {
                     let strategy = persistence
                         .strategy_store
@@ -56,11 +56,12 @@ impl StrategyFactory {
 
                     Arc::new(
                         AgentStrategy::builder()
-                            .pubsub(pubsub.clone())
+                            .pubsub(pubsub.handle().await)
                             .strategy(strategy)
                             .model_location(c.model_location.clone())
                             .model_name(c.model_name.clone())
                             .model_version(c.model_version.clone())
+                            .action_space(c.action_space)
                             .n_layers(c.n_layers)
                             .hidden_size(c.hidden_size)
                             .inputs(c.inputs.clone())

@@ -14,7 +14,7 @@ tokio-util = { workspace = true }
 tokio-rustls = { workspace = true }
 anyhow = { workspace = true }
 async-tungstenite = { workspace = true }
-flume = { workspace = true }
+kanal = { workspace = true }
 time = { workspace = true }
 futures-util = { workspace = true }
 tracing = { workspace = true }

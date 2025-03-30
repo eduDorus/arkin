@@ -2,10 +2,7 @@ use std::{fmt, sync::Arc};
 
 use time::OffsetDateTime;
 
-use crate::{
-    types::{Price, Quantity},
-    EventType, EventTypeOf,
-};
+use crate::types::{Price, Quantity};
 
 use super::Instrument;
 
@@ -32,12 +29,6 @@ impl Book {
             bids,
             asks,
         }
-    }
-}
-
-impl EventTypeOf for Book {
-    fn event_type() -> EventType {
-        EventType::Book
     }
 }
 

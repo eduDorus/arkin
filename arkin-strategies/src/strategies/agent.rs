@@ -16,14 +16,15 @@ use arkin_core::prelude::*;
 
 use crate::{Algorithm, StrategyError, StrategyService};
 
-#[derive(Debug, TypedBuilder)]
+#[derive(TypedBuilder)]
 #[allow(unused)]
 pub struct AgentStrategy {
-    pubsub: Arc<PubSub>,
+    pubsub: PubSubHandle,
     strategy: Arc<Strategy>,
     model_location: String,
     model_name: String,
     model_version: String,
+    action_space: Vec<Decimal>,
     n_layers: usize,
     hidden_size: usize,
     inputs: Vec<FeatureId>,
@@ -37,7 +38,7 @@ pub struct AgentStrategy {
 
 #[async_trait]
 impl Algorithm for AgentStrategy {
-    async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError> {
+    async fn insight_tick(&self, tick: Arc<InsightsUpdate>) -> Result<(), StrategyError> {
         info!("Processing insight tick for Agent Strategy...");
 
         for instrument in &tick.instruments {
@@ -109,10 +110,17 @@ impl Algorithm for AgentStrategy {
             obs.push(current_weight.to_f32().unwrap()); // Append current weight to observation
             let obs_array = Array::from_shape_vec((1, self.inputs.len() + 1), obs).expect("Failed to create obs array");
 
+            // Print all inputs
+            info!("Observation: {:?}", obs_array);
+            // info!("Hidden: {:?}", hidden);
+            // info!("Cell: {:?}", cell);
+
             // Convert inputs to ort::Value
             let obs_value = Tensor::from_array(obs_array).expect("Failed to create obs value");
             let hidden_value = Tensor::from_array(hidden).expect("Failed to create hidden value");
             let cell_value = Tensor::from_array(cell).expect("Failed to create cell value");
+
+            // Print all inputs
 
             // Run the model with correct input names
             let outputs = model
@@ -150,21 +158,20 @@ impl Algorithm for AgentStrategy {
                 .await
                 .insert(instrument.clone(), (new_hidden, new_cell));
 
-            info!("Action: {:?}", action[0]);
+            // info!("Action: {:?}", action[0]);
+            let weight = self.action_space[action[0] as usize];
+            // info!("Weight: {}", weight);
 
             // update the last action
-            let weight = Decimal::from_i64(action[0]).expect("Failed to convert action to weight");
-            if weight != current_weight {
-                self.current_weight.write().await.insert(instrument.clone(), weight);
-                let signal = Signal::builder()
-                    .event_time(tick.event_time)
-                    .strategy(self.strategy.clone())
-                    .instrument(instrument.clone())
-                    .weight(weight)
-                    .build();
-                info!("Agent sending signal: {}", signal);
-                self.pubsub.publish(Event::Signal(signal.into())).await;
-            }
+            self.current_weight.write().await.insert(instrument.clone(), weight);
+            let signal = Signal::builder()
+                .event_time(tick.event_time)
+                .strategy(self.strategy.clone())
+                .instrument(instrument.clone())
+                .weight(weight)
+                .build();
+            info!("Agent sending signal: {}", signal);
+            self.pubsub.publish(signal).await;
         }
 
         Ok(())
@@ -179,24 +186,30 @@ impl RunnableService for AgentStrategy {
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting Agent Strategy...");
 
-        let mut rx = self.pubsub.subscribe();
-
         loop {
             select! {
-                Ok(event) = rx.recv() => {
+                Ok((event, barrier)) = self.pubsub.rx.recv() => {
+                    info!("Agent Strategy received event");
                     match event {
-                        Event::InsightTick(tick) => {
+                        Event::InsightsUpdate(tick) => {
                             debug!("Agent Strategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
+                        Event::Finished => {
+                          barrier.wait().await;
+                          break;
+                      }
                         _ => {}
                     }
+                    info!("Agent Strategy event processed");
+                    barrier.wait().await;
                 }
                 _ = _shutdown.cancelled() => {
                     break;
                 }
             }
         }
+        info!("Agent Strategy stopped.");
         Ok(())
     }
 }

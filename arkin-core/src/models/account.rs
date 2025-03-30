@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use sqlx::Type;
+use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -98,8 +99,14 @@ impl fmt::Display for Account {
     }
 }
 
-impl From<Arc<Account>> for Event {
-    fn from(account: Arc<Account>) -> Self {
-        Event::AccountNew(account)
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct AccountUpdate {
+    pub event_time: OffsetDateTime,
+    pub account: Arc<Account>,
+}
+
+impl From<Arc<AccountUpdate>> for Event {
+    fn from(account_update: Arc<AccountUpdate>) -> Self {
+        Event::AccountNew(account_update)
     }
 }

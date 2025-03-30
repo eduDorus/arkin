@@ -10,7 +10,7 @@ use crate::errors::ExecutorError;
 pub trait ExecutorService: RunnableService + Executor {}
 
 #[async_trait]
-pub trait Executor: std::fmt::Debug + Send + Sync {
+pub trait Executor: Send + Sync {
     async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError>;
     // async fn place_orders(&self, orders: Vec<Arc<VenueOrder>>) -> Result<(), ExecutorError>;
 

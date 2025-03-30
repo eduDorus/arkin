@@ -197,9 +197,9 @@ impl TardisRequest {
     }
 }
 
-#[derive(Debug, TypedBuilder)]
+#[derive(TypedBuilder)]
 pub struct TardisIngestor {
-    pub pubsub: Arc<PubSub>,
+    pub pubsub: PubSubHandle,
     pub persistence: Arc<PersistenceService>,
     pub client: TardisHttpClient,
     pub max_concurrent_requests: usize,
@@ -384,7 +384,6 @@ impl RunnableService for TardisIngestor {
                                 trade.price,
                                 trade.quantity,
                             );
-                            let trade = Arc::new(trade);
                             self.pubsub.publish(trade).await;
                         }
                         BinanceSwapsEvent::TickStream(stream) => {
@@ -398,7 +397,6 @@ impl RunnableService for TardisIngestor {
                                 tick.ask_price,
                                 tick.ask_quantity,
                             );
-                            let tick = Arc::new(tick);
                             self.pubsub.publish(tick).await;
                         }
                     }
@@ -411,6 +409,7 @@ impl RunnableService for TardisIngestor {
         }
 
         self.pubsub.publish(Event::Finished).await;
+        info!("Tardis ingestor service stopped.");
         Ok(())
     }
 }

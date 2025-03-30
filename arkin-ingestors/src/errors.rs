@@ -3,10 +3,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum IngestorError {
     #[error("Channel send error: {0}")]
-    ChannelSendError(#[from] flume::SendError<async_tungstenite::tungstenite::Message>),
+    ChannelSendError(#[from] kanal::SendError),
 
     #[error("Channel receive error: {0}")]
-    ChannelReceiveError(#[from] flume::RecvError),
+    ChannelReceiveError(#[from] kanal::ReceiveError),
 
     #[error("Websocket error: {0}")]
     WebSocketError(#[from] async_tungstenite::tungstenite::Error),

@@ -9,7 +9,7 @@ use crate::config::ExecutorConfig;
 pub struct ExecutorFactory {}
 
 impl ExecutorFactory {
-    pub fn init(_pubsub: Arc<PubSub>, _persistence: Arc<PersistenceService>) -> Arc<dyn ExecutorService> {
+    pub async fn init(_pubsub: Arc<PubSub>, _persistence: Arc<PersistenceService>) -> Arc<dyn ExecutorService> {
         let config = load::<ExecutorConfig>();
         let _executor: Arc<dyn ExecutorService> = match &config.executors {
             // ExecutorTypeConfig::Simulation(_c) => Arc::new(SimulationExecutor::builder().pubsub(pubsub).build()),
@@ -31,7 +31,7 @@ impl ExecutorFactory {
         };
     }
 
-    pub fn init_simulation(pubsub: Arc<PubSub>) -> Arc<dyn ExecutorService> {
-        Arc::new(SimulationExecutor::builder().pubsub(pubsub).build())
+    pub async fn init_simulation(pubsub: Arc<PubSub>) -> Arc<dyn ExecutorService> {
+        Arc::new(SimulationExecutor::builder().pubsub(pubsub.handle().await).build())
     }
 }

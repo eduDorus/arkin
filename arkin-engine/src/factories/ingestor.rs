@@ -19,7 +19,7 @@ pub enum IngestorTypes {
 pub struct IngestorFactory {}
 
 impl IngestorFactory {
-    pub fn init(
+    pub async fn init(
         pubsub: Arc<PubSub>,
         persistence: Arc<PersistenceService>,
         args: &IngestorsArgs,
@@ -38,7 +38,7 @@ impl IngestorFactory {
                 }
                 Arc::new(
                     BinanceIngestor::builder()
-                        .pubsub(pubsub)
+                        .pubsub(pubsub.publisher().await)
                         .persistence(persistence)
                         .url(c.ws_url.parse().expect("Failed to parse ws binance URL"))
                         .channels(channels)
@@ -52,7 +52,7 @@ impl IngestorFactory {
         }
     }
 
-    pub fn init_download(
+    pub async fn init_download(
         pubsub: Arc<PubSub>,
         persistence: Arc<PersistenceService>,
         args: &DownloadArgs,
@@ -65,7 +65,7 @@ impl IngestorFactory {
             .build();
 
         let ingestor = TardisIngestor::builder()
-            .pubsub(pubsub)
+            .pubsub(pubsub.handle().await)
             .persistence(persistence)
             .client(client)
             .venue(args.venue.clone())
@@ -93,7 +93,7 @@ impl IngestorFactory {
         }
         Arc::new(
             SimIngestor::builder()
-                .pubsub(pubsub)
+                .pubsub(pubsub.publisher().await)
                 .persistence(persistence)
                 .instruments(instruments)
                 .tick_frequency(Duration::from_secs(args.tick_frequency))
@@ -118,7 +118,7 @@ impl IngestorFactory {
         }
         Arc::new(
             SimIngestor::builder()
-                .pubsub(pubsub)
+                .pubsub(pubsub.publisher().await)
                 .persistence(persistence)
                 .instruments(instruments)
                 .tick_frequency(Duration::from_secs(args.tick_frequency))

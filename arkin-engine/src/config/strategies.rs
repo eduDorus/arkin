@@ -47,6 +47,7 @@ pub struct AgentConfig {
     pub model_location: String,
     pub model_name: String,
     pub model_version: String,
+    pub action_space: Vec<Decimal>,
     pub n_layers: usize,
     pub hidden_size: usize,
     pub inputs: Vec<FeatureId>,

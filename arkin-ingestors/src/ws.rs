@@ -7,8 +7,8 @@ use async_tungstenite::{
     tungstenite::Message,
     WebSocketStream,
 };
-use flume::Sender;
 use futures_util::StreamExt;
+use kanal::AsyncSender;
 use tokio::{net::TcpStream, select, sync::Semaphore};
 use tokio_rustls::client::TlsStream;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -48,17 +48,17 @@ impl WebSocketManager {
 
     pub async fn run(
         &mut self,
-        manager_tx: Sender<String>,
+        manager_tx: AsyncSender<String>,
         subscription: Subscription,
         shutdown: CancellationToken,
     ) -> Result<(), IngestorError> {
         // Use select for new data in receiver or spawn new connection on permit
         info!("Starting WebSocket manager...");
-        let (sender, receiver) = flume::unbounded::<Message>();
+        let (sender, receiver) = kanal::unbounded_async::<Message>();
         let websocket_tracker = TaskTracker::new();
         loop {
             select! {
-                msg = receiver.recv_async() => {
+                msg = receiver.recv() => {
                     let msg = match msg {
                         Ok(msg) => msg,
                         Err(e) => {
@@ -69,7 +69,7 @@ impl WebSocketManager {
                     // let bin_data = msg.into_data();
                     let data = msg.to_string();
                     if self.deduplicator.check(&data) {
-                        manager_tx.send_async(data).await.unwrap();
+                        manager_tx.send(data).await.unwrap();
                     }
                 }
                 permit = self.limit_connections.clone().acquire_owned() => {
@@ -114,7 +114,7 @@ pub struct Handler {
     stream: WebSocketStream<Stream<TokioAdapter<TcpStream>, TokioAdapter<TlsStream<TcpStream>>>>,
 
     /// Send messages to the WebSocket Manager
-    sender: Sender<Message>,
+    sender: AsyncSender<Message>,
 
     /// Shutdown signal
     shutdown: CancellationToken,
@@ -123,7 +123,7 @@ pub struct Handler {
 impl Handler {
     pub async fn new(
         url: &Url,
-        sender: Sender<Message>,
+        sender: AsyncSender<Message>,
         subscription: Subscription,
         shutdown: CancellationToken,
     ) -> Result<Self, IngestorError> {
@@ -178,7 +178,7 @@ impl Handler {
         match msg {
             Message::Text(text) => {
                 debug!("Hanlder received text: {:?}", text);
-                self.sender.send_async(Message::Text(text)).await?;
+                self.sender.send(Message::Text(text)).await?;
             }
             Message::Ping(ping) => {
                 debug!("Handler received ping: {:?}", ping);

@@ -16,7 +16,8 @@ impl TransferStore {
         self.transfer_repo.insert(transfer.into()).await
     }
 
-    pub async fn insert_batch(&self, transfers: Vec<Arc<Transfer>>) -> Result<(), PersistenceError> {
+    pub async fn insert_batch(&self, transfer_group: Arc<TransferGroup>) -> Result<(), PersistenceError> {
+        let transfers = transfer_group.transfers.clone();
         let transfers_dto = transfers.into_iter().map(|t| t.into()).collect();
         self.transfer_repo.insert_batch(transfers_dto).await
     }

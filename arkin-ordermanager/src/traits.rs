@@ -10,7 +10,7 @@ use crate::OrderManagerError;
 pub trait OrderManagerService: RunnableService + OrderManager {}
 
 #[async_trait]
-pub trait OrderManager: std::fmt::Debug + Send + Sync {
+pub trait OrderManager: Send + Sync {
     // async fn order_by_id(&self, id: ExecutionOrderId) -> Option<Arc<ExecutionOrder>>;
 
     // async fn list_new_orders(&self) -> Vec<Arc<ExecutionOrder>>;

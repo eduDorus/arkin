@@ -8,7 +8,7 @@ use crate::{
     constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
     models::Insight,
     prelude::TIMESTAMP_FORMAT,
-    Event, EventType, EventTypeOf, Price, Quantity,
+    Event, Price, Quantity,
 };
 
 use super::{InsightType, Instrument, MarketSide};
@@ -63,15 +63,15 @@ impl Trade {
     }
 }
 
-impl EventTypeOf for Trade {
-    fn event_type() -> EventType {
-        EventType::Trade
+impl From<Trade> for Event {
+    fn from(trade: Trade) -> Self {
+        Event::TradeUpdate(Arc::new(trade))
     }
 }
 
 impl From<Arc<Trade>> for Event {
     fn from(trade: Arc<Trade>) -> Self {
-        Event::Trade(trade)
+        Event::TradeUpdate(trade)
     }
 }
 

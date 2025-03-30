@@ -1,12 +1,31 @@
-use std::{fmt, sync::Arc};
+use std::{fmt, sync::Arc, time::Duration};
 
 use strum::Display;
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 
-use crate::{Event, EventType, EventTypeOf, FeatureId};
+use crate::{Event, FeatureId};
 
 use super::{Instrument, Pipeline};
+
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct InsightsTick {
+    pub event_time: OffsetDateTime,
+    pub instruments: Vec<Arc<Instrument>>,
+    pub frequency: Duration,
+}
+
+impl From<InsightsTick> for Event {
+    fn from(tick: InsightsTick) -> Self {
+        Event::InsightsTick(Arc::new(tick))
+    }
+}
+
+impl From<Arc<InsightsTick>> for Event {
+    fn from(tick: Arc<InsightsTick>) -> Self {
+        Event::InsightsTick(tick)
+    }
+}
 
 #[derive(Debug, Display, Clone, PartialEq, Eq, Hash)]
 #[strum(serialize_all = "snake_case")]
@@ -35,18 +54,6 @@ pub struct Insight {
     pub persist: bool,
 }
 
-impl EventTypeOf for Insight {
-    fn event_type() -> EventType {
-        EventType::Insight
-    }
-}
-
-impl From<Arc<Insight>> for Event {
-    fn from(insight: Arc<Insight>) -> Self {
-        Event::Insight(insight)
-    }
-}
-
 impl fmt::Display for Insight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -59,5 +66,18 @@ impl fmt::Display for Insight {
             self.feature_id,
             self.value
         )
+    }
+}
+
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct InsightsUpdate {
+    pub event_time: OffsetDateTime,
+    pub instruments: Vec<Arc<Instrument>>,
+    pub insights: Vec<Arc<Insight>>,
+}
+
+impl From<Arc<InsightsUpdate>> for Event {
+    fn from(tick: Arc<InsightsUpdate>) -> Self {
+        Event::InsightsUpdate(tick)
     }
 }

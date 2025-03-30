@@ -43,9 +43,9 @@ impl From<Subscription> for Message {
     }
 }
 
-#[derive(Debug, TypedBuilder, Clone)]
+#[derive(TypedBuilder, Clone)]
 pub struct BinanceIngestor {
-    pubsub: Arc<PubSub>,
+    pubsub: PubSubPublisher,
     persistence: Arc<PersistenceService>,
     url: Url,
     channels: Vec<String>,
@@ -60,11 +60,12 @@ pub struct BinanceIngestor {
 }
 
 impl BinanceIngestor {
-    async fn process_event(pubsub: Arc<PubSub>, persistence: Arc<PersistenceService>, data: String) {
+    async fn process_event(&self, data: String) {
         match serde_json::from_str::<BinanceSwapEvent>(&data) {
             Ok(e) => {
                 debug!("BinanceSwapEvent: {}", e);
-                if let Ok(instrument) = persistence.instrument_store.read_by_venue_symbol(&e.venue_symbol()).await {
+                if let Ok(instrument) = self.persistence.instrument_store.read_by_venue_symbol(&e.venue_symbol()).await
+                {
                     debug!("Instrument found: {}", instrument.symbol);
                     match e {
                         BinanceSwapEvent::AggTrade(trade) => {
@@ -88,7 +89,7 @@ impl BinanceIngestor {
                                 trade.quantity,
                             );
                             let trade = Arc::new(trade);
-                            pubsub.publish(trade).await;
+                            self.pubsub.publish(trade).await;
                         }
                         BinanceSwapEvent::Tick(tick) => {
                             let tick = Tick::new(
@@ -101,7 +102,7 @@ impl BinanceIngestor {
                                 tick.ask_quantity,
                             );
                             let tick = Arc::new(tick);
-                            pubsub.publish(tick).await;
+                            self.pubsub.publish(tick).await;
                         }
                     }
                 } else {
@@ -129,7 +130,7 @@ impl RunnableService for BinanceIngestor {
         let mut ws_manager =
             WebSocketManager::new(self.url.clone(), self.connections_per_manager, self.duplicate_lookback);
 
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = kanal::unbounded_async();
         let subscription = Subscription::new(self.channels.iter().map(|c| c.as_str()).collect());
 
         let ws_manager_tracker = TaskTracker::new();
@@ -140,10 +141,10 @@ impl RunnableService for BinanceIngestor {
 
         loop {
             tokio::select! {
-                res = rx.recv_async() => {
+                res = rx.recv() => {
                     match res {
                         Ok(data) => {
-                            Self::process_event(self.pubsub.clone(), self.persistence.clone(), data).await;
+                            self.process_event(data).await;
                         }
                         Err(e) => {
                             error!("{}", e);
@@ -159,7 +160,7 @@ impl RunnableService for BinanceIngestor {
                 }
             }
         }
-
+        info!("Binance ingestor shutdown complete.");
         Ok(())
     }
 }

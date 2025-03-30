@@ -10,7 +10,7 @@ use crate::{AllocationOptimConfig, AllocationTypeConfig};
 pub struct AllocationFactory {}
 
 impl AllocationFactory {
-    pub fn init(
+    pub async fn init(
         pubsub: Arc<PubSub>,
         persistance: Arc<PersistenceService>,
         accounting: Arc<dyn Accounting>,
@@ -19,7 +19,7 @@ impl AllocationFactory {
         let allocation: Arc<dyn AllocationService> = match &config.allocation_optim {
             AllocationTypeConfig::Limited(c) => Arc::new(
                 SignalAllocationOptim::builder()
-                    .pubsub(pubsub.clone())
+                    .pubsub(pubsub.handle().await)
                     .persistence(persistance)
                     .accounting(accounting)
                     .leverage(c.leverage)

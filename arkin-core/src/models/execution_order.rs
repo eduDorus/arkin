@@ -8,7 +8,7 @@ use tracing::warn;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, EventType, EventTypeOf, Notional, Price, Quantity};
+use crate::{types::Commission, Notional, Price, Quantity};
 
 use super::{Instrument, MarketSide, Strategy};
 
@@ -160,18 +160,6 @@ impl ExecutionOrder {
 
     pub fn total_value(&self) -> Decimal {
         self.price * self.quantity * self.instrument.contract_size
-    }
-}
-
-impl EventTypeOf for ExecutionOrder {
-    fn event_type() -> EventType {
-        EventType::ExecutionOrder
-    }
-}
-
-impl From<Arc<ExecutionOrder>> for Event {
-    fn from(order: Arc<ExecutionOrder>) -> Self {
-        Event::ExecutionOrder(order)
     }
 }
 

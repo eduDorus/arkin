@@ -12,7 +12,7 @@ use crate::AccountingError;
 pub trait AccountingService: RunnableService + Accounting {}
 
 #[async_trait]
-pub trait Accounting: std::fmt::Debug + Send + Sync {
+pub trait Accounting: Send + Sync {
     // --- Update Methods ---
     /// Reconciles an external balance update from a venue.
     async fn balance_update(&self, update: Arc<BalanceUpdate>) -> Result<(), AccountingError>;

@@ -19,7 +19,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 parking_lot = { workspace = true }
 rayon = { workspace = true }
-flume = { workspace = true }
+kanal = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 uuid = { workspace = true }

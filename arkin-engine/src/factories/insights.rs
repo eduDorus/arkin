@@ -17,12 +17,12 @@ impl InsightsFactory {
         // Load pipeline
         let pipeline = persistence
             .pipeline_store
-            .read_by_name(&pipeline)
+            .read_by_name_or_create(&pipeline)
             .await
-            .expect("Pipeline not found");
+            .expect("Pipeline not found and could not be created");
 
         let insights: Arc<dyn RunnableService> =
-            InsightsService::init(pubsub.clone(), pipeline, &config.insights_service.pipeline).await;
+            InsightsService::init(pubsub.handle().await, pipeline, &config.insights_service.pipeline).await;
         insights
     }
 }

@@ -291,7 +291,7 @@ impl Ledger {
         debit_account: &Arc<Account>,
         credit_account: &Arc<Account>,
         amount: Decimal,
-    ) -> Result<Vec<Arc<Transfer>>, AccountingError> {
+    ) -> Result<Arc<TransferGroup>, AccountingError> {
         let transfer = Arc::new(
             Transfer::builder()
                 .event_time(event_time)
@@ -312,7 +312,7 @@ impl Ledger {
     /// - For double-entry: each Transfer has a `debit_account_id` and `credit_account_id`.
     ///
     /// Returns an error if any of the transfers are invalid.
-    pub fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<Vec<Arc<Transfer>>, AccountingError> {
+    pub fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<Arc<TransferGroup>, AccountingError> {
         for t in transfers {
             // Check if it is not the same account
             if t.debit_account.id == t.credit_account.id {
@@ -348,7 +348,14 @@ impl Ledger {
             tx_log_lock.push(t.clone());
         }
 
-        Ok(transfers.to_vec())
+        // Generate a transfer group
+        let transfer_group = TransferGroup::builder()
+            .event_time(transfers[0].event_time)
+            .transfers(transfers.to_vec())
+            .build()
+            .into();
+
+        Ok(transfer_group)
     }
 }
 

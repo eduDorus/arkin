@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -16,15 +15,14 @@ use crate::errors::InsightsError;
 use crate::pipeline::PipelineGraph;
 use crate::state::InsightsState;
 
-#[derive(Debug)]
 pub struct InsightsService {
-    pubsub: Arc<PubSub>,
+    pubsub: PubSubHandle,
     state: Arc<InsightsState>,
     graph: PipelineGraph,
 }
 
 impl InsightsService {
-    pub async fn init(pubsub: Arc<PubSub>, pipeline: Arc<Pipeline>, pipeline_config: &PipelineConfig) -> Arc<Self> {
+    pub async fn init(pubsub: PubSubHandle, pipeline: Arc<Pipeline>, pipeline_config: &PipelineConfig) -> Arc<Self> {
         let state = Arc::new(InsightsState::builder().build());
         let graph = PipelineGraph::from_config(pipeline, state.clone(), pipeline_config);
         let service = Self {
@@ -53,7 +51,7 @@ impl InsightsService {
     ) -> Result<Vec<Arc<Insight>>, InsightsError> {
         debug!("Running insights pipeline at event time: {}", event_time);
         let insights = self.graph.calculate(instruments, event_time);
-        let insights_tick = InsightTick::builder()
+        let insights_tick = InsightsUpdate::builder()
             .event_time(event_time)
             .instruments(instruments.to_vec())
             .insights(insights.clone())
@@ -78,34 +76,39 @@ impl RunnableService for InsightsService {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting insights service...");
 
-        let mut rx = self.pubsub.subscribe();
-
         loop {
             select! {
-                Ok(event) = rx.recv() => {
+                Ok((event, barrier)) = self.pubsub.rx.recv() => {
+                    info!("InsightsService received event");
                     match event {
-                        Event::IntervalTick(tick) => {
+                        Event::InsightsTick(tick) => {
                             debug!("InsightsService received interval tick: {}", tick.event_time);
                             if let Err(e) = self.process(tick.event_time, &tick.instruments, true).await {
                                 error!("Error processing interval tick: {}", e);
                             }
                         }
-                        Event::Trade(trade) => {
+                        Event::TradeUpdate(trade) => {
                             debug!("InsightsService received trade: {}", trade.event_time);
                             let insights = trade.as_ref().clone().to_insights();
                             if let Err(e) = self.insert_batch(&insights).await {
                                 error!("Error inserting trade: {}", e);
                             }
                         }
-                        Event::Tick(tick) => {
-                            debug!("InsightsService received tick: {}", tick.event_time);
-                            let insights = tick.as_ref().clone().to_insights();
-                            if let Err(e) = self.insert_batch(&insights).await {
-                                error!("Error inserting tick: {}", e);
-                            }
-                        }
+                        // Event::TickUpdate(tick) => {
+                        //     debug!("InsightsService received tick: {}", tick.event_time);
+                        //     let insights = tick.as_ref().clone().to_insights();
+                        //     if let Err(e) = self.insert_batch(&insights).await {
+                        //         error!("Error inserting tick: {}", e);
+                        //     }
+                        // }
+                        Event::Finished => {
+                          barrier.wait().await;
+                          break;
+                      }
                         _ => {}
                     }
+                    info!("InsightsService event processed");
+                    barrier.wait().await;
                 }
                 _ = shutdown.cancelled() => {
                     info!("Insights service shutdown...");
@@ -113,6 +116,7 @@ impl RunnableService for InsightsService {
                 }
             }
         }
+        info!("Insights service stopped.");
         Ok(())
     }
 }

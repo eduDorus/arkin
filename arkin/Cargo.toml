@@ -17,6 +17,8 @@ arkin-engine = { path = "../arkin-engine" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
+tokio-util = { workspace = true }
+futures-util = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 clickhouse = { workspace = true }
@@ -26,3 +28,5 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 statrs = { workspace = true }
+time = { workspace = true }
+kanal = { workspace = true }

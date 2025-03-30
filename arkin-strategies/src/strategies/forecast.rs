@@ -11,10 +11,10 @@ use arkin_core::prelude::*;
 
 use crate::{Algorithm, StrategyError, StrategyService};
 
-#[derive(Debug, TypedBuilder)]
+#[derive(TypedBuilder)]
 #[allow(unused)]
 pub struct ForecastStrategy {
-    pubsub: Arc<PubSub>,
+    pubsub: PubSubHandle,
     strategy: Arc<Strategy>,
     inputs: Vec<FeatureId>,
     threshold: f64,
@@ -24,7 +24,7 @@ pub struct ForecastStrategy {
 
 #[async_trait]
 impl Algorithm for ForecastStrategy {
-    async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError> {
+    async fn insight_tick(&self, tick: Arc<InsightsUpdate>) -> Result<(), StrategyError> {
         info!("Processing insight tick for Forecast Strategy...");
 
         // Extract inputs from the tick
@@ -104,7 +104,7 @@ impl Algorithm for ForecastStrategy {
                     .weight(new_weight)
                     .build();
                 info!("Forecast sending signal: {}", signal);
-                self.pubsub.publish(Event::Signal(signal.into())).await;
+                self.pubsub.publish(signal).await;
             }
         }
         Ok(())
@@ -119,24 +119,30 @@ impl RunnableService for ForecastStrategy {
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting Forecast Strategy...");
 
-        let mut rx = self.pubsub.subscribe();
-
         loop {
             select! {
-                Ok(event) = rx.recv() => {
+                Ok((event, barrier)) = self.pubsub.rx.recv() => {
+                  info!("ForecastStrategy received event");
                     match event {
-                        Event::InsightTick(tick) => {
+                        Event::InsightsUpdate(tick) => {
                             debug!("ForecastStrategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
+                        Event::Finished => {
+                          barrier.wait().await;
+                          break;
+                      }
                         _ => {}
                     }
+                    info!("ForecastStrategy event processed");
+                    barrier.wait().await;
                 }
                 _ = _shutdown.cancelled() => {
                     break;
                 }
             }
         }
+        info!("Forecast Strategy stopped.");
         Ok(())
     }
 }

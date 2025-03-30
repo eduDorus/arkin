@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use futures_util::StreamExt;
@@ -14,9 +11,9 @@ use typed_builder::TypedBuilder;
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
-#[derive(Debug, TypedBuilder)]
+#[derive(TypedBuilder)]
 pub struct SimIngestor {
-    pubsub: Arc<PubSub>,
+    pubsub: PubSubPublisher,
     persistence: Arc<PersistenceService>,
     instruments: Vec<Arc<Instrument>>,
     tick_frequency: Duration,
@@ -33,7 +30,6 @@ impl RunnableService for SimIngestor {
 
         let mut current_time;
         let mut next_tick_time = self.start + self.tick_frequency;
-        let mut rx = self.pubsub.subscribe();
 
         let tick_stream = self
             .persistence
@@ -101,31 +97,18 @@ impl RunnableService for SimIngestor {
 
             if current_time >= next_tick_time {
                 info!("SimIngestor: Publishing IntervalTick at {}", next_tick_time);
-                let interval_tick = IntervalTick::builder()
+                let interval_tick = InsightsTick::builder()
                     .event_time(next_tick_time)
                     .instruments(self.instruments.clone())
                     .frequency(self.tick_frequency)
                     .build();
                 self.pubsub.publish(interval_tick).await;
                 next_tick_time += self.tick_frequency;
-
-                // Wait for insight tick to be processed
-                let timer = Instant::now();
-                while let Ok(event) = rx.recv().await {
-                    match event {
-                        Event::InsightTick(_) => break,
-                        _ => {}
-                    }
-                }
-                tokio::time::sleep(Duration::from_millis(10)).await;
-                info!("SimIngestor: InsightTick processed in {:?}", timer.elapsed());
             }
         }
 
-        self.pubsub.publish(Event::Finished).await;
-
-        info!("Simulation ingestor service shutdown...");
-
+        // self.pubsub.publish(Event::Finished).await;
+        info!("Simulation ingestor service stopped.");
         Ok(())
     }
 }

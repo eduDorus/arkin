@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use typed_builder::TypedBuilder;
 
-use arkin_core::Account;
+use arkin_core::AccountUpdate;
 
 use crate::{errors::PersistenceError, repos::AccountRepo};
 
@@ -12,7 +12,8 @@ pub struct AccountStore {
 }
 
 impl AccountStore {
-    pub async fn insert(&self, account: Arc<Account>) -> Result<(), PersistenceError> {
+    pub async fn insert(&self, account: Arc<AccountUpdate>) -> Result<(), PersistenceError> {
+        let account = account.account.clone();
         self.account_repo.insert(account.into()).await?;
         Ok(())
     }

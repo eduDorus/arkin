@@ -93,14 +93,14 @@ impl fmt::Display for Transfer {
     }
 }
 
-impl From<Arc<Transfer>> for Event {
-    fn from(transfer: Arc<Transfer>) -> Self {
-        Event::Transfer(transfer)
-    }
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct TransferGroup {
+    pub event_time: OffsetDateTime,
+    pub transfers: Vec<Arc<Transfer>>,
 }
 
-impl From<Vec<Arc<Transfer>>> for Event {
-    fn from(transfers: Vec<Arc<Transfer>>) -> Self {
-        Event::TransferBatch(transfers)
+impl From<Arc<TransferGroup>> for Event {
+    fn from(transfer_group: Arc<TransferGroup>) -> Self {
+        Event::TransferNew(transfer_group)
     }
 }

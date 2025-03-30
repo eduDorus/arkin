@@ -10,7 +10,6 @@ use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
 use crate::cli::{Cli, Commands, DownloadArgs, IngestorsArgs, InsightsArgs, SimulationArgs};
-use crate::config::EngineConfig;
 use crate::factories::{
     AccountingFactory, AllocationFactory, ExecutorFactory, IngestorFactory, InsightsFactory, OrderManagerFactory,
     StrategyFactory,
@@ -30,29 +29,43 @@ pub struct DefaultEngine {
 
 impl DefaultEngine {
     pub async fn new() -> Self {
-        let config = load::<EngineConfig>();
         let args = Cli::parse();
 
-        // Check if default engine is configured
-        let config = config.engine.default.expect("Default engine not configured");
-        let pubsub = PubSub::new(config.pubsub_capacity);
-
-        // Init persistence
-        let config = load::<PersistenceConfig>();
-        let instance = match &args.command {
-            Commands::Simulation(args) => Instance::builder()
-                .name(args.instance_name.clone())
-                .instance_type(InstanceType::Simulation)
-                .build(),
-            Commands::Live(args) => Instance::builder()
-                .name(args.instance_name.clone())
-                .instance_type(InstanceType::Live)
-                .build(),
-            _ => Instance::builder()
-                .name("other".to_string())
-                .instance_type(InstanceType::Utility)
-                .build(),
+        let (instance, clock): (Instance, Arc<dyn SimulationClock>) = match &args.command {
+            Commands::Insights(args) => {
+                let instance = Instance::builder()
+                    .name(args.pipeline.clone())
+                    .instance_type(InstanceType::Simulation)
+                    .build();
+                let clock = Arc::new(SimulationModeClock::new(args.start, args.end));
+                (instance, clock)
+            }
+            Commands::Simulation(args) => {
+                let instance = Instance::builder()
+                    .name(args.instance_name.clone())
+                    .instance_type(InstanceType::Simulation)
+                    .build();
+                let clock = Arc::new(SimulationModeClock::new(args.start, args.end));
+                (instance, clock)
+            }
+            Commands::Live(args) => {
+                let instance = Instance::builder()
+                    .name(args.instance_name.clone())
+                    .instance_type(InstanceType::Live)
+                    .build();
+                let clock = Arc::new(LiveModeClock);
+                (instance, clock)
+            }
+            _ => {
+                let instance = Instance::builder()
+                    .name("other".to_string())
+                    .instance_type(InstanceType::Utility)
+                    .build();
+                let clock = Arc::new(LiveModeClock);
+                (instance, clock)
+            }
         };
+        let pubsub = Arc::new(PubSub::builder().clock(clock).build());
 
         let only_predictions = match &args.command {
             Commands::Download(_args) => false,
@@ -77,13 +90,21 @@ impl DefaultEngine {
             Commands::Simulation(args) => args.dry_run,
             Commands::Live(_args) => false,
         };
-        let persistence =
-            PersistenceService::new(pubsub.clone(), &config, instance, only_normalized, only_predictions, dry_run)
-                .await;
+
+        let config = load::<PersistenceConfig>();
+        let persistence = PersistenceService::new(
+            pubsub.subscriber().await,
+            &config,
+            instance,
+            only_normalized,
+            only_predictions,
+            dry_run,
+        )
+        .await;
 
         let engine = Self {
             timer: Instant::now(),
-            pubsub,
+            pubsub: pubsub.clone(),
             persistence: persistence.clone(),
             service_tracker: TaskTracker::new(),
             service_shutdown: CancellationToken::new(),
@@ -91,6 +112,7 @@ impl DefaultEngine {
             core_service_tracker: TaskTracker::new(),
         };
 
+        engine.start_service(pubsub, true).await;
         engine.start_service(persistence, true).await;
 
         let res = match &args.command {
@@ -111,13 +133,13 @@ impl DefaultEngine {
     }
 
     pub async fn run_download(&self, args: &DownloadArgs) -> Result<(), TradingEngineError> {
-        let ingestor = IngestorFactory::init_download(self.pubsub.clone(), self.persistence.clone(), &args);
+        let ingestor = IngestorFactory::init_download(self.pubsub.clone(), self.persistence.clone(), &args).await;
         self.start_service(ingestor, false).await;
         Ok(())
     }
 
     pub async fn run_ingestor(&self, args: &IngestorsArgs) -> Result<(), TradingEngineError> {
-        let ingestor = IngestorFactory::init(self.pubsub.clone(), self.persistence.clone(), args);
+        let ingestor = IngestorFactory::init(self.pubsub.clone(), self.persistence.clone(), args).await;
         self.start_service(ingestor, false).await;
         Ok(())
     }
@@ -143,13 +165,13 @@ impl DefaultEngine {
         info!("Accounting initialized");
         let strategies = StrategyFactory::init(self.pubsub.clone(), self.persistence.clone()).await;
         info!("Strategies initialized");
-        let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), accounting.clone());
+        let allocation =
+            AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), accounting.clone()).await;
         info!("Allocation initialized");
-        let order_manager = OrderManagerFactory::init(self.pubsub.clone());
+        let order_manager = OrderManagerFactory::init(self.pubsub.clone()).await;
         info!("Order Manager initialized");
-        let execution = ExecutorFactory::init_simulation(self.pubsub.clone());
+        let execution = ExecutorFactory::init_simulation(self.pubsub.clone()).await;
         info!("Execution initialized");
-        info!("strategy count: {}", strategies.len());
 
         let mut services: Vec<Arc<dyn RunnableService>> =
             vec![insights, ingestor, accounting, allocation, order_manager, execution];
@@ -194,7 +216,9 @@ impl DefaultEngine {
     pub async fn wait_for_shutdown(&self) {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
         let mut sigint = signal(SignalKind::interrupt()).unwrap();
-        let mut rx = self.pubsub.subscribe();
+
+        // let subscriber = self.pubsub.subscriber().await;
+
         loop {
             tokio::select! {
                 _ = sigterm.recv() => {
@@ -207,13 +231,17 @@ impl DefaultEngine {
                   self.shutdown().await;
                   break;
                 },
-                event = rx.recv() => {
-                    if let Ok(Event::Finished) = event {
-                      info!("Received finished event, shutting down...");
-                        self.shutdown().await;
-                        break;
-                    }
-                }
+                // Ok((event, barrier)) = subscriber.rx.recv() => {
+                //       match event {
+                //         Event::Finished => {
+                //             info!("Received finished event, shutting down...");
+                //             self.shutdown().await;
+                //             break;
+                //         }
+                //         _ => {}
+                //       }
+                //     barrier.wait().await;
+                // }
             }
         }
         info!("Successfully shutdown!");

@@ -11,10 +11,10 @@ use arkin_core::prelude::*;
 
 use crate::{Algorithm, StrategyError, StrategyService};
 
-#[derive(Debug, TypedBuilder)]
+#[derive(TypedBuilder)]
 #[allow(unused)]
 pub struct CrossoverStrategy {
-    pubsub: Arc<PubSub>,
+    pubsub: PubSubHandle,
     strategy: Arc<Strategy>,
     fast_ma: FeatureId,
     slow_ma: FeatureId,
@@ -30,31 +30,37 @@ impl RunnableService for CrossoverStrategy {
     async fn start(&self, _shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting Crossover Strategy...");
 
-        let mut rx = self.pubsub.subscribe();
-
         loop {
             select! {
-                Ok(event) = rx.recv() => {
+                Ok((event, barrier)) = self.pubsub.rx.recv() => {
+                  info!("CrossoverStrategy received event");
                     match event {
-                        Event::InsightTick(tick) => {
+                        Event::InsightsUpdate(tick) => {
                             debug!("CrossoverStrategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
+                        Event::Finished => {
+                          barrier.wait().await;
+                          break;
+                      }
                         _ => {}
                     }
+                    info!("CrossoverStrategy event processed");
+                    barrier.wait().await;
                 }
                 _ = _shutdown.cancelled() => {
                     break;
                 }
             }
         }
+        info!("Crossover Strategy stopped.");
         Ok(())
     }
 }
 
 #[async_trait]
 impl Algorithm for CrossoverStrategy {
-    async fn insight_tick(&self, tick: Arc<InsightTick>) -> Result<(), StrategyError> {
+    async fn insight_tick(&self, tick: Arc<InsightsUpdate>) -> Result<(), StrategyError> {
         debug!("Processing insight tick for Crossover Strategy...");
 
         // Lock the current weight map
@@ -106,7 +112,7 @@ impl Algorithm for CrossoverStrategy {
         debug!("Crossover sending {} signals", signals.len());
         for signal in signals {
             info!("Crossover sending signal: {}", signal);
-            self.pubsub.publish(Event::Signal(signal.clone())).await;
+            self.pubsub.publish(signal).await;
         }
         Ok(())
     }

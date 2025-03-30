@@ -96,7 +96,7 @@ impl PipelineGraph {
         debug!("In-Degree count: {}", in_degrees.lock().iter().fold(0, |acc, x| acc + x));
 
         // Step 2: Enqueue nodes with zero in-degree
-        let (queue_tx, queue_rx) = flume::unbounded();
+        let (queue_tx, queue_rx) = kanal::unbounded();
         for node in &self.order {
             if in_degrees.lock()[node.index()] == 0 {
                 debug!("Ready node: {}", node.index());

@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use std::{collections::HashMap, sync::Arc};
-use time::OffsetDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
@@ -10,14 +9,12 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
-use arkin_persistence::prelude::*;
 
 use crate::{ledger::Ledger, Accounting, AccountingError, AccountingService};
 
-#[derive(Debug, TypedBuilder)]
+#[derive(TypedBuilder)]
 pub struct LedgerAccounting {
-    pubsub: Arc<PubSub>,
-    _persistence: Arc<PersistenceService>,
+    pubsub: PubSubHandle,
     #[builder(default = Ledger::builder().build())]
     ledger: Ledger,
 }
@@ -25,7 +22,6 @@ pub struct LedgerAccounting {
 impl LedgerAccounting {
     pub async fn deposit(
         &self,
-        event_time: OffsetDateTime,
         debit_venue: &Arc<Venue>,
         credit_venue: &Arc<Venue>,
         asset: &Tradable,
@@ -39,6 +35,7 @@ impl LedgerAccounting {
             .find_or_create_account(credit_venue, &asset, &AccountOwner::User, account_type)
             .await;
 
+        let event_time = self.pubsub.current_time().await;
         let transfers = self.ledger.transfer(event_time, &debit_account, &credit_account, amount)?;
         self.pubsub.publish(transfers).await;
         Ok(())
@@ -46,7 +43,6 @@ impl LedgerAccounting {
 
     pub async fn withdraw(
         &self,
-        event_time: OffsetDateTime,
         debit_venue: &Arc<Venue>,
         credit_venue: &Arc<Venue>,
         asset: &Tradable,
@@ -60,6 +56,7 @@ impl LedgerAccounting {
             .find_or_create_account(credit_venue, asset, &AccountOwner::Venue, &AccountType::Spot)
             .await;
 
+        let event_time = self.pubsub.current_time().await;
         let transfers = self.ledger.transfer(event_time, &debit_account, &credit_account, amount)?;
         self.pubsub.publish(transfers).await;
         Ok(())
@@ -67,7 +64,6 @@ impl LedgerAccounting {
 
     pub async fn exchange(
         &self,
-        event_time: OffsetDateTime,
         venue: Arc<Venue>,
         debit_asset: Tradable,
         credit_asset: Tradable,
@@ -75,6 +71,7 @@ impl LedgerAccounting {
         credit_amount: Decimal,
     ) -> Result<(), AccountingError> {
         let transfer_group_id = Uuid::new_v4();
+        let event_time = self.pubsub.current_time().await;
 
         let debit_account = self
             .find_or_create_account(&venue, &debit_asset, &AccountOwner::User, &AccountType::Spot)
@@ -121,7 +118,6 @@ impl LedgerAccounting {
 
     pub async fn margin_trade(
         &self,
-        event_time: OffsetDateTime,
         side: MarketSide,
         strategy: Arc<Strategy>,
         instrument: Arc<Instrument>,
@@ -137,6 +133,7 @@ impl LedgerAccounting {
         info!("Amount: {}", amount);
         info!("Margin Rate: {}", margin_rate);
         info!("Commission Rate: {}", commission_rate);
+        let event_time = self.pubsub.current_time().await;
         let venue = instrument.venue.clone();
         let inst_asset = Tradable::Instrument(instrument.clone());
         let margin_asset = Tradable::Asset(instrument.margin_asset.clone());
@@ -355,7 +352,14 @@ impl LedgerAccounting {
             let account = self
                 .ledger
                 .add_account(venue.clone(), asset.clone(), owner.clone(), account_type.clone());
-            self.pubsub.publish(account.clone()).await;
+
+            let event_time = self.pubsub.current_time().await;
+            let account_update: Arc<AccountUpdate> = AccountUpdate::builder()
+                .event_time(event_time)
+                .account(account.clone())
+                .build()
+                .into();
+            self.pubsub.publish(account_update).await;
             account
         }
     }
@@ -386,7 +390,6 @@ impl Accounting for LedgerAccounting {
             InstrumentType::Perpetual => {
                 debug!("Portfolio processing perpetual order: {}", order);
                 self.margin_trade(
-                    order.updated_at,
                     order.side,
                     order.strategy.clone(),
                     order.instrument.clone(),
@@ -608,18 +611,24 @@ impl AccountingService for LedgerAccounting {}
 #[async_trait]
 impl RunnableService for LedgerAccounting {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
-        let mut rx = self.pubsub.subscribe();
-        while !shutdown.is_cancelled() {
+        loop {
             select! {
-                Ok(event) = rx.recv() => {
+                Ok((event, barrier)) = self.pubsub.rx.recv() => {
+                    info!("LedgerAccounting received event");
                     match event {
                         Event::VenueOrderFillUpdate(order) => {
                           self.order_update(order).await.unwrap_or_else(|e| {
                             error!("Failed to process order update: {}", e);
                           });
+                        },
+                        Event::Finished => {
+                            barrier.wait().await;
+                            break;
                         }
                         _ => {}
                     }
+                    info!("LedgerAccounting event processed");
+                    barrier.wait().await;
                 }
                 _ = shutdown.cancelled() => {
                     debug!("Accounting shutting down...");
@@ -637,6 +646,7 @@ impl RunnableService for LedgerAccounting {
                 }
             }
         }
+        info!("Accounting service stopped.");
         Ok(())
     }
 }

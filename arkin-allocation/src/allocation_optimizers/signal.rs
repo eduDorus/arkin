@@ -16,9 +16,9 @@ use uuid::Uuid;
 
 use crate::{AllocationOptim, AllocationOptimError, AllocationService};
 
-#[derive(Debug, TypedBuilder)]
+#[derive(TypedBuilder)]
 pub struct SignalAllocationOptim {
-    pubsub: Arc<PubSub>,
+    pubsub: PubSubHandle,
     persistence: Arc<PersistenceService>,
     accounting: Arc<dyn Accounting>,
     #[builder(default = RwLock::new(HashMap::new()))]
@@ -149,27 +149,20 @@ impl SignalAllocationOptim {
 
 #[async_trait]
 impl AllocationOptim for SignalAllocationOptim {
-    async fn optimize(&self, signal: Arc<Signal>) -> Result<Arc<ExecutionOrder>, AllocationOptimError> {
+    async fn optimize(&self, signal: Arc<Signal>) {
         // Update optimal allocation with the new signal
         self.insert_signal(signal.clone()).await;
 
-        // Step 6: Calculate capital per signal with 30% cap
-        info!("Calculating capital per signal...");
+        // Calculate capital per signal
         let capital_per_signal = self.calculate_capital_per_signal(&signal).await;
 
         // Process each signal and collect orders
-        info!("Processing signal...");
-        let execution_order = self.process_signal(&signal, capital_per_signal).await?;
+        let res = self.process_signal(&signal, capital_per_signal).await;
 
         // Publish orders
-        info!("Publishing orders...");
-        if let Some(order) = execution_order {
+        if let Ok(Some(order)) = res {
             info!("Publishing order: {}", order);
-            self.pubsub.publish(order.clone()).await;
-            return Ok(order);
-        } else {
-            warn!("No orders to publish");
-            return Err(AllocationOptimError::NoOrdersToPublish(signal));
+            self.pubsub.publish(Event::ExecutionOrderNew(order.clone())).await;
         }
     }
 }
@@ -179,18 +172,23 @@ impl RunnableService for SignalAllocationOptim {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting LimitedAllocation...");
 
-        let mut rx = self.pubsub.subscribe();
-
         loop {
             select! {
-                Ok(event) = rx.recv() => {
+                Ok((event, barrier)) = self.pubsub.rx.recv() => {
+                    info!("LimitedAllocationOptim received event");
                     match event {
-                        Event::Signal(signal) => {
+                        Event::SignalUpdate(signal) => {
                             debug!("LimitedAllocationOptim received signal: {}", signal.event_time);
-                            self.optimize(signal).await?;
+                            self.optimize(signal).await;
                         }
+                        Event::Finished => {
+                          barrier.wait().await;
+                          break;
+                      }
                         _ => {}
                     }
+                    info!("LimitedAllocationOptim event processed");
+                    barrier.wait().await;
                 }
                 _ = shutdown.cancelled() => {
                     info!("LimitedAllocationOptim shutdown...");
@@ -198,6 +196,7 @@ impl RunnableService for SignalAllocationOptim {
                 }
             }
         }
+        info!("LimitedAllocationOptim stopped.");
         Ok(())
     }
 }
