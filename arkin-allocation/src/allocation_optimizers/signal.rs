@@ -48,7 +48,7 @@ impl SignalAllocationOptim {
         let venue = &signal.instrument.venue;
         let margin_asset = &signal.instrument.margin_asset;
         let capital = self.accounting.asset_margin_balance(venue, margin_asset).await;
-        info!("Available capital for {}: {}", signal.instrument, capital);
+        debug!("Available capital for {}: {}", signal.instrument, capital);
         if capital.is_zero() {
             warn!("No capital available for allocation");
             return Decimal::ZERO;
@@ -56,10 +56,10 @@ impl SignalAllocationOptim {
 
         // Get combined weight of all active signals
         let num_signals = self.signals_count().await;
-        info!("Number of active signals: {}", num_signals);
+        debug!("Number of active signals: {}", num_signals);
 
         let capital_per_signal = (capital * self.max_allocation) / Decimal::from(num_signals);
-        info!("Capital per signal: {}", capital_per_signal);
+        debug!("Capital per signal: {}", capital_per_signal);
         capital_per_signal
     }
 
@@ -73,7 +73,7 @@ impl SignalAllocationOptim {
 
         // Get current position
         let current_position = self.accounting.strategy_instrument_position(&signal.strategy, instrument).await;
-        info!("Current position for {}: {}", instrument, current_position);
+        debug!("Current position for {}: {}", instrument, current_position);
 
         // Get current price
         let tick = self
@@ -83,15 +83,15 @@ impl SignalAllocationOptim {
             .await
             .ok_or(AllocationOptimError::NoPriceDataAvailable(instrument.clone()))?;
         let price = tick.mid_price();
-        info!("Current price for {}: {}", instrument, price);
+        debug!("Current price for {}: {}", instrument, price);
 
         // Calculate desired portfolio value and quantity based on signal weight
         let desired_allocated_capital = (signal.weight * capital_per_signal) / price;
-        info!("Desired allocated capital for {}: {}", instrument, desired_allocated_capital);
+        debug!("Desired allocated capital for {}: {}", instrument, desired_allocated_capital);
 
         // Step 3: Check if current position matches desired position
         let diff_quantity = desired_allocated_capital - current_position;
-        info!("Difference in quantity: {}", diff_quantity);
+        debug!("Difference in quantity: {}", diff_quantity);
 
         // Step 4: If difference is negligible, skip trading
         if diff_quantity.abs() < instrument.lot_size {
@@ -105,16 +105,16 @@ impl SignalAllocationOptim {
         } else {
             MarketSide::Sell
         };
-        info!("Trade side for {}: {}", instrument, side);
+        debug!("Trade side for {}: {}", instrument, side);
 
         // Step 6 & 7: Calculate trade quantity, capped by capital per signal
         let final_quantity = self.round_quantity(diff_quantity.abs(), instrument);
-        info!("Final quantity for {}: {}", instrument, final_quantity);
+        debug!("Final quantity for {}: {}", instrument, final_quantity);
 
         // Validate trade value against minimum threshold
         let trade_value = final_quantity * price;
         if trade_value < self.min_trade_value {
-            info!(
+            debug!(
                 "Skipping trade for {}: value {} below minimum {}",
                 instrument, trade_value, self.min_trade_value
             );
@@ -133,7 +133,6 @@ impl SignalAllocationOptim {
             .price(price)
             .updated_at(tick.event_time)
             .build();
-        info!("Created execution order: {}", order);
 
         Ok(Some(Arc::new(order)))
     }
@@ -161,7 +160,6 @@ impl AllocationOptim for SignalAllocationOptim {
 
         // Publish orders
         if let Ok(Some(order)) = res {
-            info!("Publishing order: {}", order);
             self.pubsub.publish(Event::ExecutionOrderNew(order.clone())).await;
         }
     }
@@ -174,21 +172,18 @@ impl RunnableService for SignalAllocationOptim {
 
         loop {
             select! {
-                Ok((event, barrier)) = self.pubsub.rx.recv() => {
-                    info!("LimitedAllocationOptim received event");
+                Some(event) = self.pubsub.recv() => {
                     match event {
                         Event::SignalUpdate(signal) => {
                             debug!("LimitedAllocationOptim received signal: {}", signal.event_time);
                             self.optimize(signal).await;
                         }
                         Event::Finished => {
-                          barrier.wait().await;
                           break;
                       }
                         _ => {}
                     }
-                    info!("LimitedAllocationOptim event processed");
-                    barrier.wait().await;
+                    self.pubsub.ack().await;
                 }
                 _ = shutdown.cancelled() => {
                     info!("LimitedAllocationOptim shutdown...");

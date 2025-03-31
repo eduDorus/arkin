@@ -78,20 +78,17 @@ impl RunnableService for DefaultOrderManager {
 
         loop {
             tokio::select! {
-                Ok((event, barrier)) = self.pubsub.rx.recv() => {
-                  info!("OrderManager received event");
+                Some(event) = self.pubsub.recv() => {
                   match event {
                     Event::ExecutionOrderNew(order) => self.place_order(order).await?,
                     Event::VenueOrderStatusUpdate(order) => self.order_update(order).await?,
                     Event::VenueOrderFillUpdate(order) => self.order_fill(order).await?,
                     Event::Finished => {
-                      barrier.wait().await;
                       break;
                   }
                     _ => {}
                   }
-                  info!("OrderManager event processed");
-                  barrier.wait().await;
+                  self.pubsub.ack().await;
                 }
                 _ = shutdown.cancelled() => {
                     info!("Execution shutdown...");

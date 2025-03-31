@@ -58,36 +58,35 @@ impl SimulationExecutor {
     }
 
     pub async fn tick_update(&self, tick: Arc<Tick>) {
-        // return
-        // info!("SimulationExecutor tick_update: {}", tick.instrument);
+        info!("SimulationExecutor tick_update: {}", tick.instrument);
         // Check if orders is empty
-        // let lock = self.orders.read().await;
-        // if lock.is_empty() {
-        //     return;
-        // }
-        // let orders = lock.clone();
-        // drop(lock);
+        let lock = self.orders.read().await;
+        if lock.is_empty() {
+            return;
+        }
+        let orders = lock.clone();
+        drop(lock);
 
         // check if we got a price for the instrument
-        // for (_id, order) in orders.iter() {
-        //     if order.instrument == tick.instrument {
-        //         // Execute market order at tob if limit order check if we can execute
-        //         match order.order_type {
-        //             VenueOrderType::Market => {
-        //                 info!("SimulationExecutor found market order: {}", order);
-        //                 self.execute_order(order, &tick).await;
-        //             }
-        //             VenueOrderType::Limit => {
-        //                 if order.side == MarketSide::Buy && tick.ask_price() <= order.price {
-        //                     self.execute_order(order, &tick).await;
-        //                 } else if order.side == MarketSide::Sell && tick.bid_price() >= order.price {
-        //                     self.execute_order(order, &tick).await;
-        //                 }
-        //             }
-        //             _ => unimplemented!("Unsupported order type"),
-        //         };
-        //     }
-        // };
+        for (_id, order) in orders.iter() {
+            if order.instrument == tick.instrument {
+                // Execute market order at tob if limit order check if we can execute
+                match order.order_type {
+                    VenueOrderType::Market => {
+                        info!("SimulationExecutor found market order: {}", order);
+                        self.execute_order(order, &tick).await;
+                    }
+                    VenueOrderType::Limit => {
+                        if order.side == MarketSide::Buy && tick.ask_price() <= order.price {
+                            self.execute_order(order, &tick).await;
+                        } else if order.side == MarketSide::Sell && tick.bid_price() >= order.price {
+                            self.execute_order(order, &tick).await;
+                        }
+                    }
+                    _ => unimplemented!("Unsupported order type"),
+                };
+            }
+        }
     }
 }
 
@@ -159,20 +158,17 @@ impl RunnableService for SimulationExecutor {
 
         loop {
             select! {
-                Ok((event, barrier)) = self.pubsub.rx.recv() => {
-                  info!("SimulationExecutor received event");
+                Some(event) = self.pubsub.recv() => {
                     match event {
                        Event::VenueOrderNew(order) => self.place_order(order).await?,
                        Event::VenueOrderCancel(order) => self.cancel_order(order.id).await?,
                       //  Event::TickUpdate(tick) => self.tick_update(tick).await,
                        Event::Finished => {
-                        barrier.wait().await;
-                        break;
+                          break;
                        },
                        _ => {}
                     }
-                    info!("SimulationExecutor event processed");
-                    barrier.wait().await;
+                    self.pubsub.ack().await;
                 }
                 _ = shutdown.cancelled() => {
                     info!("SimulationExecutor shutdown...");

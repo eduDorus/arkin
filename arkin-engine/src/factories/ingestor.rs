@@ -65,7 +65,7 @@ impl IngestorFactory {
             .build();
 
         let ingestor = TardisIngestor::builder()
-            .pubsub(pubsub.handle().await)
+            .pubsub(pubsub.publisher().await)
             .persistence(persistence)
             .client(client)
             .venue(args.venue.clone())

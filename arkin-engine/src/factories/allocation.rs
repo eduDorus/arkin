@@ -19,7 +19,7 @@ impl AllocationFactory {
         let allocation: Arc<dyn AllocationService> = match &config.allocation_optim {
             AllocationTypeConfig::Limited(c) => Arc::new(
                 SignalAllocationOptim::builder()
-                    .pubsub(pubsub.handle().await)
+                    .pubsub(pubsub.handle("Allocation").await)
                     .persistence(persistance)
                     .accounting(accounting)
                     .leverage(c.leverage)

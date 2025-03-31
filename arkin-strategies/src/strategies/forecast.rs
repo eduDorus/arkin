@@ -121,21 +121,18 @@ impl RunnableService for ForecastStrategy {
 
         loop {
             select! {
-                Ok((event, barrier)) = self.pubsub.rx.recv() => {
-                  info!("ForecastStrategy received event");
+                Some(event) = self.pubsub.recv() => {
                     match event {
                         Event::InsightsUpdate(tick) => {
                             debug!("ForecastStrategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
                         Event::Finished => {
-                          barrier.wait().await;
                           break;
                       }
                         _ => {}
                     }
-                    info!("ForecastStrategy event processed");
-                    barrier.wait().await;
+                    self.pubsub.ack().await;
                 }
                 _ = _shutdown.cancelled() => {
                     break;

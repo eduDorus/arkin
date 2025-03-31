@@ -93,7 +93,7 @@ impl DefaultEngine {
 
         let config = load::<PersistenceConfig>();
         let persistence = PersistenceService::new(
-            pubsub.subscriber().await,
+            pubsub.subscriber("PersistenceService").await,
             &config,
             instance,
             only_normalized,
@@ -158,28 +158,36 @@ impl DefaultEngine {
         // Init services
         info!("Initializing services...");
         let insights = InsightsFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.pipeline).await;
+        self.start_service(insights, false).await;
         info!("Insights initialized");
+
         let ingestor = IngestorFactory::init_simulation(self.pubsub.clone(), self.persistence.clone(), args).await;
+        self.start_service(ingestor, false).await;
+        info!("Ingestor initialized");
+
         let accounting =
             AccountingFactory::init(self.pubsub.clone(), self.persistence.clone(), &args.accounting_type).await;
+        self.start_service(accounting.clone(), false).await;
         info!("Accounting initialized");
+
         let strategies = StrategyFactory::init(self.pubsub.clone(), self.persistence.clone()).await;
+        for strategy in strategies {
+            self.start_service(strategy, false).await;
+        }
         info!("Strategies initialized");
-        let allocation =
-            AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), accounting.clone()).await;
+
+        let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), accounting).await;
+        self.start_service(allocation.clone(), false).await;
         info!("Allocation initialized");
+
         let order_manager = OrderManagerFactory::init(self.pubsub.clone()).await;
+        self.start_service(order_manager.clone(), false).await;
         info!("Order Manager initialized");
+
         let execution = ExecutorFactory::init_simulation(self.pubsub.clone()).await;
+        self.start_service(execution.clone(), false).await;
         info!("Execution initialized");
 
-        let mut services: Vec<Arc<dyn RunnableService>> =
-            vec![insights, ingestor, accounting, allocation, order_manager, execution];
-        for strategy in strategies {
-            services.push(strategy);
-        }
-
-        self.start_services(services, false).await;
         Ok(())
     }
 
@@ -204,14 +212,14 @@ impl DefaultEngine {
         }
     }
 
-    async fn start_services<I>(&self, services: I, core_service: bool)
-    where
-        I: IntoIterator<Item = Arc<dyn RunnableService>>,
-    {
-        for service in services {
-            self.start_service(service, core_service).await;
-        }
-    }
+    // async fn start_services<I>(&self, services: I, core_service: bool)
+    // where
+    //     I: IntoIterator<Item = Arc<dyn RunnableService>>,
+    // {
+    //     for service in services {
+    //         self.start_service(service, core_service).await;
+    //     }
+    // }
 
     pub async fn wait_for_shutdown(&self) {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();

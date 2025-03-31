@@ -613,8 +613,7 @@ impl RunnableService for LedgerAccounting {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         loop {
             select! {
-                Ok((event, barrier)) = self.pubsub.rx.recv() => {
-                    info!("LedgerAccounting received event");
+                Some(event) = self.pubsub.recv() => {
                     match event {
                         Event::VenueOrderFillUpdate(order) => {
                           self.order_update(order).await.unwrap_or_else(|e| {
@@ -622,13 +621,11 @@ impl RunnableService for LedgerAccounting {
                           });
                         },
                         Event::Finished => {
-                            barrier.wait().await;
                             break;
                         }
                         _ => {}
                     }
-                    info!("LedgerAccounting event processed");
-                    barrier.wait().await;
+                    self.pubsub.ack().await;
                 }
                 _ = shutdown.cancelled() => {
                     debug!("Accounting shutting down...");

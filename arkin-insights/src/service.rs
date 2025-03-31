@@ -78,8 +78,7 @@ impl RunnableService for InsightsService {
 
         loop {
             select! {
-                Ok((event, barrier)) = self.pubsub.rx.recv() => {
-                    info!("InsightsService received event");
+                Some(event) = self.pubsub.recv() => {
                     match event {
                         Event::InsightsTick(tick) => {
                             debug!("InsightsService received interval tick: {}", tick.event_time);
@@ -94,21 +93,19 @@ impl RunnableService for InsightsService {
                                 error!("Error inserting trade: {}", e);
                             }
                         }
-                        // Event::TickUpdate(tick) => {
-                        //     debug!("InsightsService received tick: {}", tick.event_time);
-                        //     let insights = tick.as_ref().clone().to_insights();
-                        //     if let Err(e) = self.insert_batch(&insights).await {
-                        //         error!("Error inserting tick: {}", e);
-                        //     }
-                        // }
+                        Event::TickUpdate(tick) => {
+                            debug!("InsightsService received tick: {}", tick.event_time);
+                            let insights = tick.as_ref().clone().to_insights();
+                            if let Err(e) = self.insert_batch(&insights).await {
+                                error!("Error inserting tick: {}", e);
+                            }
+                        }
                         Event::Finished => {
-                          barrier.wait().await;
                           break;
                       }
                         _ => {}
                     }
-                    info!("InsightsService event processed");
-                    barrier.wait().await;
+                    self.pubsub.ack().await;
                 }
                 _ = shutdown.cancelled() => {
                     info!("Insights service shutdown...");

@@ -21,8 +21,12 @@ impl InsightsFactory {
             .await
             .expect("Pipeline not found and could not be created");
 
-        let insights: Arc<dyn RunnableService> =
-            InsightsService::init(pubsub.handle().await, pipeline, &config.insights_service.pipeline).await;
+        let insights: Arc<dyn RunnableService> = InsightsService::init(
+            pubsub.handle("InsightsService").await,
+            pipeline,
+            &config.insights_service.pipeline,
+        )
+        .await;
         insights
     }
 }

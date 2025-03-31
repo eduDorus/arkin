@@ -39,8 +39,6 @@ pub struct AgentStrategy {
 #[async_trait]
 impl Algorithm for AgentStrategy {
     async fn insight_tick(&self, tick: Arc<InsightsUpdate>) -> Result<(), StrategyError> {
-        info!("Processing insight tick for Agent Strategy...");
-
         for instrument in &tick.instruments {
             // Get the model
             // Check if we have a model for the instrument
@@ -110,11 +108,6 @@ impl Algorithm for AgentStrategy {
             obs.push(current_weight.to_f32().unwrap()); // Append current weight to observation
             let obs_array = Array::from_shape_vec((1, self.inputs.len() + 1), obs).expect("Failed to create obs array");
 
-            // Print all inputs
-            info!("Observation: {:?}", obs_array);
-            // info!("Hidden: {:?}", hidden);
-            // info!("Cell: {:?}", cell);
-
             // Convert inputs to ort::Value
             let obs_value = Tensor::from_array(obs_array).expect("Failed to create obs value");
             let hidden_value = Tensor::from_array(hidden).expect("Failed to create hidden value");
@@ -170,7 +163,6 @@ impl Algorithm for AgentStrategy {
                 .instrument(instrument.clone())
                 .weight(weight)
                 .build();
-            info!("Agent sending signal: {}", signal);
             self.pubsub.publish(signal).await;
         }
 
@@ -188,21 +180,18 @@ impl RunnableService for AgentStrategy {
 
         loop {
             select! {
-                Ok((event, barrier)) = self.pubsub.rx.recv() => {
-                    info!("Agent Strategy received event");
+                Some(event) = self.pubsub.recv() => {
                     match event {
                         Event::InsightsUpdate(tick) => {
                             debug!("Agent Strategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
                         Event::Finished => {
-                          barrier.wait().await;
                           break;
                       }
                         _ => {}
                     }
-                    info!("Agent Strategy event processed");
-                    barrier.wait().await;
+                    self.pubsub.ack().await;
                 }
                 _ = _shutdown.cancelled() => {
                     break;

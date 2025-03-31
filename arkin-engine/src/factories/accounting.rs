@@ -41,7 +41,9 @@ impl AccountingFactory {
                     .await
                     .expect("Failed to read asset from DB");
 
-                let accounting = LedgerAccounting::builder().pubsub(pubsub.handle().await).build();
+                let accounting = LedgerAccounting::builder()
+                    .pubsub(pubsub.handle("LedgerAccounting").await)
+                    .build();
                 accounting
                     .deposit(
                         &personal_venue,

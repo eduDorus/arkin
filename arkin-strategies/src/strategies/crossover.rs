@@ -32,21 +32,18 @@ impl RunnableService for CrossoverStrategy {
 
         loop {
             select! {
-                Ok((event, barrier)) = self.pubsub.rx.recv() => {
-                  info!("CrossoverStrategy received event");
+                Some(event) = self.pubsub.recv() => {
                     match event {
                         Event::InsightsUpdate(tick) => {
                             debug!("CrossoverStrategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
                         Event::Finished => {
-                          barrier.wait().await;
                           break;
                       }
                         _ => {}
                     }
-                    info!("CrossoverStrategy event processed");
-                    barrier.wait().await;
+                    self.pubsub.ack().await;
                 }
                 _ = _shutdown.cancelled() => {
                     break;

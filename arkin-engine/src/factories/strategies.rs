@@ -23,7 +23,7 @@ impl StrategyFactory {
 
                     Arc::new(
                         CrossoverStrategy::builder()
-                            .pubsub(pubsub.handle().await)
+                            .pubsub(pubsub.handle("CorssoverStrategy").await)
                             .strategy(strategy)
                             .fast_ma(c.fast_ma.clone())
                             .slow_ma(c.slow_ma.clone())
@@ -40,7 +40,7 @@ impl StrategyFactory {
 
                     Arc::new(
                         ForecastStrategy::builder()
-                            .pubsub(pubsub.handle().await)
+                            .pubsub(pubsub.handle("ForecastStrategy").await)
                             .strategy(strategy)
                             .inputs(c.inputs.clone())
                             .threshold(c.threshold)
@@ -56,7 +56,7 @@ impl StrategyFactory {
 
                     Arc::new(
                         AgentStrategy::builder()
-                            .pubsub(pubsub.handle().await)
+                            .pubsub(pubsub.handle("AgentStrategy").await)
                             .strategy(strategy)
                             .model_location(c.model_location.clone())
                             .model_name(c.model_name.clone())

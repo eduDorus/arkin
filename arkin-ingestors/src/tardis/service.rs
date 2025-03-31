@@ -199,7 +199,7 @@ impl TardisRequest {
 
 #[derive(TypedBuilder)]
 pub struct TardisIngestor {
-    pub pubsub: PubSubHandle,
+    pub pubsub: PubSubPublisher,
     pub persistence: Arc<PersistenceService>,
     pub client: TardisHttpClient,
     pub max_concurrent_requests: usize,

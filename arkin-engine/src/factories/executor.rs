@@ -32,6 +32,10 @@ impl ExecutorFactory {
     }
 
     pub async fn init_simulation(pubsub: Arc<PubSub>) -> Arc<dyn ExecutorService> {
-        Arc::new(SimulationExecutor::builder().pubsub(pubsub.handle().await).build())
+        Arc::new(
+            SimulationExecutor::builder()
+                .pubsub(pubsub.handle("SimulationExecutor").await)
+                .build(),
+        )
     }
 }

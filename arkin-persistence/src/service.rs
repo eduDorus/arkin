@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use sqlx::ConnectOptions;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use arkin_core::prelude::*;
 
@@ -189,20 +189,18 @@ impl RunnableService for PersistenceService {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting persistence service...");
 
-        let mut interval = tokio::time::interval(self.auto_commit_interval);
+        // let mut interval = tokio::time::interval(self.auto_commit_interval);
 
         loop {
             tokio::select! {
-                    Ok((mut event, barrier)) = self.pubsub.rx.recv() => {
-                        info!("Persistence service received event");
+                    Some(mut event) = self.pubsub.recv() => {
                         // If we do a dry run we don't save any data
                         if self.dry_run {
                           // Still need to update price cache
-                            // if let Event::TickUpdate(t) = event {
-                            //   self.tick_store.update_tick_cache(t).await;
-                            // }
-                            info!("Dry run mode, skipping event");
-                            barrier.wait().await;
+                            if let Event::TickUpdate(t) = event {
+                              self.tick_store.update_tick_cache(t).await;
+                            }
+                            self.pubsub.ack().await;
                             continue;
                         }
 
@@ -236,27 +234,25 @@ impl RunnableService for PersistenceService {
                             Event::Finished => {
                               if let Err(e) = self.flush().await {
                                 error!("Failed to commit persistence service on shutdown: {}", e);
-                            }
-                            if let Err(e) = self.close().await {
-                                error!("Failed to close persistence service on shutdown: {}", e);
-                            }
-                              barrier.wait().await;
-                              break;
-                          }
+                                }
+                                if let Err(e) = self.close().await {
+                                    error!("Failed to close persistence service on shutdown: {}", e);
+                                }
+                                break
+                              }
                             _ => {Ok(())}
                         };
                         if let Err(e) = res {
                             error!("Failed to insert event: {:?}", e);
                         }
-                        info!("Persistence service event processed");
-                        barrier.wait().await;
+                        self.pubsub.ack().await;
                     }
-                    _ = interval.tick() => {
-                        debug!("Auto commit persistence service...");
-                        if let Err(e) = self.flush().await {
-                            error!("Failed to auto commit persistence service: {}", e);
-                        }
-                    }
+                    // _ = interval.tick() => {
+                    //     debug!("Auto commit persistence service...");
+                    //     if let Err(e) = self.flush().await {
+                    //         error!("Failed to auto commit persistence service: {}", e);
+                    //     }
+                    // }
                     _ = shutdown.cancelled() => {
                         if let Err(e) = self.flush().await {
                             error!("Failed to commit persistence service on shutdown: {}", e);
