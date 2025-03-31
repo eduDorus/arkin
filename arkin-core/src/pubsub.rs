@@ -6,7 +6,7 @@ use std::{cmp::Reverse, collections::HashMap};
 use async_trait::async_trait;
 use kanal::{AsyncReceiver, AsyncSender};
 use time::OffsetDateTime;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 use typed_builder::TypedBuilder;
@@ -106,18 +106,18 @@ impl PubSubSubscriber {
 
 #[derive(TypedBuilder)]
 pub struct PubSub {
-    #[builder(default = RwLock::new(Vec::new()))]
-    event_receivers: RwLock<Vec<AsyncReceiver<Event>>>,
-    #[builder(default = RwLock::new(HashMap::new()))]
-    subscribers: RwLock<HashMap<String, AsyncSender<Event>>>,
-    #[builder(default = RwLock::new(kanal::bounded_async(1)))]
-    subscribers_acknowledge: RwLock<(AsyncSender<()>, AsyncReceiver<()>)>,
+    #[builder(default = Arc::new(RwLock::new(Vec::new())))]
+    event_receivers: Arc<RwLock<Vec<AsyncReceiver<Event>>>>,
+    #[builder(default = Arc::new(RwLock::new(HashMap::new())))]
+    subscribers: Arc<RwLock<HashMap<String, AsyncSender<Event>>>>,
+    #[builder(default = Arc::new(RwLock::new(kanal::bounded_async(128))))]
+    subscribers_acknowledge: Arc<RwLock<(AsyncSender<()>, AsyncReceiver<()>)>>,
     clock: Arc<dyn SimulationClock>,
 }
 
 impl PubSub {
     pub async fn subscriber(&self, name: &str) -> PubSubSubscriber {
-        let (tx, rx) = kanal::bounded_async(100000);
+        let (tx, rx) = kanal::bounded_async(1);
         self.subscribers.write().await.insert(name.to_string(), tx);
         PubSubSubscriber {
             rx,
@@ -137,7 +137,7 @@ impl PubSub {
 
     pub async fn handle(&self, name: &str) -> PubSubHandle {
         let (publisher_tx, publisher_rx) = kanal::bounded_async(100000);
-        let (receiver_tx, receiver_rx) = kanal::bounded_async(100000);
+        let (receiver_tx, receiver_rx) = kanal::bounded_async(1);
         self.event_receivers.write().await.push(publisher_rx);
         self.subscribers.write().await.insert(name.to_string(), receiver_tx);
         PubSubHandle {
@@ -147,85 +147,99 @@ impl PubSub {
             clock: self.clock.clone(),
         }
     }
-
-    async fn notify_subscribers(&self, event: Event) {
-        let subscribers = self.subscribers.read().await;
-        // info!("Notifying {} subscribers", subscribers.len());
-        for (_name, tx) in subscribers.iter() {
-            // info!("Notifying subscriber: {}", name);
-            if let Err(e) = tx.send(event.clone()).await {
-                error!("Failed to notify subscriber: {}", e);
-            }
-        }
-        let mut subscribers_ack_count = subscribers.len();
-        loop {
-            let ack = self.subscribers_acknowledge.read().await.1.recv().await;
-            if let Ok(()) = ack {
-                // info!("Subscriber acknowledged event: {}", ack);
-                subscribers_ack_count -= 1;
-                if subscribers_ack_count == 0 {
-                    break;
-                }
-            }
-        }
-    }
-
-    async fn notify_subscribers_no_ack(&self, event: Event) {
-        let subscribers = self.subscribers.read().await;
-        // info!("Notifying {} subscribers", subscribers.len());
-        for (name, tx) in subscribers.iter() {
-            info!("Notifying subscriber no ack: {}", name);
-            if let Err(e) = tx.send(event.clone()).await {
-                error!("Failed to notify subscriber: {}", e);
-            }
-        }
-    }
 }
 
 #[async_trait]
 impl RunnableService for PubSub {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
-        let mut event_queue = BinaryHeap::new();
-        loop {
-            // Collect new events
-            for receiver in self.event_receivers.read().await.iter() {
-                while let Ok(Some(event)) = receiver.try_recv() {
-                    event_queue.push(Reverse(event));
-                }
-            }
+        // Shared event queue
+        let event_queue = Arc::new(Mutex::new(BinaryHeap::<Reverse<Event>>::new()));
 
-            if let Some(Reverse(event)) = event_queue.pop() {
-                if !event.is_market_data() {
-                    info!("Processing event: {}", event);
-                }
-                self.clock.advance_time(event.timestamp()).await;
-                self.notify_subscribers(event.clone()).await;
-            } else {
-                // Check for shutdown
-                if shutdown.is_cancelled() {
-                    info!("PubSub shutting down...");
-                    self.notify_subscribers_no_ack(Event::Finished).await;
+        // Event Collector Task
+        let collector_event_queue = event_queue.clone();
+        let collector_event_receivers = self.event_receivers.clone();
+        let collector_shutdown = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                if collector_shutdown.is_cancelled() {
                     break;
                 }
+                let receivers = collector_event_receivers.read().await;
+                for receiver in receivers.iter() {
+                    if let Ok(Some(event)) = receiver.try_recv() {
+                        collector_event_queue.lock().await.push(Reverse(event));
+                    }
+                }
+            }
+            info!("Event collector task stopped.");
+        });
 
-                if self.clock.is_finished().await {
-                    info!("PubSub finished processing all events.");
-                    // Notify subscribers that processing is finished
-                    self.notify_subscribers_no_ack(Event::Finished).await;
+        // Event Processor Task
+        let processor_clock = self.clock.clone();
+        let processor_subscribers = self.subscribers.clone();
+        let processor_subscribers_acknowledge = self.subscribers_acknowledge.clone();
+        let processor_event_queue = event_queue.clone();
+        let processor_shutdown = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                if processor_shutdown.is_cancelled() {
+                    let subscribers = processor_subscribers.read().await;
+                    for (_name, tx) in subscribers.iter() {
+                        if let Err(e) = tx.send(Event::Finished).await {
+                            error!("Failed to notify subscriber: {}", e);
+                        }
+                    }
                     break;
                 }
-
-                // If it is the final day advance the clock if there are no events by 1 sec a time
-                if self.clock.is_final_hour().await {
-                    info!("Final hour reached, advancing clock by 1 second.");
-                    let current_time = self.clock.get_current_time().await;
-                    let next_time = current_time + Duration::from_secs(1);
-                    self.clock.advance_time(next_time).await;
+                let mut queue = processor_event_queue.lock().await;
+                if let Some(Reverse(event)) = queue.pop() {
+                    drop(queue); // Release lock early
+                    if !event.is_market_data() {
+                        info!("Processing event: {}", event);
+                    }
+                    processor_clock.advance_time(event.timestamp()).await;
+                    let subscribers = processor_subscribers.read().await;
+                    for (_name, tx) in subscribers.iter() {
+                        if let Err(e) = tx.send(event.clone()).await {
+                            error!("Failed to notify subscriber: {}", e);
+                        }
+                    }
+                    let mut subscribers_ack_count = subscribers.len();
+                    loop {
+                        let ack = processor_subscribers_acknowledge.read().await.1.recv().await;
+                        if let Ok(()) = ack {
+                            subscribers_ack_count -= 1;
+                            if subscribers_ack_count == 0 {
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    drop(queue); // Release lock before slow operations
+                    if processor_clock.is_finished().await {
+                        info!("PubSub finished processing all events.");
+                        let subscribers = processor_subscribers.read().await;
+                        for (_name, tx) in subscribers.iter() {
+                            if let Err(e) = tx.send(Event::Finished).await {
+                                error!("Failed to notify subscriber: {}", e);
+                            }
+                        }
+                        break;
+                    }
+                    if processor_clock.is_final_hour().await {
+                        info!("Final hour reached, advancing clock by 1 second.");
+                        let current_time = processor_clock.get_current_time().await;
+                        let next_time = current_time + Duration::from_secs(1);
+                        processor_clock.advance_time(next_time).await;
+                    }
+                    tokio::time::sleep(Duration::from_millis(1)).await;
                 }
-
-                tokio::time::sleep(Duration::from_millis(1)).await;
             }
-        }
+            info!("Event processor task stopped.");
+        });
+
+        // Wait for shutdown signal
+        shutdown.cancelled().await;
         info!("PubSub service stopped.");
         Ok(())
     }

@@ -96,7 +96,7 @@ impl RunnableService for SimIngestor {
             };
 
             if current_time >= next_tick_time {
-                info!("SimIngestor: Publishing IntervalTick at {}", next_tick_time);
+                // info!("SimIngestor: Publishing IntervalTick at {}", next_tick_time);
                 let interval_tick = InsightsTick::builder()
                     .event_time(next_tick_time)
                     .instruments(self.instruments.clone())
