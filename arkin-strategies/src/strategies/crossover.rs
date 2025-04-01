@@ -38,9 +38,6 @@ impl RunnableService for CrossoverStrategy {
                             debug!("CrossoverStrategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
-                        Event::Finished => {
-                          break;
-                      }
                         _ => {}
                     }
                     self.pubsub.ack().await;

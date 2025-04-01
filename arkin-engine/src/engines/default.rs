@@ -225,7 +225,7 @@ impl DefaultEngine {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
         let mut sigint = signal(SignalKind::interrupt()).unwrap();
 
-        // let subscriber = self.pubsub.subscriber().await;
+        let subscriber = self.pubsub.subscriber("Engine").await;
 
         loop {
             tokio::select! {
@@ -239,17 +239,17 @@ impl DefaultEngine {
                   self.shutdown().await;
                   break;
                 },
-                // Ok((event, barrier)) = subscriber.rx.recv() => {
-                //       match event {
-                //         Event::Finished => {
-                //             info!("Received finished event, shutting down...");
-                //             self.shutdown().await;
-                //             break;
-                //         }
-                //         _ => {}
-                //       }
-                //     barrier.wait().await;
-                // }
+                Some(event) = subscriber.recv() => {
+                      match event {
+                        Event::Finished => {
+                            info!("Received finished event, shutting down...");
+                            self.shutdown().await;
+                            break;
+                        }
+                        _ => {}
+                      }
+                    subscriber.ack().await;
+                }
             }
         }
         info!("Successfully shutdown!");

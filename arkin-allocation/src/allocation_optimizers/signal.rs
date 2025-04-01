@@ -178,9 +178,6 @@ impl RunnableService for SignalAllocationOptim {
                             debug!("LimitedAllocationOptim received signal: {}", signal.event_time);
                             self.optimize(signal).await;
                         }
-                        Event::Finished => {
-                          break;
-                      }
                         _ => {}
                     }
                     self.pubsub.ack().await;

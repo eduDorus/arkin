@@ -83,9 +83,6 @@ impl RunnableService for DefaultOrderManager {
                     Event::ExecutionOrderNew(order) => self.place_order(order).await?,
                     Event::VenueOrderStatusUpdate(order) => self.order_update(order).await?,
                     Event::VenueOrderFillUpdate(order) => self.order_fill(order).await?,
-                    Event::Finished => {
-                      break;
-                  }
                     _ => {}
                   }
                   self.pubsub.ack().await;

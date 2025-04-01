@@ -231,15 +231,6 @@ impl RunnableService for PersistenceService {
                             Event::VenueOrderFillUpdate(order) => self.venue_order_store.update(order).await,
                             Event::AccountNew(account) => self.account_store.insert(account).await,
                             Event::TransferNew(transfer) => self.transfer_store.insert_batch(transfer).await,
-                            Event::Finished => {
-                              if let Err(e) = self.flush().await {
-                                error!("Failed to commit persistence service on shutdown: {}", e);
-                                }
-                                if let Err(e) = self.close().await {
-                                    error!("Failed to close persistence service on shutdown: {}", e);
-                                }
-                                break
-                              }
                             _ => {Ok(())}
                         };
                         if let Err(e) = res {

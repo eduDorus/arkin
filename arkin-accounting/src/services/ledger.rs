@@ -619,9 +619,6 @@ impl RunnableService for LedgerAccounting {
                           self.order_update(order).await.unwrap_or_else(|e| {
                             error!("Failed to process order update: {}", e);
                           });
-                        },
-                        Event::Finished => {
-                            break;
                         }
                         _ => {}
                     }

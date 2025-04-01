@@ -100,9 +100,6 @@ impl RunnableService for InsightsService {
                                 error!("Error inserting tick: {}", e);
                             }
                         }
-                        Event::Finished => {
-                          break;
-                      }
                         _ => {}
                     }
                     self.pubsub.ack().await;

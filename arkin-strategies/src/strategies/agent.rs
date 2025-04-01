@@ -186,9 +186,6 @@ impl RunnableService for AgentStrategy {
                             debug!("Agent Strategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
-                        Event::Finished => {
-                          break;
-                      }
                         _ => {}
                     }
                     self.pubsub.ack().await;

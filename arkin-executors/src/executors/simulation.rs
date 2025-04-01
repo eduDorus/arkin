@@ -5,7 +5,7 @@ use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use tokio::{select, sync::RwLock};
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -28,7 +28,7 @@ pub struct SimulationExecutor {
 
 impl SimulationExecutor {
     pub async fn execute_order(&self, order: &VenueOrder, tick: &Arc<Tick>) {
-        info!("SimulationExecutor execute_order: {}", order);
+        debug!("SimulationExecutor execute_order: {}", order);
         let price = if order.side == MarketSide::Buy {
             tick.ask_price()
         } else {
@@ -58,7 +58,6 @@ impl SimulationExecutor {
     }
 
     pub async fn tick_update(&self, tick: Arc<Tick>) {
-        info!("SimulationExecutor tick_update: {}", tick.instrument);
         // Check if orders is empty
         let lock = self.orders.read().await;
         if lock.is_empty() {
@@ -73,7 +72,7 @@ impl SimulationExecutor {
                 // Execute market order at tob if limit order check if we can execute
                 match order.order_type {
                     VenueOrderType::Market => {
-                        info!("SimulationExecutor found market order: {}", order);
+                        debug!("SimulationExecutor found market order: {}", order);
                         self.execute_order(order, &tick).await;
                     }
                     VenueOrderType::Limit => {
@@ -93,7 +92,7 @@ impl SimulationExecutor {
 #[async_trait]
 impl Executor for SimulationExecutor {
     async fn place_order(&self, order: Arc<VenueOrder>) -> Result<(), ExecutorError> {
-        info!("SimulationExecutor placing order: {}", order);
+        debug!("SimulationExecutor placing order: {}", order);
         let mut orders = self.orders.write().await;
 
         if !orders.contains_key(&order.id) {
@@ -108,7 +107,7 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_order(&self, id: VenueOrderId) -> Result<(), ExecutorError> {
-        info!("SimulationExecutor cancelling order: {}", id);
+        debug!("SimulationExecutor cancelling order: {}", id);
         let mut orders = self.orders.write().await;
 
         if let Some(mut order) = orders.remove(&id) {
@@ -121,7 +120,7 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_orders_by_instrument(&self, instrument: Arc<Instrument>) -> Result<(), ExecutorError> {
-        info!("SimulationExecutor cancelling orders by instrument: {}", instrument);
+        debug!("SimulationExecutor cancelling orders by instrument: {}", instrument);
         let mut orders = self.orders.write().await;
         let mut to_cancel = vec![];
 
@@ -140,7 +139,7 @@ impl Executor for SimulationExecutor {
     }
 
     async fn cancel_all_orders(&self) -> Result<(), ExecutorError> {
-        info!("SimulationExecutor cancelling all orders");
+        debug!("SimulationExecutor cancelling all orders");
         let mut orders = self.orders.write().await;
 
         for (_id, mut order) in orders.drain() {
@@ -162,10 +161,7 @@ impl RunnableService for SimulationExecutor {
                     match event {
                        Event::VenueOrderNew(order) => self.place_order(order).await?,
                        Event::VenueOrderCancel(order) => self.cancel_order(order.id).await?,
-                      //  Event::TickUpdate(tick) => self.tick_update(tick).await,
-                       Event::Finished => {
-                          break;
-                       },
+                       Event::TickUpdate(tick) => self.tick_update(tick).await,
                        _ => {}
                     }
                     self.pubsub.ack().await;
@@ -461,9 +457,9 @@ impl ExecutorService for SimulationExecutor {}
 //         let sell_order_id = sell_order.id.clone();
 
 //         // Insert orders into the executor.
-//         info!("Placing buy order: {}", buy_order_id);
+//         debug!("Placing buy order: {}", buy_order_id);
 //         executor.place_order(buy_order.into()).await.unwrap();
-//         info!("Placing sell order: {}", sell_order_id);
+//         debug!("Placing sell order: {}", sell_order_id);
 //         executor.place_order(sell_order.into()).await.unwrap();
 
 //         let mut rx = pubsub.subscribe();
@@ -489,7 +485,7 @@ impl ExecutorService for SimulationExecutor {}
 //         let mut updated_buy_order: Option<Arc<VenueOrder>> = None;
 //         let mut updated_sell_order: Option<Arc<VenueOrder>> = None;
 //         while events_received < 2 {
-//             info!("Waiting for event...");
+//             debug!("Waiting for event...");
 //             let event = rx.recv().await.expect("Channel closed");
 //             if let Event::VenueOrderFillUpdate(updated_order) = event {
 //                 if updated_order.id == buy_order_id {

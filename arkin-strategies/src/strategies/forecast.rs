@@ -127,9 +127,6 @@ impl RunnableService for ForecastStrategy {
                             debug!("ForecastStrategy received insight tick: {}", tick.event_time);
                             self.insight_tick(tick).await?;
                         }
-                        Event::Finished => {
-                          break;
-                      }
                         _ => {}
                     }
                     self.pubsub.ack().await;
