@@ -2,12 +2,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_stream::try_stream;
 use futures_util::{stream, Stream, StreamExt};
-use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
+use tokio_util::task::TaskTracker;
 use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
@@ -21,80 +20,70 @@ pub struct TradeStore {
     trade_repo: Arc<TradeClickhouseRepo>,
     #[builder(default)]
     trade_buffer: Arc<Mutex<Vec<Arc<Trade>>>>,
-    #[builder(default = Cache::new(1000))]
-    last_trade_cache: Cache<Uuid, Arc<Trade>>,
     buffer_size: usize,
+    #[builder(default)]
+    flush_tracker: TaskTracker,
 }
 
 impl TradeStore {
     pub async fn flush(&self) -> Result<(), PersistenceError> {
-        // Lock and extract trades without cloning
-        let trades = {
-            let mut lock = self.trade_buffer.lock().await;
-            std::mem::take(&mut *lock) // Take ownership and clear the vector
-        };
+        let mut lock = self.trade_buffer.lock().await;
+        let trades = lock.clone();
+        lock.clear();
+        drop(lock);
 
-        // Convert to DTOs and insert into the database
-        let trades = trades.into_iter().map(|t| t.into()).collect::<Vec<_>>();
-        debug!("Flushing {} trades", trades.len());
-        if let Err(e) = self.trade_repo.insert_batch(trades).await {
-            error!("Failed to flush trades: {}", e);
-            return Err(e);
+        if trades.is_empty() {
+            debug!("No trades to flush.");
+            return Ok(());
         }
+
+        let repo = self.trade_repo.clone();
+        let trades = trades.into_iter().map(|t| t.into()).collect::<Vec<_>>();
+
+        self.flush_tracker.spawn(async move {
+            debug!("Flushing {} trades", trades.len());
+
+            // Insert the trades into the database
+            loop {
+                match repo.insert_batch(&trades).await {
+                    Ok(_) => {
+                        debug!("Successfully flushed {} trades", trades.len());
+                        break;
+                    }
+                    Err(e) => {
+                        error!("Failed to flush trades: {}", e);
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    }
+                }
+            }
+        });
         Ok(())
     }
 
-    pub async fn commit(&self) -> Result<(), PersistenceError> {
-        let should_commit = {
-            let lock = self.trade_buffer.lock().await;
-            lock.len() >= self.buffer_size
-        };
+    pub async fn insert(&self, trade: Arc<Trade>) -> Result<(), PersistenceError> {
+        self.trade_repo.insert(trade.into()).await
+    }
 
-        if should_commit {
+    pub async fn insert_buffered(&self, trade: Arc<Trade>) -> Result<(), PersistenceError> {
+        let mut lock = self.trade_buffer.lock().await;
+        lock.push(trade);
+
+        if lock.len() >= self.buffer_size {
+            drop(lock);
             self.flush().await?;
         }
         Ok(())
     }
 
-    async fn update_trade_cache(&self, trade: Arc<Trade>) {
-        if let Some(cached_trade) = self.last_trade_cache.get(&trade.instrument.id).await {
-            if cached_trade.event_time < trade.event_time {
-                self.last_trade_cache.insert(trade.instrument.id, trade.clone()).await;
-            }
-        } else {
-            self.last_trade_cache.insert(trade.instrument.id, trade.clone()).await;
-        }
-    }
-
-    pub async fn insert(&self, trade: Arc<Trade>) -> Result<(), PersistenceError> {
-        self.update_trade_cache(trade.clone()).await;
-        self.trade_repo.insert(trade.into()).await
-    }
-
-    pub async fn insert_buffered(&self, trade: Arc<Trade>) -> Result<(), PersistenceError> {
-        self.update_trade_cache(trade.clone()).await;
-        {
-            let mut lock = self.trade_buffer.lock().await;
-            lock.push(trade);
-        }
-        self.commit().await?;
-        Ok(())
-    }
-
     pub async fn insert_buffered_vec(&self, trades: Vec<Arc<Trade>>) -> Result<(), PersistenceError> {
-        for trade in &trades {
-            self.update_trade_cache(trade.clone()).await;
-        }
-        {
-            let mut lock = self.trade_buffer.lock().await; // Wait for lock
-            lock.extend(trades);
-        }
-        self.commit().await?;
-        Ok(())
-    }
+        let mut lock = self.trade_buffer.lock().await;
+        lock.extend(trades);
 
-    pub async fn read_last_trade(&self, instrument_id: &Uuid) -> Option<Arc<Trade>> {
-        self.last_trade_cache.get(instrument_id).await
+        if lock.len() >= self.buffer_size {
+            drop(lock);
+            self.flush().await?;
+        }
+        Ok(())
     }
 
     pub async fn read_range(

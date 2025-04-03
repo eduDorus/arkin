@@ -4,14 +4,16 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
-use tokio::{select, sync::RwLock};
+use tokio::{
+    select,
+    sync::{Mutex, RwLock},
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_accounting::prelude::*;
 use arkin_core::prelude::*;
-use arkin_persistence::prelude::*;
 use uuid::Uuid;
 
 use crate::{AllocationOptim, AllocationOptimError, AllocationService};
@@ -19,8 +21,9 @@ use crate::{AllocationOptim, AllocationOptimError, AllocationService};
 #[derive(TypedBuilder)]
 pub struct SignalAllocationOptim {
     pubsub: PubSubHandle,
-    persistence: Arc<PersistenceService>,
     accounting: Arc<dyn Accounting>,
+    #[builder(default)]
+    prices: Mutex<HashMap<Arc<Instrument>, Arc<Tick>>>,
     #[builder(default = RwLock::new(HashMap::new()))]
     strategy_signals: RwLock<HashMap<(Arc<Strategy>, Arc<Instrument>), Arc<Signal>>>,
     leverage: Decimal,
@@ -77,10 +80,11 @@ impl SignalAllocationOptim {
 
         // Get current price
         let tick = self
-            .persistence
-            .tick_store
-            .get_last_tick(instrument)
+            .prices
+            .lock()
             .await
+            .get(instrument)
+            .cloned()
             .ok_or(AllocationOptimError::NoPriceDataAvailable(instrument.clone()))?;
         let price = tick.mid_price();
         debug!("Current price for {}: {}", instrument, price);
@@ -174,10 +178,10 @@ impl RunnableService for SignalAllocationOptim {
             select! {
                 Some(event) = self.pubsub.recv() => {
                     match event {
-                        Event::SignalUpdate(signal) => {
-                            debug!("LimitedAllocationOptim received signal: {}", signal.event_time);
-                            self.optimize(signal).await;
-                        }
+                        Event::TickUpdate(tick) => {
+                          self.prices.lock().await.insert(tick.instrument.clone(), tick);
+                        },
+                        Event::SignalUpdate(signal) => self.optimize(signal).await,
                         _ => {}
                     }
                     self.pubsub.ack().await;

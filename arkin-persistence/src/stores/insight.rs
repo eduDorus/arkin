@@ -21,13 +21,11 @@ pub struct InsightsStore {
 
 impl InsightsStore {
     pub async fn flush(&self) -> Result<(), PersistenceError> {
-        // Lock and extract ticks without cloning
-        let insights = {
-            let mut lock = self.insights_buffer.lock().await;
-            std::mem::take(&mut *lock) // Take ownership and clear the vector
-        };
+        let mut lock = self.insights_buffer.lock().await;
+        let insights = lock.clone();
+        lock.clear();
+        drop(lock);
 
-        // If there are no insights to flush, return early
         if insights.is_empty() {
             debug!("No insights to flush.");
             return Ok(());
@@ -85,7 +83,6 @@ impl InsightsStore {
     }
 
     pub async fn insert_buffered_vec(&self, insights: Vec<Arc<Insight>>) -> Result<(), PersistenceError> {
-        // Filter out any insights that don't need to be persisted
         let insights = insights.into_iter().filter(|i| i.persist).collect::<Vec<_>>();
         if insights.is_empty() {
             return Ok(());

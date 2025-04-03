@@ -2,9 +2,9 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_stream::try_stream;
 use futures_util::{stream, Stream, StreamExt};
-use moka2::future::Cache;
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
+use tokio_util::task::TaskTracker;
 use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -21,80 +21,70 @@ pub struct TickStore {
     tick_repo: Arc<TickClickhouseRepo>,
     #[builder(default)]
     tick_buffer: Arc<Mutex<Vec<Arc<Tick>>>>,
-    #[builder(default = Cache::new(1000))]
-    last_tick_cache: Cache<Arc<Instrument>, Arc<Tick>>,
     buffer_size: usize,
+    #[builder(default)]
+    flush_tracker: TaskTracker,
 }
 
 impl TickStore {
     pub async fn flush(&self) -> Result<(), PersistenceError> {
-        // Lock and extract ticks without cloning
-        let ticks = {
-            let mut lock = self.tick_buffer.lock().await;
-            std::mem::take(&mut *lock) // Take ownership and clear the vector
-        };
+        let mut lock = self.tick_buffer.lock().await;
+        let ticks = lock.clone();
+        lock.clear();
+        drop(lock);
 
-        // Convert to DTOs and insert into the database
-        let ticks = ticks.into_iter().map(|t| t.into()).collect::<Vec<_>>();
-        debug!("Flushing {} ticks", ticks.len());
-        if let Err(e) = self.tick_repo.insert_batch(&ticks).await {
-            error!("Failed to flush ticks: {}", e);
-            return Err(e);
+        if ticks.is_empty() {
+            debug!("No insights to flush.");
+            return Ok(());
         }
+
+        let repo = self.tick_repo.clone();
+        let ticks = ticks.into_iter().map(|t| t.into()).collect::<Vec<_>>();
+
+        self.flush_tracker.spawn(async move {
+            debug!("Flushing {} ticks", ticks.len());
+
+            // Insert the ticks into the database
+            loop {
+                match repo.insert_batch(&ticks).await {
+                    Ok(_) => {
+                        debug!("Successfully flushed {} ticks", ticks.len());
+                        break;
+                    }
+                    Err(e) => {
+                        error!("Failed to flush ticks: {}", e);
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    }
+                }
+            }
+        });
         Ok(())
     }
 
-    pub async fn commit(&self) -> Result<(), PersistenceError> {
-        let should_commit = {
-            let lock = self.tick_buffer.lock().await;
-            lock.len() >= self.buffer_size
-        };
+    pub async fn insert(&self, tick: Arc<Tick>) -> Result<(), PersistenceError> {
+        self.tick_repo.insert(tick.into()).await
+    }
 
-        if should_commit {
+    pub async fn insert_buffered(&self, tick: Arc<Tick>) -> Result<(), PersistenceError> {
+        let mut lock = self.tick_buffer.lock().await;
+        lock.push(tick);
+
+        if lock.len() >= self.buffer_size {
+            drop(lock);
             self.flush().await?;
         }
         Ok(())
     }
 
-    pub async fn update_tick_cache(&self, tick: Arc<Tick>) {
-        if let Some(cached_tick) = self.last_tick_cache.get(&tick.instrument).await {
-            if cached_tick.tick_id < tick.tick_id {
-                self.last_tick_cache.insert(tick.instrument.clone(), tick.clone()).await;
-            }
-        } else {
-            self.last_tick_cache.insert(tick.instrument.clone(), tick.clone()).await;
-        }
-    }
-
-    pub async fn insert(&self, tick: Arc<Tick>) -> Result<(), PersistenceError> {
-        self.update_tick_cache(tick.clone()).await;
-        self.tick_repo.insert(tick.into()).await
-    }
-
-    pub async fn insert_buffered(&self, tick: Arc<Tick>) -> Result<(), PersistenceError> {
-        self.update_tick_cache(tick.clone()).await;
-        {
-            let mut lock = self.tick_buffer.lock().await;
-            lock.push(tick);
-        }
-        self.commit().await?;
-        Ok(())
-    }
-
     pub async fn insert_buffered_vec(&self, ticks: Vec<Arc<Tick>>) -> Result<(), PersistenceError> {
-        for tick in &ticks {
-            self.update_tick_cache(tick.clone()).await;
-        }
-        {
-            let mut lock = self.tick_buffer.lock().await; // Wait for lock
-            lock.extend(ticks);
-        }
-        self.commit().await?;
-        Ok(())
-    }
+        let mut lock = self.tick_buffer.lock().await;
+        lock.extend(ticks);
 
-    pub async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Option<Arc<Tick>> {
-        self.last_tick_cache.get(instrument).await
+        if lock.len() >= self.buffer_size {
+            drop(lock);
+            self.flush().await?;
+        }
+        Ok(())
     }
 
     pub async fn read_range(
@@ -127,10 +117,6 @@ impl TickStore {
         from: OffsetDateTime,
         to: OffsetDateTime,
     ) -> Result<impl Stream<Item = Result<Arc<Tick>, PersistenceError>> + '_, PersistenceError> {
-        // We do not `async` here, because returning `impl Stream` + `'a` from an `async fn`
-        // is not yet stable. Instead, we return a non-async function that constructs the stream.
-
-        // Collect the IDs.
         let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
         let mut cursor = self.tick_repo.stream_range(&ids, from, to).await?;
 
@@ -151,12 +137,7 @@ impl TickStore {
                 .ask_price(row.ask_price)
                 .ask_quantity(row.ask_quantity)
                 .build();
-
                 let tick_arc = Arc::new(tick);
-
-                self.update_tick_cache(Arc::clone(&tick_arc)).await;
-
-                // Yield the constructed tick to the stream.
                 yield tick_arc;
             }
         };

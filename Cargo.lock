@@ -385,6 +385,7 @@ dependencies = [
  "async-trait",
  "clickhouse",
  "futures-util",
+ "kanal",
  "moka2",
  "rust_decimal",
  "rust_decimal_macros",

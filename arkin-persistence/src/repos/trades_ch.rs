@@ -99,10 +99,10 @@ impl TradeClickhouseRepo {
         Ok(())
     }
 
-    pub async fn insert_batch(&self, trades: Vec<TradeClickhouseDTO>) -> Result<(), PersistenceError> {
+    pub async fn insert_batch(&self, trades: &[TradeClickhouseDTO]) -> Result<(), PersistenceError> {
         let mut insert = self.client.insert(&self.table_name)?;
         for trade in trades {
-            insert.write(&trade).await?;
+            insert.write(trade).await?;
         }
         insert.end().await?;
         Ok(())

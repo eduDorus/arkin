@@ -176,7 +176,7 @@ impl DefaultEngine {
         }
         info!("Strategies initialized");
 
-        let allocation = AllocationFactory::init(self.pubsub.clone(), self.persistence.clone(), accounting).await;
+        let allocation = AllocationFactory::init(self.pubsub.clone(), accounting).await;
         self.start_service(allocation.clone(), false).await;
         info!("Allocation initialized");
 

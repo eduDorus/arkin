@@ -11,6 +11,7 @@ use uuid::Uuid;
 pub enum InstanceType {
     Live,
     Simulation,
+    Insights,
     Utility,
 }
 
