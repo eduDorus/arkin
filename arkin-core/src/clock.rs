@@ -11,6 +11,9 @@ pub trait SimulationClock: Send + Sync {
     async fn advance_time(&self, time: OffsetDateTime);
     async fn is_final_hour(&self) -> bool;
     async fn is_finished(&self) -> bool;
+    async fn is_live(&self) -> bool {
+        false
+    }
 }
 
 pub struct LiveModeClock;
@@ -20,15 +23,22 @@ impl SimulationClock for LiveModeClock {
     async fn get_current_time(&self) -> OffsetDateTime {
         OffsetDateTime::now_utc()
     }
+
     async fn advance_time(&self, _time: OffsetDateTime) {
         // No-op in production mode
-        warn!("set_current_time is a no-op in production mode");
+        warn!("advance_time is a no-op in production mode");
     }
+
     async fn is_final_hour(&self) -> bool {
         false
     }
+
     async fn is_finished(&self) -> bool {
         false
+    }
+
+    async fn is_live(&self) -> bool {
+        true
     }
 }
 
@@ -51,14 +61,17 @@ impl SimulationClock for SimulationModeClock {
     async fn get_current_time(&self) -> OffsetDateTime {
         self.current_time.read().await.clone()
     }
+
     async fn advance_time(&self, time: OffsetDateTime) {
         self.current_time.write().await.clone_from(&time);
     }
+
     async fn is_final_hour(&self) -> bool {
         let current_time = self.current_time.read().await;
         let end_time_minus_one_hour = self.end_time - Duration::from_secs(3600);
         *current_time >= end_time_minus_one_hour
     }
+
     async fn is_finished(&self) -> bool {
         let current_time = self.current_time.read().await;
         *current_time >= self.end_time

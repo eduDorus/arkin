@@ -16,37 +16,78 @@ async fn main() -> Result<()> {
 
     let n_quantiles = 1000;
     let levels: Vec<f64> = (1..n_quantiles).map(|i| i as f64 / n_quantiles as f64).collect();
-
     let levels_str = levels.iter().map(|&l| format!("{:.4}", l)).collect::<Vec<_>>().join(", ");
-    let query = format!(
-        r#"
-        SELECT
-          instrument_id,
-          feature_id,
-          quantilesExact({})(value) AS quantiles,
-          quantileExact(0.5)(value) AS median,
-          (quantileExact(0.75)(value) - quantileExact(0.25)(value)) as iqr
-        FROM
-          insights FINAL
-        WHERE
-          event_time BETWEEN '2023-01-01 00:00:00' AND '2025-02-01 00:00:00'
-          AND pipeline_id = '3d94c39e-3b39-4617-8852-ab02810690ff'
-          AND insight_type = 'continuous'
-        GROUP BY
-          instrument_id,
-          feature_id
-        ORDER BY
-          instrument_id,
-          feature_id ASC
-        "#,
-        levels_str
-    );
-    println!("{}", query);
+    // let query = format!(
+    //     r#"
+    //     SELECT
+    //       instrument_id,
+    //       feature_id,
+    //       quantilesExact({})(value) AS quantiles,
+    //       quantileExact(0.5)(value) AS median,
+    //       (quantileExact(0.75)(value) - quantileExact(0.25)(value)) as iqr
+    //     FROM
+    //       insights FINAL
+    //     WHERE
+    //       event_time BETWEEN '2021-01-03 00:00:00' AND '2025-04-01 00:00:00'
+    //       AND pipeline_id = '7f470d54-ac4f-479f-9f62-5a88960725e9'
+    //       AND insight_type = 'continuous'
+    //     GROUP BY
+    //       instrument_id,
+    //       feature_id
+    //     ORDER BY
+    //       instrument_id,
+    //       feature_id ASC
+    //     "#,
+    //     levels_str
+    // );
+    // println!("{}", query);
 
-    let quantiles_data = client.query(&query).fetch_all::<ScalerDataDTO>().await?;
+    // Get distinct feature_ids:
+    let feature_query = r#"
+        SELECT DISTINCT feature_id
+        FROM insights FINAL
+        WHERE
+          event_time BETWEEN '2021-01-03 00:00:00' AND '2025-04-01 00:00:00'
+          AND pipeline_id = '7f470d54-ac4f-479f-9f62-5a88960725e9'
+          AND insight_type = 'continuous'
+        "#;
+    let feature_ids: Vec<String> = client.query(feature_query).fetch_all::<String>().await?;
+
+    // Create a query for each feature_id:
+    let mut quantile_result = Vec::with_capacity(feature_ids.len());
+    for feature_id in feature_ids {
+        let query = format!(
+            r#"
+            SELECT
+              instrument_id,
+              feature_id,
+              quantilesExact({})(value) AS quantiles,
+              quantileExact(0.5)(value) AS median,
+              (quantileExact(0.75)(value) - quantileExact(0.25)(value)) as iqr
+            FROM
+              insights FINAL
+            WHERE
+              event_time BETWEEN '2021-01-03 00:00:00' AND '2025-04-01 00:00:00'
+              AND pipeline_id = '7f470d54-ac4f-479f-9f62-5a88960725e9'
+              AND insight_type = 'continuous'
+              AND feature_id = '{}'
+            GROUP BY
+              instrument_id,
+              feature_id
+            ORDER BY
+              instrument_id,
+              feature_id ASC
+            "#,
+            levels_str, feature_id
+        );
+        let quantile_data = client.query(&query).fetch_one::<ScalerDataDTO>().await?;
+        quantile_result.push(quantile_data);
+    }
+
+    // let quantiles_data = client.query(&query).fetch_all::<ScalerDataDTO>().await?;
     let scaler_data = QuantileData {
         levels,
-        data: quantiles_data.into_iter().map(|q| q.into()).collect(),
+        data: quantile_result.into_iter().map(|q| q.into()).collect(),
     };
 
     // Save to json file:

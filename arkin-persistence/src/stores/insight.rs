@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use tokio_util::task::TaskTracker;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -41,7 +41,7 @@ impl InsightsStore {
             loop {
                 match repo.insert_batch(&insights).await {
                     Ok(_) => {
-                        debug!("Successfully flushed {} insights", insights.len());
+                        info!("Successfully flushed {} insights", insights.len());
                         break;
                     }
                     Err(e) => {
@@ -51,18 +51,6 @@ impl InsightsStore {
                 }
             }
         });
-        Ok(())
-    }
-
-    pub async fn commit(&self) -> Result<(), PersistenceError> {
-        let should_commit = {
-            let lock = self.insights_buffer.lock().await;
-            lock.len() >= self.buffer_size
-        };
-
-        if should_commit {
-            self.flush().await?;
-        }
         Ok(())
     }
 
@@ -79,6 +67,11 @@ impl InsightsStore {
 
         let mut lock = self.insights_buffer.lock().await; // Wait for lock
         lock.push(insight);
+
+        if lock.len() >= self.buffer_size {
+            drop(lock);
+            self.flush().await?;
+        }
         Ok(())
     }
 
@@ -90,6 +83,11 @@ impl InsightsStore {
 
         let mut lock = self.insights_buffer.lock().await; // Wait for lock
         lock.extend(insights);
+
+        if lock.len() >= self.buffer_size {
+            drop(lock);
+            self.flush().await?;
+        }
         Ok(())
     }
 }

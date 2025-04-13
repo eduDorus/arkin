@@ -81,7 +81,7 @@ impl RunnableService for InsightsService {
                 Some(event) = self.pubsub.recv() => {
                     match event {
                         Event::InsightsTick(tick) => {
-                            debug!("InsightsService received interval tick: {}", tick.event_time);
+                            info!("InsightsService received interval tick: {}", tick.event_time);
                             if let Err(e) = self.process(tick.event_time, &tick.instruments, true).await {
                                 error!("Error processing interval tick: {}", e);
                             }

@@ -48,7 +48,7 @@ impl TickStore {
             loop {
                 match repo.insert_batch(&ticks).await {
                     Ok(_) => {
-                        debug!("Successfully flushed {} ticks", ticks.len());
+                        info!("Successfully flushed {} ticks", ticks.len());
                         break;
                     }
                     Err(e) => {

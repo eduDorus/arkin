@@ -47,7 +47,7 @@ impl TradeStore {
             loop {
                 match repo.insert_batch(&trades).await {
                     Ok(_) => {
-                        debug!("Successfully flushed {} trades", trades.len());
+                        info!("Successfully flushed {} trades", trades.len());
                         break;
                     }
                     Err(e) => {

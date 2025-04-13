@@ -82,7 +82,7 @@ config = { version = "0.15", features = [ "yaml" ] }
 backoff = { version = "0.4", features = [ "tokio" ] }
 
 # Graph Library
-petgraph = { version = "0.7", features = [ "graphmap" ], default-features = false }
+petgraph = { version = "0.8", features = [ "graphmap" ], default-features = false }
 
 # Caching
 moka2 = { version = "0.13.0", features = [ "future" ] }

@@ -217,7 +217,7 @@ impl RunnableService for PersistenceService {
                         let res = match event {
                             Event::TickUpdate(tick) => {
                                 // Persist only if not in Live mode
-                                if mode != InstanceType::Live || mode != InstanceType::Utility {
+                                if mode == InstanceType::Live || mode == InstanceType::Utility {
                                     tick_store.insert_buffered(tick).await
                                 } else {
                                     Ok(())
@@ -225,7 +225,7 @@ impl RunnableService for PersistenceService {
                             }
                             Event::TradeUpdate(trade) => {
                                 // Persist only if not in Live mode
-                                if mode != InstanceType::Live || mode != InstanceType::Utility {
+                                if mode == InstanceType::Live || mode == InstanceType::Utility {
                                     trade_store.insert_buffered(trade).await
                                 } else {
                                     Ok(())
@@ -270,6 +270,7 @@ impl RunnableService for PersistenceService {
                     },
                 }
             }
+            info!("Flushing event buffer on shutdown...");
             if let Err(e) = tick_store.flush().await {
                 error!("Failed to flush tick store: {:?}", e);
             }
@@ -317,12 +318,15 @@ impl RunnableService for PersistenceService {
                         info!("Persistence service shutdown...");
                         task_tracker.close();
                         task_tracker.wait().await;
+                        info!("Flushing persistence service on shutdown...");
                         if let Err(e) = self.flush().await {
                             error!("Failed to commit persistence service on shutdown: {}", e);
                         }
                         if let Err(e) = self.close().await {
                             error!("Failed to close persistence service on shutdown: {}", e);
                         }
+                        info!("Chilling for 5 seconds before stopping...");
+                        tokio::time::sleep(Duration::from_secs(5)).await;
                         break;
                     }
             }

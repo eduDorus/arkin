@@ -167,7 +167,13 @@ impl RunnableService for PubSub {
                 let receivers = collector_event_receivers.read().await;
                 for receiver in receivers.iter() {
                     if let Ok(Some(event)) = receiver.try_recv() {
-                        collector_event_queue.lock().await.push(Reverse(event));
+                        let mut lock = collector_event_queue.lock().await;
+                        lock.push(Reverse(event));
+                        if lock.len() > 100000000 {
+                            drop(lock);
+                            // error!("Event queue is full, waiting 5s");
+                            tokio::time::sleep(Duration::from_secs(5)).await;
+                        }
                     }
                 }
             }
@@ -197,7 +203,9 @@ impl RunnableService for PubSub {
                     if !event.is_market_data() {
                         info!("Processing event: {}", event);
                     }
-                    processor_clock.advance_time(event.timestamp()).await;
+                    if !processor_clock.is_live().await {
+                        processor_clock.advance_time(event.timestamp()).await;
+                    }
                     let subscribers = processor_subscribers.read().await;
                     for (_name, tx) in subscribers.iter() {
                         if let Err(e) = tx.send(event.clone()).await {
