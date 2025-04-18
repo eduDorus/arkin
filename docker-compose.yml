@@ -1,3 +1,5 @@
+version: '3'
+
 services:
   postgres:
     image: postgres:17
@@ -10,11 +12,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./data/postgres/data:/var/lib/postgresql/data
-      - ./data/postgres/logs:/var/logs
+      - /mnt/data/postgres/data:/var/lib/postgresql/data
+      - /mnt/data/postgres/logs:/var/logs
     networks:
       - network
-
 
   grafana:
     image: grafana/grafana-oss:11.6.0
@@ -23,77 +24,36 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./data/grafana:/var/lib/grafana
+      - /mnt/data/grafana:/var/lib/grafana
     networks:
       - network
-  
 
   clickhouse:
-      image: clickhouse/clickhouse-server:25.3
-      container_name: arkin-clickhouse
-      hostname: clickhouse
-      ports:
-        - "8123:8123"   # HTTP interface
-        - "9000:9000"   # Native client interface
-        # Uncomment the following line if inter-server communication is needed
-        # - "9009:9009"   # Inter-server communication
-      volumes:
-        - ./data/clickhouse/data:/var/lib/clickhouse
-        - ./data/clickhouse/config:/etc/clickhouse-server
-        - ./data/clickhouse/logs:/var/log/clickhouse-server
-        # Uncomment the following line to add initialization scripts
-        # - ./data/clickhouse/initdb:/docker-entrypoint-initdb.d
-      environment:
-        CLICKHOUSE_DB: arkin
-        CLICKHOUSE_USER: arkin_admin
-        CLICKHOUSE_PASSWORD: test1234
-        CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"  # Enable default access management
-      ulimits:
-        nofile:
-          soft: 262144
-          hard: 262144
-      networks:
-        - network
-
-  # timescaledb:
-  #   image: timescale/timescaledb:latest-pg16
-  #   container_name: arkin-tsdb
-  #   hostname: timescaledb
-  #   environment:
-  #     POSTGRES_DB: arkin
-  #     POSTGRES_USER: arkin_admin
-  #     POSTGRES_PASSWORD: test1234
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - ./data/timescaledb/data:/var/lib/postgresql/data
-  #     - ./data/timescaledb/logs:/var/logs
-  #   networks:
-  #     - network
-
-  # metabase:
-    #   image: metabase/metabase:latest
-    #   container_name: arkin-metabase
-    #   hostname: metabase
-    #   volumes:
-    #     - /dev/urandom:/dev/random:ro
-    #     - ./data/metabase/plugins:/plugins
-    #   ports:
-    #     - 3001:3000
-    #   environment:
-    #     MB_DB_TYPE: postgres
-    #     MB_DB_DBNAME: metabase
-    #     MB_DB_PORT: 5432
-    #     MB_DB_USER: arkin_admin
-    #     MB_DB_PASS: test1234
-    #     MB_DB_HOST: postgres
-    #   networks:
-    #     - network
-    #   healthcheck:
-    #     test: curl --fail -I http://localhost:3000/api/health || exit 1
-    #     interval: 15s
-    #     timeout: 5s
-    #     retries: 5
+    image: clickhouse/clickhouse-server:25.3
+    container_name: arkin-clickhouse
+    hostname: clickhouse
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native client interface
+      # Uncomment the following line if inter-server communication is needed
+      # - "9009:9009"   # Inter-server communication
+    volumes:
+      - /mnt/data/clickhouse/data:/var/lib/clickhouse
+      - /mnt/data/clickhouse/config:/etc/clickhouse-server
+      - /mnt/data/clickhouse/logs:/var/log/clickhouse-server
+      # Uncomment the following line to add initialization scripts
+      # - /mnt/data/clickhouse/initdb:/docker-entrypoint-initdb.d
+    environment:
+      CLICKHOUSE_DB: arkin
+      CLICKHOUSE_USER: arkin_admin
+      CLICKHOUSE_PASSWORD: test1234
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"  # Enable default access management
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - network
 
 networks:
   network:
