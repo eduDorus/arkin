@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO instruments (\n                id, venue_id, symbol, venue_symbol, instrument_type, base_asset_id, quote_asset_id, margin_asset_id, strike, maturity, option_type,\n                contract_size, price_precision, quantity_precision, base_precision, quote_precision, lot_size, tick_size, status\n            ) VALUES (\n                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11, $12, $13, $14, $15, $16, $17, $18, $19\n            )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "instrument_type",
+            "kind": {
+              "Enum": [
+                "spot",
+                "perpetual",
+                "future",
+                "option"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Numeric",
+        "Timestamptz",
+        {
+          "Custom": {
+            "name": "instrument_option_type",
+            "kind": {
+              "Enum": [
+                "call",
+                "put"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Numeric",
+        "Numeric",
+        {
+          "Custom": {
+            "name": "instrument_status",
+            "kind": {
+              "Enum": [
+                "trading",
+                "halted",
+                "setteled"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2823eb0c589400b6bb38ff1b8ba6930efa471512e1375a445d8d9a3b98d36b0c"
+}

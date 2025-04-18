@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id, \n                asset_id, \n                venue_id,\n                owner AS \"owner:AccountOwner\",\n                account_type AS \"account_type:AccountType\"\n            FROM accounts\n            WHERE instance_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "asset_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "venue_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "owner:AccountOwner",
+        "type_info": {
+          "Custom": {
+            "name": "account_owner",
+            "kind": {
+              "Enum": [
+                "user",
+                "venue"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "account_type:AccountType",
+        "type_info": {
+          "Custom": {
+            "name": "account_type",
+            "kind": {
+              "Enum": [
+                "spot",
+                "margin",
+                "instrument"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ea5da5134eafe444adaf525e5622c05e93bdc4c9fcdf02da349754579805071b"
+}

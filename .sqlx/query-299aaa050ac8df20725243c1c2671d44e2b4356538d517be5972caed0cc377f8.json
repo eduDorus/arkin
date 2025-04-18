@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                symbol,\n                name,\n                asset_type AS \"asset_type:AssetType\"\n            FROM assets\n            WHERE symbol = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "symbol",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "asset_type:AssetType",
+        "type_info": {
+          "Custom": {
+            "name": "asset_type",
+            "kind": {
+              "Enum": [
+                "crypto",
+                "stock",
+                "fiat",
+                "commodity"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "299aaa050ac8df20725243c1c2671d44e2b4356538d517be5972caed0cc377f8"
+}

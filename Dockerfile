@@ -1,9 +1,9 @@
 # DEFAULT ARGUMENTS
-ARG BINARY_NAME=arkin
+ARG BINARY_NAME=main
 ARG PROFILE=maxperf
 
 # BUILD IMAGE
-FROM rust:1.80.0-bookworm as build
+FROM rust:1.86.0-bookworm AS build
 # Set arguments
 ARG BINARY_NAME
 ARG PROFILE
@@ -12,12 +12,12 @@ ARG PROFILE
 WORKDIR /app
 
 # Optimise build time by caching dependencies
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir -p src/bin && echo "fn main() {}" > src/bin/${BINARY_NAME}.rs
-RUN cargo build --profile ${PROFILE} --bin ${BINARY_NAME}
+COPY . ./
+# RUN mkdir -p arkin/src/bin && echo "fn main() {}" > src/bin/${BINARY_NAME}.rs
+# RUN cargo build --profile ${PROFILE} --bin ${BINARY_NAME}
 
 # Copy the source
-COPY src ./src
+# COPY src ./src
 RUN cargo build --profile ${PROFILE} --bin ${BINARY_NAME}
 
 # PRODUCTION IMAGE
@@ -31,4 +31,4 @@ ENV RUST_LOG=info
 
 # Copy the binary from the build image
 WORKDIR /app
-COPY --from=build /app/target/${PROFILE}/${BINARY_NAME} /appj
+COPY --from=build /app/target/${PROFILE}/${BINARY_NAME} /app

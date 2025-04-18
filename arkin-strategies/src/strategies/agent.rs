@@ -16,6 +16,29 @@ use arkin_core::prelude::*;
 
 use crate::{Algorithm, StrategyError, StrategyService};
 
+#[derive(Debug, Clone, TypedBuilder)]
+struct AgentState {
+    hidden: Array3<f32>,
+    cell: Array3<f32>,
+    current_weight: Decimal,
+    holding_steps: Decimal,
+    trade_pnl: Decimal,
+}
+
+impl AgentState {
+    pub fn new(n_layers: usize, hidden_size: usize) -> Self {
+        Self {
+            hidden: Array3::zeros((n_layers, 1, hidden_size)),
+            cell: Array3::zeros((n_layers, 1, hidden_size)),
+            current_weight: Decimal::ZERO,
+            holding_steps: Decimal::ZERO,
+            trade_pnl: Decimal::ZERO,
+        }
+    }
+
+    // pub fn update(&mut self, action: Decimal, hidden: Array3<f32>, cell: Array3<f32>) -> Self {}
+}
+
 #[derive(TypedBuilder)]
 #[allow(unused)]
 pub struct AgentStrategy {
@@ -31,7 +54,7 @@ pub struct AgentStrategy {
     #[builder(default)]
     models: RwLock<HashMap<Arc<Instrument>, Arc<Session>>>,
     #[builder(default)]
-    current_weight: RwLock<HashMap<Arc<Instrument>, Decimal>>,
+    agent_state: RwLock<HashMap<Arc<Instrument>, AgentState>>,
     #[builder(default)]
     hidden_states: RwLock<HashMap<Arc<Instrument>, (Array3<f32>, Array3<f32>)>>,
 }
@@ -65,29 +88,19 @@ impl Algorithm for AgentStrategy {
             let model = self.models.read().await.get(instrument).expect("Model not found").clone();
 
             // Lock the current weight map
-            let current_weight = self
-                .current_weight
+            let agent_state = self
+                .agent_state
                 .read()
                 .await
                 .get(instrument)
                 .cloned()
-                .unwrap_or(Decimal::ZERO);
-
-            // Get or initialize hidden and cell states
-            let hidden_states = self.hidden_states.read().await;
-            let (hidden, cell) = hidden_states.get(instrument).cloned().unwrap_or_else(|| {
-                (
-                    Array3::zeros((self.n_layers, 1, self.hidden_size)),
-                    Array3::zeros((self.n_layers, 1, self.hidden_size)),
-                )
-            });
-            drop(hidden_states); // Release the read lock
+                .unwrap_or(AgentState::new(self.n_layers, self.hidden_size));
 
             // Prepare the observation from tick insights (single step)
             let mut obs: Vec<f32> = self
                 .inputs
                 .iter()
-                .map(|feature_id| {
+                .filter_map(|feature_id| {
                     tick.insights
                         .iter()
                         .find(|i| {
@@ -97,7 +110,6 @@ impl Algorithm for AgentStrategy {
                                     || i.insight_type == InsightType::Prediction)
                         })
                         .map(|i| i.value)
-                        .unwrap_or(0.0) // Default to 0.0 if feature missing
                 })
                 .map(|v| v as f32)
                 .collect();
@@ -105,15 +117,19 @@ impl Algorithm for AgentStrategy {
                 warn!("Incomplete observation data for instrument {}", instrument);
                 continue; // Skip this instrument if data is missing
             }
-            obs.push(current_weight.to_f32().unwrap()); // Append current weight to observation
-            let obs_array = Array::from_shape_vec((1, self.inputs.len() + 1), obs).expect("Failed to create obs array");
+
+            // Add agent state
+            obs.push(agent_state.current_weight.to_f32().unwrap_or(0.0));
+            // obs.push(agent_state.holding_steps / dec!(10).to_f32().unwrap());
+            // obs.push(agent_state.trade_pnl * dec!(100).to_f32().unwrap());
+
+            // Prepare the hidden and cell states
+            let obs_array = Array::from_shape_vec((1, self.inputs.len() + 3), obs).expect("Failed to create obs array");
 
             // Convert inputs to ort::Value
             let obs_value = Tensor::from_array(obs_array).expect("Failed to create obs value");
-            let hidden_value = Tensor::from_array(hidden).expect("Failed to create hidden value");
-            let cell_value = Tensor::from_array(cell).expect("Failed to create cell value");
-
-            // Print all inputs
+            let hidden_value = Tensor::from_array(agent_state.hidden).expect("Failed to create hidden value");
+            let cell_value = Tensor::from_array(agent_state.cell).expect("Failed to create cell value");
 
             // Run the model with correct input names
             let outputs = model
@@ -146,22 +162,22 @@ impl Algorithm for AgentStrategy {
             let new_cell = new_cell.into_dimensionality::<Ix3>().expect("Cell state is not 3D");
 
             // Update hidden states
-            self.hidden_states
-                .write()
-                .await
-                .insert(instrument.clone(), (new_hidden, new_cell));
+            // self.hidden_states
+            //     .write()
+            //     .await
+            //     .insert(instrument.clone(), (new_hidden, new_cell));
 
             // info!("Action: {:?}", action[0]);
-            let weight = self.action_space[action[0] as usize];
-            // info!("Weight: {}", weight);
+            let new_weight = self.action_space[action[0] as usize];
 
-            // update the last action
-            self.current_weight.write().await.insert(instrument.clone(), weight);
+            // Update agent_state
+            // agent_state.update(new_weight, new_hidden, new_cell);
+
             let signal = Signal::builder()
                 .event_time(tick.event_time)
                 .strategy(self.strategy.clone())
                 .instrument(instrument.clone())
-                .weight(weight)
+                .weight(new_weight)
                 .build();
             self.pubsub.publish(signal).await;
         }

@@ -1,0 +1,45 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                id,\n                name,\n                instance_type AS \"instance_type:InstanceType\"\n            FROM instances \n            WHERE name = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "instance_type:InstanceType",
+        "type_info": {
+          "Custom": {
+            "name": "instance_type",
+            "kind": {
+              "Enum": [
+                "live",
+                "simulation",
+                "utility"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d484d13e9d4f64c0df817d199b69712c706628ae0e69234dd6cd3729e307bd9d"
+}
