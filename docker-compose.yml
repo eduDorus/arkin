@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   postgres:
     image: postgres:17
@@ -54,6 +52,21 @@ services:
         hard: 262144
     networks:
       - network
+        
+  arkin-binance-ingestor:
+    image: arkin:v1.0.0  # Replace with your image name, e.g., arkin:1.0 or a registry path
+    container_name: arkin-binance-ingestor
+    hostname: arkin-binance-ingestor
+    command: ["./main", "ingestor", "-i", "binance", "--instruments", "BTCUSDT,ETHUSDT,SOLUSDT"]
+    environment:
+      - RUST_LOG=info
+      - CONFIG_DIR=/app/configs
+      - RUN_MODE=prod  # Changed to prod for production
+    volumes:
+      - /mnt/data/arkin/configs:/app/configs:ro  # Mount configs as read-only
+    networks:
+      - network
+    restart: unless-stopped
 
 networks:
   network:
