@@ -11,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 use typed_builder::TypedBuilder;
 
+use crate::utils::PeekableReceiver;
 use crate::{Event, RunnableService, SimulationClock};
 
 #[derive(Clone)]
@@ -107,7 +108,7 @@ impl PubSubSubscriber {
 #[derive(TypedBuilder)]
 pub struct PubSub {
     #[builder(default = Arc::new(RwLock::new(Vec::new())))]
-    event_receivers: Arc<RwLock<Vec<AsyncReceiver<Event>>>>,
+    event_receivers: Arc<RwLock<Vec<PeekableReceiver<Event>>>>,
     #[builder(default = Arc::new(RwLock::new(HashMap::new())))]
     subscribers: Arc<RwLock<HashMap<String, AsyncSender<Event>>>>,
     #[builder(default = Arc::new(RwLock::new(kanal::bounded_async(128))))]
@@ -128,7 +129,7 @@ impl PubSub {
 
     pub async fn publisher(&self) -> PubSubPublisher {
         let (tx, rx) = kanal::bounded_async(100000);
-        self.event_receivers.write().await.push(rx);
+        self.event_receivers.write().await.push(PeekableReceiver::new(rx));
         PubSubPublisher {
             tx,
             clock: self.clock.clone(),
@@ -138,7 +139,7 @@ impl PubSub {
     pub async fn handle(&self, name: &str) -> PubSubHandle {
         let (publisher_tx, publisher_rx) = kanal::bounded_async(100000);
         let (receiver_tx, receiver_rx) = kanal::bounded_async(1);
-        self.event_receivers.write().await.push(publisher_rx);
+        self.event_receivers.write().await.push(PeekableReceiver::new(publisher_rx));
         self.subscribers.write().await.insert(name.to_string(), receiver_tx);
         PubSubHandle {
             tx: publisher_tx,
@@ -158,24 +159,34 @@ impl RunnableService for PubSub {
         // Event Collector Task
         let collector_event_queue = event_queue.clone();
         let collector_event_receivers = self.event_receivers.clone();
+        let collector_clock = self.clock.clone();
         let collector_shutdown = shutdown.clone();
         tokio::spawn(async move {
             loop {
                 if collector_shutdown.is_cancelled() {
                     break;
                 }
-                let receivers = collector_event_receivers.read().await;
-                for receiver in receivers.iter() {
-                    if let Ok(Some(event)) = receiver.try_recv() {
+                let mut receivers = collector_event_receivers.write().await;
+                for receiver in receivers.iter_mut() {
+                    // Peek if there is a element and if it is within 24h
+                    if let Some(peeked) = receiver.peek() {
+                        if peeked.timestamp() > collector_clock.get_current_time().await + Duration::from_secs(3600) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                    if let Some(event) = receiver.next() {
                         let mut lock = collector_event_queue.lock().await;
                         lock.push(Reverse(event));
                         if lock.len() > 100000000 {
                             drop(lock);
-                            // error!("Event queue is full, waiting 5s");
-                            tokio::time::sleep(Duration::from_secs(5)).await;
+                            error!("Event queue is full, waiting 5s");
+                            // tokio::time::sleep(Duration::from_secs(5)).await;
                         }
                     }
                 }
+                // tokio::time::sleep(Duration::from_micros(1)).await;
             }
             info!("Event collector task stopped.");
         });

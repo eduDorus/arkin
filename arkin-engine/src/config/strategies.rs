@@ -51,4 +51,6 @@ pub struct AgentConfig {
     pub n_layers: usize,
     pub hidden_size: usize,
     pub inputs: Vec<FeatureId>,
+    pub input_change: FeatureId,
+    pub commission_rate: Decimal,
 }

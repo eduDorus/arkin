@@ -1,3 +1,4 @@
+use std::fmt;
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
@@ -7,6 +8,7 @@ use ort::{
     value::Tensor,
 };
 use rust_decimal::prelude::*;
+use rust_decimal_macros::dec;
 use tokio::{select, sync::RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
@@ -28,15 +30,72 @@ struct AgentState {
 impl AgentState {
     pub fn new(n_layers: usize, hidden_size: usize) -> Self {
         Self {
-            hidden: Array3::zeros((n_layers, 1, hidden_size)),
-            cell: Array3::zeros((n_layers, 1, hidden_size)),
+            hidden: Array3::ones((n_layers, 1, hidden_size)),
+            cell: Array3::ones((n_layers, 1, hidden_size)),
             current_weight: Decimal::ZERO,
             holding_steps: Decimal::ZERO,
             trade_pnl: Decimal::ZERO,
         }
     }
 
-    // pub fn update(&mut self, action: Decimal, hidden: Array3<f32>, cell: Array3<f32>) -> Self {}
+    pub fn update_pnl(&mut self, pct_change: Decimal) {
+        self.trade_pnl += self.current_weight * pct_change;
+    }
+
+    pub fn update_state(&mut self, new_weight: Decimal, commission_rate: Decimal) {
+        let current_weight = self.current_weight;
+        let delta_position = (new_weight - current_weight).abs();
+        let commission = commission_rate * delta_position;
+
+        // Entering a trade
+        if current_weight == Decimal::ZERO && new_weight != Decimal::ZERO {
+            self.holding_steps = Decimal::ONE;
+            self.trade_pnl -= commission;
+
+        // Closing a trade
+        } else if current_weight != Decimal::ZERO && new_weight == Decimal::ZERO {
+            self.holding_steps = Decimal::ZERO;
+            self.trade_pnl = Decimal::ZERO;
+        } else if current_weight != Decimal::ZERO && new_weight != Decimal::ZERO && current_weight != new_weight {
+            // Changing position
+            self.holding_steps += Decimal::ONE;
+        }
+        // Staying in a trade
+        else if current_weight != Decimal::ZERO && new_weight != Decimal::ZERO && current_weight == new_weight {
+            self.holding_steps += Decimal::ONE;
+        }
+        // Staying out of a trade (current_weight == Decimal::ZERO && new_weight == Decimal::ZERO)
+        else if current_weight == Decimal::ZERO && new_weight == Decimal::ZERO {
+            self.holding_steps = Decimal::ZERO;
+            self.trade_pnl = Decimal::ZERO;
+        } else {
+            warn!(
+                "Unexpected state: current_weight: {}, new_weight: {}",
+                current_weight, new_weight
+            );
+        }
+
+        // Update current weight to the new weight
+        self.current_weight = new_weight;
+    }
+
+    pub fn set_hidden(&mut self, hidden: Array3<f32>) {
+        self.hidden = hidden;
+    }
+
+    pub fn set_cell(&mut self, cell: Array3<f32>) {
+        self.cell = cell;
+    }
+}
+
+impl fmt::Display for AgentState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AgentState {{ current_weight: {}, holding_steps: {}, trade_pnl: {}, hidden: {:?}, cell: {:?} }}",
+            self.current_weight, self.holding_steps, self.trade_pnl, self.hidden, self.cell
+        )
+    }
 }
 
 #[derive(TypedBuilder)]
@@ -51,6 +110,8 @@ pub struct AgentStrategy {
     n_layers: usize,
     hidden_size: usize,
     inputs: Vec<FeatureId>,
+    input_change: FeatureId,
+    commission_rate: Decimal,
     #[builder(default)]
     models: RwLock<HashMap<Arc<Instrument>, Arc<Session>>>,
     #[builder(default)]
@@ -63,11 +124,7 @@ pub struct AgentStrategy {
 impl Algorithm for AgentStrategy {
     async fn insight_tick(&self, tick: Arc<InsightsUpdate>) -> Result<(), StrategyError> {
         for instrument in &tick.instruments {
-            // Get the model
-            // Check if we have a model for the instrument
-            // If not, check if we have a model file
-            // If we have a model file, load the model
-            // If we don't have a model file, log a warning and return None
+            // Get or init  the model
             if !self.models.read().await.contains_key(instrument) {
                 info!("Initializing model for {}", instrument);
                 let filename = format!(
@@ -86,15 +143,6 @@ impl Algorithm for AgentStrategy {
                 self.models.write().await.insert(instrument.clone(), model.into());
             }
             let model = self.models.read().await.get(instrument).expect("Model not found").clone();
-
-            // Lock the current weight map
-            let agent_state = self
-                .agent_state
-                .read()
-                .await
-                .get(instrument)
-                .cloned()
-                .unwrap_or(AgentState::new(self.n_layers, self.hidden_size));
 
             // Prepare the observation from tick insights (single step)
             let mut obs: Vec<f32> = self
@@ -118,18 +166,40 @@ impl Algorithm for AgentStrategy {
                 continue; // Skip this instrument if data is missing
             }
 
+            // Get the current change
+            let pct_change = tick
+                .insights
+                .iter()
+                .find(|i| {
+                    i.instrument == Some(instrument.clone())
+                        && i.feature_id == self.input_change
+                        && i.insight_type == InsightType::Continuous
+                })
+                .map(|i| i.value)
+                .unwrap_or(0.0);
+
+            // Lock the current weight map
+            let mut agent_state = self
+                .agent_state
+                .read()
+                .await
+                .get(instrument)
+                .cloned()
+                .unwrap_or(AgentState::new(self.n_layers, self.hidden_size));
+            agent_state.update_pnl(Decimal::from_f64(pct_change).unwrap());
+
             // Add agent state
             obs.push(agent_state.current_weight.to_f32().unwrap_or(0.0));
-            // obs.push(agent_state.holding_steps / dec!(10).to_f32().unwrap());
-            // obs.push(agent_state.trade_pnl * dec!(100).to_f32().unwrap());
+            obs.push((agent_state.holding_steps / dec!(10)).to_f32().unwrap());
+            obs.push((agent_state.trade_pnl * dec!(100)).to_f32().unwrap());
 
             // Prepare the hidden and cell states
             let obs_array = Array::from_shape_vec((1, self.inputs.len() + 3), obs).expect("Failed to create obs array");
 
             // Convert inputs to ort::Value
             let obs_value = Tensor::from_array(obs_array).expect("Failed to create obs value");
-            let hidden_value = Tensor::from_array(agent_state.hidden).expect("Failed to create hidden value");
-            let cell_value = Tensor::from_array(agent_state.cell).expect("Failed to create cell value");
+            let hidden_value = Tensor::from_array(agent_state.hidden.clone()).expect("Failed to create hidden value");
+            let cell_value = Tensor::from_array(agent_state.cell.clone()).expect("Failed to create cell value");
 
             // Run the model with correct input names
             let outputs = model
@@ -158,20 +228,16 @@ impl Algorithm for AgentStrategy {
                 .to_owned();
 
             // Convert states to Array3
+            let new_weight = self.action_space[action[0] as usize];
             let new_hidden = new_hidden.into_dimensionality::<Ix3>().expect("Hidden state is not 3D");
             let new_cell = new_cell.into_dimensionality::<Ix3>().expect("Cell state is not 3D");
 
-            // Update hidden states
-            // self.hidden_states
-            //     .write()
-            //     .await
-            //     .insert(instrument.clone(), (new_hidden, new_cell));
-
-            // info!("Action: {:?}", action[0]);
-            let new_weight = self.action_space[action[0] as usize];
-
-            // Update agent_state
-            // agent_state.update(new_weight, new_hidden, new_cell);
+            // Update the agent state
+            agent_state.update_state(new_weight, self.commission_rate);
+            agent_state.set_hidden(new_hidden);
+            agent_state.set_cell(new_cell);
+            self.agent_state.write().await.insert(instrument.clone(), agent_state.clone());
+            info!("Agent state for {}: {}", instrument, agent_state);
 
             let signal = Signal::builder()
                 .event_time(tick.event_time)

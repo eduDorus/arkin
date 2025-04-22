@@ -186,15 +186,36 @@ impl TickClickhouseRepo {
             .client
             .query(
                 r#"
+              WITH timeseries AS (
+                SELECT
+                    argMax(event_time, (event_time, tick_id)) AS last_event_time,
+                    argMax(tick_id, (event_time, tick_id)) AS last_tick_id,
+                    argMax(bid_price, (event_time, tick_id)) AS last_bid_price,
+                    argMax(bid_quantity, (event_time, tick_id)) AS last_bid_quantity,
+                    argMax(ask_price, (event_time, tick_id)) AS last_ask_price,
+                    argMax(ask_quantity, (event_time, tick_id)) AS last_ask_quantity,
+                    instrument_id,
+                    toStartOfSecond(event_time) AS second_start
+                FROM
+                    ? FINAL
+                WHERE
+                    second_start BETWEEN ? AND ?
+                    AND instrument_id IN (?)
+                GROUP BY
+                    instrument_id, second_start
+                ORDER BY
+                    second_start, instrument_id
+              )
               SELECT 
-                  ?fields 
+                last_event_time as event_time,
+                instrument_id, 
+                last_tick_id as tick_id, 
+                last_bid_price as bid_price, 
+                last_bid_quantity as bid_quantity,
+                last_ask_price as ask_price,
+                last_ask_quantity as ask_quantity
               FROM 
-                  ? FINAL
-              WHERE 
-                  event_time BETWEEN ? AND ? 
-                  AND instrument_id IN (?)
-              ORDER BY 
-                  event_time, tick_id ASC
+                timeseries
               "#,
             )
             .bind(Identifier(&self.table_name))

@@ -65,6 +65,8 @@ impl StrategyFactory {
                             .n_layers(c.n_layers)
                             .hidden_size(c.hidden_size)
                             .inputs(c.inputs.clone())
+                            .input_change(c.input_change)
+                            .commission_rate(c.commission_rate)
                             .build(),
                     )
                 }

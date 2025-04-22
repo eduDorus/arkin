@@ -76,13 +76,22 @@ impl RunnableService for InsightsService {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting insights service...");
 
+        let mut warm_up = 1440;
+
         loop {
             select! {
                 Some(event) = self.pubsub.recv() => {
                     match event {
                         Event::InsightsTick(tick) => {
                             info!("InsightsService received interval tick: {}", tick.event_time);
-                            if let Err(e) = self.process(tick.event_time, &tick.instruments, true).await {
+                            let publish = if warm_up > 0 {
+                                warm_up -= 1;
+                                info!("Warming up insights service for {} more steps, skipping publish", warm_up);
+                                false
+                            } else {
+                                true
+                            };
+                            if let Err(e) = self.process(tick.event_time, &tick.instruments, publish).await {
                                 error!("Error processing interval tick: {}", e);
                             }
                         }
