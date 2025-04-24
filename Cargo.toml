@@ -1,5 +1,5 @@
 [workspace]
-members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-accounting", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-ordermanager", "arkin-engine", "arkin-binance", "arkin-executors" ]
+members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-accounting", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-ordermanager", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
 
 default-members = [ "arkin" ]
 
@@ -95,8 +95,7 @@ ort = { version = "=2.0.0-rc.9" }
 ndarray = { version = "0.16.1" }
 # Models & Optimisation
 # catboost-rs = "0.1"
-# clarabel = "0"
-
+clarabel = "0"
 # Testing
 # mockall = "0.13"
 # test-case = "3.3"

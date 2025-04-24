@@ -1,12 +1,11 @@
 use std::fmt;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use ndarray::{Array, Array3, Ix3};
-use ort::{
-    session::{builder::GraphOptimizationLevel, Session},
-    value::Tensor,
-};
+use ort::{session::Session, value::Tensor};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use tokio::{select, sync::RwLock};
@@ -20,21 +19,25 @@ use crate::{Algorithm, StrategyError, StrategyService};
 
 #[derive(Debug, Clone, TypedBuilder)]
 struct AgentState {
-    hidden: Array3<f32>,
-    cell: Array3<f32>,
+    entry_signal_count: usize, // Counter for entry signals
+    exit_signal_count: usize,  // Counter for exit signals
     current_weight: Decimal,
     holding_steps: Decimal,
     trade_pnl: Decimal,
+    hidden: Array3<f32>,
+    cell: Array3<f32>,
 }
 
 impl AgentState {
     pub fn new(n_layers: usize, hidden_size: usize) -> Self {
         Self {
-            hidden: Array3::ones((n_layers, 1, hidden_size)),
-            cell: Array3::ones((n_layers, 1, hidden_size)),
+            entry_signal_count: 0,
+            exit_signal_count: 0,
             current_weight: Decimal::ZERO,
             holding_steps: Decimal::ZERO,
             trade_pnl: Decimal::ZERO,
+            hidden: Array3::ones((n_layers, 1, hidden_size)),
+            cell: Array3::ones((n_layers, 1, hidden_size)),
         }
     }
 
@@ -42,30 +45,62 @@ impl AgentState {
         self.trade_pnl += self.current_weight * pct_change;
     }
 
-    pub fn update_state(&mut self, new_weight: Decimal, commission_rate: Decimal) {
+    pub fn update_state(&mut self, proposed_weight: Decimal, commission_rate: Decimal) {
+        let mut actual_new_weight = self.current_weight; // Default to no change
+
+        if self.current_weight == Decimal::ZERO {
+            // Not in a trade
+            if proposed_weight != Decimal::ZERO {
+                self.entry_signal_count += 1;
+                info!("Increasing entry signal count to {}", self.entry_signal_count);
+                if self.entry_signal_count >= 2 {
+                    // Require at least 2 consecutive signals
+                    actual_new_weight = proposed_weight; // Enter the trade
+                    self.entry_signal_count = 0; // Reset counter after entry
+                }
+            } else {
+                self.entry_signal_count = 0; // Reset if sequence is interrupted
+            }
+        } else {
+            // In a trade
+            if proposed_weight == Decimal::ZERO {
+                self.exit_signal_count += 1;
+                info!("Increasing exit signal count to {}", self.exit_signal_count);
+                if self.exit_signal_count >= 2 {
+                    // Require at least 2 consecutive signals
+                    actual_new_weight = Decimal::ZERO; // Exit the trade
+                    self.exit_signal_count = 0; // Reset counter after exit
+                }
+            } else {
+                self.exit_signal_count = 0; // Reset if sequence is interrupted
+                if proposed_weight != self.current_weight {
+                    actual_new_weight = proposed_weight; // Adjust position immediately
+                }
+            }
+        }
+
+        // Update the state based on actual_new_weight
         let current_weight = self.current_weight;
-        let delta_position = (new_weight - current_weight).abs();
-        let commission = commission_rate * delta_position;
+        let new_weight = actual_new_weight;
 
-        // Entering a trade
         if current_weight == Decimal::ZERO && new_weight != Decimal::ZERO {
-            self.holding_steps = Decimal::ONE;
+            // Entering a trade
+            let delta_position = new_weight.abs();
+            let commission = commission_rate * delta_position;
             self.trade_pnl -= commission;
-
-        // Closing a trade
+            self.holding_steps = Decimal::ONE;
         } else if current_weight != Decimal::ZERO && new_weight == Decimal::ZERO {
+            // Exiting a trade
             self.holding_steps = Decimal::ZERO;
             self.trade_pnl = Decimal::ZERO;
         } else if current_weight != Decimal::ZERO && new_weight != Decimal::ZERO && current_weight != new_weight {
-            // Changing position
+            // Adjusting position
             self.holding_steps += Decimal::ONE;
-        }
-        // Staying in a trade
-        else if current_weight != Decimal::ZERO && new_weight != Decimal::ZERO && current_weight == new_weight {
+        } else if current_weight != Decimal::ZERO && new_weight == current_weight {
+            // Staying in a trade
             self.holding_steps += Decimal::ONE;
-        }
-        // Staying out of a trade (current_weight == Decimal::ZERO && new_weight == Decimal::ZERO)
-        else if current_weight == Decimal::ZERO && new_weight == Decimal::ZERO {
+        } else if current_weight == Decimal::ZERO && new_weight == Decimal::ZERO {
+            // Staying out of a trade
             self.holding_steps = Decimal::ZERO;
             self.trade_pnl = Decimal::ZERO;
         } else {
@@ -75,7 +110,7 @@ impl AgentState {
             );
         }
 
-        // Update current weight to the new weight
+        // Update the current weight
         self.current_weight = new_weight;
     }
 
@@ -134,10 +169,12 @@ impl Algorithm for AgentStrategy {
 
                 let model = Session::builder()
                     .expect("Failed to create session builder")
-                    .with_optimization_level(GraphOptimizationLevel::Level3)
-                    .expect("Failed to set optimization level")
-                    .with_intra_threads(4)
-                    .expect("Failed to set intra threads")
+                    // .with_optimization_level(GraphOptimizationLevel::Level3)
+                    // .expect("Failed to set optimization level")
+                    // .with_intra_threads(4)
+                    // .expect("Failed to set intra threads")
+                    .with_deterministic_compute(true)
+                    .expect("Failed to set deterministic compute")
                     .commit_from_file(filename)
                     .expect("Failed to commit from file");
                 self.models.write().await.insert(instrument.clone(), model.into());
@@ -145,7 +182,7 @@ impl Algorithm for AgentStrategy {
             let model = self.models.read().await.get(instrument).expect("Model not found").clone();
 
             // Prepare the observation from tick insights (single step)
-            let mut obs: Vec<f32> = self
+            let mut obs: Vec<f64> = self
                 .inputs
                 .iter()
                 .filter_map(|feature_id| {
@@ -159,7 +196,7 @@ impl Algorithm for AgentStrategy {
                         })
                         .map(|i| i.value)
                 })
-                .map(|v| v as f32)
+                .map(|v| v)
                 .collect();
             if obs.len() != self.inputs.len() {
                 warn!("Incomplete observation data for instrument {}", instrument);
@@ -189,9 +226,28 @@ impl Algorithm for AgentStrategy {
             agent_state.update_pnl(Decimal::from_f64(pct_change).unwrap());
 
             // Add agent state
-            obs.push(agent_state.current_weight.to_f32().unwrap_or(0.0));
-            obs.push((agent_state.holding_steps / dec!(10)).to_f32().unwrap());
-            obs.push((agent_state.trade_pnl * dec!(100)).to_f32().unwrap());
+            obs.push(agent_state.current_weight.to_f64().unwrap_or(0.0));
+            obs.push((agent_state.holding_steps / dec!(10)).to_f64().unwrap());
+            obs.push((agent_state.trade_pnl * dec!(100)).to_f64().unwrap());
+
+            let obs = obs
+                .into_iter()
+                .map(|v| ((v * 1_000_000.0).round() / 1_000_000.0) as f32)
+                .collect::<Vec<_>>();
+
+            // Here we have all the observations
+            let mut file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open("observations_8.txt")
+                .expect("Failed to open observations.txt");
+            let row = format!(
+                "{}, {}, {}",
+                tick.event_time,
+                instrument.id,
+                obs.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(", ")
+            );
+            writeln!(file, "{}", row).expect("Failed to write observation row");
 
             // Prepare the hidden and cell states
             let obs_array = Array::from_shape_vec((1, self.inputs.len() + 3), obs).expect("Failed to create obs array");

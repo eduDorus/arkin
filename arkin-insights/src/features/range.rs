@@ -92,7 +92,7 @@ impl Feature for RangeFeature {
         }
 
         // Calculate distribution
-        let value = match self.method {
+        let mut value = match self.method {
             // Basic
             RangeAlgo::Count => data.len() as f64,
             RangeAlgo::Sum => sum(&data),
@@ -127,6 +127,9 @@ impl Feature for RangeFeature {
             );
             return None;
         }
+
+        // Set precision to 6 decimal places
+        value = (value * 1_000_000.0).round() / 1_000_000.0;
 
         let insight = Insight::builder()
             .event_time(event_time)

@@ -20,9 +20,9 @@ pub struct SimulationExecutor {
     pubsub: PubSubHandle,
     #[builder(default)]
     orders: RwLock<HashMap<VenueOrderId, VenueOrder>>,
-    #[builder(default = dec!(0.000360))]
+    #[builder(default = dec!(0.0005))]
     taker_commission: Decimal,
-    #[builder(default = dec!(0.000144))]
+    #[builder(default = dec!(0.0002))]
     maker_commission: Decimal,
 }
 
@@ -192,8 +192,10 @@ impl ExecutorService for SimulationExecutor {}
 //     #[test(tokio::test)]
 //     async fn test_place_order() {
 //         // Create a shared pubsub and executor.
-//         let pubsub = Arc::new(PubSub::new(1024));
-//         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
+//         let pubsub = test_pubsub();
+//         let executor = SimulationExecutor::builder()
+//             .pubsub(pubsub.handle("SimulationExecutor").await)
+//             .build();
 
 //         // Create dummy portfolio and instrument.
 //         let strategy = test_strategy_1();
@@ -213,7 +215,7 @@ impl ExecutorService for SimulationExecutor {}
 //         let order_arc = Arc::new(order);
 
 //         // Subscribe to pubsub events.
-//         let mut rx = pubsub.subscribe();
+//         let mut rx = executor.subscriber().await;
 
 //         // Place the order.
 //         executor.place_order(Arc::clone(&order_arc)).await.unwrap();
@@ -243,8 +245,10 @@ impl ExecutorService for SimulationExecutor {}
 
 //     #[test(tokio::test)]
 //     async fn test_cancel_order() {
-//         let pubsub = Arc::new(PubSub::new(1024));
-//         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
+//         let pubsub = test_pubsub();
+//         let executor = SimulationExecutor::builder()
+//             .pubsub(pubsub.handle("SimulationExecutor").await)
+//             .build();
 
 //         let strategy = test_strategy_1();
 //         let instrument = test_inst_binance_btc_usdt_perp();
@@ -288,8 +292,10 @@ impl ExecutorService for SimulationExecutor {}
 
 //     #[test(tokio::test)]
 //     async fn test_cancel_orders_by_instrument() {
-//         let pubsub = Arc::new(PubSub::new(1024));
-//         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
+//         let pubsub = test_pubsub();
+//         let executor = SimulationExecutor::builder()
+//             .pubsub(pubsub.handle("SimulationExecutor").await)
+//             .build();
 
 //         let strategy = test_strategy_1();
 //         let instrument_btc = test_inst_binance_btc_usdt_perp();
@@ -364,8 +370,10 @@ impl ExecutorService for SimulationExecutor {}
 
 //     #[test(tokio::test)]
 //     async fn test_cancel_all_orders() {
-//         let pubsub = Arc::new(PubSub::new(1024));
-//         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
+//         let pubsub = test_pubsub();
+//         let executor = SimulationExecutor::builder()
+//             .pubsub(pubsub.handle("SimulationExecutor").await)
+//             .build();
 
 //         let strategy = test_strategy_1();
 //         let instrument = test_inst_binance_btc_usdt_perp();
@@ -424,8 +432,10 @@ impl ExecutorService for SimulationExecutor {}
 
 //     #[test(tokio::test)]
 //     async fn test_market_order_execution() {
-//         let pubsub = Arc::new(PubSub::new(1024));
-//         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
+//         let pubsub = test_pubsub();
+//         let executor = SimulationExecutor::builder()
+//             .pubsub(pubsub.handle("SimulationExecutor").await)
+//             .build();
 
 //         let strategy = test_strategy_1();
 //         let instrument = test_inst_binance_btc_usdt_perp();
@@ -507,8 +517,10 @@ impl ExecutorService for SimulationExecutor {}
 
 //     #[test(tokio::test)]
 //     async fn test_limit_order_execution() {
-//         let pubsub = Arc::new(PubSub::new(1024));
-//         let executor = SimulationExecutor::builder().pubsub(Arc::clone(&pubsub)).build();
+//         let pubsub = test_pubsub();
+//         let executor = SimulationExecutor::builder()
+//             .pubsub(pubsub.handle("SimulationExecutor").await)
+//             .build();
 
 //         let strategy = test_strategy_1();
 //         let instrument = test_inst_binance_btc_usdt_perp();

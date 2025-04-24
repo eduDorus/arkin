@@ -70,13 +70,23 @@ impl Feature for TwoValueFeature {
             }
         }
 
-        // Unwrap values
-
-        let change = match self.method {
+        let mut change = match self.method {
             TwoValueAlgo::Imbalance => imbalance(value_1, value_2),
             TwoValueAlgo::Elasticity => elasticity(value_1, value_2),
             TwoValueAlgo::Division => value_1 / value_2,
         };
+
+        // Check if we have a value
+        if change.is_nan() {
+            warn!(
+                "NaN value for distribution calculation for feature {} with method {}",
+                self.output, self.method
+            );
+            return None;
+        }
+
+        // Set precision to 6 decimal places
+        change = (change * 1_000_000.0).round() / 1_000_000.0;
 
         // Return insight
         let insight = Insight::builder()

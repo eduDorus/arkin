@@ -4,8 +4,8 @@ use tracing::info;
 use arkin_core::prelude::*;
 use arkin_engine::prelude::*;
 
-// #[tokio::main(flavor = "current_thread")]
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main(flavor = "current_thread")]
+// #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     init_tracing();
 

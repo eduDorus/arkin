@@ -93,7 +93,7 @@ impl Feature for DualRangeFeature {
         }
 
         // Calculate distribution
-        let value = match self.method {
+        let mut value = match self.method {
             DualRangeAlgo::Covariance => covariance(&data_1, &data_2),
             DualRangeAlgo::Correlation => correlation(&data_1, &data_2),
             DualRangeAlgo::CosineSimilarity => cosine_similarity(&data_1, &data_2),
@@ -108,6 +108,9 @@ impl Feature for DualRangeFeature {
             );
             return None;
         }
+
+        // Set precision to 6 decimal places
+        value = (value * 1_000_000.0).round() / 1_000_000.0;
 
         let insight = Insight::builder()
             .event_time(event_time)

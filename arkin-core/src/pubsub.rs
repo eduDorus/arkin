@@ -170,7 +170,7 @@ impl RunnableService for PubSub {
                 for receiver in receivers.iter_mut() {
                     // Peek if there is a element and if it is within 24h
                     if let Some(peeked) = receiver.peek() {
-                        if peeked.timestamp() > collector_clock.get_current_time().await + Duration::from_secs(3600) {
+                        if peeked.timestamp() > collector_clock.get_current_time().await + Duration::from_secs(86400) {
                             continue;
                         }
                     } else {
@@ -182,7 +182,7 @@ impl RunnableService for PubSub {
                         if lock.len() > 100000000 {
                             drop(lock);
                             error!("Event queue is full, waiting 5s");
-                            // tokio::time::sleep(Duration::from_secs(5)).await;
+                            tokio::time::sleep(Duration::from_secs(1)).await;
                         }
                     }
                 }
@@ -208,9 +208,7 @@ impl RunnableService for PubSub {
                     }
                     break;
                 }
-                let mut queue = processor_event_queue.lock().await;
-                if let Some(Reverse(event)) = queue.pop() {
-                    drop(queue); // Release lock early
+                if let Some(Reverse(event)) = processor_event_queue.lock().await.pop() {
                     if !event.is_market_data() {
                         info!("Processing event: {}", event);
                     }
@@ -234,7 +232,6 @@ impl RunnableService for PubSub {
                         }
                     }
                 } else {
-                    drop(queue); // Release lock before slow operations
                     if processor_clock.is_finished().await {
                         info!("PubSub finished processing all events.");
                         let subscribers = processor_subscribers.read().await;

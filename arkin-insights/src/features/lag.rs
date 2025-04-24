@@ -65,12 +65,24 @@ impl Feature for LagFeature {
         let prev_value = prev_value.expect("Prev value should not be None");
         let value = value.expect("Value should not be None");
 
-        let change = match self.method {
+        let mut change = match self.method {
             LagAlgo::AbsoluteChange => abs_change(value, prev_value),
             LagAlgo::PercentChange => pct_change(value, prev_value),
             LagAlgo::LogChange => log_change(value, prev_value),
             LagAlgo::Difference => difference(value, prev_value),
         };
+
+        // Check if we have a value
+        if change.is_nan() {
+            warn!(
+                "NaN value for distribution calculation for feature {} with method {}",
+                self.output, self.method
+            );
+            return None;
+        }
+
+        // Set precision to 6 decimal places
+        change = (change * 1_000_000.0).round() / 1_000_000.0;
 
         // Return insight
         let insight = Insight::builder()

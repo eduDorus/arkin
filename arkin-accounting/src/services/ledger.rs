@@ -4,7 +4,7 @@ use rust_decimal_macros::dec;
 use std::{collections::HashMap, sync::Arc};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -127,12 +127,12 @@ impl LedgerAccounting {
         margin_rate: Decimal,
         commission_rate: Decimal,
     ) -> Result<(), AccountingError> {
-        info!("Starting Margin Trade...");
-        info!("Side: {}", side);
-        info!("Price: {}", price);
-        info!("Amount: {}", amount);
-        info!("Margin Rate: {}", margin_rate);
-        info!("Commission Rate: {}", commission_rate);
+        debug!("Starting Margin Trade...");
+        debug!("Side: {}", side);
+        debug!("Price: {}", price);
+        debug!("Amount: {}", amount);
+        debug!("Margin Rate: {}", margin_rate);
+        debug!("Commission Rate: {}", commission_rate);
         let event_time = self.pubsub.current_time().await;
         let venue = instrument.venue.clone();
         let inst_asset = Tradable::Instrument(instrument.clone());
@@ -157,39 +157,39 @@ impl LedgerAccounting {
             .await;
 
         let (cost_basis, current_position) = self.ledger.current_position(&strategy, Some(&instrument));
-        info!("Cost Basis: {}, Current Position {}", cost_basis, current_position);
+        debug!("Cost Basis: {}, Current Position {}", cost_basis, current_position);
         let new_position = match side {
             MarketSide::Buy => current_position + amount,
             MarketSide::Sell => current_position - amount,
         };
-        info!("New Position after {} will be: {}", side, new_position);
+        debug!("New Position after {} will be: {}", side, new_position);
 
         // Calculate amount closed and PnL
         let amount_closed = if (current_position > Decimal::ZERO && new_position <= Decimal::ZERO)
             || (current_position < Decimal::ZERO && new_position >= Decimal::ZERO)
         {
-            info!("Position will fully close: {} -> {}", current_position, new_position);
+            debug!("Position will fully close: {} -> {}", current_position, new_position);
             current_position.abs() // Full close before flip
         } else {
-            info!("Position will not close fully: {} -> {}", current_position, new_position);
+            debug!("Position will not close fully: {} -> {}", current_position, new_position);
             amount.min(current_position.abs()) // Partial close
         };
-        info!("Amount closed: {}", amount_closed);
+        debug!("Amount closed: {}", amount_closed);
 
         let entry_price = if !current_position.is_zero() {
             cost_basis / current_position.abs()
         } else {
             Decimal::ZERO
         };
-        info!("Entry price from ledger: {}", entry_price);
+        debug!("Entry price from ledger: {}", entry_price);
         let pnl = if current_position > Decimal::ZERO {
-            info!("Calculating PnL for long position");
+            debug!("Calculating PnL for long position");
             (price - entry_price) * amount_closed
         } else if current_position < Decimal::ZERO {
-            info!("Calculating PnL for short position");
+            debug!("Calculating PnL for short position");
             (entry_price - price) * amount_closed
         } else {
-            info!("No PnL for flat position");
+            debug!("No PnL for flat position");
             dec!(0)
         };
 
@@ -209,11 +209,11 @@ impl LedgerAccounting {
             let closing_margin = current_margin * (amount_closed / current_position.abs());
             posting - closing_margin
         };
-        info!("Margin delta: {}", margin_delta);
+        debug!("Margin delta: {}", margin_delta);
 
         //  Calculate commission
         let commission = amount * price * commission_rate;
-        info!("Commission: {}", commission);
+        debug!("Commission: {}", commission);
 
         // Step 7: Create transfers
         let transfer_group_id = Uuid::new_v4();
@@ -329,8 +329,8 @@ impl LedgerAccounting {
         }
 
         for t in &transfers {
-            info!("Transfers:");
-            info!(" - {}", t);
+            debug!("Transfers:");
+            debug!(" - {}", t);
         }
 
         // Apply transfers atomically
@@ -640,738 +640,750 @@ impl RunnableService for LedgerAccounting {
                 }
             }
         }
-        info!("Accounting service stopped.");
+        debug!("Accounting service stopped.");
         Ok(())
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use test_log::test;
-
-//     #[test(tokio::test)]
-//     async fn test_multi_strategy_multi_instrument() {
-//         let pubsub = PubSub::new(1024);
-//         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-//         let strategy_1 = test_strategy_1();
-//         let strategy_2 = test_strategy_2();
-
-//         let personal = test_personal_venue();
-//         let venue = test_binance_venue();
-//         let inst_btc = test_inst_binance_btc_usdt_perp();
-//         let inst_eth = test_inst_binance_eth_usdt_perp();
-//         let usdt = Tradable::Asset(test_usdt_asset());
-
-//         // Initial deposit
-//         accounting
-//             .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
-//             .await
-//             .unwrap();
-
-//         let user_margin = accounting
-//             .ledger
-//             .find_or_create_account(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
-
-//         // Go long strategy 1: Buy 1 BTC at 1000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy_1.clone(),
-//                 inst_btc.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         // Go long strategy 2: Buy 1 ETH at 2000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy_2.clone(),
-//                 inst_eth.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(2000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(2000));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(50));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(100));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9849.4));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(0));
-
-//         // Go long strategy 1: Buy 1 ETH at 2200 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy_1.clone(),
-//                 inst_eth.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(2200),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         // Go long strategy 2: Buy 1 BTC at 1200 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy_2.clone(),
-//                 inst_btc.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1200),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(2200));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1200));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(2000));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(160));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(160));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9678.72));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(0));
-
-//         // Reduce strategy 1: Sell 1 ETH at 1800 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy_1.clone(),
-//                 inst_eth.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1800),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         // Reduce strategy 2: Sell 1 ETh at 1800 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy_2.clone(),
-//                 inst_eth.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1800),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1200));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(50));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(60));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9288.00));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(-400));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(-200));
-
-//         // Reduce strategy 1: Sell 0.5 BTC at 3000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy_1.clone(),
-//                 inst_btc.clone(),
-//                 None,
-//                 dec!(0.5),
-//                 dec!(3000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         // Reduce strategy 2: Sell 0.5 BTC at 3000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy_2.clone(),
-//                 inst_btc.clone(),
-//                 None,
-//                 dec!(0.5),
-//                 dec!(3000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(0.5));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0.5));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(500));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(600));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(25));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(30));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(11242.40));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(600));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(700));
-
-//         // increase strategy 1: Buy 0.5 BTC at 1700 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy_1.clone(),
-//                 inst_btc.clone(),
-//                 None,
-//                 dec!(0.5),
-//                 dec!(1700),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         // increase strategy 2: Buy 0.5 BTC at 1700 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy_2.clone(),
-//                 inst_btc.clone(),
-//                 None,
-//                 dec!(0.5),
-//                 dec!(1700),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1350));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1450));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(0));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(11897.06));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(950));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(950));
-
-//         // Reduce strategy 1: Sell 1. BTC at 2000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy_1.clone(),
-//                 inst_btc.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(2000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         // Reduce strategy 2: Sell 1. BTC at 2000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy_2.clone(),
-//                 inst_btc.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(2000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(0));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(13096.26));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(1600.0));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(1500.0));
-//     }
-
-//     #[test(tokio::test)]
-//     async fn test_go_long_and_close() {
-//         let pubsub = PubSub::new(1024);
-//         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-//         let strategy = test_strategy_1();
-//         let personal = test_personal_venue();
-//         let venue = test_binance_venue();
-//         let instrument = test_inst_binance_btc_usdt_perp();
-//         let margin_asset = instrument.margin_asset.clone();
-//         let usdt = Tradable::Asset(instrument.margin_asset.clone());
-
-//         // Initial deposit
-//         accounting
-//             .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
-//             .await
-//             .unwrap();
-
-//         // Go long: Buy 1 BTC at 1000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1000),
-//                 dec!(0.05),   // 5% margin rate
-//                 dec!(0.0002), // 0.02% commission rate
-//             )
-//             .await
-//             .unwrap();
-
-//         let user_margin = accounting
-//             .ledger
-//             .find_or_create_account(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
-//         let venue_spot = accounting
-//             .ledger
-//             .find_or_create_account(&venue, &usdt, &AccountOwner::Venue, &AccountType::Spot);
-
-//         // Check balances from ledger
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50)); // 1 * 1000 * 0.05
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8)); // 10000 - 50 - 0.2
-
-//         // TODO: Move this to a separate test
-//         // Check margin from accounting
-//         let asset_margin_balances = accounting.asset_margin_balance(&venue, &instrument.margin_asset).await;
-//         let asset_available_margin_balances = accounting
-//             .asset_available_margin_balance(&venue, &instrument.margin_asset)
-//             .await;
-//         assert_eq!(asset_margin_balances, dec!(9999.8));
-//         assert_eq!(asset_available_margin_balances, dec!(9949.8));
-
-//         // Check margin from accounting (venue)
-//         let margin_balances = accounting.margin_balance(&venue).await;
-//         let available_margin_balances = accounting.available_margin_balance(&venue).await;
-//         assert_eq!(margin_balances.get(&margin_asset), Some(&dec!(9999.8)));
-//         assert_eq!(available_margin_balances.get(&margin_asset), Some(&dec!(9949.8)));
-
-//         // Check position from accounting
-//         let position = accounting.position(&venue).await;
-//         assert_eq!(position.get(&instrument), Some(&dec!(1)));
-
-//         // Check specific instrument position from accounting
-//         let inst_position = accounting.instrument_position(&instrument).await;
-//         assert_eq!(inst_position, dec!(1));
-
-//         // Check strategy position from accounting
-//         let strategy_position = accounting.strategy_position(&strategy).await;
-//         assert_eq!(strategy_position.get(&instrument), Some(&dec!(1)));
-
-//         // Close: Sell 1 BTC at 1200 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1200),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10199.56));
-//         assert_eq!(accounting.ledger.balance(venue_spot.id), dec!(-199.5600));
-
-//         // Check margin from accounting
-//         let asset_margin_balances = accounting.asset_margin_balance(&venue, &instrument.margin_asset).await;
-//         let asset_available_margin_balances = accounting
-//             .asset_available_margin_balance(&venue, &instrument.margin_asset)
-//             .await;
-//         assert_eq!(asset_margin_balances, dec!(10199.56));
-//         assert_eq!(asset_available_margin_balances, dec!(10199.56));
-
-//         // Check margin from accounting (venue)
-//         // TODO: Move this to a separate test
-//         let margin_balances = accounting.margin_balance(&venue).await;
-//         let available_margin_balances = accounting.available_margin_balance(&venue).await;
-//         assert_eq!(margin_balances.get(&margin_asset), Some(&dec!(10199.56)));
-//         assert_eq!(available_margin_balances.get(&margin_asset), Some(&dec!(10199.56)));
-
-//         // Check position from accounting
-//         let position = accounting.position(&venue).await;
-//         assert_eq!(position.get(&instrument), Some(&dec!(0)));
-//         assert_eq!(position.len(), 1);
-
-//         // Check specific instrument position from accounting
-//         let inst_position = accounting.instrument_position(&instrument).await;
-//         assert_eq!(inst_position, dec!(0));
-
-//         // Check strategy position from accounting
-//         let strategy_position = accounting.strategy_position(&strategy).await;
-//         assert_eq!(strategy_position.get(&instrument), Some(&dec!(0)));
-
-//         // Check realized PnL from accounting
-//         let realized_pnl = accounting.strategy_realized_pnl(&strategy).await;
-//         assert_eq!(realized_pnl, dec!(200));
-//     }
-
-//     #[test(tokio::test)]
-//     async fn test_go_long_reduce_then_close() {
-//         let pubsub = PubSub::new(1024);
-//         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-//         let strategy = test_strategy_1();
-//         let personal = test_personal_venue();
-//         let venue = test_binance_venue();
-//         let instrument = test_inst_binance_btc_usdt_perp();
-//         let usdt = Tradable::Asset(instrument.margin_asset.clone());
-
-//         // Initial deposit
-//         accounting
-//             .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
-//             .await
-//             .unwrap();
-
-//         let user_margin = accounting
-//             .ledger
-//             .find_or_create_account(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
-
-//         // Go long: Buy 1 BTC at 1000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(2),
-//                 dec!(1000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(2));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(100));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9899.6));
-
-//         // Reduce: Sell 0.5 BTC at 1200 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(0.5),
-//                 dec!(1200),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1.5));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(75));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(100));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10024.48));
-
-//         // Close: Sell 0.5 BTC at 800 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(1.5),
-//                 dec!(800),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(-200));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9799.24));
-//     }
-
-//     #[test(tokio::test)]
-//     async fn test_go_short_and_close() {
-//         let pubsub = PubSub::new(1024);
-//         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-//         let strategy = test_strategy_1();
-//         let personal = test_personal_venue();
-//         let venue = test_binance_venue();
-//         let instrument = test_inst_binance_btc_usdt_perp();
-//         let usdt = Tradable::Asset(instrument.margin_asset.clone());
-
-//         // Initial deposit
-//         accounting
-//             .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
-//             .await
-//             .unwrap();
-
-//         let user_margin = accounting
-//             .ledger
-//             .find_or_create_account(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
-
-//         // Go short: Sell 1 BTC at 1000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8));
-
-//         // Close: Buy 1 BTC at 800 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(800),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200)); // (1000 - 800) * 1
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10199.64)); // 9949.8 + 50 (freed) - 0.16 (comm) + 200 (PnL)
-//     }
-
-//     #[test(tokio::test)]
-//     async fn test_go_short_reduce_then_close() {
-//         let pubsub = PubSub::new(1024);
-//         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-//         let strategy = test_strategy_1();
-//         let personal = test_personal_venue();
-//         let venue = test_binance_venue();
-//         let instrument = test_inst_binance_btc_usdt_perp();
-//         let usdt = Tradable::Asset(instrument.margin_asset.clone());
-
-//         // Initial deposit
-//         accounting
-//             .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
-//             .await
-//             .unwrap();
-
-//         let user_margin = accounting
-//             .ledger
-//             .find_or_create_account(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
-
-//         // Go short: Sell 1 BTC at 1000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8));
-
-//         // Reduce: Buy 0.5 BTC at 800 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(0.5),
-//                 dec!(800),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-0.5));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(25.0)); // 0.5 * 800 * 0.05
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(100)); // (1000 - 800) * 0.5
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10074.72)); // 9949.8 + 30 (freed) - 0.16 (comm) + 100 (PnL)
-
-//         // Close: Buy 0.5 BTC at 1200 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(0.5),
-//                 dec!(1200),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(0)); // 100 - (1000 - 1200) * 0.5
-//         assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9999.60)); // 10079.64 + 20 (freed) - 0.24 (comm) - 100 (PnL)
-//     }
-
-//     #[test(tokio::test)]
-//     async fn test_go_long_flip_short_flip_long_close() {
-//         let pubsub = PubSub::new(1024);
-//         let accounting = LedgerAccounting::builder().pubsub(pubsub).build();
-//         let strategy = test_strategy_1();
-//         let personal = test_personal_venue();
-//         let venue = test_binance_venue();
-//         let instrument = test_inst_binance_btc_usdt_perp();
-//         let usdt = Tradable::Asset(instrument.margin_asset.clone());
-
-//         // Initial deposit
-//         accounting
-//             .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
-//             .await
-//             .unwrap();
-
-//         // Go long: Buy 1 BTC at 1000 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(1000),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
-
-//         // Flip to short: Sell 2 BTC at 1200 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(2),
-//                 dec!(1200),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(60)); // 1 * 1200 * 0.05
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200)); // (1200 - 1000) * 1
-
-//         // Flip to long: Buy 2 BTC at 800 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Buy,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(2),
-//                 dec!(800),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(40)); // 1 * 800 * 0.05
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(600)); // 200 - (1200 - 800) * 1
-
-//         // Close: Sell 1 BTC at 900 USDT
-//         accounting
-//             .margin_trade(
-//                 MarketSide::Sell,
-//                 strategy.clone(),
-//                 instrument.clone(),
-//                 None,
-//                 dec!(1),
-//                 dec!(900),
-//                 dec!(0.05),
-//                 dec!(0.0002),
-//             )
-//             .await
-//             .unwrap();
-
-//         assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
-//         assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(700));
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_log::test;
+
+    #[test(tokio::test)]
+    async fn test_multi_strategy_multi_instrument() {
+        let pubsub = test_pubsub();
+        let accounting = LedgerAccounting::builder()
+            .pubsub(pubsub.handle("LedgerAccounting").await)
+            .build();
+        let strategy_1 = test_strategy_1();
+        let strategy_2 = test_strategy_2();
+
+        let personal = test_personal_venue();
+        let venue = test_binance_venue();
+        let inst_btc = test_inst_binance_btc_usdt_perp();
+        let inst_eth = test_inst_binance_eth_usdt_perp();
+        let usdt = Tradable::Asset(test_usdt_asset());
+
+        // Initial deposit
+        accounting
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
+            .await
+            .unwrap();
+
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
+
+        // Go long strategy 1: Buy 1 BTC at 1000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy_1.clone(),
+                inst_btc.clone(),
+                None,
+                dec!(1),
+                dec!(1000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        // Go long strategy 2: Buy 1 ETH at 2000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy_2.clone(),
+                inst_eth.clone(),
+                None,
+                dec!(1),
+                dec!(2000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(2000));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(50));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(100));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9849.4));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(0));
+
+        // Go long strategy 1: Buy 1 ETH at 2200 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy_1.clone(),
+                inst_eth.clone(),
+                None,
+                dec!(1),
+                dec!(2200),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        // Go long strategy 2: Buy 1 BTC at 1200 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy_2.clone(),
+                inst_btc.clone(),
+                None,
+                dec!(1),
+                dec!(1200),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(2200));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1200));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(2000));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(160));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(160));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9678.72));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(0));
+
+        // Reduce strategy 1: Sell 1 ETH at 1800 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy_1.clone(),
+                inst_eth.clone(),
+                None,
+                dec!(1),
+                dec!(1800),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        // Reduce strategy 2: Sell 1 ETh at 1800 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy_2.clone(),
+                inst_eth.clone(),
+                None,
+                dec!(1),
+                dec!(1800),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1000));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1200));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(50));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(60));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9288.00));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(-400));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(-200));
+
+        // Reduce strategy 1: Sell 0.5 BTC at 3000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy_1.clone(),
+                inst_btc.clone(),
+                None,
+                dec!(0.5),
+                dec!(3000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        // Reduce strategy 2: Sell 0.5 BTC at 3000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy_2.clone(),
+                inst_btc.clone(),
+                None,
+                dec!(0.5),
+                dec!(3000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(0.5));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0.5));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(500));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(600));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(25));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(30));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(11242.40));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(600));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(700));
+
+        // increase strategy 1: Buy 0.5 BTC at 1700 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy_1.clone(),
+                inst_btc.clone(),
+                None,
+                dec!(0.5),
+                dec!(1700),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        // increase strategy 2: Buy 0.5 BTC at 1700 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy_2.clone(),
+                inst_btc.clone(),
+                None,
+                dec!(0.5),
+                dec!(1700),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(1));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(1350));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(1450));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(0));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(11897.06));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(950));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(950));
+
+        // Reduce strategy 1: Sell 1. BTC at 2000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy_1.clone(),
+                inst_btc.clone(),
+                None,
+                dec!(1),
+                dec!(2000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        // Reduce strategy 2: Sell 1. BTC at 2000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy_2.clone(),
+                inst_btc.clone(),
+                None,
+                dec!(1),
+                dec!(2000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_balance(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_1, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_btc)), dec!(0));
+        assert_eq!(accounting.ledger.strategy_cost_basis(&strategy_2, Some(&inst_eth)), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_1, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy_2, None), dec!(0));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(13096.26));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_1, None), dec!(1600.0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy_2, None), dec!(1500.0));
+    }
+
+    #[test(tokio::test)]
+    async fn test_go_long_and_close() {
+        let pubsub = test_pubsub();
+        let accounting = LedgerAccounting::builder()
+            .pubsub(pubsub.handle("LedgerAccounting").await)
+            .build();
+        let strategy = test_strategy_1();
+        let personal = test_personal_venue();
+        let venue = test_binance_venue();
+        let instrument = test_inst_binance_btc_usdt_perp();
+        let margin_asset = instrument.margin_asset.clone();
+        let usdt = Tradable::Asset(instrument.margin_asset.clone());
+
+        // Initial deposit
+        accounting
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
+            .await
+            .unwrap();
+
+        // Go long: Buy 1 BTC at 1000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(1),
+                dec!(1000),
+                dec!(0.05),   // 5% margin rate
+                dec!(0.0002), // 0.02% commission rate
+            )
+            .await
+            .unwrap();
+
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
+        let venue_spot = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::Venue, &AccountType::Spot);
+
+        // Check balances from ledger
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50)); // 1 * 1000 * 0.05
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8)); // 10000 - 50 - 0.2
+
+        // TODO: Move this to a separate test
+        // Check margin from accounting
+        let asset_margin_balances = accounting.asset_margin_balance(&venue, &instrument.margin_asset).await;
+        let asset_available_margin_balances = accounting
+            .asset_available_margin_balance(&venue, &instrument.margin_asset)
+            .await;
+        assert_eq!(asset_margin_balances, dec!(9999.8));
+        assert_eq!(asset_available_margin_balances, dec!(9949.8));
+
+        // Check margin from accounting (venue)
+        let margin_balances = accounting.margin_balance(&venue).await;
+        let available_margin_balances = accounting.available_margin_balance(&venue).await;
+        assert_eq!(margin_balances.get(&margin_asset), Some(&dec!(9999.8)));
+        assert_eq!(available_margin_balances.get(&margin_asset), Some(&dec!(9949.8)));
+
+        // Check position from accounting
+        let position = accounting.position(&venue).await;
+        assert_eq!(position.get(&instrument), Some(&dec!(1)));
+
+        // Check specific instrument position from accounting
+        let inst_position = accounting.instrument_position(&instrument).await;
+        assert_eq!(inst_position, dec!(1));
+
+        // Check strategy position from accounting
+        let strategy_position = accounting.strategy_position(&strategy).await;
+        assert_eq!(strategy_position.get(&instrument), Some(&dec!(1)));
+
+        // Close: Sell 1 BTC at 1200 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(1),
+                dec!(1200),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10199.56));
+        assert_eq!(accounting.ledger.balance(venue_spot.id), dec!(-199.5600));
+
+        // Check margin from accounting
+        let asset_margin_balances = accounting.asset_margin_balance(&venue, &instrument.margin_asset).await;
+        let asset_available_margin_balances = accounting
+            .asset_available_margin_balance(&venue, &instrument.margin_asset)
+            .await;
+        assert_eq!(asset_margin_balances, dec!(10199.56));
+        assert_eq!(asset_available_margin_balances, dec!(10199.56));
+
+        // Check margin from accounting (venue)
+        // TODO: Move this to a separate test
+        let margin_balances = accounting.margin_balance(&venue).await;
+        let available_margin_balances = accounting.available_margin_balance(&venue).await;
+        assert_eq!(margin_balances.get(&margin_asset), Some(&dec!(10199.56)));
+        assert_eq!(available_margin_balances.get(&margin_asset), Some(&dec!(10199.56)));
+
+        // Check position from accounting
+        let position = accounting.position(&venue).await;
+        assert_eq!(position.get(&instrument), Some(&dec!(0)));
+        assert_eq!(position.len(), 1);
+
+        // Check specific instrument position from accounting
+        let inst_position = accounting.instrument_position(&instrument).await;
+        assert_eq!(inst_position, dec!(0));
+
+        // Check strategy position from accounting
+        let strategy_position = accounting.strategy_position(&strategy).await;
+        assert_eq!(strategy_position.get(&instrument), Some(&dec!(0)));
+
+        // Check realized PnL from accounting
+        let realized_pnl = accounting.strategy_realized_pnl(&strategy).await;
+        assert_eq!(realized_pnl, dec!(200));
+    }
+
+    #[test(tokio::test)]
+    async fn test_go_long_reduce_then_close() {
+        let pubsub = test_pubsub();
+        let accounting = LedgerAccounting::builder()
+            .pubsub(pubsub.handle("LedgerAccounting").await)
+            .build();
+        let strategy = test_strategy_1();
+        let personal = test_personal_venue();
+        let venue = test_binance_venue();
+        let instrument = test_inst_binance_btc_usdt_perp();
+        let usdt = Tradable::Asset(instrument.margin_asset.clone());
+
+        // Initial deposit
+        accounting
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
+            .await
+            .unwrap();
+
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
+
+        // Go long: Buy 1 BTC at 1000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(2),
+                dec!(1000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(2));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(100));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9899.6));
+
+        // Reduce: Sell 0.5 BTC at 1200 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(0.5),
+                dec!(1200),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1.5));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(75));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(100));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10024.48));
+
+        // Close: Sell 0.5 BTC at 800 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(1.5),
+                dec!(800),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(-200));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9799.24));
+    }
+
+    #[test(tokio::test)]
+    async fn test_go_short_and_close() {
+        let pubsub = test_pubsub();
+        let accounting = LedgerAccounting::builder()
+            .pubsub(pubsub.handle("LedgerAccounting").await)
+            .build();
+        let strategy = test_strategy_1();
+        let personal = test_personal_venue();
+        let venue = test_binance_venue();
+        let instrument = test_inst_binance_btc_usdt_perp();
+        let usdt = Tradable::Asset(instrument.margin_asset.clone());
+
+        // Initial deposit
+        accounting
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
+            .await
+            .unwrap();
+
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
+
+        // Go short: Sell 1 BTC at 1000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(1),
+                dec!(1000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8));
+
+        // Close: Buy 1 BTC at 800 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(1),
+                dec!(800),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200)); // (1000 - 800) * 1
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10199.64)); // 9949.8 + 50 (freed) - 0.16 (comm) + 200 (PnL)
+    }
+
+    #[test(tokio::test)]
+    async fn test_go_short_reduce_then_close() {
+        let pubsub = test_pubsub();
+        let accounting = LedgerAccounting::builder()
+            .pubsub(pubsub.handle("LedgerAccounting").await)
+            .build();
+        let strategy = test_strategy_1();
+        let personal = test_personal_venue();
+        let venue = test_binance_venue();
+        let instrument = test_inst_binance_btc_usdt_perp();
+        let usdt = Tradable::Asset(instrument.margin_asset.clone());
+
+        // Initial deposit
+        accounting
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
+            .await
+            .unwrap();
+
+        let user_margin = accounting
+            .ledger
+            .find_or_create(&venue, &usdt, &AccountOwner::User, &AccountType::Margin);
+
+        // Go short: Sell 1 BTC at 1000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(1),
+                dec!(1000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9949.8));
+
+        // Reduce: Buy 0.5 BTC at 800 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(0.5),
+                dec!(800),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-0.5));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(25.0)); // 0.5 * 800 * 0.05
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(100)); // (1000 - 800) * 0.5
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(10074.72)); // 9949.8 + 30 (freed) - 0.16 (comm) + 100 (PnL)
+
+        // Close: Buy 0.5 BTC at 1200 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(0.5),
+                dec!(1200),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(0)); // 100 - (1000 - 1200) * 0.5
+        assert_eq!(accounting.ledger.balance(user_margin.id), dec!(9999.60)); // 10079.64 + 20 (freed) - 0.24 (comm) - 100 (PnL)
+    }
+
+    #[test(tokio::test)]
+    async fn test_go_long_flip_short_flip_long_close() {
+        let pubsub = test_pubsub();
+        let accounting = LedgerAccounting::builder()
+            .pubsub(pubsub.handle("LedgerAccounting").await)
+            .build();
+        let strategy = test_strategy_1();
+        let personal = test_personal_venue();
+        let venue = test_binance_venue();
+        let instrument = test_inst_binance_btc_usdt_perp();
+        let usdt = Tradable::Asset(instrument.margin_asset.clone());
+
+        // Initial deposit
+        accounting
+            .deposit(&personal, &venue, &usdt, dec!(10000), &AccountType::Margin)
+            .await
+            .unwrap();
+
+        // Go long: Buy 1 BTC at 1000 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(1),
+                dec!(1000),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(50));
+
+        // Flip to short: Sell 2 BTC at 1200 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(2),
+                dec!(1200),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(-1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(60)); // 1 * 1200 * 0.05
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(200)); // (1200 - 1000) * 1
+
+        // Flip to long: Buy 2 BTC at 800 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Buy,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(2),
+                dec!(800),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(1));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(40)); // 1 * 800 * 0.05
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(600)); // 200 - (1200 - 800) * 1
+
+        // Close: Sell 1 BTC at 900 USDT
+        accounting
+            .margin_trade(
+                MarketSide::Sell,
+                strategy.clone(),
+                instrument.clone(),
+                None,
+                dec!(1),
+                dec!(900),
+                dec!(0.05),
+                dec!(0.0002),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(accounting.ledger.strategy_balance(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.margin_posted(&strategy, None), dec!(0));
+        assert_eq!(accounting.ledger.strategy_pnl(&strategy, None), dec!(700));
+    }
+}

@@ -35,10 +35,17 @@ pub struct SignalAllocationOptim {
 }
 
 impl SignalAllocationOptim {
-    async fn insert_signal(&self, signal: Arc<Signal>) {
+    async fn update_signal(&self, signal: Arc<Signal>) -> bool {
         let key = (signal.strategy.clone(), signal.instrument.clone());
         let mut lock = self.strategy_signals.write().await;
+        if let Some(existing_signal) = lock.get(&key) {
+            if existing_signal.weight == signal.weight {
+                debug!("Signal for {} has not changed, skipping optimization", signal.instrument);
+                return false;
+            }
+        }
         lock.insert(key, signal);
+        return true;
     }
 
     async fn signals_count(&self) -> usize {
@@ -154,17 +161,22 @@ impl SignalAllocationOptim {
 impl AllocationOptim for SignalAllocationOptim {
     async fn optimize(&self, signal: Arc<Signal>) {
         // Update optimal allocation with the new signal
-        self.insert_signal(signal.clone()).await;
+        let optimise = self.update_signal(signal.clone()).await;
 
-        // Calculate capital per signal
-        let capital_per_signal = self.calculate_capital_per_signal(&signal).await;
+        if optimise {
+            info!("Signal updated for {}: {}", signal.instrument, signal.weight);
+            // Calculate capital per signal
+            let capital_per_signal = self.calculate_capital_per_signal(&signal).await;
 
-        // Process each signal and collect orders
-        let res = self.process_signal(&signal, capital_per_signal).await;
+            // Process each signal and collect orders
+            let res = self.process_signal(&signal, capital_per_signal).await;
 
-        // Publish orders
-        if let Ok(Some(order)) = res {
-            self.pubsub.publish(Event::ExecutionOrderNew(order.clone())).await;
+            // Publish orders
+            if let Ok(Some(order)) = res {
+                self.pubsub.publish(Event::ExecutionOrderNew(order.clone())).await;
+            }
+        } else {
+            info!("Signal for {} has not changed, skipping optimization", signal.instrument);
         }
     }
 }

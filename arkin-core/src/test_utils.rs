@@ -1,13 +1,23 @@
 use std::{str::FromStr, sync::Arc};
 
 use rust_decimal_macros::dec;
-use time::OffsetDateTime;
+use time::{macros::datetime, OffsetDateTime};
 use uuid::Uuid;
 
 use crate::{
     Asset, AssetType, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceType, Instrument,
-    InstrumentStatus, InstrumentType, MarketSide, Pipeline, Price, Quantity, Strategy, Tick, Venue, VenueType,
+    InstrumentStatus, InstrumentType, MarketSide, Pipeline, Price, PubSub, Quantity, SimulationModeClock, Strategy,
+    Tick, Venue, VenueType,
 };
+
+pub fn test_pubsub() -> Arc<PubSub> {
+    let clock = Arc::new(SimulationModeClock::new(
+        datetime!(2025-03-01 00:00:00).assume_utc(),
+        datetime!(2025-03-02 00:00:00).assume_utc(),
+    ));
+    let pubsub = PubSub::builder().clock(clock).build();
+    Arc::new(pubsub)
+}
 
 pub fn test_btc_asset() -> Arc<Asset> {
     let asset = Asset::builder()

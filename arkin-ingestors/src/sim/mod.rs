@@ -34,7 +34,7 @@ impl RunnableService for SimIngestor {
         let tick_stream = self
             .persistence
             .tick_store
-            .stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, Frequency::Daily)
+            .stream_range_buffered(&self.instruments, self.start, self.start, self.buffer_size, Frequency::Daily)
             .await;
 
         let trade_stream = self
@@ -95,7 +95,7 @@ impl RunnableService for SimIngestor {
                 (None, None) => break, // no more data
             };
 
-            if current_time >= next_tick_time {
+            if current_time > next_tick_time {
                 // info!("SimIngestor: Publishing IntervalTick at {}", next_tick_time);
                 let interval_tick = InsightsTick::builder()
                     .event_time(next_tick_time)

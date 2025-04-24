@@ -1,5 +1,5 @@
 [package]
-name = "test-integration"
+name = "tests"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true
@@ -19,6 +19,8 @@ arkin-engine = { path = "../arkin-engine" }
 [dev-dependencies]
 tokio = { workspace = true }
 tracing = { workspace = true }
-
+time = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
 
 test-log = { workspace = true }

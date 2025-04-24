@@ -123,6 +123,13 @@ impl PipelineGraph {
                         .par_iter()
                         .filter_map(|instrument| feature.calculate(instrument, timestamp))
                         .flatten()
+                        .map(|i| {
+                            let value = (i.value * 1_000_000.0).round() / 1_000_000.0;
+                            // Clone the insight and set the value
+                            let mut insight = i.as_ref().clone();
+                            insight.value = value;
+                            insight.into()
+                        })
                         .collect::<Vec<_>>();
                     state.insert_batch(&insights);
                     pipeline_result.lock().extend(insights);
