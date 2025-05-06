@@ -118,17 +118,19 @@ impl Feature for OnnxFeature {
             }
             // Get the third prediction
             let mut insights = Vec::with_capacity(predications.len());
-            for (idx, prediction) in predications.iter().enumerate() {
+            for (idx, raw_prediction) in predications.iter().enumerate() {
                 // Inverse scale the predictions
-                let scaled_prediction = self.robust_scaler.inverse_transform_normal(*prediction as f64);
+                let scaled_prediction = self.robust_scaler.inverse_transform_normal(*raw_prediction as f64);
                 debug!("Inverse Scaled Prediction: {:?}", scaled_prediction);
 
                 // Inverse transform the predictions
                 // The prediction is that the first three values are 5min (3 quantiles) next three are 15min, etc.
                 let postfix = match idx {
                     0..=2 => "5min",
-                    3..=5 => "15min",
-                    6..=8 => "60min",
+                    3..=5 => "10min",
+                    6..=8 => "15min",
+                    9..=11 => "30min",
+                    12..=14 => "1h",
                     _ => {
                         warn!("Invalid index: {}", idx);
                         return None;
@@ -142,10 +144,22 @@ impl Feature for OnnxFeature {
                 );
                 debug!("Inverse Transformed Prediction: {}", prediction);
 
-                // Let's just make a new feature_id with the
-                let feature_id = format!("{}_{}", self.output, idx);
+                // Push the raw prediction
+                let feature_id = format!("{}_{}_raw", self.output, idx);
+                let insight = Insight::builder()
+                    .event_time(event_time)
+                    .pipeline(Some(self.pipeline.clone()))
+                    .instrument(Some(instrument.clone()))
+                    .feature_id(feature_id.into())
+                    .value(*raw_prediction as f64)
+                    .insight_type(InsightType::Normalized)
+                    .persist(self.persist)
+                    .build()
+                    .into();
+                insights.push(insight);
 
                 // // Return insight
+                let feature_id = format!("{}_{}", self.output, idx);
                 let insight = Insight::builder()
                     .event_time(event_time)
                     .pipeline(Some(self.pipeline.clone()))

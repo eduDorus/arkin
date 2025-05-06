@@ -58,7 +58,7 @@ impl RobustScaler {
 
     pub fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
         let key = (instrument_id, feature_id.clone());
-        let (median, iqr) = self.feature_data.get(&key).expect("Feature ID not found");
+        let (median, iqr) = self.feature_data.get(&key).expect(&format!("Feature ID not found: {:?}", key));
         (x - median) / iqr
     }
 
@@ -68,7 +68,7 @@ impl RobustScaler {
 
     pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
         let key = (instrument_id, feature_id.clone());
-        let (median, iqr) = self.feature_data.get(&key).expect("Feature ID not found");
+        let (median, iqr) = self.feature_data.get(&key).expect(&format!("Feature ID not found: {:?}", key));
         x * iqr + median
     }
 
@@ -124,7 +124,12 @@ impl QuantileTransformer {
             return x;
         }
         let key = (instrument_id, feature_id.clone());
-        let quantiles = self.feature_quantiles.get(&key).expect("Feature ID not found in quantiles");
+        let quantiles = if let Some(quantiles) = self.feature_quantiles.get(&key) {
+            quantiles
+        } else {
+            warn!("Feature ID: {} not found in quantile transformer", feature_id);
+            return x;
+        };
 
         // Forward interpolation
         let forward = interp(x, quantiles, &self.references);
@@ -152,7 +157,10 @@ impl QuantileTransformer {
     pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, y: f64) -> f64 {
         // Step 1: Get quantiles and references for the feature
         let key = (instrument_id, feature_id.clone());
-        let quantiles = self.feature_quantiles.get(&key).expect("Feature ID not found");
+        let quantiles = self
+            .feature_quantiles
+            .get(&key)
+            .expect(&format!("Feature ID not found: {:?}", key));
 
         // Step 2: Compute p based on output distribution
         let p = match self.output_distribution {
