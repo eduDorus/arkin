@@ -19,28 +19,15 @@ use crate::{Algorithm, StrategyError, StrategyService};
 
 #[derive(Debug, Clone, TypedBuilder)]
 struct AgentState {
-    entry_signal_count: usize, // Counter for entry signals
-    exit_signal_count: usize,  // Counter for exit signals
+    #[builder(default)]
     current_weight: Decimal,
-    holding_steps: Decimal,
+    #[builder(default)]
+    delta_weight: Decimal,
+    #[builder(default)]
     trade_pnl: Decimal,
-    hidden: Array3<f32>,
-    cell: Array3<f32>,
 }
 
 impl AgentState {
-    pub fn new(n_layers: usize, hidden_size: usize) -> Self {
-        Self {
-            entry_signal_count: 0,
-            exit_signal_count: 0,
-            current_weight: Decimal::ZERO,
-            holding_steps: Decimal::ZERO,
-            trade_pnl: Decimal::ZERO,
-            hidden: Array3::ones((n_layers, 1, hidden_size)),
-            cell: Array3::ones((n_layers, 1, hidden_size)),
-        }
-    }
-
     pub fn update_pnl(&mut self, pct_change: Decimal) {
         self.trade_pnl += self.current_weight * pct_change;
     }
@@ -141,9 +128,7 @@ pub struct AgentStrategy {
     model_location: String,
     model_name: String,
     model_version: String,
-    action_space: Vec<Decimal>,
-    n_layers: usize,
-    hidden_size: usize,
+    sequence_length: usize,
     inputs: Vec<FeatureId>,
     input_change: FeatureId,
     commission_rate: Decimal,
@@ -151,8 +136,6 @@ pub struct AgentStrategy {
     models: RwLock<HashMap<Arc<Instrument>, Arc<Session>>>,
     #[builder(default)]
     agent_state: RwLock<HashMap<Arc<Instrument>, AgentState>>,
-    #[builder(default)]
-    hidden_states: RwLock<HashMap<Arc<Instrument>, (Array3<f32>, Array3<f32>)>>,
 }
 
 #[async_trait]

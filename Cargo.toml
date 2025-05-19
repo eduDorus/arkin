@@ -35,7 +35,7 @@ parking_lot = { version = "0.12", features = [ "hardware-lock-elision" ], defaul
 rayon = "1.10"
 
 # Async
-tokio = { version = "1.44", features = [ "full" ] }
+tokio = { version = "1.45", features = [ "full" ] }
 kanal = { version = "0.1.1", features = [ "std-mutex" ] }
 async-trait = "0.1"
 async-stream = "0.3"
