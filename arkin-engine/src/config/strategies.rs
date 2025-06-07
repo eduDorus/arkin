@@ -15,8 +15,8 @@ pub enum StrategyAlgorithmConfig {
     Spreader(SpreaderConfig),
     #[serde(rename = "forecast")]
     Forecast(ForecastConfig),
-    #[serde(rename = "agent")]
-    Agent(AgentConfig),
+    // #[serde(rename = "agent")]
+    // Agent(AgentConfig),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

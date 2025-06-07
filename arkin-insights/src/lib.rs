@@ -3,7 +3,6 @@ mod errors;
 mod feature_factory;
 mod features;
 mod fft;
-mod forecast;
 mod hdbscan;
 mod math;
 mod pipeline;
@@ -20,7 +19,6 @@ pub mod prelude {
     pub use crate::config::*;
     pub use crate::errors::*;
     pub use crate::fft::*;
-    pub use crate::forecast::*;
     pub use crate::hdbscan::*;
     pub use crate::math::*;
     pub use crate::service::InsightsService;

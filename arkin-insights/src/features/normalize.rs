@@ -39,6 +39,7 @@ impl RobustScaler {
         RobustScaler::new(scaler_data)
     }
 
+    #[allow(dead_code)]
     pub fn features(&self) -> Vec<FeatureId> {
         self.feature_data.keys().map(|(_, f)| f.clone()).collect()
     }
@@ -66,17 +67,20 @@ impl RobustScaler {
         x / 1.3489795003921636
     }
 
+    #[allow(dead_code)]
     pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
         let key = (instrument_id, feature_id.clone());
         let (median, iqr) = self.feature_data.get(&key).expect(&format!("Feature ID not found: {:?}", key));
         x * iqr + median
     }
 
+    #[allow(dead_code)]
     pub fn inverse_transform_normal(&self, x: f64) -> f64 {
         x * 1.3489795003921636
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DistributionType {
     Uniform,
@@ -98,6 +102,7 @@ impl QuantileTransformer {
         QuantileTransformer::new(scaler_data, output_distribution)
     }
 
+    #[allow(dead_code)]
     pub fn features(&self) -> Vec<FeatureId> {
         self.feature_quantiles.keys().map(|(_, f)| f.clone()).collect()
     }
@@ -154,6 +159,7 @@ impl QuantileTransformer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, y: f64) -> f64 {
         // Step 1: Get quantiles and references for the feature
         let key = (instrument_id, feature_id.clone());

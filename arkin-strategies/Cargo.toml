@@ -18,8 +18,9 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 typed-builder = { workspace = true }
-ort = { workspace = true }
-ndarray = { workspace = true }
+
+# ort = { workspace = true }
+# ndarray = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }

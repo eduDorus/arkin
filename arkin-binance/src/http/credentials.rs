@@ -26,15 +26,15 @@ pub struct HmacSignature {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct RsaSignature {
-    pub key: String,
-    pub password: Option<String>,
-}
-
-#[derive(PartialEq, Eq, Clone)]
 pub struct Ed25519Signature {
     pub key: String,
 }
+
+// #[derive(PartialEq, Eq, Clone)]
+// pub struct RsaSignature {
+//     pub key: String,
+//     pub password: Option<String>,
+// }
 
 impl Credentials {
     pub fn from_hmac(api_key: impl Into<String>, api_secret: impl Into<String>) -> Self {

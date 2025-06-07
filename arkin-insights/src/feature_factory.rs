@@ -8,7 +8,6 @@ use crate::{
         DistributionType, DualRangeFeature, LagFeature, NormalizeFeature, OHLCVFeature, QuantileTransformer,
         RangeFeature, RobustScaler, TimeFeature, TwoValueFeature,
     },
-    prelude::OnnxFeature,
     state::InsightsState,
     ta::{
         AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
@@ -181,28 +180,28 @@ impl FeatureFactory {
                                 .build(),
                         )
                     }
-                    FeatureConfig::Onnx(c) => {
-                        let transformer =
-                            QuantileTransformer::load(&c.quantile_data_location, DistributionType::Normal);
-                        let scaler = RobustScaler::load(&c.quantile_data_location);
+                    // FeatureConfig::Onnx(c) => {
+                    //     let transformer =
+                    //         QuantileTransformer::load(&c.quantile_data_location, DistributionType::Normal);
+                    //     let scaler = RobustScaler::load(&c.quantile_data_location);
 
-                        Arc::new(
-                            OnnxFeature::builder()
-                                .pipeline(pipeline.clone())
-                                .insight_state(state.clone())
-                                .model_location(c.model_location.clone())
-                                .model_name(c.model_name.clone())
-                                .model_version(c.model_version.clone())
-                                .input(c.input.clone())
-                                .output(c.output.clone())
-                                .sequence_length(c.sequence_length)
-                                .target_feature(c.target_feature.clone())
-                                .quantile_transformer(transformer)
-                                .robust_scaler(scaler)
-                                .persist(c.persist)
-                                .build(),
-                        )
-                    }
+                    //     Arc::new(
+                    //         OnnxFeature::builder()
+                    //             .pipeline(pipeline.clone())
+                    //             .insight_state(state.clone())
+                    //             .model_location(c.model_location.clone())
+                    //             .model_name(c.model_name.clone())
+                    //             .model_version(c.model_version.clone())
+                    //             .input(c.input.clone())
+                    //             .output(c.output.clone())
+                    //             .sequence_length(c.sequence_length)
+                    //             .target_feature(c.target_feature.clone())
+                    //             .quantile_transformer(transformer)
+                    //             .robust_scaler(scaler)
+                    //             .persist(c.persist)
+                    //             .build(),
+                    //     )
+                    // }
                     // FeatureConfig::CatBoost(c) => Arc::new(
                     //     CatBoostFeature::builder()
                     //         .insight_state(state.clone())

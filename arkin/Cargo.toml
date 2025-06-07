@@ -22,7 +22,7 @@ futures-util = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 clickhouse = { workspace = true }
-ort = { version = "=2.0.0-rc.9" }
+ort = { version = "=2.0.0-rc.10" }
 ndarray = "0.16.1"
 serde = { workspace = true }
 serde_json = { workspace = true }

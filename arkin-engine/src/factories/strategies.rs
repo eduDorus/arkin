@@ -46,30 +46,29 @@ impl StrategyFactory {
                             .threshold(c.threshold)
                             .build(),
                     )
-                }
-                StrategyAlgorithmConfig::Agent(c) => {
-                    let strategy = persistence
-                        .strategy_store
-                        .read_by_name_or_create(&c.name)
-                        .await
-                        .expect("Failed to read or create strategy");
+                } // StrategyAlgorithmConfig::Agent(c) => {
+                  //     let strategy = persistence
+                  //         .strategy_store
+                  //         .read_by_name_or_create(&c.name)
+                  //         .await
+                  //         .expect("Failed to read or create strategy");
 
-                    Arc::new(
-                        AgentStrategy::builder()
-                            .pubsub(pubsub.handle("AgentStrategy").await)
-                            .strategy(strategy)
-                            .model_location(c.model_location.clone())
-                            .model_name(c.model_name.clone())
-                            .model_version(c.model_version.clone())
-                            .action_space(c.action_space)
-                            .n_layers(c.n_layers)
-                            .hidden_size(c.hidden_size)
-                            .inputs(c.inputs.clone())
-                            .input_change(c.input_change)
-                            .commission_rate(c.commission_rate)
-                            .build(),
-                    )
-                }
+                  //     Arc::new(
+                  //         AgentStrategy::builder()
+                  //             .pubsub(pubsub.handle("AgentStrategy").await)
+                  //             .strategy(strategy)
+                  //             .model_location(c.model_location.clone())
+                  //             .model_name(c.model_name.clone())
+                  //             .model_version(c.model_version.clone())
+                  //             .action_space(c.action_space)
+                  //             .n_layers(c.n_layers)
+                  //             .hidden_size(c.hidden_size)
+                  //             .inputs(c.inputs.clone())
+                  //             .input_change(c.input_change)
+                  //             .commission_rate(c.commission_rate)
+                  //             .build(),
+                  //     )
+                  // }
             };
             strategies.push(algo);
         }
