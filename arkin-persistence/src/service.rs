@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use clickhouse::Client;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use sqlx::ConnectOptions;
 use tokio_util::sync::CancellationToken;
@@ -46,27 +47,36 @@ impl PersistenceService {
         only_predictions: bool,
         dry_run: bool,
     ) -> Arc<Self> {
-        let db_config = config.database.clone();
+        let pg_config = config.postgres.clone();
         let conn_options = PgConnectOptions::new()
-            .host(&db_config.host)
-            .port(db_config.port)
-            .username(&db_config.user)
-            .password(&db_config.password)
-            .database(&db_config.database)
+            .host(&pg_config.host)
+            .port(pg_config.port)
+            .username(&pg_config.user)
+            .password(&pg_config.password)
+            .database(&pg_config.database)
             .ssl_mode(PgSslMode::Prefer)
             .log_statements("DEBUG".parse().unwrap())
             .log_slow_statements("DEBUG".parse().unwrap(), Duration::from_secs(300));
 
-        let pool = PgPoolOptions::new()
-            .min_connections(db_config.min_connections)
-            .max_connections(db_config.max_connections)
-            .idle_timeout(Duration::from_secs(db_config.idle_timeout))
-            .acquire_timeout(Duration::from_secs(db_config.acquire_timeout))
-            .max_lifetime(Duration::from_secs(db_config.max_lifetime))
+        let pg_pool = PgPoolOptions::new()
+            .min_connections(pg_config.min_connections)
+            .max_connections(pg_config.max_connections)
+            .idle_timeout(Duration::from_secs(pg_config.idle_timeout))
+            .acquire_timeout(Duration::from_secs(pg_config.acquire_timeout))
+            .max_lifetime(Duration::from_secs(pg_config.max_lifetime))
             .connect_lazy_with(conn_options);
 
+        let ch_config = config.clickhouse.clone();
+        let ch_client = Client::default()
+            .with_url(format!("http://{}:{}", ch_config.host, ch_config.port))
+            .with_compression(clickhouse::Compression::Lz4)
+            .with_database(ch_config.database)
+            .with_user(ch_config.user)
+            .with_password(ch_config.password)
+            .with_option("wait_end_of_query", "1");
+
         // Initialize repositories
-        let instance_repo = InstanceRepo::builder().pool(pool.clone()).build();
+        let instance_repo = InstanceRepo::builder().pool(pg_pool.clone()).build();
         let instance_store = Arc::new(InstanceStore::builder().instance_repo(instance_repo.to_owned()).build());
         let instance = if let Ok(instance) = instance_store.read_by_name(&instance.name).await {
             instance
@@ -76,28 +86,31 @@ impl PersistenceService {
             instance
         };
 
-        let account_repo = AccountRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
-        let transfer_repo = TransferRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
-        let venue_repo = VenueRepo::builder().pool(pool.clone()).build();
-        let asset_repo = AssetRepo::builder().pool(pool.clone()).build();
-        let instrument_repo = InstrumentRepo::builder().pool(pool.clone()).build();
-        let pipeline_repo = PipelineRepo::builder().pool(pool.clone()).build();
+        let account_repo = AccountRepo::builder().pool(pg_pool.clone()).instance(instance.clone()).build();
+        let transfer_repo = TransferRepo::builder().pool(pg_pool.clone()).instance(instance.clone()).build();
+        let venue_repo = VenueRepo::builder().pool(pg_pool.clone()).build();
+        let asset_repo = AssetRepo::builder().pool(pg_pool.clone()).build();
+        let instrument_repo = InstrumentRepo::builder().pool(pg_pool.clone()).build();
+        let pipeline_repo = PipelineRepo::builder().pool(pg_pool.clone()).build();
         // let insights_repo = InsightsParquetRepo::new("insights_latest.parquet").await.unwrap();
         // let insights_repo = InsightsRepo::builder().pool(pool.clone()).build();
-        let insights_repo = InsightsClickhouseRepo::new();
+        let insights_repo = InsightsClickhouseRepo::new(ch_client.clone());
         insights_repo.create_table().await.unwrap();
-        let strategy_repo = StrategyRepo::builder().pool(pool.clone()).build();
-        let signal_repo = SignalRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
+        let strategy_repo = StrategyRepo::builder().pool(pg_pool.clone()).build();
+        let signal_repo = SignalRepo::builder().pool(pg_pool.clone()).instance(instance.clone()).build();
         // let allocation_repo = AllocationRepo::builder().pool(pool.clone()).build();
         let execution_order_repo = ExecutionOrderRepo::builder()
-            .pool(pool.clone())
+            .pool(pg_pool.clone())
             .instance(instance.clone())
             .build();
-        let venue_order_repo = VenueOrderRepo::builder().pool(pool.clone()).instance(instance.clone()).build();
+        let venue_order_repo = VenueOrderRepo::builder()
+            .pool(pg_pool.clone())
+            .instance(instance.clone())
+            .build();
 
-        let tick_repo = TickClickhouseRepo::new();
+        let tick_repo = TickClickhouseRepo::new(ch_client.clone());
         tick_repo.create_table().await.unwrap();
-        let trade_repo = TradeClickhouseRepo::new();
+        let trade_repo = TradeClickhouseRepo::new(ch_client.clone());
         trade_repo.create_table().await.unwrap();
         // let tick_repo = TickRepo::builder().pool(pool.clone()).build();
         // let trade_repo = TradeRepo::builder().pool(pool.clone()).build();

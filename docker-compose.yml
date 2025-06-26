@@ -10,8 +10,8 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - /mnt/data/postgres/data:/var/lib/postgresql/data
-      - /mnt/data/postgres/logs:/var/logs
+      - /Users/dj/repos/arkin/data/postgres/data:/var/lib/postgresql/data
+      - /Users/dj/repos/arkin/data/postgres/logs:/var/logs
     networks:
       - network
     restart: unless-stopped
@@ -23,7 +23,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - /mnt/data/grafana:/var/lib/grafana
+      - /Users/dj/repos/arkin/data/grafana:/var/lib/grafana
     networks:
       - network
     restart: unless-stopped
@@ -35,14 +35,10 @@ services:
     ports:
       - "8123:8123"   # HTTP interface
       - "9000:9000"   # Native client interface
-      # Uncomment the following line if inter-server communication is needed
-      # - "9009:9009"   # Inter-server communication
     volumes:
-      - /mnt/data/clickhouse/data:/var/lib/clickhouse
-      - /mnt/data/clickhouse/config:/etc/clickhouse-server
-      - /mnt/data/clickhouse/logs:/var/log/clickhouse-server
-      # Uncomment the following line to add initialization scripts
-      # - /mnt/data/clickhouse/initdb:/docker-entrypoint-initdb.d
+      - /Users/dj/repos/arkin/data/clickhouse/data:/var/lib/clickhouse
+      - /Users/dj/repos/arkin/data/clickhouse/config:/etc/clickhouse-server
+      - /Users/dj/repos/arkin/data/clickhouse/logs:/var/log/clickhouse-server
     environment:
       CLICKHOUSE_DB: arkin
       CLICKHOUSE_USER: arkin_admin
@@ -65,15 +61,8 @@ services:
       - "8001:8001"  # gRPC endpoint
       - "8002:8002"  # Metrics endpoint
     volumes:
-      - /home/dj/repos/arkin-research/trition-server:/models
+      - /Users/dj/repos/arkin-research/trition-server:/models
     command: tritonserver --model-repository=/models --model-control-mode=poll --repository-poll-secs=60
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
         
   # arkin-binance-ingestor:
   #  image: arkin:v1.0.0  # Replace with your image name, e.g., arkin:1.0 or a registry path
@@ -85,7 +74,7 @@ services:
   #    - CONFIG_DIR=/app/configs
   #    - RUN_MODE=prod  # Changed to prod for production
   #  volumes:
-  #    - /mnt/data/arkin/configs:/app/configs:ro  # Mount configs as read-only
+  #    - /Users/dj/repos/arkin/mnt/data/arkin/configs:/app/configs:ro  # Mount configs as read-only
   #  networks:
   #    - network
   #  restart: unless-stopped

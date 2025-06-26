@@ -51,15 +51,8 @@ impl fmt::Debug for TradeClickhouseRepo {
 }
 
 impl TradeClickhouseRepo {
-    pub fn new() -> Self {
+    pub fn new(client: Client) -> Self {
         let table_name = "trades";
-        let client = Client::default()
-            .with_url("http://192.168.100.100:8123")
-            .with_compression(clickhouse::Compression::Lz4)
-            .with_database("arkin")
-            .with_user("arkin_admin")
-            .with_password("test1234")
-            .with_option("wait_end_of_query", "1");
 
         TradeClickhouseRepo {
             client,

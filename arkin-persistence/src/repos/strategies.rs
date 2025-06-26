@@ -150,14 +150,14 @@ impl StrategyRepo {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::test_utils::connect_database;
+    use crate::test_utils::connect_postgres_db;
 
     use super::*;
     use test_log::test;
 
     #[test(tokio::test)]
     async fn test_strategy_repo() {
-        let pool = connect_database();
+        let pool = connect_postgres_db();
         let repo = StrategyRepo::builder().pool(pool).build();
 
         let mut strategy = Strategy::builder()

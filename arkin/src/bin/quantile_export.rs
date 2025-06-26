@@ -12,7 +12,7 @@ const INSTRUMENT_ID: &str = "f5dd7db6-89da-4c68-b62e-6f80b763bef6";
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = Client::default()
-        .with_url("http://192.168.100.100:8123")
+        .with_url("http://127.0.0.1:8123")
         .with_compression(clickhouse::Compression::Lz4)
         .with_database("arkin")
         .with_user("arkin_admin")

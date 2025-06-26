@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
 
     // let table_name = "insights";
     let client = Client::default()
-        .with_url("http://192.168.100.100:8123")
+        .with_url("http://127.0.0.1:8123")
         .with_compression(clickhouse::Compression::Lz4)
         .with_database("arkin")
         .with_user("arkin_admin")
