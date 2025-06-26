@@ -95,7 +95,7 @@ yata = "0.7"
 # ndarray = { version = "0.16.1" }
 # Models & Optimisation
 # catboost-rs = "0.1"
-clarabel = "0"
+# clarabel = "0"
 # Testing
 # mockall = "0.13"
 # test-case = "3.3"

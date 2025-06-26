@@ -30,5 +30,7 @@ uuid = { workspace = true }
 statrs = { workspace = true }
 time = { workspace = true }
 kanal = { workspace = true }
-clarabel = { workspace = true }
+# clarabel = { workspace = true }
 typed-builder = { workspace = true }
+rand = "0.9.1"
+reqwest = { workspace = true }
