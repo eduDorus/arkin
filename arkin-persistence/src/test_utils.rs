@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::time::Duration;
 
-use arkin_core::prelude::load;
+use arkin_core::prelude::*;
 use clickhouse::Client;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgSslMode},

@@ -4,15 +4,16 @@ use serde::{Deserialize, Serialize};
 use statrs::distribution::{ContinuousCDF, Normal};
 use uuid::Uuid;
 
+const VERSION: &str = "v1.5.0";
 const START: &str = "2021-01-07 00:00:00";
-const END: &str = "2025-04-01 00:00:00";
-const PIPELINE_ID: &str = "c1dcc33d-c3f5-4cbd-8a97-bef6aba52df1";
+const END: &str = "2025-06-01 00:00:00";
+const PIPELINE_ID: &str = "bede7dd7-2232-4039-b680-cf1d67cc8210";
 const INSTRUMENT_ID: &str = "f5dd7db6-89da-4c68-b62e-6f80b763bef6";
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = Client::default()
-        .with_url("http://127.0.0.1:8123")
+        .with_url("http://192.168.100.100:8123")
         .with_compression(clickhouse::Compression::Lz4)
         .with_database("arkin")
         .with_user("arkin_admin")
@@ -84,7 +85,7 @@ async fn main() -> Result<()> {
     };
 
     // Save to json file:
-    let file = std::fs::File::create("./scalers/quantiles_v1.1.0.json")?;
+    let file = std::fs::File::create(format!("./scalers/quantiles_{}.json", VERSION))?;
     serde_json::to_writer(file, &scaler_data)?;
 
     // Load from json file:
