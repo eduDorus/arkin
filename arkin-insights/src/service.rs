@@ -76,7 +76,7 @@ impl RunnableService for InsightsService {
     async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting insights service...");
 
-        let mut warm_up = 5759;
+        let mut warm_up = 4319;
 
         loop {
             select! {

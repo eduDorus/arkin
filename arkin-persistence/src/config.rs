@@ -4,8 +4,6 @@ use serde::{Deserialize, Serialize};
 pub struct PersistenceConfig {
     pub postgres: PostgresConfig,
     pub clickhouse: ClickhouseConfig,
-    pub auto_commit_interval: u64,
-    pub batch_size: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -29,4 +27,5 @@ pub struct ClickhouseConfig {
     pub user: String,
     pub password: String,
     pub database: String,
+    pub buffer_size: usize,
 }

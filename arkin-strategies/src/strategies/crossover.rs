@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
-use tokio::{select, sync::RwLock};
+use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 use typed_builder::TypedBuilder;
@@ -18,8 +18,6 @@ pub struct CrossoverStrategy {
     strategy: Arc<Strategy>,
     fast_ma: FeatureId,
     slow_ma: FeatureId,
-    #[builder(default = RwLock::new(HashMap::new()))]
-    current_weight: RwLock<HashMap<Arc<Instrument>, Decimal>>,
 }
 
 #[async_trait]
@@ -57,9 +55,6 @@ impl Algorithm for CrossoverStrategy {
     async fn insight_tick(&self, tick: Arc<InsightsUpdate>) -> Result<(), StrategyError> {
         debug!("Processing insight tick for Crossover Strategy...");
 
-        // Lock the current weight map
-        let mut current_weight = self.current_weight.write().await;
-
         let mut signals = vec![];
         for i in &tick.instruments {
             let fast_ma = tick.insights.iter().find(|x| {
@@ -78,7 +73,7 @@ impl Algorithm for CrossoverStrategy {
                 }
             });
 
-            let weight = match (fast_ma, slow_ma) {
+            let new_weight = match (fast_ma, slow_ma) {
                 (Some(f), Some(s)) => match f.value > s.value {
                     true => Decimal::ONE,
                     false => Decimal::NEGATIVE_ONE,
@@ -86,18 +81,11 @@ impl Algorithm for CrossoverStrategy {
                 _ => Decimal::ZERO,
             };
 
-            // Check if the weight has changed and update or insert
-            let current_weight = current_weight.entry(i.clone()).or_insert(Decimal::ZERO);
-            if *current_weight == weight {
-                continue;
-            }
-            *current_weight = weight;
-
             let signal = Signal::builder()
                 .event_time(tick.event_time)
                 .instrument(i.clone())
                 .strategy(self.strategy.clone())
-                .weight(weight)
+                .weight(new_weight)
                 .build();
             let signal = Arc::new(signal);
             signals.push(signal);

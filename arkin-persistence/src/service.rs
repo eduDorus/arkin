@@ -20,7 +20,6 @@ pub struct PersistenceService {
     pub dry_run: bool,
     pub only_normalized: bool,
     pub only_predictions: bool,
-    pub auto_commit_interval: Duration,
     pub instance_store: Arc<InstanceStore>,
     pub account_store: Arc<AccountStore>,
     pub transfer_store: Arc<TransferStore>,
@@ -133,7 +132,7 @@ impl PersistenceService {
         let insights_store = Arc::new(
             InsightsStore::builder()
                 .insights_repo(insights_repo.to_owned())
-                .buffer_size(config.batch_size)
+                .buffer_size(ch_config.buffer_size)
                 .build(),
         );
         let strategy_store = Arc::new(StrategyStore::builder().strategy_repo(strategy_repo.to_owned()).build());
@@ -150,14 +149,14 @@ impl PersistenceService {
             TickStore::builder()
                 .tick_repo(tick_repo.into())
                 .instrument_store(instrument_store.to_owned())
-                .buffer_size(config.batch_size)
+                .buffer_size(ch_config.buffer_size)
                 .build(),
         );
         let trade_store = Arc::new(
             TradeStore::builder()
                 .trade_repo(trade_repo.into())
                 .instrument_store(instrument_store.to_owned())
-                .buffer_size(config.batch_size)
+                .buffer_size(ch_config.buffer_size)
                 .build(),
         );
 
@@ -167,7 +166,6 @@ impl PersistenceService {
             dry_run,
             only_normalized,
             only_predictions,
-            auto_commit_interval: Duration::from_secs(config.auto_commit_interval),
             instance_store,
             account_store,
             transfer_store,
