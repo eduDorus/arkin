@@ -171,9 +171,10 @@ impl AllocationOptim for SignalAllocationOptim {
             // Process each signal and collect orders
             let res = self.process_signal(&signal, capital_per_signal).await;
 
-            // Publish orders
-            if let Ok(Some(order)) = res {
-                self.pubsub.publish(Event::ExecutionOrderNew(order.clone())).await;
+            match res {
+                Ok(Some(order)) => self.pubsub.publish(Event::ExecutionOrderNew(order.clone())).await,
+                Err(e) => warn!("{}", e),
+                _ => debug!("No New Execution Orders"),
             }
         } else {
             info!("Signal for {} has not changed, skipping optimization", signal.instrument);
