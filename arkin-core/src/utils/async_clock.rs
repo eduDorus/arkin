@@ -87,13 +87,11 @@ impl Clock {
 
 #[cfg(test)]
 mod tests {
-    use crate::logging;
-
     use super::*;
+    use test_log::test;
 
-    #[tokio::test]
+    #[test(tokio::test)]
     async fn test_time_component() {
-        logging::init_test_tracing();
         info!("Starting time component test...");
         let config = ClockConfig { tick_frequency: 1 };
         let time_component = Clock::from_config(&config);

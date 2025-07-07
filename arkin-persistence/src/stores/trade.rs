@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_stream::try_stream;
-use futures_util::{stream, Stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
 use tokio_util::task::TaskTracker;

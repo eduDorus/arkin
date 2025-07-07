@@ -17,7 +17,7 @@ arkin-engine = { path = "../arkin-engine" }
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
 tokio-util = { workspace = true }
-futures-util = { workspace = true }
+futures = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 kanal = { workspace = true }

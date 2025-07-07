@@ -7,7 +7,7 @@ use async_tungstenite::{
     tungstenite::Message,
     WebSocketStream,
 };
-use futures_util::StreamExt;
+use futures::StreamExt;
 use kanal::AsyncSender;
 use tokio::{net::TcpStream, select, sync::Semaphore};
 use tokio_rustls::client::TlsStream;

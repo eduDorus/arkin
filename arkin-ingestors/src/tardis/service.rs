@@ -8,7 +8,7 @@ use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures_util::{stream, Stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use time::macros::format_description;
 use time::OffsetDateTime;

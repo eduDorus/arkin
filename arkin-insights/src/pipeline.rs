@@ -252,8 +252,6 @@ impl PipelineGraph {
 
 // #[tokio::test]
 // async fn test_pipeline_calculate() {
-//     logging::init_test_tracing();
-
 //     // Create graph
 //     let mut graph = Pipeline::default();
 
@@ -282,8 +280,6 @@ impl PipelineGraph {
 
 // #[tokio::test(flavor = "multi_thread")]
 // async fn test_pipeline_from_config() {
-//     logging::init_test_tracing();
-
 //     let config = PipelineConfig {
 //         name: "test_pipeline".to_string(),
 //         frequency: 1,

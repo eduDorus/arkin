@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use async_tungstenite::tungstenite::Message;
 use dashmap::DashMap;
-use futures_util::StreamExt;
+use futures::StreamExt;
 use rust_decimal::Decimal;
 use tokio::select;
 use tokio_util::sync::CancellationToken;

@@ -10,7 +10,7 @@ use arkin_binance::{prelude::*, AggTradeStream, BookTickerStream};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use flume::{Receiver, Sender};
-use futures_util::StreamExt;
+use futures::StreamExt;
 use models::BinanceUSDMMarketEvent;
 use rust_decimal::prelude::*;
 use strum::Display;

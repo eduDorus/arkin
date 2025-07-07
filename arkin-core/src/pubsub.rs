@@ -176,7 +176,7 @@ impl RunnableService for PubSub {
                     } else {
                         continue;
                     }
-                    if let Some(event) = receiver.next() {
+                    if let Some(event) = receiver.take() {
                         let mut lock = collector_event_queue.lock().await;
                         lock.push(Reverse(event));
                         if lock.len() > 100000000 {

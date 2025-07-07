@@ -23,7 +23,7 @@ impl<T> PeekableReceiver<T> {
     }
 
     // Consume the peeked event and return it
-    pub fn next(&mut self) -> Option<T> {
+    pub fn take(&mut self) -> Option<T> {
         if let Some(item) = self.peeked.take() {
             Some(item)
         } else {

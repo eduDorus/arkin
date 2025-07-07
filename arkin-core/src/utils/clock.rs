@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use futures_util::{stream, Stream};
+use futures::{stream, Stream};
 use time::OffsetDateTime;
 use tracing::info;
 

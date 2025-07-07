@@ -49,15 +49,13 @@ impl Deduplicator {
 
 #[cfg(test)]
 mod tests {
+    use test_log::test;
     use tracing::info;
-
-    use crate::logging;
 
     use super::*;
 
-    #[test]
+    #[test(test)]
     fn test_hash_string_consistency() {
-        logging::init_test_tracing();
         let input = "hello";
         let hash1 = Deduplicator::hash_string(input);
         let hash2 = Deduplicator::hash_string(input);
@@ -65,7 +63,7 @@ mod tests {
         info!("Hash for '{}': {}", input, hash1)
     }
 
-    #[test]
+    #[test(test)]
     fn test_hash_string_uniqueness() {
         let input1 = "hello";
         let input2 = "world";
@@ -74,7 +72,7 @@ mod tests {
         assert_ne!(hash1, hash2, "Hashes should be different for different inputs");
     }
 
-    #[test]
+    #[test(test)]
     fn test_deduplicator() {
         let mut deduplicator = Deduplicator::new(3);
 

@@ -15,7 +15,7 @@ serde = { workspace = true }
 tracing = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
-futures-util = { workspace = true }
+futures = { workspace = true }
 async-trait = { workspace = true }
 uuid = { workspace = true }
 sqlx = { workspace = true }

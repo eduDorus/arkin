@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use futures_util::StreamExt;
+use futures::StreamExt;
 use time::OffsetDateTime;
 use tokio::pin;
 use tokio_util::sync::CancellationToken;

@@ -21,7 +21,7 @@ async-trait = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
 typed-builder = { workspace = true }
-futures-util = { workspace = true }
+futures = { workspace = true }
 dashmap = { workspace = true }
 anyhow = { workspace = true }
 time = { workspace = true }

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use futures_util::StreamExt;
+use futures::StreamExt;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 
