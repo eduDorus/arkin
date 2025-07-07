@@ -189,6 +189,8 @@ dependencies = [
  "async-trait",
  "dashmap",
  "rand 0.9.1",
+ "rust_decimal",
+ "rust_decimal_macros",
  "test-log",
  "time",
  "tokio",

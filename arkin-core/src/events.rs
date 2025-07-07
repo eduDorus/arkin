@@ -44,10 +44,7 @@ pub enum Event {
     VenueOrderInflight(Arc<VenueOrder>),
     VenueOrderPlaced(Arc<VenueOrder>),
     VenueOrderRejected(Arc<VenueOrder>),
-    VenueOrderPartiallyFilled(Arc<VenueOrder>),
-    VenueOrderPartiallyFilledCancelled(Arc<VenueOrder>),
-    VenueOrderPartiallyFilledExpired(Arc<VenueOrder>),
-    VenueOrderFilled(Arc<VenueOrder>),
+    VenueOrderFill(Arc<VenueOrder>),
     VenueOrderCancelled(Arc<VenueOrder>),
     VenueOrderExpired(Arc<VenueOrder>),
 
@@ -89,10 +86,7 @@ impl Event {
             Event::VenueOrderInflight(event) => event.updated_at,
             Event::VenueOrderPlaced(event) => event.updated_at,
             Event::VenueOrderRejected(event) => event.updated_at,
-            Event::VenueOrderPartiallyFilled(event) => event.updated_at,
-            Event::VenueOrderPartiallyFilledCancelled(event) => event.updated_at,
-            Event::VenueOrderPartiallyFilledExpired(event) => event.updated_at,
-            Event::VenueOrderFilled(event) => event.updated_at,
+            Event::VenueOrderFill(event) => event.updated_at,
             Event::VenueOrderCancelled(event) => event.updated_at,
             Event::VenueOrderExpired(event) => event.updated_at,
             // Other

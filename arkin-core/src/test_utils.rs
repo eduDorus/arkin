@@ -1,6 +1,7 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
+use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use time::{macros::datetime, OffsetDateTime};
 use tokio::sync::{Mutex, RwLock};
@@ -279,13 +280,13 @@ pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
     Arc::new(order)
 }
 
-pub fn test_venue_market_order_new(time: OffsetDateTime) -> VenueOrder {
+pub fn test_venue_market_order_new(time: OffsetDateTime, instrument: Arc<Instrument>, side: MarketSide) -> VenueOrder {
     VenueOrder::builder()
         .id(Uuid::new_v4())
         .strategy(Some(test_strategy_1()))
-        .instrument(test_inst_binance_btc_usdt_perp())
+        .instrument(instrument)
         .order_type(VenueOrderType::Market)
-        .side(MarketSide::Buy)
+        .side(side)
         .price(dec!(0))
         .quantity(dec!(1))
         .status(VenueOrderStatus::New)
@@ -294,14 +295,19 @@ pub fn test_venue_market_order_new(time: OffsetDateTime) -> VenueOrder {
         .build()
 }
 
-pub fn test_venue_limit_order_new(time: OffsetDateTime) -> VenueOrder {
+pub fn test_venue_limit_order_new(
+    time: OffsetDateTime,
+    instrument: Arc<Instrument>,
+    price: Decimal,
+    side: MarketSide,
+) -> VenueOrder {
     VenueOrder::builder()
         .id(Uuid::new_v4())
         .strategy(Some(test_strategy_1()))
-        .instrument(test_inst_binance_btc_usdt_perp())
+        .instrument(instrument)
         .order_type(VenueOrderType::Limit)
-        .side(MarketSide::Buy)
-        .price(dec!(100000))
+        .side(side)
+        .price(price)
         .quantity(dec!(1))
         .status(VenueOrderStatus::New)
         .created_at(time)
