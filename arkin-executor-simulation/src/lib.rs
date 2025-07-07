@@ -157,38 +157,75 @@ mod tests {
 
     #[tokio::test]
     #[test_log::test]
-    async fn test_place_order() {
+    async fn test_place_market_order() {
         // Setup
         let publisher = MockPublisher::new();
         let time = MockTime::new();
         let execution = SimulationExecution::new("test", time.clone(), publisher.clone());
-        let mut order = test_venue_order_new(time.now().await);
+        let mut mkt_order = test_venue_market_order_new(time.now().await);
 
         // Execute
-        execution.handle_event(Event::NewVenueOrder(order.clone().into())).await;
+        execution.handle_event(Event::NewVenueOrder(mkt_order.clone().into())).await;
 
         // Verify events
         let events = publisher.get_events().await;
-        order.status = VenueOrderStatus::Inflight;
+        mkt_order.status = VenueOrderStatus::Inflight;
         assert_eq!(events.len(), 2, "Expected two events");
         assert_eq!(
             events[0],
-            Event::VenueOrderInflight(order.clone().into()),
+            Event::VenueOrderInflight(mkt_order.clone().into()),
             "First event should be Inflight"
         );
         assert_eq!(execution.orderbook.len(), 1, "Order should be in the orderbook");
 
         // Check second event and orderbook state
-        order.status = VenueOrderStatus::Placed;
+        mkt_order.status = VenueOrderStatus::Placed;
         assert_eq!(
             events[1],
-            Event::VenueOrderPlaced(order.clone().into()),
+            Event::VenueOrderPlaced(mkt_order.clone().into()),
             "First event should be Inflight"
         );
 
         // Check orderbook
         assert_eq!(execution.orderbook.len(), 1, "Order should be in the orderbook");
-        let order_in_book = execution.orderbook.get(order.id).unwrap();
+        let order_in_book = execution.orderbook.get(mkt_order.id).unwrap();
+        assert_eq!(order_in_book.status, VenueOrderStatus::Placed, "Status should be Placed");
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn test_place_limit_order() {
+        // Setup
+        let publisher = MockPublisher::new();
+        let time = MockTime::new();
+        let execution = SimulationExecution::new("test", time.clone(), publisher.clone());
+        let mut mkt_order = test_venue_market_order_new(time.now().await);
+
+        // Execute
+        execution.handle_event(Event::NewVenueOrder(mkt_order.clone().into())).await;
+
+        // Verify events
+        let events = publisher.get_events().await;
+        mkt_order.status = VenueOrderStatus::Inflight;
+        assert_eq!(events.len(), 2, "Expected two events");
+        assert_eq!(
+            events[0],
+            Event::VenueOrderInflight(mkt_order.clone().into()),
+            "First event should be Inflight"
+        );
+        assert_eq!(execution.orderbook.len(), 1, "Order should be in the orderbook");
+
+        // Check second event and orderbook state
+        mkt_order.status = VenueOrderStatus::Placed;
+        assert_eq!(
+            events[1],
+            Event::VenueOrderPlaced(mkt_order.clone().into()),
+            "First event should be Inflight"
+        );
+
+        // Check orderbook
+        assert_eq!(execution.orderbook.len(), 1, "Order should be in the orderbook");
+        let order_in_book = execution.orderbook.get(mkt_order.id).unwrap();
         assert_eq!(order_in_book.status, VenueOrderStatus::Placed, "Status should be Placed");
     }
 
@@ -199,7 +236,7 @@ mod tests {
         let publisher = MockPublisher::new();
         let time = MockTime::new();
         let execution = SimulationExecution::new("test", time.clone(), publisher.clone());
-        let mut order = test_venue_order_new(time.now().await);
+        let mut order = test_venue_market_order_new(time.now().await);
 
         // Place the order first
         execution.handle_event(Event::NewVenueOrder(order.clone().into())).await;
@@ -244,9 +281,9 @@ mod tests {
             let execution = SimulationExecution::new("test", time.clone(), publisher.clone());
 
             // Create and place three orders
-            let order1 = test_venue_order_new(time.now().await);
-            let order2 = test_venue_order_new(time.now().await);
-            let order3 = test_venue_order_new(time.now().await);
+            let order1 = test_venue_market_order_new(time.now().await);
+            let order2 = test_venue_market_order_new(time.now().await);
+            let order3 = test_venue_market_order_new(time.now().await);
 
             execution.handle_event(Event::NewVenueOrder(order1.clone().into())).await;
             execution.handle_event(Event::NewVenueOrder(order2.clone().into())).await;

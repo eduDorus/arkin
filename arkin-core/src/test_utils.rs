@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     Asset, AssetType, Event, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceType,
     Instrument, InstrumentStatus, InstrumentType, MarketSide, Pipeline, Price, PubSub, Publisher, Quantity,
-    SimulationSystemTime, Strategy, SystemTime, Tick, Venue, VenueOrder, VenueOrderStatus, VenueType,
+    SimulationSystemTime, Strategy, SystemTime, Tick, Venue, VenueOrder, VenueOrderStatus, VenueOrderType, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -279,14 +279,29 @@ pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
     Arc::new(order)
 }
 
-pub fn test_venue_order_new(time: OffsetDateTime) -> VenueOrder {
+pub fn test_venue_market_order_new(time: OffsetDateTime) -> VenueOrder {
     VenueOrder::builder()
         .id(Uuid::new_v4())
         .strategy(Some(test_strategy_1()))
         .instrument(test_inst_binance_btc_usdt_perp())
-        // .order_type(ExecutionOrderType::Maker)
+        .order_type(VenueOrderType::Market)
         .side(MarketSide::Buy)
         .price(dec!(0))
+        .quantity(dec!(1))
+        .status(VenueOrderStatus::New)
+        .created_at(time)
+        .updated_at(time)
+        .build()
+}
+
+pub fn test_venue_limit_order_new(time: OffsetDateTime) -> VenueOrder {
+    VenueOrder::builder()
+        .id(Uuid::new_v4())
+        .strategy(Some(test_strategy_1()))
+        .instrument(test_inst_binance_btc_usdt_perp())
+        .order_type(VenueOrderType::Limit)
+        .side(MarketSide::Buy)
+        .price(dec!(100000))
         .quantity(dec!(1))
         .status(VenueOrderStatus::New)
         .created_at(time)
