@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
 
     let n_quantiles = 1000;
     let levels: Vec<f64> = (1..n_quantiles).map(|i| i as f64 / n_quantiles as f64).collect();
-    let levels_str = levels.iter().map(|&l| format!("{:.4}", l)).collect::<Vec<_>>().join(", ");
+    let levels_str = levels.iter().map(|&l| format!("{l:.4}")).collect::<Vec<_>>().join(", ");
 
     // Get distinct feature_ids:
     let feature_query = format!(
@@ -32,18 +32,17 @@ async fn main() -> Result<()> {
         FROM 
           insights FINAL
         WHERE
-          event_time BETWEEN '{}' AND '{}'
-          AND pipeline_id = '{}'
-          AND instrument_id = '{}'
+          event_time BETWEEN '{START}' AND '{END}'
+          AND pipeline_id = '{PIPELINE_ID}'
+          AND instrument_id = '{INSTRUMENT_ID}'
           AND insight_type = 'continuous'
         ORDER BY 
           feature_id ASC
-        "#,
-        START, END, PIPELINE_ID, INSTRUMENT_ID
+        "#
     );
     let feature_ids: Vec<String> = client.query(&feature_query).fetch_all::<String>().await?;
     for feature in &feature_ids {
-        println!(" - {}", feature);
+        println!(" - {feature}");
     }
 
     // Create a query for each feature_id:
@@ -54,25 +53,24 @@ async fn main() -> Result<()> {
             SELECT
               instrument_id,
               feature_id,
-              quantilesExact({})(value) AS quantiles,
+              quantilesExact({levels_str})(value) AS quantiles,
               quantileExact(0.5)(value) AS median,
               (quantileExact(0.75)(value) - quantileExact(0.25)(value)) as iqr
             FROM
               insights FINAL
             WHERE
-              event_time BETWEEN '{}' AND '{}'
-              AND pipeline_id = '{}'
-              AND instrument_id = '{}'
+              event_time BETWEEN '{START}' AND '{END}'
+              AND pipeline_id = '{PIPELINE_ID}'
+              AND instrument_id = '{INSTRUMENT_ID}'
               AND insight_type = 'continuous'
-              AND feature_id = '{}'
+              AND feature_id = '{feature_id}'
             GROUP BY
               instrument_id,
               feature_id
             ORDER BY
               instrument_id,
               feature_id ASC
-            "#,
-            levels_str, START, END, PIPELINE_ID, INSTRUMENT_ID, feature_id
+            "#
         );
         let quantile_data = client.query(&query).fetch_one::<ScalerDataDTO>().await?;
         quantile_result.push(quantile_data);
@@ -81,11 +79,11 @@ async fn main() -> Result<()> {
     // let quantiles_data = client.query(&query).fetch_all::<ScalerDataDTO>().await?;
     let scaler_data = QuantileData {
         levels,
-        data: quantile_result.into_iter().map(|q| q.into()).collect(),
+        data: quantile_result,
     };
 
     // Save to json file:
-    let file = std::fs::File::create(format!("./scalers/quantiles_{}.json", VERSION))?;
+    let file = std::fs::File::create(format!("./scalers/quantiles_{VERSION}.json"))?;
     serde_json::to_writer(file, &scaler_data)?;
 
     // Load from json file:

@@ -65,8 +65,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> WebSocketState<T> {
             params = params_str,
             id = id
         );
-        let message = Message::Text(s);
-        debug!("Sent {}", message);
+        let message = Message::Text(s.into());
 
         self.socket.send(message).await.unwrap();
 

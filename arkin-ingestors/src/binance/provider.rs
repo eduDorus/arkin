@@ -39,7 +39,7 @@ impl Subscription {
 
 impl From<Subscription> for Message {
     fn from(sub: Subscription) -> Self {
-        Message::Text(serde_json::to_string(&sub).expect("Failed to serialize subscription"))
+        Message::Text(serde_json::to_string(&sub).expect("Failed to serialize subscription").into())
     }
 }
 

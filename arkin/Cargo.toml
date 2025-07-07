@@ -1,4 +1,3 @@
-# https://web.stanford.edu/~boyd/papers/pdf/markowitz.pdf
 [package]
 name = "arkin"
 version.workspace = true
@@ -21,16 +20,12 @@ tokio-util = { workspace = true }
 futures-util = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
-clickhouse = { workspace = true }
-ort = { version = "=2.0.0-rc.10" }
-ndarray = "0.16.1"
+kanal = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+rand = { workspace = true }
+time = { workspace = true }
+reqwest = { workspace = true }
+clickhouse = { workspace = true }
 uuid = { workspace = true }
 statrs = { workspace = true }
-time = { workspace = true }
-kanal = { workspace = true }
-# clarabel = { workspace = true }
-typed-builder = { workspace = true }
-rand = "0.9.1"
-reqwest = { workspace = true }

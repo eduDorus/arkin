@@ -129,7 +129,7 @@ impl Handler {
     ) -> Result<Self, IngestorError> {
         let (mut stream, _) = connect_async(url.to_string()).await?;
         // Send ping
-        let ping = Message::Ping(vec![]);
+        let ping = Message::Ping(bytes::Bytes::new());
         stream.send(ping).await?;
 
         Ok(Self {

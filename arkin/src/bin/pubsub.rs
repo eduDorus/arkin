@@ -49,7 +49,7 @@ pub async fn main() {
                 frequency: Duration::from_secs(1),
             };
             if let Err(e) = handle_1.send(event.into()).await {
-                println!("Failed to send event: {:?}", e);
+                println!("Failed to send event: {e:?}");
             }
             i += 1;
             if i > MESSAGE_SIZE {
@@ -68,7 +68,7 @@ pub async fn main() {
                 frequency: Duration::from_secs(1),
             };
             if let Err(e) = handle_2.send(event.into()).await {
-                println!("Failed to send event: {:?}", e);
+                println!("Failed to send event: {e:?}");
             }
             i += 1;
             if i > MESSAGE_SIZE {

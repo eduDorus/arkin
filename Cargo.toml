@@ -1,5 +1,6 @@
 [workspace]
-members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-accounting", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-ordermanager", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
+# members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-accounting", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-ordermanager", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
+members = [ "arkin", "arkin-core", "arkin-engine" ]
 
 default-members = [ "arkin" ]
 
@@ -18,6 +19,7 @@ license = "Proprietary"
 
 [workspace.dependencies]
 # Utiliy
+rand = "0.9"
 uuid = { version = "1", features = [ "v4", "fast-rng", "serde" ], default-features = false }
 strum = { version = "0.27", features = [ "derive" ], default-features = false }
 url = { version = "2.5", default-features = false }
@@ -35,7 +37,7 @@ parking_lot = { version = "0.12", features = [ "hardware-lock-elision" ], defaul
 rayon = "1.10"
 
 # Async
-tokio = { version = "1.45", features = [ "full" ] }
+tokio = { version = "1.46", features = [ "full" ] }
 kanal = { version = "0.1.1", features = [ "std-mutex" ] }
 async-trait = "0.1"
 async-stream = "0.3"
@@ -44,7 +46,7 @@ tokio-util = { version = "0.7", features = [ "rt" ] }
 
 # HTTP & Websockets
 tokio-rustls = { version = "0.26", features = [ "ring" ], default-features = false }
-async-tungstenite = { version = "0.28", features = [ "tokio-runtime", "tokio-rustls-webpki-roots" ], default-features = false }
+async-tungstenite = { version = "0.29", features = [ "tokio-runtime", "tokio-rustls-webpki-roots" ], default-features = false }
 reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "http2", "gzip", "brotli", "zstd", "deflate", "socks", "hickory-dns" ], default-features = false }
 
 # Data Types

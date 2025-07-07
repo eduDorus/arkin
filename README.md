@@ -4,6 +4,9 @@
 
 This software is proprietary and not open-source. For more information on licensing, please contact [Your Contact Information].
 
+## Stuff
+- https://web.stanford.edu/~boyd/papers/pdf/markowitz.pdf
+
 
 ## Download
 ### Market Data

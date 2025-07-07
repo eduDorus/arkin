@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .collect::<Vec<usize>>();
 
                 println!("Inference successful!");
-                println!("OUTPUT{} shape: {:?}", i, shape);
+                println!("OUTPUT{i} shape: {shape:?}");
             }
         } else {
             println!("Failed to get a response: {} - {}", response.status(), response.text().await?);
@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let duration = start.elapsed();
-    println!("Total time: {:?}", duration);
+    println!("Total time: {duration:?}");
 
     // Define constants
     const SEQUENCE_LENGTH: usize = 36;
@@ -134,8 +134,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let outputs = response_json["outputs"].as_array().ok_or("Outputs not an array")?;
 
             // Match Python output order: ACTION (0), ACTION_SPACE (1), PROBABILITY (3), WEIGHT (2)
-            let output_order = vec![0, 1, 3, 2];
-            let output_names = vec!["ACTION", "ACTION_SPACE", "WEIGHT", "PROBABILITY"];
+            let output_order = [0, 1, 3, 2];
+            let output_names = ["ACTION", "ACTION_SPACE", "WEIGHT", "PROBABILITY"];
 
             println!("Inference successful!");
             for (idx, &output_idx) in output_order.iter().enumerate() {
@@ -159,7 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let duration = start.elapsed();
-    println!("Total time: {:?}", duration);
+    println!("Total time: {duration:?}");
 
     Ok(())
 }
