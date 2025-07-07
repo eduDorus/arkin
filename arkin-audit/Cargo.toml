@@ -1,0 +1,12 @@
+[package]
+name = "arkin-audit"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-core = { path = "../arkin-core" }
+
+tracing = { workspace = true }
+async-trait = { workspace = true }

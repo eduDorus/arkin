@@ -11,6 +11,7 @@ use crate::{
 #[derive(Debug, Display, Clone, EnumDiscriminants)]
 #[strum_discriminants(name(EventType))]
 #[strum_discriminants(derive(Hash), derive(Display), derive(EnumIter))]
+#[strum(serialize_all = "snake_case")]
 pub enum Event {
     // Market Data
     TickUpdate(Arc<Tick>),
@@ -37,7 +38,7 @@ pub enum Event {
     VenueOrderStatusUpdate(Arc<VenueOrder>),
     VenueOrderFillUpdate(Arc<VenueOrder>),
     // Other
-    Finished,
+    Finished(OffsetDateTime),
 }
 
 impl Event {
@@ -68,7 +69,7 @@ impl Event {
             Event::VenueOrderStatusUpdate(event) => event.event_time,
             Event::VenueOrderFillUpdate(event) => event.event_time,
             // Other
-            Event::Finished => OffsetDateTime::from_unix_timestamp(253402300799).unwrap(), // Year 9999
+            Event::Finished(ts) => *ts,
         }
     }
 

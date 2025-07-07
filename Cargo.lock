@@ -128,6 +128,7 @@ name = "arkin"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arkin-audit",
  "arkin-core",
  "clickhouse",
  "futures",
@@ -143,6 +144,15 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "arkin-audit"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "tracing",
 ]
 
 [[package]]
