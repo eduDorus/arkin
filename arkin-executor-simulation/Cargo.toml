@@ -1,0 +1,16 @@
+[package]
+name = "arkin-executor-simulation"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-core = { path = "../arkin-core" }
+
+tokio = { workspace = true }
+async-trait = { workspace = true }
+rand = { workspace = true }
+tracing = { workspace = true }
+dashmap = { workspace = true }
+uuid = { workspace = true }

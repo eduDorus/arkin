@@ -182,6 +182,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-executor-simulation"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "dashmap",
+ "rand 0.9.1",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "arraydeque"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

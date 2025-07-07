@@ -6,7 +6,7 @@ use strum::Display;
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 
-use crate::{Event, Price, Quantity};
+use crate::{Price, Quantity};
 
 use super::{Instrument, MarketSide};
 
@@ -47,18 +47,6 @@ impl PositionUpdate {
 
     pub fn notional_value(&self) -> Decimal {
         self.entry_price * self.quantity.abs() * self.instrument.contract_size
-    }
-}
-
-impl From<Arc<PositionUpdate>> for Event {
-    fn from(update: Arc<PositionUpdate>) -> Self {
-        Event::PositionUpdate(update)
-    }
-}
-
-impl From<PositionUpdate> for Event {
-    fn from(update: PositionUpdate) -> Self {
-        Event::PositionUpdate(Arc::new(update))
     }
 }
 

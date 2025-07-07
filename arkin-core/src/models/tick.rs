@@ -11,7 +11,7 @@ use crate::{
         TICK_BID_QUANTITY_FEATURE_ID,
     },
     prelude::TIMESTAMP_FORMAT,
-    Event, Price, Quantity,
+    Price, Quantity,
 };
 
 use super::{Insight, InsightType, Instrument};
@@ -97,18 +97,6 @@ impl Tick {
 
     pub fn ask_price(&self) -> Price {
         self.ask_price
-    }
-}
-
-impl From<Tick> for Event {
-    fn from(tick: Tick) -> Self {
-        Event::TickUpdate(Arc::new(tick))
-    }
-}
-
-impl From<Arc<Tick>> for Event {
-    fn from(tick: Arc<Tick>) -> Self {
-        Event::TickUpdate(tick)
     }
 }
 

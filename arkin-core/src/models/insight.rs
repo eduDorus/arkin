@@ -4,7 +4,7 @@ use strum::Display;
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 
-use crate::{Event, FeatureId};
+use crate::FeatureId;
 
 use super::{Instrument, Pipeline};
 
@@ -13,18 +13,6 @@ pub struct InsightsTick {
     pub event_time: OffsetDateTime,
     pub instruments: Vec<Arc<Instrument>>,
     pub frequency: Duration,
-}
-
-impl From<InsightsTick> for Event {
-    fn from(tick: InsightsTick) -> Self {
-        Event::InsightsTick(Arc::new(tick))
-    }
-}
-
-impl From<Arc<InsightsTick>> for Event {
-    fn from(tick: Arc<InsightsTick>) -> Self {
-        Event::InsightsTick(tick)
-    }
 }
 
 #[derive(Debug, Display, Clone, PartialEq, Eq, Hash)]
@@ -74,10 +62,4 @@ pub struct InsightsUpdate {
     pub event_time: OffsetDateTime,
     pub instruments: Vec<Arc<Instrument>>,
     pub insights: Vec<Arc<Insight>>,
-}
-
-impl From<Arc<InsightsUpdate>> for Event {
-    fn from(tick: Arc<InsightsUpdate>) -> Self {
-        Event::InsightsUpdate(tick)
-    }
 }

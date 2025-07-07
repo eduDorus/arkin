@@ -5,8 +5,6 @@ use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::Event;
-
 use super::{Tradable, Venue};
 
 #[derive(Debug, Clone, PartialEq, Type)]
@@ -103,10 +101,4 @@ impl fmt::Display for Account {
 pub struct AccountUpdate {
     pub event_time: OffsetDateTime,
     pub account: Arc<Account>,
-}
-
-impl From<Arc<AccountUpdate>> for Event {
-    fn from(account_update: Arc<AccountUpdate>) -> Self {
-        Event::AccountNew(account_update)
-    }
 }

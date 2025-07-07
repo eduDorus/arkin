@@ -8,7 +8,7 @@ use crate::{
     constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
     models::Insight,
     prelude::TIMESTAMP_FORMAT,
-    Event, Price, Quantity,
+    Price, Quantity,
 };
 
 use super::{InsightType, Instrument, MarketSide};
@@ -60,18 +60,6 @@ impl Trade {
                 .build(),
         ];
         insights.into_iter().map(Arc::new).collect()
-    }
-}
-
-impl From<Trade> for Event {
-    fn from(trade: Trade) -> Self {
-        Event::TradeUpdate(Arc::new(trade))
-    }
-}
-
-impl From<Arc<Trade>> for Event {
-    fn from(trade: Arc<Trade>) -> Self {
-        Event::TradeUpdate(trade)
     }
 }
 

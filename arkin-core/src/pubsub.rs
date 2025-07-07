@@ -22,7 +22,7 @@ pub enum EventFilter {
 
 #[derive(Debug, Clone)]
 pub struct PubSubPublisher {
-    tx: AsyncSender<Arc<Event>>,
+    tx: AsyncSender<Event>,
 }
 
 #[async_trait]
@@ -37,14 +37,14 @@ impl Publisher for PubSubPublisher {
 
 #[derive(Debug, Clone)]
 pub struct PubSubSubscriber {
-    rx: AsyncReceiver<Arc<Event>>,
+    rx: AsyncReceiver<Event>,
     ack: bool,
     ack_tx: AsyncSender<()>,
 }
 
 #[async_trait]
 impl Subscriber for PubSubSubscriber {
-    async fn recv(&self) -> Option<Arc<Event>> {
+    async fn recv(&self) -> Option<Event> {
         match self.rx.recv().await {
             Ok(event) => Some(event),
             Err(e) => {
@@ -69,10 +69,10 @@ impl Subscriber for PubSubSubscriber {
 
 pub struct PubSub {
     time: Arc<dyn SystemTime>,
-    event_queue: Mutex<BinaryHeap<Reverse<Arc<Event>>>>,
-    publishers: DashMap<u64, PeekableReceiver<Arc<Event>>>,
+    event_queue: Mutex<BinaryHeap<Reverse<Event>>>,
+    publishers: DashMap<u64, PeekableReceiver<Event>>,
     next_id: AtomicU64,
-    subscribers: DashMap<u64, AsyncSender<Arc<Event>>>,
+    subscribers: DashMap<u64, AsyncSender<Event>>,
     event_subscriptions: DashMap<EventType, Vec<u64>>,
     subscribers_acknowledge: bool,
     subscribers_acknowledge_channel: (AsyncSender<()>, AsyncReceiver<()>),
@@ -80,16 +80,17 @@ pub struct PubSub {
 
 impl PubSub {
     pub fn new(time: Arc<dyn SystemTime>, ack: bool) -> Arc<Self> {
-        Arc::new(Self {
+        Self {
             time: time,
-            event_queue: Mutex::new(BinaryHeap::<Reverse<Arc<Event>>>::new()),
+            event_queue: Mutex::new(BinaryHeap::<Reverse<Event>>::new()),
             publishers: DashMap::new(),
             next_id: AtomicU64::new(0),
             subscribers: DashMap::new(),
             event_subscriptions: DashMap::new(),
             subscribers_acknowledge: ack,
             subscribers_acknowledge_channel: kanal::bounded_async(1024),
-        })
+        }
+        .into()
     }
     fn get_next_id(&self) -> u64 {
         self.next_id.fetch_add(1, Ordering::Relaxed)
@@ -135,7 +136,7 @@ impl PubSub {
         PubSubPublisher { tx }.into()
     }
 
-    async fn broadcast_event(&self, event: Arc<Event>) {
+    async fn broadcast_event(&self, event: Event) {
         let mut ack_counter = 0;
         let event_type = event.discriminant();
 

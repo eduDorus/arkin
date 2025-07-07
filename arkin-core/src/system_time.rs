@@ -11,7 +11,7 @@ pub struct LiveSystemTime;
 
 impl LiveSystemTime {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self)
+        Self.into()
     }
 }
 
@@ -46,10 +46,11 @@ pub struct SimulationSystemTime {
 
 impl SimulationSystemTime {
     pub fn new(start_time: OffsetDateTime, end_time: OffsetDateTime) -> Arc<Self> {
-        Arc::new(Self {
+        Self {
             current_time: Arc::new(RwLock::new(start_time)),
             end_time,
-        })
+        }
+        .into()
     }
 }
 

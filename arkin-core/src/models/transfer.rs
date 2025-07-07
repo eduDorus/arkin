@@ -7,8 +7,6 @@ use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::Event;
-
 use super::{Account, Instrument, Strategy, Tradable};
 
 #[derive(Debug, Display, Clone, PartialEq, Type)]
@@ -97,10 +95,4 @@ impl fmt::Display for Transfer {
 pub struct TransferGroup {
     pub event_time: OffsetDateTime,
     pub transfers: Vec<Arc<Transfer>>,
-}
-
-impl From<Arc<TransferGroup>> for Event {
-    fn from(transfer_group: Arc<TransferGroup>) -> Self {
-        Event::TransferNew(transfer_group)
-    }
 }

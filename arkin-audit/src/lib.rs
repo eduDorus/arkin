@@ -11,9 +11,10 @@ pub struct Audit {
 
 impl Audit {
     pub fn new(indentifier: &str) -> Arc<Self> {
-        Arc::new(Self {
+        Self {
             identifier: indentifier.to_owned(),
-        })
+        }
+        .into()
     }
 }
 
@@ -24,7 +25,7 @@ impl Runnable for Audit {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn handle_event(&self, event: Arc<Event>) {
+    async fn handle_event(&self, event: Event) {
         info!(target: "audit", "new event added to audit: {}", event);
     }
 }

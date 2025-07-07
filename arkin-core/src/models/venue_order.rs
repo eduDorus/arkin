@@ -7,9 +7,8 @@ use tracing::error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Event, Price, Quantity};
-
-use super::{Asset, Instrument, MarketSide, Strategy};
+use crate::models::{Asset, Instrument, MarketSide, Strategy};
+use crate::{types::Commission, Price, Quantity};
 
 pub type VenueOrderId = Uuid;
 
@@ -37,18 +36,19 @@ pub enum VenueOrderTimeInForce {
     Gtd,
 }
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type, PartialOrd, Ord)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "venue_order_status", rename_all = "snake_case")]
 pub enum VenueOrderStatus {
     New,
+    Inflight,
     Placed,
+    Rejected,
     PartiallyFilled,
-    PartiallyFilledCanceled,
+    PartiallyFilledCancelled,
     PartiallyFilledExpired,
     Filled,
     Cancelled,
-    Rejected,
     Expired,
 }
 
@@ -56,7 +56,6 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
-    pub event_time: OffsetDateTime,
     pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub side: MarketSide,
@@ -85,6 +84,7 @@ pub struct VenueOrder {
     pub commission: Commission,
     #[builder(default = VenueOrderStatus::New)]
     pub status: VenueOrderStatus,
+    pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
 
@@ -100,8 +100,8 @@ impl VenueOrder {
         self.commission += commission;
 
         self.status = match self.filled_quantity == self.quantity {
-            true => VenueOrderStatus::Filled,
             false => VenueOrderStatus::PartiallyFilled,
+            true => VenueOrderStatus::Filled,
         };
         self.updated_at = event_time;
     }
@@ -117,35 +117,54 @@ impl VenueOrder {
         }
     }
 
-    pub fn update_commision_asset(&mut self, asset: Arc<Asset>) {
-        self.commission_asset = Some(asset);
-    }
-
-    pub fn cancel(&mut self) {
+    pub fn cancelled(&mut self) {
         match self.status {
             VenueOrderStatus::New => self.status = VenueOrderStatus::Cancelled,
             VenueOrderStatus::Placed => self.status = VenueOrderStatus::Cancelled,
-            VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledCanceled,
+            VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledCancelled,
             _ => error!("Cannot cancel order in state {}", self.status),
         }
+    }
+
+    pub fn expired(&mut self) {
+        match self.status {
+            VenueOrderStatus::Placed => self.status = VenueOrderStatus::Expired,
+            VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledExpired,
+            _ => error!("Cannot expire order in state {}", self.status),
+        }
+    }
+
+    pub fn update_commision_asset(&mut self, asset: Arc<Asset>) {
+        self.commission_asset = Some(asset);
     }
 
     pub fn remaining_quantity(&self) -> Quantity {
         self.quantity - self.filled_quantity
     }
 
+    pub fn has_fill(&self) -> bool {
+        self.filled_quantity > Quantity::ZERO
+    }
+
+    pub fn total_value(&self) -> Price {
+        self.price * self.quantity * self.instrument.contract_size
+    }
+
     fn is_valid_transition(&self, new_status: &VenueOrderStatus) -> bool {
         matches!(
             (&self.status, new_status),
             (VenueOrderStatus::New, VenueOrderStatus::Placed)
-                | (VenueOrderStatus::New, VenueOrderStatus::Rejected)
+                | (VenueOrderStatus::New, VenueOrderStatus::Inflight)
                 | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
+                | (VenueOrderStatus::New, VenueOrderStatus::Rejected)
+                | (VenueOrderStatus::Inflight, VenueOrderStatus::Placed)
+                | (VenueOrderStatus::Inflight, VenueOrderStatus::Rejected)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Expired)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledCanceled)
+                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledCancelled)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledExpired)
         )
     }
@@ -161,27 +180,14 @@ impl VenueOrder {
     pub fn is_finalized(&self) -> bool {
         matches!(
             self.status,
-            VenueOrderStatus::PartiallyFilledCanceled
-                | VenueOrderStatus::PartiallyFilledExpired
-                | VenueOrderStatus::Filled
-                | VenueOrderStatus::Cancelled
+            VenueOrderStatus::Placed
                 | VenueOrderStatus::Rejected
+                | VenueOrderStatus::Cancelled
                 | VenueOrderStatus::Expired
+                | VenueOrderStatus::Filled
+                | VenueOrderStatus::PartiallyFilledCancelled
+                | VenueOrderStatus::PartiallyFilledExpired
         )
-    }
-
-    pub fn has_fill(&self) -> bool {
-        self.filled_quantity > Quantity::ZERO
-    }
-
-    pub fn total_value(&self) -> Price {
-        self.price * self.quantity * self.instrument.contract_size
-    }
-}
-
-impl From<Arc<VenueOrder>> for Event {
-    fn from(order: Arc<VenueOrder>) -> Self {
-        Event::VenueOrderNew(order)
     }
 }
 

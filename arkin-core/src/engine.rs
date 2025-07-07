@@ -15,11 +15,12 @@ pub struct Engine {
 
 impl Engine {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self {
+        Self {
             services: RwLock::new(HashMap::new()),
             start_order: RwLock::new(BTreeMap::new()),
             stop_order: RwLock::new(BTreeMap::new()),
-        })
+        }
+        .into()
     }
 
     pub async fn register(&self, service: Arc<Service>, start_priority: u64, stop_priority: u64) {

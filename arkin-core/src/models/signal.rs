@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 
-use crate::{Event, Weight};
+use crate::Weight;
 
 use super::{Instrument, Strategy};
 
@@ -22,17 +22,5 @@ impl fmt::Display for Signal {
             "instrument={} strategy={} weight={}",
             self.instrument.symbol, self.strategy.name, self.weight
         )
-    }
-}
-
-impl From<Signal> for Event {
-    fn from(signal: Signal) -> Self {
-        Event::SignalUpdate(Arc::new(signal))
-    }
-}
-
-impl From<Arc<Signal>> for Event {
-    fn from(signal: Arc<Signal>) -> Self {
-        Event::SignalUpdate(signal)
     }
 }

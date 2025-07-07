@@ -36,7 +36,7 @@ pub trait Runnable: Sync + Send {
     fn identifier(&self) -> &str;
 
     // async fn event_loop(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {}
-    async fn handle_event(&self, _event: Arc<Event>) {}
+    async fn handle_event(&self, _event: Event) {}
 
     /// Performs initialization logic before starting the main tasks.
     ///
@@ -97,7 +97,7 @@ pub trait Publisher: Send + Sync {
 
 #[async_trait]
 pub trait Subscriber: Send + Sync {
-    async fn recv(&self) -> Option<Arc<Event>>;
+    async fn recv(&self) -> Option<Event>;
     fn needs_ack(&self) -> bool;
     async fn send_ack(&self);
 }

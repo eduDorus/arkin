@@ -27,16 +27,30 @@ pub enum Event {
     InsightsUpdate(Arc<InsightsUpdate>),
     // Strategy Signals
     SignalUpdate(Arc<Signal>),
-    // Execution Orders
-    ExecutionOrderNew(Arc<ExecutionOrder>),
-    ExecutionOrderCancel(Arc<ExecutionOrder>),
-    ExecutionOrderStatusUpdate(Arc<ExecutionOrder>),
-    ExecutionOrderFillUpdate(Arc<ExecutionOrder>),
-    // Venue Orders
-    VenueOrderNew(Arc<VenueOrder>),
-    VenueOrderCancel(Arc<VenueOrder>),
-    VenueOrderStatusUpdate(Arc<VenueOrder>),
-    VenueOrderFillUpdate(Arc<VenueOrder>),
+    // Allocation Execution Orders
+    NewExecutionOrder(Arc<ExecutionOrder>),
+    CancelExecutionOrder(Arc<ExecutionOrder>),
+    CancelAllExecutionOrders(OffsetDateTime),
+
+    // Order Manager Venue Orders
+    NewVenueOrder(Arc<VenueOrder>),
+    CancelVenueOrder(Arc<VenueOrder>),
+    CancelAllVenueOrders(OffsetDateTime),
+    ExecutionOrderPlaced(Arc<ExecutionOrder>),
+    ExecutionOrderFilled(Arc<ExecutionOrder>),
+    ExecutionOrderCancelled(Arc<ExecutionOrder>),
+
+    // Execution Venue Orders
+    VenueOrderInflight(Arc<VenueOrder>),
+    VenueOrderPlaced(Arc<VenueOrder>),
+    VenueOrderRejected(Arc<VenueOrder>),
+    VenueOrderPartiallyFilled(Arc<VenueOrder>),
+    VenueOrderPartiallyFilledCancelled(Arc<VenueOrder>),
+    VenueOrderPartiallyFilledExpired(Arc<VenueOrder>),
+    VenueOrderFilled(Arc<VenueOrder>),
+    VenueOrderCancelled(Arc<VenueOrder>),
+    VenueOrderExpired(Arc<VenueOrder>),
+
     // Other
     Finished(OffsetDateTime),
 }
@@ -58,16 +72,29 @@ impl Event {
             Event::InsightsUpdate(event) => event.event_time,
             // Strategy Signals
             Event::SignalUpdate(event) => event.event_time,
-            // Execution Orders
-            Event::ExecutionOrderNew(event) => event.event_time,
-            Event::ExecutionOrderCancel(event) => event.event_time,
-            Event::ExecutionOrderStatusUpdate(event) => event.event_time,
-            Event::ExecutionOrderFillUpdate(event) => event.event_time,
-            // Venue Orders
-            Event::VenueOrderNew(event) => event.event_time,
-            Event::VenueOrderCancel(event) => event.event_time,
-            Event::VenueOrderStatusUpdate(event) => event.event_time,
-            Event::VenueOrderFillUpdate(event) => event.event_time,
+            // Allocation Execution Orders
+            Event::NewExecutionOrder(event) => event.event_time,
+            Event::CancelExecutionOrder(event) => event.event_time,
+            Event::CancelAllExecutionOrders(ts) => *ts,
+
+            // Order Manager Venue Orders
+            Event::NewVenueOrder(event) => event.updated_at,
+            Event::CancelVenueOrder(event) => event.updated_at,
+            Event::CancelAllVenueOrders(ts) => *ts,
+            Event::ExecutionOrderPlaced(event) => event.event_time,
+            Event::ExecutionOrderFilled(event) => event.event_time,
+            Event::ExecutionOrderCancelled(event) => event.event_time,
+
+            // Execution Venue Order Updates
+            Event::VenueOrderInflight(event) => event.updated_at,
+            Event::VenueOrderPlaced(event) => event.updated_at,
+            Event::VenueOrderRejected(event) => event.updated_at,
+            Event::VenueOrderPartiallyFilled(event) => event.updated_at,
+            Event::VenueOrderPartiallyFilledCancelled(event) => event.updated_at,
+            Event::VenueOrderPartiallyFilledExpired(event) => event.updated_at,
+            Event::VenueOrderFilled(event) => event.updated_at,
+            Event::VenueOrderCancelled(event) => event.updated_at,
+            Event::VenueOrderExpired(event) => event.updated_at,
             // Other
             Event::Finished(ts) => *ts,
         }
