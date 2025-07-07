@@ -102,7 +102,7 @@ impl SimulationExecution {
             info!(target: "executor::simulation", "order {} successfully cancelled", order.id);
             self.publisher.publish(Event::VenueOrderCancelled(order.into())).await;
         } else {
-            warn!(target: "executor::simulation", "order {} not in order book, could not cancel", order.id)
+            warn!(target: "executor::simulation", "order {} not in order book, could not cancel", order.id);
         }
     }
 
@@ -115,7 +115,7 @@ impl SimulationExecution {
             if let Some((_, order)) = self.orderbook.remove(order.id) {
                 self.publisher.publish(Event::VenueOrderCancelled(order.into())).await;
             } else {
-                warn!(target: "executor::simulation", "order {} not in order book, could not cancel", order.id)
+                warn!(target: "executor::simulation", "order {} not in order book, could not cancel", order.id);
             }
         }
     }

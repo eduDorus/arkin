@@ -8,6 +8,7 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::models::{Asset, Instrument, MarketSide, Strategy};
+use crate::ExecutionOrderId;
 use crate::{types::Commission, Price, Quantity};
 
 pub type VenueOrderId = Uuid;
@@ -56,6 +57,8 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
+    #[builder(default = None)]
+    pub execution_order_id: Option<ExecutionOrderId>,
     pub instrument: Arc<Instrument>,
     pub strategy: Option<Arc<Strategy>>,
     pub side: MarketSide,
@@ -98,12 +101,12 @@ impl VenueOrder {
             (self.filled_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
         self.filled_quantity += quantity;
         self.commission += commission;
+        self.updated_at = event_time;
 
-        self.status = match self.filled_quantity == self.quantity {
+        self.status = match self.remaining_quantity().is_zero() {
             false => VenueOrderStatus::PartiallyFilled,
             true => VenueOrderStatus::Filled,
         };
-        self.updated_at = event_time;
     }
 
     pub fn update_status(&mut self, new_status: VenueOrderStatus, time: OffsetDateTime) {
@@ -170,10 +173,6 @@ impl VenueOrder {
         )
     }
 
-    pub fn is_new(&self) -> bool {
-        self.status == VenueOrderStatus::New
-    }
-
     pub fn is_active(&self) -> bool {
         matches!(self.status, VenueOrderStatus::Placed | VenueOrderStatus::PartiallyFilled)
     }
@@ -181,8 +180,7 @@ impl VenueOrder {
     pub fn is_finalized(&self) -> bool {
         matches!(
             self.status,
-            VenueOrderStatus::Placed
-                | VenueOrderStatus::Rejected
+            VenueOrderStatus::Rejected
                 | VenueOrderStatus::Cancelled
                 | VenueOrderStatus::Expired
                 | VenueOrderStatus::Filled

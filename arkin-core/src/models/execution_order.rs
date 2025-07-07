@@ -8,7 +8,7 @@ use tracing::warn;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Notional, Price, Quantity};
+use crate::{types::Commission, Notional, Price, Quantity, VenueOrderId};
 
 use super::{Instrument, MarketSide, Strategy};
 
@@ -25,27 +25,25 @@ pub enum ExecutionOrderType {
     ALGO,
 }
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type, PartialOrd, Ord)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "execution_order_status", rename_all = "snake_case")]
 pub enum ExecutionOrderStatus {
     New,
-    InProgress,
-    PartiallyFilled,
-    PartiallyFilledCancelling,
-    PartiallyFilledCancelled,
-    Filled,
-    Cancelling,
+    Active,
+    Completed,
     Cancelled,
+    Expired,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder, Hash)]
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
-    pub event_time: OffsetDateTime,
-    pub strategy: Option<Arc<Strategy>>,
     pub instrument: Arc<Instrument>,
+    pub strategy: Option<Arc<Strategy>>,
+    #[builder(default = vec![])]
+    pub venue_order_ids: Vec<VenueOrderId>,
     pub order_type: ExecutionOrderType,
     pub side: MarketSide,
     pub price: Price,
@@ -58,7 +56,7 @@ pub struct ExecutionOrder {
     pub total_commission: Commission,
     #[builder(default = ExecutionOrderStatus::New)]
     pub status: ExecutionOrderStatus,
-    #[builder(default = OffsetDateTime::now_utc())]
+    pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
 
@@ -70,16 +68,15 @@ impl ExecutionOrder {
         self.total_commission += commission;
         self.updated_at = event_time;
 
-        // Update the state
-        match self.remaining_quantity().is_zero() {
-            true => self.status = ExecutionOrderStatus::Filled,
-            false => self.status = ExecutionOrderStatus::PartiallyFilled,
+        if self.remaining_quantity().is_zero() {
+            self.status = ExecutionOrderStatus::Completed;
         }
     }
 
-    pub fn update_status(&mut self, new_status: ExecutionOrderStatus) {
+    pub fn update_status(&mut self, new_status: ExecutionOrderStatus, event_time: OffsetDateTime) {
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
+            self.updated_at = event_time;
         } else {
             warn!(
                 "Invalid state transition from {} to {} for order {}",
@@ -91,59 +88,31 @@ impl ExecutionOrder {
     pub fn cancel(&mut self) {
         match self.status {
             ExecutionOrderStatus::New => self.status = ExecutionOrderStatus::Cancelled,
-            ExecutionOrderStatus::InProgress => self.status = ExecutionOrderStatus::Cancelling,
-            ExecutionOrderStatus::PartiallyFilled => self.status = ExecutionOrderStatus::PartiallyFilledCancelling,
+            ExecutionOrderStatus::Active => self.status = ExecutionOrderStatus::Cancelled,
             _ => warn!("Cannot cancel order in state {}", self.status),
         }
     }
 
-    pub fn is_new(&self) -> bool {
-        self.status == ExecutionOrderStatus::New
-    }
-
-    pub fn is_in_progress(&self) -> bool {
-        matches!(
-            self.status,
-            ExecutionOrderStatus::InProgress | ExecutionOrderStatus::PartiallyFilled
-        )
-    }
-
-    pub fn is_cancelling(&self) -> bool {
-        matches!(
-            self.status,
-            ExecutionOrderStatus::Cancelling | ExecutionOrderStatus::PartiallyFilledCancelling
-        )
-    }
-
-    pub fn is_cancelled(&self) -> bool {
-        matches!(
-            self.status,
-            ExecutionOrderStatus::PartiallyFilledCancelled | ExecutionOrderStatus::Cancelled
-        )
-    }
-
-    pub fn is_closed(&self) -> bool {
-        matches!(
-            self.status,
-            ExecutionOrderStatus::PartiallyFilledCancelled
-                | ExecutionOrderStatus::Cancelled
-                | ExecutionOrderStatus::Filled
-        )
-    }
-
     fn is_valid_transition(&self, new_status: &ExecutionOrderStatus) -> bool {
-        match (&self.status, new_status) {
-            (ExecutionOrderStatus::New, ExecutionOrderStatus::InProgress)
-            | (ExecutionOrderStatus::New, ExecutionOrderStatus::Cancelled)
-            | (ExecutionOrderStatus::InProgress, ExecutionOrderStatus::PartiallyFilled)
-            | (ExecutionOrderStatus::InProgress, ExecutionOrderStatus::Filled)
-            | (ExecutionOrderStatus::InProgress, ExecutionOrderStatus::Cancelling)
-            | (ExecutionOrderStatus::PartiallyFilled, ExecutionOrderStatus::PartiallyFilledCancelling)
-            | (ExecutionOrderStatus::PartiallyFilled, ExecutionOrderStatus::Filled)
-            | (ExecutionOrderStatus::PartiallyFilledCancelling, ExecutionOrderStatus::PartiallyFilledCancelled)
-            | (ExecutionOrderStatus::Cancelling, ExecutionOrderStatus::Cancelled) => true,
-            _ => false,
-        }
+        matches!(
+            (&self.status, new_status),
+            (ExecutionOrderStatus::New, ExecutionOrderStatus::Active)
+                | (ExecutionOrderStatus::New, ExecutionOrderStatus::Cancelled)
+                | (ExecutionOrderStatus::Active, ExecutionOrderStatus::Completed)
+                | (ExecutionOrderStatus::Active, ExecutionOrderStatus::Cancelled)
+                | (ExecutionOrderStatus::Active, ExecutionOrderStatus::Expired)
+        )
+    }
+
+    pub fn is_active(&self) -> bool {
+        matches!(self.status, ExecutionOrderStatus::Active)
+    }
+
+    pub fn is_finalized(&self) -> bool {
+        matches!(
+            self.status,
+            ExecutionOrderStatus::Completed | ExecutionOrderStatus::Cancelled | ExecutionOrderStatus::Expired
+        )
     }
 
     pub fn remaining_quantity(&self) -> Quantity {

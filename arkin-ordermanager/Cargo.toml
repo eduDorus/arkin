@@ -18,6 +18,8 @@ async-trait = { workspace = true }
 tracing = { workspace = true }
 typed-builder = { workspace = true }
 anyhow = { workspace = true }
+dashmap = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }

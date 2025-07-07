@@ -8,9 +8,9 @@ use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::{
-    Asset, AssetType, Event, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceType,
-    Instrument, InstrumentStatus, InstrumentType, MarketSide, Pipeline, Price, PubSub, Publisher, Quantity,
-    SimulationSystemTime, Strategy, SystemTime, Tick, Venue, VenueOrder, VenueOrderStatus, VenueOrderType, VenueType,
+    Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus, InstrumentType, MarketSide,
+    Pipeline, Price, PubSub, Publisher, Quantity, SimulationSystemTime, Strategy, SystemTime, Tick, Venue, VenueOrder,
+    VenueOrderStatus, VenueOrderType, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -245,55 +245,54 @@ pub fn test_strategy_2() -> Arc<Strategy> {
     Arc::new(strategy)
 }
 
-pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
-    let order = ExecutionOrder::builder()
-        .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-        .event_time(OffsetDateTime::now_utc())
-        .strategy(Some(test_strategy_1()))
-        .instrument(test_inst_binance_btc_usdt_perp())
-        .order_type(ExecutionOrderType::Maker)
-        .side(MarketSide::Buy)
-        .price(dec!(0))
-        .quantity(dec!(1))
-        .status(ExecutionOrderStatus::New)
-        .updated_at(OffsetDateTime::now_utc())
-        .build();
-    Arc::new(order)
-}
+// pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
+//     let order = ExecutionOrder::builder()
+//         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
+//         .event_time(OffsetDateTime::now_utc())
+//         .strategy(Some(test_strategy_1()))
+//         .instrument(test_inst_binance_btc_usdt_perp())
+//         .order_type(ExecutionOrderType::Maker)
+//         .side(MarketSide::Buy)
+//         .price(dec!(0))
+//         .quantity(dec!(1))
+//         .status(ExecutionOrderStatus::New)
+//         .updated_at(OffsetDateTime::now_utc())
+//         .build();
+//     Arc::new(order)
+// }
 
-pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
-    let order = ExecutionOrder::builder()
-        .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-        .event_time(OffsetDateTime::now_utc())
-        .strategy(Some(test_strategy_1()))
-        .instrument(test_inst_binance_btc_usdt_perp())
-        .order_type(ExecutionOrderType::Maker)
-        .side(MarketSide::Buy)
-        .price(dec!(0).into())
-        .quantity(dec!(1))
-        .fill_price(dec!(110))
-        .filled_quantity(dec!(1))
-        .total_commission(dec!(0.2))
-        .status(ExecutionOrderStatus::Filled)
-        .updated_at(OffsetDateTime::now_utc())
-        .build();
-    Arc::new(order)
-}
-
-pub fn test_venue_market_order_new(time: OffsetDateTime, instrument: Arc<Instrument>, side: MarketSide) -> VenueOrder {
-    VenueOrder::builder()
-        .id(Uuid::new_v4())
-        .strategy(Some(test_strategy_1()))
-        .instrument(instrument)
-        .order_type(VenueOrderType::Market)
-        .side(side)
-        .price(dec!(0))
-        .quantity(dec!(1))
-        .status(VenueOrderStatus::New)
-        .created_at(time)
-        .updated_at(time)
-        .build()
-}
+// pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
+//     let order = ExecutionOrder::builder()
+//         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
+//         .event_time(OffsetDateTime::now_utc())
+//         .strategy(Some(test_strategy_1()))
+//         .instrument(test_inst_binance_btc_usdt_perp())
+//         .order_type(ExecutionOrderType::Maker)
+//         .side(MarketSide::Buy)
+//         .price(dec!(0).into())
+//         .quantity(dec!(1))
+//         .fill_price(dec!(110))
+//         .filled_quantity(dec!(1))
+//         .total_commission(dec!(0.2))
+//         .status(ExecutionOrderStatus::Filled)
+//         .updated_at(OffsetDateTime::now_utc())
+//         .build();
+//     Arc::new(order)
+// }
+// pub fn test_venue_market_order_new(time: OffsetDateTime, instrument: Arc<Instrument>, side: MarketSide) -> VenueOrder {
+//     VenueOrder::builder()
+//         .id(Uuid::new_v4())
+//         .strategy(Some(test_strategy_1()))
+//         .instrument(instrument)
+//         .order_type(VenueOrderType::Market)
+//         .side(side)
+//         .price(dec!(0))
+//         .quantity(dec!(1))
+//         .status(VenueOrderStatus::New)
+//         .created_at(time)
+//         .updated_at(time)
+//         .build()
+// }
 
 pub fn test_venue_limit_order_new(
     time: OffsetDateTime,

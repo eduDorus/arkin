@@ -70,17 +70,17 @@ impl Event {
             // Strategy Signals
             Event::SignalUpdate(event) => event.event_time,
             // Allocation Execution Orders
-            Event::NewExecutionOrder(event) => event.event_time,
-            Event::CancelExecutionOrder(event) => event.event_time,
+            Event::NewExecutionOrder(event) => event.updated_at,
+            Event::CancelExecutionOrder(event) => event.updated_at,
             Event::CancelAllExecutionOrders(ts) => *ts,
 
             // Order Manager Venue Orders
             Event::NewVenueOrder(event) => event.updated_at,
             Event::CancelVenueOrder(event) => event.updated_at,
             Event::CancelAllVenueOrders(ts) => *ts,
-            Event::ExecutionOrderPlaced(event) => event.event_time,
-            Event::ExecutionOrderFilled(event) => event.event_time,
-            Event::ExecutionOrderCancelled(event) => event.event_time,
+            Event::ExecutionOrderPlaced(event) => event.updated_at,
+            Event::ExecutionOrderFilled(event) => event.updated_at,
+            Event::ExecutionOrderCancelled(event) => event.updated_at,
 
             // Execution Venue Order Updates
             Event::VenueOrderInflight(event) => event.updated_at,
