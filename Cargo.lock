@@ -189,6 +189,8 @@ dependencies = [
  "async-trait",
  "dashmap",
  "rand 0.9.1",
+ "test-log",
+ "time",
  "tokio",
  "tracing",
  "uuid",

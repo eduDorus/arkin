@@ -14,3 +14,8 @@ rand = { workspace = true }
 tracing = { workspace = true }
 dashmap = { workspace = true }
 uuid = { workspace = true }
+time = { workspace = true }
+
+
+[dev-dependencies]
+test-log = { workspace = true }

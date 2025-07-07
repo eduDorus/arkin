@@ -1,14 +1,77 @@
 use std::{str::FromStr, sync::Arc};
 
+use async_trait::async_trait;
 use rust_decimal_macros::dec;
 use time::{macros::datetime, OffsetDateTime};
+use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::{
-    Asset, AssetType, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceType, Instrument,
-    InstrumentStatus, InstrumentType, MarketSide, Pipeline, Price, PubSub, Quantity, SimulationSystemTime, Strategy,
-    Tick, Venue, VenueType,
+    Asset, AssetType, Event, ExecutionOrder, ExecutionOrderStatus, ExecutionOrderType, Instance, InstanceType,
+    Instrument, InstrumentStatus, InstrumentType, MarketSide, Pipeline, Price, PubSub, Publisher, Quantity,
+    SimulationSystemTime, Strategy, SystemTime, Tick, Venue, VenueOrder, VenueOrderStatus, VenueType,
 };
+
+// Define this in a test module or separate utils file for reuse
+pub struct MockTime {
+    current_time: RwLock<OffsetDateTime>,
+}
+
+impl MockTime {
+    pub fn new() -> Arc<Self> {
+        Self {
+            current_time: RwLock::new(datetime!(2025-01-01 00:00:00).assume_utc()),
+        }
+        .into()
+    }
+}
+
+#[async_trait]
+impl SystemTime for MockTime {
+    async fn now(&self) -> OffsetDateTime {
+        self.current_time.read().await.clone()
+    }
+
+    async fn advance_time(&self, time: OffsetDateTime) {
+        *self.current_time.write().await = time;
+    }
+
+    async fn is_final_hour(&self) -> bool {
+        false
+    }
+
+    async fn is_finished(&self) -> bool {
+        false
+    }
+
+    async fn is_live(&self) -> bool {
+        false
+    }
+}
+
+pub struct MockPublisher {
+    events: Arc<Mutex<Vec<Event>>>,
+}
+
+impl MockPublisher {
+    pub fn new() -> Arc<Self> {
+        Self {
+            events: Arc::new(Mutex::new(Vec::new())),
+        }
+        .into()
+    }
+
+    pub async fn get_events(&self) -> Vec<Event> {
+        self.events.lock().await.clone()
+    }
+}
+
+#[async_trait]
+impl Publisher for MockPublisher {
+    async fn publish(&self, event: Event) {
+        self.events.lock().await.push(event);
+    }
+}
 
 pub fn test_pubsub() -> Arc<PubSub> {
     let clock = SimulationSystemTime::new(
@@ -214,4 +277,19 @@ pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
         .updated_at(OffsetDateTime::now_utc())
         .build();
     Arc::new(order)
+}
+
+pub fn test_venue_order_new(time: OffsetDateTime) -> VenueOrder {
+    VenueOrder::builder()
+        .id(Uuid::new_v4())
+        .strategy(Some(test_strategy_1()))
+        .instrument(test_inst_binance_btc_usdt_perp())
+        // .order_type(ExecutionOrderType::Maker)
+        .side(MarketSide::Buy)
+        .price(dec!(0))
+        .quantity(dec!(1))
+        .status(VenueOrderStatus::New)
+        .created_at(time)
+        .updated_at(time)
+        .build()
 }

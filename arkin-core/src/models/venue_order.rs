@@ -56,8 +56,8 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
-    pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
+    pub strategy: Option<Arc<Strategy>>,
     pub side: MarketSide,
     #[builder(default = VenueOrderType::Market)]
     pub order_type: VenueOrderType,
@@ -106,9 +106,10 @@ impl VenueOrder {
         self.updated_at = event_time;
     }
 
-    pub fn update_status(&mut self, new_status: VenueOrderStatus) {
+    pub fn update_status(&mut self, new_status: VenueOrderStatus, time: OffsetDateTime) {
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
+            self.updated_at = time
         } else {
             error!(
                 "Invalid state transition from {} to {} for order {}",

@@ -12,9 +12,7 @@ pub trait SystemTime: Send + Sync {
     async fn advance_time(&self, time: OffsetDateTime);
     async fn is_final_hour(&self) -> bool;
     async fn is_finished(&self) -> bool;
-    async fn is_live(&self) -> bool {
-        false
-    }
+    async fn is_live(&self) -> bool;
 }
 
 /// A trait for defining the lifecycle of a service in the system.

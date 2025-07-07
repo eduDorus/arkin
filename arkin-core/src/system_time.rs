@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use time::OffsetDateTime;
 use tokio::sync::RwLock;
-use tracing::warn;
+use tracing::error;
 
 use crate::SystemTime;
 
@@ -23,7 +23,7 @@ impl SystemTime for LiveSystemTime {
 
     async fn advance_time(&self, _time: OffsetDateTime) {
         // No-op in production mode
-        warn!("advance_time is a no-op in production mode");
+        error!("advance_time is a no-op in production mode");
     }
 
     async fn is_final_hour(&self) -> bool {
@@ -73,6 +73,10 @@ impl SystemTime for SimulationSystemTime {
     async fn is_finished(&self) -> bool {
         let current_time = self.current_time.read().await;
         *current_time >= self.end_time
+    }
+
+    async fn is_live(&self) -> bool {
+        false
     }
 }
 
