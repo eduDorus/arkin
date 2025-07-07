@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use strum::{Display, EnumDiscriminants};
+use strum::{Display, EnumDiscriminants, EnumIter};
 use time::OffsetDateTime;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 
 #[derive(Debug, Display, Clone, EnumDiscriminants)]
 #[strum_discriminants(name(EventType))]
-#[strum_discriminants(derive(Hash))]
+#[strum_discriminants(derive(Hash), derive(Display), derive(EnumIter))]
 pub enum Event {
     // Market Data
     TickUpdate(Arc<Tick>),

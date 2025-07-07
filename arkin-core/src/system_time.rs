@@ -5,22 +5,19 @@ use time::OffsetDateTime;
 use tokio::sync::RwLock;
 use tracing::warn;
 
-#[async_trait]
-pub trait SimulationClock: Send + Sync {
-    async fn get_current_time(&self) -> OffsetDateTime;
-    async fn advance_time(&self, time: OffsetDateTime);
-    async fn is_final_hour(&self) -> bool;
-    async fn is_finished(&self) -> bool;
-    async fn is_live(&self) -> bool {
-        false
+use crate::SystemTime;
+
+pub struct LiveSystemTime;
+
+impl LiveSystemTime {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self)
     }
 }
 
-pub struct LiveModeClock;
-
 #[async_trait]
-impl SimulationClock for LiveModeClock {
-    async fn get_current_time(&self) -> OffsetDateTime {
+impl SystemTime for LiveSystemTime {
+    async fn now(&self) -> OffsetDateTime {
         OffsetDateTime::now_utc()
     }
 
@@ -42,23 +39,23 @@ impl SimulationClock for LiveModeClock {
     }
 }
 
-pub struct SimulationModeClock {
+pub struct SimulationSystemTime {
     current_time: Arc<RwLock<OffsetDateTime>>,
     end_time: OffsetDateTime,
 }
 
-impl SimulationModeClock {
-    pub fn new(start_time: OffsetDateTime, end_time: OffsetDateTime) -> Self {
-        Self {
+impl SimulationSystemTime {
+    pub fn new(start_time: OffsetDateTime, end_time: OffsetDateTime) -> Arc<Self> {
+        Arc::new(Self {
             current_time: Arc::new(RwLock::new(start_time)),
             end_time,
-        }
+        })
     }
 }
 
 #[async_trait]
-impl SimulationClock for SimulationModeClock {
-    async fn get_current_time(&self) -> OffsetDateTime {
+impl SystemTime for SimulationSystemTime {
+    async fn now(&self) -> OffsetDateTime {
         self.current_time.read().await.clone()
     }
 
@@ -87,19 +84,19 @@ mod tests {
     async fn test_simulation_clock() {
         let start_time = datetime!(2023-10-01 12:00:00 UTC);
         let end_time = datetime!(2023-10-01 14:00:00 UTC);
-        let clock = SimulationModeClock::new(start_time, end_time);
+        let clock = SimulationSystemTime::new(start_time, end_time);
 
-        assert_eq!(clock.get_current_time().await, start_time);
+        assert_eq!(clock.now().await, start_time);
         assert!(!clock.is_finished().await);
 
         let new_time = datetime!(2023-10-01 13:00:00 UTC);
         clock.advance_time(new_time).await;
 
-        assert_eq!(clock.get_current_time().await, new_time);
+        assert_eq!(clock.now().await, new_time);
         assert!(!clock.is_finished().await);
 
         clock.advance_time(end_time).await;
-        assert_eq!(clock.get_current_time().await, end_time);
+        assert_eq!(clock.now().await, end_time);
         assert!(clock.is_finished().await);
     }
 }

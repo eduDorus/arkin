@@ -14,6 +14,14 @@ pub struct Engine {
 }
 
 impl Engine {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            services: RwLock::new(HashMap::new()),
+            start_order: RwLock::new(BTreeMap::new()),
+            stop_order: RwLock::new(BTreeMap::new()),
+        })
+    }
+
     pub async fn register(&self, service: Arc<Service>, start_priority: u64, stop_priority: u64) {
         info!(target: "engine", "register services {}", service.identifier());
         let name = service.identifier().to_owned();

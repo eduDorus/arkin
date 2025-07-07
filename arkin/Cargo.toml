@@ -12,7 +12,7 @@ path = "src/bin/main.rs"
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
-arkin-engine = { path = "../arkin-engine" }
+# arkin-engine = { path = "../arkin-engine" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }

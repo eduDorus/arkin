@@ -1,6 +1,6 @@
 [workspace]
 # members = [ "arkin", "arkin-core", "arkin-persistence", "arkin-accounting", "arkin-ingestors", "arkin-insights", "arkin-strategies", "arkin-allocation", "arkin-ordermanager", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
-members = [ "arkin", "arkin-core", "arkin-engine" ]
+members = [ "arkin", "arkin-core" ]
 
 default-members = [ "arkin" ]
 
@@ -55,7 +55,7 @@ rust_decimal_macros = "1.37"
 bytes = "1.10"
 
 # Data Structures
-dashmap = { version = "6.1", features = [ "inline", "rayon", "inline" ], default-features = false }
+dashmap = { version = "6.1", features = [ "inline", "rayon" ], default-features = false }
 
 # Serialization
 serde = { version = "1.0", features = [ "derive" ] }

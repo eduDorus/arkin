@@ -31,7 +31,7 @@ impl DefaultEngine {
     pub async fn new() -> Self {
         let args = Cli::parse();
 
-        let (instance, clock): (Instance, Arc<dyn SimulationClock>) = match &args.command {
+        let (instance, clock): (Instance, Arc<dyn SystemTime>) = match &args.command {
             Commands::Insights(args) => {
                 let instance = Instance::builder()
                     .name(args.pipeline.clone())

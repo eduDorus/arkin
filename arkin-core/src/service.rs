@@ -90,12 +90,12 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn new(service: Arc<dyn Runnable>, subscriber: Option<Arc<dyn Subscriber>>) -> Self {
-        Self {
+    pub fn new(service: Arc<dyn Runnable>, subscriber: Option<Arc<dyn Subscriber>>) -> Arc<Self> {
+        Arc::new(Self {
             ctx: Arc::new(ServiceCtx::new()),
             subscriber,
             service,
-        }
+        })
     }
 
     pub fn identifier(&self) -> &str {

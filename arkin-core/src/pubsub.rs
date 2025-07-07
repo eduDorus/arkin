@@ -1,90 +1,49 @@
+use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use std::{cmp::Reverse, collections::HashMap};
 
 use async_trait::async_trait;
+use dashmap::DashMap;
 use kanal::{AsyncReceiver, AsyncSender};
-use time::OffsetDateTime;
-use tokio::sync::{Mutex, RwLock};
-use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
-use typed_builder::TypedBuilder;
+use strum::{IntoDiscriminant, IntoEnumIterator};
+use tokio::sync::Mutex;
+use tokio::time::timeout;
+use tracing::{error, info, instrument, warn};
 
 use crate::utils::PeekableReceiver;
-use crate::{Event, RunnableService, SimulationClock};
+use crate::{Event, EventType, Publisher, Runnable, ServiceCtx, Subscriber, SystemTime};
 
-#[derive(Clone)]
-pub struct PubSubHandle {
-    tx: AsyncSender<Event>,
-    rx: AsyncReceiver<Event>,
-    rx_ack: AsyncSender<()>,
-    clock: Arc<dyn SimulationClock>,
+pub enum EventFilter {
+    All,
+    Events(Vec<EventType>),
 }
 
-impl PubSubHandle {
-    pub async fn recv(&self) -> Option<Event> {
-        match self.rx.recv().await {
-            Ok(event) => Some(event),
-            Err(e) => {
-                error!("Failed to receive event: {}", e);
-                None
-            }
-        }
-    }
-
-    pub async fn ack(&self) {
-        if let Err(e) = self.rx_ack.send(()).await {
-            error!("Failed to acknowledge event: {}", e);
-        }
-    }
-
-    pub async fn publish<E>(&self, event: E)
-    where
-        E: Into<Event>,
-    {
-        let event = event.into();
-        if let Err(e) = self.tx.send(event).await {
-            error!("Failed to publish event: {}", e);
-        }
-    }
-
-    pub async fn current_time(&self) -> OffsetDateTime {
-        self.clock.get_current_time().await
-    }
-}
-
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PubSubPublisher {
-    tx: AsyncSender<Event>,
-    clock: Arc<dyn SimulationClock>,
+    tx: AsyncSender<Arc<Event>>,
 }
 
-impl PubSubPublisher {
-    pub async fn publish<E>(&self, event: E)
-    where
-        E: Into<Event>,
-    {
-        let event = event.into();
-        if let Err(e) = self.tx.send(event).await {
+#[async_trait]
+impl Publisher for PubSubPublisher {
+    async fn publish(&self, event: Event) {
+        if let Err(e) = self.tx.send(event.into()).await {
             error!("Failed to publish event: {}", e);
         }
     }
-
-    pub async fn current_time(&self) -> OffsetDateTime {
-        self.clock.get_current_time().await
-    }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PubSubSubscriber {
-    rx: AsyncReceiver<Event>,
-    rx_ack: AsyncSender<()>,
-    clock: Arc<dyn SimulationClock>,
+    rx: AsyncReceiver<Arc<Event>>,
+    ack: bool,
+    ack_tx: AsyncSender<()>,
 }
 
-impl PubSubSubscriber {
-    pub async fn recv(&self) -> Option<Event> {
+#[async_trait]
+impl Subscriber for PubSubSubscriber {
+    async fn recv(&self) -> Option<Arc<Event>> {
         match self.rx.recv().await {
             Ok(event) => Some(event),
             Err(e) => {
@@ -94,169 +53,219 @@ impl PubSubSubscriber {
         }
     }
 
-    pub async fn ack(&self) {
-        if let Err(e) = self.rx_ack.send(()).await {
-            error!("Failed to acknowledge event: {}", e);
-        }
+    fn needs_ack(&self) -> bool {
+        self.ack
     }
 
-    pub async fn current_time(&self) -> OffsetDateTime {
-        self.clock.get_current_time().await
+    async fn send_ack(&self) {
+        if self.ack {
+            if let Err(e) = self.ack_tx.send(()).await {
+                error!("Failed to acknowledge event: {}", e);
+            }
+        }
     }
 }
 
-#[derive(TypedBuilder)]
 pub struct PubSub {
-    #[builder(default = Arc::new(RwLock::new(Vec::new())))]
-    event_receivers: Arc<RwLock<Vec<PeekableReceiver<Event>>>>,
-    #[builder(default = Arc::new(RwLock::new(HashMap::new())))]
-    subscribers: Arc<RwLock<HashMap<String, AsyncSender<Event>>>>,
-    #[builder(default = Arc::new(RwLock::new(kanal::bounded_async(128))))]
-    subscribers_acknowledge: Arc<RwLock<(AsyncSender<()>, AsyncReceiver<()>)>>,
-    clock: Arc<dyn SimulationClock>,
+    time: Arc<dyn SystemTime>,
+    event_queue: Mutex<BinaryHeap<Reverse<Arc<Event>>>>,
+    publishers: DashMap<u64, PeekableReceiver<Arc<Event>>>,
+    next_id: AtomicU64,
+    subscribers: DashMap<u64, AsyncSender<Arc<Event>>>,
+    event_subscriptions: DashMap<EventType, Vec<u64>>,
+    subscribers_acknowledge: bool,
+    subscribers_acknowledge_channel: (AsyncSender<()>, AsyncReceiver<()>),
 }
 
 impl PubSub {
-    pub async fn subscriber(&self, name: &str) -> PubSubSubscriber {
+    pub fn new(time: Arc<dyn SystemTime>, ack: bool) -> Arc<Self> {
+        Arc::new(Self {
+            time: time,
+            event_queue: Mutex::new(BinaryHeap::<Reverse<Arc<Event>>>::new()),
+            publishers: DashMap::new(),
+            next_id: AtomicU64::new(0),
+            subscribers: DashMap::new(),
+            event_subscriptions: DashMap::new(),
+            subscribers_acknowledge: ack,
+            subscribers_acknowledge_channel: kanal::bounded_async(1024),
+        })
+    }
+    fn get_next_id(&self) -> u64 {
+        self.next_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    pub fn subscribe(&self, filter: EventFilter) -> Arc<PubSubSubscriber> {
+        info!(target: "pubsub", "new subscriber");
         let (tx, rx) = kanal::bounded_async(1);
-        self.subscribers.write().await.insert(name.to_string(), tx);
+
+        // Update the subscriber list
+        let id = self.get_next_id();
+        self.subscribers.insert(id, tx);
+
+        // Update the event subscriptions
+        match filter {
+            EventFilter::All => {
+                for event_type in EventType::iter() {
+                    self.event_subscriptions.entry(event_type).or_default().push(id);
+                }
+            }
+            EventFilter::Events(events) => {
+                for event_type in events {
+                    self.event_subscriptions.entry(event_type).or_default().push(id);
+                }
+            }
+        }
+
         PubSubSubscriber {
             rx,
-            rx_ack: self.subscribers_acknowledge.read().await.0.clone(),
-            clock: self.clock.clone(),
+            ack: self.subscribers_acknowledge,
+            ack_tx: self.subscribers_acknowledge_channel.0.clone(),
         }
+        .into()
     }
 
-    pub async fn publisher(&self) -> PubSubPublisher {
+    pub fn publisher(&self) -> Arc<PubSubPublisher> {
+        info!(target: "pubsub", "new publisher");
         let (tx, rx) = kanal::bounded_async(100000);
-        self.event_receivers.write().await.push(PeekableReceiver::new(rx));
-        PubSubPublisher {
-            tx,
-            clock: self.clock.clone(),
+
+        // Update publisher list
+        let id = self.get_next_id();
+        self.publishers.insert(id, PeekableReceiver::new(rx));
+        PubSubPublisher { tx }.into()
+    }
+
+    async fn broadcast_event(&self, event: Arc<Event>) {
+        let mut ack_counter = 0;
+        let event_type = event.discriminant();
+
+        // Get subscriber ids (DashMap returns a ref, not a Vec)
+        let subscriber_ids: Vec<u64> = self
+            .event_subscriptions
+            .get(&event_type)
+            .map(|v| v.value().clone())
+            .unwrap_or_default();
+        info!(target: "pubsub", "sending event {} to {} subscribers", event_type,  subscriber_ids.len());
+
+        // Send to subscribers and check for closed connections (DashMap version)
+        let mut to_remove = Vec::new();
+        for id in subscriber_ids {
+            if let Some(sender) = self.subscribers.get(&id) {
+                match sender.send(event.clone()).await {
+                    Ok(()) => ack_counter += 1,
+                    Err(_) => {
+                        info!(target: "pubsub", "subscriber closed connection, will be removed");
+                        to_remove.push(id);
+                    }
+                }
+            } else {
+                to_remove.push(id);
+            }
+        }
+
+        // Remove dead subscribers (DashMap is already thread-safe)
+        if !to_remove.is_empty() {
+            for id in to_remove {
+                info!(target: "pubsub", "subscriber {} disconnected, removing...", id);
+                self.subscribers.remove(&id);
+                for mut entry in self.event_subscriptions.iter_mut() {
+                    let ids = entry.value_mut();
+                    if let Some(pos) = ids.iter().position(|&x| x == id) {
+                        ids.swap_remove(pos);
+                    }
+                }
+            }
+        }
+
+        // Wait for acknowledgements
+        if self.subscribers_acknowledge {
+            let mut ack_received = 0;
+            if timeout(Duration::from_secs(1), async {
+                while ack_received < ack_counter {
+                    info!(target: "pubsub", "{} waiting for ack ({}/{})", event_type, ack_received, ack_counter);
+                    if self.subscribers_acknowledge_channel.1.recv().await.is_ok() {
+                        ack_received += 1;
+                        info!(target: "pubsub", "{} received ack ({}/{})", event_type, ack_received, ack_counter);
+                    }
+                    // Err(e) => {
+                    //     // Timeout reached
+                    //     break;
+                    // }
+                }
+            })
+            .await
+            .is_err()
+            {
+                warn!(target: "pubsub", "timeout waiting {} for ack {} of {}, moving on", event, ack_received, ack_counter);
+            }
         }
     }
 
-    pub async fn handle(&self, name: &str) -> PubSubHandle {
-        let (publisher_tx, publisher_rx) = kanal::bounded_async(100000);
-        let (receiver_tx, receiver_rx) = kanal::bounded_async(1);
-        self.event_receivers.write().await.push(PeekableReceiver::new(publisher_rx));
-        self.subscribers.write().await.insert(name.to_string(), receiver_tx);
-        PubSubHandle {
-            tx: publisher_tx,
-            rx: receiver_rx,
-            rx_ack: self.subscribers_acknowledge.read().await.0.clone(),
-            clock: self.clock.clone(),
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn event_collector_task(&self, ctx: Arc<ServiceCtx>) {
+        info!(target: "pubsub", "starting event collector task");
+        while ctx.is_running().await {
+            // let mut receivers = self.publishers.write().await;
+            for mut receiver in self.publishers.iter_mut() {
+                // Peek if there is a element and if it is within 24h
+                if let Some(peeked) = receiver.value_mut().peek() {
+                    if peeked.timestamp() > self.time.now().await + Duration::from_secs(86400) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+                if let Some(event) = receiver.take() {
+                    let mut lock = self.event_queue.lock().await;
+                    lock.push(Reverse(event));
+                    if lock.len() > 10000000 {
+                        drop(lock);
+                        info!(target: "pubsub", "event queue is full, waiting 5s");
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+                }
+            }
         }
+        info!(target: "pubsub", "event collector task has stopped");
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn event_processor_task(&self, ctx: Arc<ServiceCtx>) {
+        info!(target: "pubsub", "starting event processor task");
+        while ctx.is_running().await {
+            // let length = self.event_queue.lock().await.len();
+            // info!(target: "pubsub", "event queue length: {}", length);
+            if let Some(Reverse(event)) = self.event_queue.lock().await.pop() {
+                if !event.is_market_data() {
+                    info!(target: "pubsub", "processing event: {}", event);
+                }
+                if !self.time.is_live().await {
+                    self.time.advance_time(event.timestamp()).await;
+                }
+                self.broadcast_event(event).await;
+            } else {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        }
+        info!(target: "pubsub", "event processor task has stopped");
     }
 }
 
 #[async_trait]
-impl RunnableService for PubSub {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
-        // Shared event queue
-        let event_queue = Arc::new(Mutex::new(BinaryHeap::<Reverse<Event>>::new()));
+impl Runnable for PubSub {
+    fn identifier(&self) -> &str {
+        "pubsub"
+    }
 
-        // Event Collector Task
-        let collector_event_queue = event_queue.clone();
-        let collector_event_receivers = self.event_receivers.clone();
-        let collector_clock = self.clock.clone();
-        let collector_shutdown = shutdown.clone();
-        tokio::spawn(async move {
-            loop {
-                if collector_shutdown.is_cancelled() {
-                    break;
-                }
-                let mut receivers = collector_event_receivers.write().await;
-                for receiver in receivers.iter_mut() {
-                    // Peek if there is a element and if it is within 24h
-                    if let Some(peeked) = receiver.peek() {
-                        if peeked.timestamp() > collector_clock.get_current_time().await + Duration::from_secs(86400) {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                    if let Some(event) = receiver.take() {
-                        let mut lock = collector_event_queue.lock().await;
-                        lock.push(Reverse(event));
-                        if lock.len() > 100000000 {
-                            drop(lock);
-                            error!("Event queue is full, waiting 5s");
-                            tokio::time::sleep(Duration::from_secs(1)).await;
-                        }
-                    }
-                }
-                // tokio::time::sleep(Duration::from_micros(1)).await;
-            }
-            info!("Event collector task stopped.");
-        });
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn start_tasks(self: Arc<Self>, ctx: Arc<ServiceCtx>) {
+        info!(target: "pubsub", "starting tasks");
+        let exec = self.clone();
+        let ctx_clone = ctx.clone();
+        ctx.spawn(async move { exec.event_collector_task(ctx_clone).await });
 
-        // Event Processor Task
-        let processor_clock = self.clock.clone();
-        let processor_subscribers = self.subscribers.clone();
-        let processor_subscribers_acknowledge = self.subscribers_acknowledge.clone();
-        let processor_event_queue = event_queue.clone();
-        let processor_shutdown = shutdown.clone();
-        tokio::spawn(async move {
-            loop {
-                if processor_shutdown.is_cancelled() {
-                    let subscribers = processor_subscribers.read().await;
-                    for (_name, tx) in subscribers.iter() {
-                        if let Err(e) = tx.send(Event::Finished).await {
-                            error!("Failed to notify subscriber: {}", e);
-                        }
-                    }
-                    break;
-                }
-                if let Some(Reverse(event)) = processor_event_queue.lock().await.pop() {
-                    if !event.is_market_data() {
-                        info!("Processing event: {}", event);
-                    }
-                    if !processor_clock.is_live().await {
-                        processor_clock.advance_time(event.timestamp()).await;
-                    }
-                    let subscribers = processor_subscribers.read().await;
-                    for (_name, tx) in subscribers.iter() {
-                        if let Err(e) = tx.send(event.clone()).await {
-                            error!("Failed to notify subscriber: {}", e);
-                        }
-                    }
-                    let mut subscribers_ack_count = subscribers.len();
-                    loop {
-                        let ack = processor_subscribers_acknowledge.read().await.1.recv().await;
-                        if let Ok(()) = ack {
-                            subscribers_ack_count -= 1;
-                            if subscribers_ack_count == 0 {
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    if processor_clock.is_finished().await {
-                        info!("PubSub finished processing all events.");
-                        let subscribers = processor_subscribers.read().await;
-                        for (_name, tx) in subscribers.iter() {
-                            if let Err(e) = tx.send(Event::Finished).await {
-                                error!("Failed to notify subscriber: {}", e);
-                            }
-                        }
-                        break;
-                    }
-                    if processor_clock.is_final_hour().await {
-                        info!("Final hour reached, advancing clock by 1 second.");
-                        let current_time = processor_clock.get_current_time().await;
-                        let next_time = current_time + Duration::from_secs(1);
-                        processor_clock.advance_time(next_time).await;
-                    }
-                    tokio::time::sleep(Duration::from_millis(1)).await;
-                }
-            }
-            info!("Event processor task stopped.");
-        });
-
-        // Wait for shutdown signal
-        shutdown.cancelled().await;
-        info!("PubSub service stopped.");
-        Ok(())
+        let exec = self.clone();
+        let ctx_clone = ctx.clone();
+        ctx.spawn(async move { exec.event_processor_task(ctx_clone).await });
+        info!(target: "pubsub", "tasks started");
     }
 }

@@ -24,6 +24,7 @@ async-trait = { workspace = true }
 serde_json = { workspace = true }
 typed-builder = { workspace = true }
 kanal = { workspace = true }
+dashmap = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }
