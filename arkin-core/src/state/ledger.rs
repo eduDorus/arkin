@@ -1,28 +1,83 @@
-use parking_lot::RwLock;
+use dashmap::DashMap;
 use rust_decimal::prelude::*;
-use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error;
 use time::OffsetDateTime;
+use tokio::sync::RwLock;
 use tracing::info;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_core::prelude::*;
+use crate::{
+    Account, AccountOwner, AccountType, Instrument, InstrumentType, Strategy, Tradable, Transfer, TransferGroup,
+    TransferType, Venue,
+};
 
-use crate::AccountingError;
+#[derive(Error, Debug)]
+pub enum AccountingError {
+    #[error("Missing strategy information on strategy account creation")]
+    MissingStrategy,
+
+    #[error("Asset not found: {0}")]
+    AssetNotFound(String),
+
+    #[error("Currency mismatch in transfer: {0}")]
+    CurrencyMismatch(Arc<Transfer>),
+
+    #[error("Insufficient balance in debit account: {0}")]
+    InsufficientBalance(Arc<Transfer>),
+
+    #[error("Invalid balance: {0}")]
+    InvalidBalance(Decimal),
+
+    #[error("Transfer amount must be > 0: {0}")]
+    InvalidTransferAmount(Arc<Transfer>),
+
+    #[error("Debit account not found: {0}")]
+    DebitAccountNotFound(String),
+
+    #[error("Credit account not found: {0}")]
+    CreditAccountNotFound(String),
+
+    #[error("Liquidity Account not found for {0}: {1}")]
+    LiquidityAccountNotFound(Arc<Venue>, Tradable),
+
+    #[error("Venue Account not found for {0}: {1}")]
+    VenueAccountNotFound(Arc<Venue>, Tradable),
+
+    #[error("Strategy Account not found for {0}: {1}")]
+    StrategyAccountNotFound(Arc<Strategy>, Tradable),
+
+    #[error("Invalid exchange: {0}")]
+    InvalidExchange(String),
+
+    #[error("Invalid instrument: {0}")]
+    UnsupportedInstrumentType(InstrumentType),
+
+    #[error("Same account found for transaction: {0}")]
+    SameAccount(Arc<Transfer>),
+}
 
 /// The in-memory ledger tracks accounts and can apply sets of transfers atomically.
 #[derive(Debug, TypedBuilder)]
 pub struct Ledger {
     // For simplicity, we'll hold accounts in a HashMap
-    #[builder(default = RwLock::new(HashMap::new()))]
-    accounts: RwLock<HashMap<Uuid, Arc<Account>>>,
+    #[builder(default)]
+    accounts: DashMap<Uuid, Arc<Account>>,
     // We store completed transfers here, or you could store them in a DB, etc.
     #[builder(default = RwLock::new(Vec::new()))]
     transfers: RwLock<Vec<Arc<Transfer>>>,
 }
 
 impl Ledger {
+    pub fn new() -> Arc<Self> {
+        Self {
+            accounts: DashMap::new(),
+            transfers: RwLock::new(Vec::new()),
+        }
+        .into()
+    }
+
     /// Adds an account to the ledger and returns it.
     pub fn add_account(
         &self,
@@ -42,7 +97,7 @@ impl Ledger {
                     .account_type(account_type)
                     .build()
                     .into();
-                self.accounts.write().insert(account.id.clone(), account.clone());
+                self.accounts.insert(account.id.clone(), account.clone());
                 info!("Added account: {} {}", account.id, account);
                 account
             }
@@ -57,11 +112,10 @@ impl Ledger {
         owner: &AccountOwner,
         account_type: &AccountType,
     ) -> Option<Arc<Account>> {
-        let accounts = self.accounts.read();
-        accounts
-            .values()
+        self.accounts
+            .iter()
             .find(|a| a.venue == *venue && a.asset == *asset && a.owner == *owner && a.account_type == *account_type)
-            .cloned()
+            .map(|e| e.value().clone())
     }
 
     /// Finds an account by venue, asset, and account type, or creates it if it doesn't exist.
@@ -80,20 +134,18 @@ impl Ledger {
 
     /// Returns an account by ID.
     pub fn account(&self, account_id: Uuid) -> Option<Arc<Account>> {
-        let lock = self.accounts.read();
-        lock.get(&account_id).cloned()
+        self.accounts.get(&account_id).map(|e| e.clone())
     }
 
     /// Returns all accounts in the ledger.
     pub fn accounts(&self) -> Vec<Arc<Account>> {
-        let lock = self.accounts.read();
-        lock.values().cloned().collect()
+        self.accounts.iter().map(|e| e.clone()).collect()
     }
 
     /// Returns the global balance for an account.
     /// This is the sum of all debit and credit transfers from the account.
-    pub fn balance(&self, account_id: Uuid) -> Decimal {
-        let transfers = self.transfers.read();
+    pub async fn balance(&self, account_id: Uuid) -> Decimal {
+        let transfers = self.transfers.read().await;
         transfers.iter().fold(Decimal::ZERO, |acc, t| {
             if t.credit_account.id == account_id {
                 acc + t.amount
@@ -106,7 +158,7 @@ impl Ledger {
     }
 
     /// Returns the net position amount for an account and strategy.
-    pub fn strategy_balance(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+    pub async fn strategy_balance(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
         let filter = |t: &&Arc<Transfer>| {
             t.has_type(&TransferType::Trade)
                 && t.has_strategy(strategy)
@@ -116,7 +168,7 @@ impl Ledger {
                 }
         };
 
-        let transfers = self.transfers.read();
+        let transfers = self.transfers.read().await;
         transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
             if t.credit_account.is_user_account() {
                 acc + t.amount
@@ -127,7 +179,7 @@ impl Ledger {
     }
 
     /// Returns the net PnL for an account and strategy.
-    pub fn strategy_pnl(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+    pub async fn strategy_pnl(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
         let filter = |t: &&Arc<Transfer>| {
             t.has_type(&TransferType::Pnl)
                 && t.has_strategy(strategy)
@@ -137,7 +189,7 @@ impl Ledger {
                 }
         };
 
-        let transfers = self.transfers.read();
+        let transfers = self.transfers.read().await;
         transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
             if t.credit_account.is_user_account() {
                 acc + t.amount
@@ -147,18 +199,18 @@ impl Ledger {
         })
     }
 
-    pub fn strategy_net_value(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
-        let (total_cost, total_amount) = self.current_position(strategy, instrument);
+    pub async fn strategy_net_value(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+        let (total_cost, total_amount) = self.current_position(strategy, instrument).await;
         total_cost * total_amount
     }
 
-    pub fn strategy_cost_basis(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
-        let (total_cost, _) = self.current_position(strategy, instrument);
+    pub async fn strategy_cost_basis(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+        let (total_cost, _) = self.current_position(strategy, instrument).await;
         total_cost
     }
 
     /// Returns the total cost basis and current amount.
-    pub fn current_position(
+    pub async fn current_position(
         &self,
         strategy: &Arc<Strategy>,
         instrument: Option<&Arc<Instrument>>,
@@ -172,7 +224,7 @@ impl Ledger {
                 }
         };
 
-        let transfers = self.transfers.read();
+        let transfers = self.transfers.read().await;
         let mut total_cost = Decimal::ZERO;
         let mut total_amount = Decimal::ZERO;
         let mut running_position = Decimal::ZERO;
@@ -256,7 +308,7 @@ impl Ledger {
     }
 
     /// Returns the total margin posted for the current position.
-    pub fn margin_posted(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
+    pub async fn margin_posted(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
         let filter = |t: &&Arc<Transfer>| {
             t.has_type(&TransferType::Margin)
                 && t.has_strategy(strategy)
@@ -266,7 +318,7 @@ impl Ledger {
                 }
         };
 
-        let transfers = self.transfers.read();
+        let transfers = self.transfers.read().await;
         transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
             if t.debit_account.is_user_account() {
                 acc + t.amount // Margin posted to venue
@@ -278,14 +330,14 @@ impl Ledger {
 
     /// Returns all transfers in the ledger.
     /// This can be quite expensive and should only be used for debugging or reporting.
-    pub fn get_transfers(&self) -> Vec<Arc<Transfer>> {
-        let lock = self.transfers.read();
+    pub async fn get_transfers(&self) -> Vec<Arc<Transfer>> {
+        let lock = self.transfers.read().await;
         lock.iter().cloned().collect()
     }
 
     /// Performs a single same-currency transfer **atomically**:
     /// This is a helper function since transfers are quite common.
-    pub fn transfer(
+    pub async fn transfer(
         &self,
         event_time: OffsetDateTime,
         debit_account: &Arc<Account>,
@@ -304,7 +356,7 @@ impl Ledger {
                 .unit_price(Decimal::ONE)
                 .build(),
         );
-        self.apply_transfers(&[transfer.clone()])
+        self.apply_transfers(&[transfer.clone()]).await
     }
 
     /// Performs one or more same-currency transfers **atomically**:
@@ -312,7 +364,7 @@ impl Ledger {
     /// - For double-entry: each Transfer has a `debit_account_id` and `credit_account_id`.
     ///
     /// Returns an error if any of the transfers are invalid.
-    pub fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<Arc<TransferGroup>, AccountingError> {
+    pub async fn apply_transfers(&self, transfers: &[Arc<Transfer>]) -> Result<Arc<TransferGroup>, AccountingError> {
         for t in transfers {
             // Check if it is not the same account
             if t.debit_account.id == t.credit_account.id {
@@ -329,7 +381,7 @@ impl Ledger {
                 && (t.debit_account.account_type == AccountType::Spot
                     || t.debit_account.account_type == AccountType::Margin)
             {
-                if self.balance(t.debit_account.id) < t.amount {
+                if self.balance(t.debit_account.id).await < t.amount {
                     return Err(AccountingError::InsufficientBalance(t.clone()));
                 }
             }
@@ -342,11 +394,12 @@ impl Ledger {
 
         // 2. All validations passed, apply them in memory.
         // This could potentially be a problem since we are validating before we lock
-        let mut tx_log_lock = self.transfers.write();
+        let mut tx_log_lock = self.transfers.write().await;
         for t in transfers {
             info!("Applying transfer: {}", t);
             tx_log_lock.push(t.clone());
         }
+        drop(tx_log_lock);
 
         // Generate a transfer group
         let transfer_group = TransferGroup::builder()
@@ -362,18 +415,21 @@ impl Ledger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal_macros::dec;
-    use test_log::test;
 
-    #[test(tokio::test)]
+    use rust_decimal_macros::dec;
+
+    use crate::test_utils;
+
+    #[tokio::test]
+    #[test_log::test]
     async fn test_successful_transfer() {
         let ledger = Ledger::builder().build();
 
-        let personal_venue = test_personal_venue();
-        let binance_venue = test_binance_venue();
+        let personal_venue = test_utils::test_personal_venue();
+        let binance_venue = test_utils::test_binance_venue();
 
         // let strategy = test_strategy();
-        let usdt = test_usdt_asset();
+        let usdt = test_utils::test_usdt_asset();
 
         // Create Personal account for USD
         let account_l = ledger.add_account(
@@ -400,22 +456,25 @@ mod tests {
         let amount = dec!(100);
         ledger
             .transfer(OffsetDateTime::now_utc(), &account_l, &account_a, amount)
+            .await
             .unwrap();
         ledger
             .transfer(OffsetDateTime::now_utc(), &account_a, &account_b, amount)
+            .await
             .unwrap();
         let half_amount = amount / dec!(2);
         ledger
             .transfer(OffsetDateTime::now_utc(), &account_b, &account_a, half_amount)
+            .await
             .unwrap();
 
         // Verify balances
-        assert_eq!(ledger.balance(account_l.id), -amount); // -100 USD
-        assert_eq!(ledger.balance(account_a.id), half_amount); // +50 USD
-        assert_eq!(ledger.balance(account_b.id), half_amount); // +50 USD
+        assert_eq!(ledger.balance(account_l.id).await, -amount); // -100 USD
+        assert_eq!(ledger.balance(account_a.id).await, half_amount); // +50 USD
+        assert_eq!(ledger.balance(account_b.id).await, half_amount); // +50 USD
 
         // Verify transfer record
-        let transfers = ledger.get_transfers();
+        let transfers = ledger.get_transfers().await;
         assert_eq!(transfers.len(), 3);
         let t = &transfers[1];
         assert_eq!(t.debit_account.id, account_a.id);
@@ -425,12 +484,13 @@ mod tests {
         assert_eq!(t.unit_price, dec!(1));
     }
 
-    #[test]
-    fn test_insufficient_balance_client_spot() {
+    #[tokio::test]
+    #[test_log::test]
+    async fn test_insufficient_balance_client_spot() {
         let ledger = Ledger::builder().build();
-        let personal_venue = test_personal_venue();
-        let binance_venue = test_binance_venue();
-        let usdt = test_usdt_asset();
+        let personal_venue = test_utils::test_personal_venue();
+        let binance_venue = test_utils::test_binance_venue();
+        let usdt = test_utils::test_usdt_asset();
 
         // Create Personal account for USD
         let account_l = ledger.add_account(
@@ -450,19 +510,23 @@ mod tests {
 
         ledger
             .transfer(OffsetDateTime::now_utc(), &account_l, &account_a, dec!(1000))
+            .await
             .unwrap();
-        let result = ledger.transfer(OffsetDateTime::now_utc(), &account_a, &account_l, dec!(1001));
+        let result = ledger
+            .transfer(OffsetDateTime::now_utc(), &account_a, &account_l, dec!(1001))
+            .await;
         assert!(matches!(result, Err(AccountingError::InsufficientBalance(_))));
 
-        assert_eq!(ledger.balance(account_l.id), dec!(-1000));
-        assert_eq!(ledger.balance(account_a.id), dec!(1000));
+        assert_eq!(ledger.balance(account_l.id).await, dec!(-1000));
+        assert_eq!(ledger.balance(account_a.id).await, dec!(1000));
     }
 
-    #[test]
-    fn test_invalid_amount() {
+    #[tokio::test]
+    #[test_log::test]
+    async fn test_invalid_amount() {
         let ledger = Ledger::builder().build();
-        let binance_venue = test_binance_venue();
-        let usdt = test_usdt_asset();
+        let binance_venue = test_utils::test_binance_venue();
+        let usdt = test_utils::test_usdt_asset();
 
         // Create two Strategy accounts for USD
         let account_a = ledger.add_account(
@@ -478,19 +542,24 @@ mod tests {
             AccountType::Margin,
         );
 
-        let result_zero = ledger.transfer(OffsetDateTime::now_utc(), &account_a, &account_b, dec!(0));
+        let result_zero = ledger
+            .transfer(OffsetDateTime::now_utc(), &account_a, &account_b, dec!(0))
+            .await;
         assert!(matches!(result_zero, Err(AccountingError::InvalidTransferAmount(_))));
 
-        let result_negative = ledger.transfer(OffsetDateTime::now_utc(), &account_a, &account_b, dec!(-10));
+        let result_negative = ledger
+            .transfer(OffsetDateTime::now_utc(), &account_a, &account_b, dec!(-10))
+            .await;
         assert!(matches!(result_negative, Err(AccountingError::InvalidTransferAmount(_))));
     }
 
-    #[test]
-    fn test_currency_mismatch() {
+    #[tokio::test]
+    #[test_log::test]
+    async fn test_currency_mismatch() {
         let ledger = Ledger::builder().build();
-        let binance_venue = test_binance_venue();
-        let usdt = test_usdt_asset();
-        let btc = test_btc_asset();
+        let binance_venue = test_utils::test_binance_venue();
+        let usdt = test_utils::test_usdt_asset();
+        let btc = test_utils::test_btc_asset();
 
         let account_usd = ledger.add_account(
             binance_venue.clone(),
@@ -501,15 +570,18 @@ mod tests {
         let account_btc =
             ledger.add_account(binance_venue.clone(), btc.clone().into(), AccountOwner::User, AccountType::Spot);
 
-        let result = ledger.transfer(OffsetDateTime::now_utc(), &account_usd, &account_btc, dec!(100));
+        let result = ledger
+            .transfer(OffsetDateTime::now_utc(), &account_usd, &account_btc, dec!(100))
+            .await;
         assert!(matches!(result, Err(AccountingError::CurrencyMismatch(_))));
     }
 
-    #[test]
-    fn test_same_account() {
+    #[tokio::test]
+    #[test_log::test]
+    async fn test_same_account() {
         let ledger = Ledger::builder().build();
-        let binance_venue = test_binance_venue();
-        let usdt = test_usdt_asset();
+        let binance_venue = test_utils::test_binance_venue();
+        let usdt = test_utils::test_usdt_asset();
 
         let account_a = ledger.add_account(
             binance_venue.clone(),
@@ -517,7 +589,9 @@ mod tests {
             AccountOwner::User,
             AccountType::Spot,
         );
-        let result = ledger.transfer(OffsetDateTime::now_utc(), &account_a, &account_a, dec!(100));
+        let result = ledger
+            .transfer(OffsetDateTime::now_utc(), &account_a, &account_a, dec!(100))
+            .await;
         assert!(matches!(result, Err(AccountingError::SameAccount(_))));
     }
 }

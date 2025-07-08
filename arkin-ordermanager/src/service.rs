@@ -8,15 +8,13 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{ExecutionOrderBook, VenueOrderBook};
-
 #[derive(TypedBuilder)]
 pub struct OrderManager {
     identifier: String,
     time: Arc<dyn SystemTime>,
     publisher: Arc<dyn Publisher>,
-    execution_order_book: ExecutionOrderBook,
-    venue_order_book: VenueOrderBook,
+    execution_order_book: Arc<ExecutionOrderBook>,
+    venue_order_book: Arc<VenueOrderBook>,
 }
 
 impl OrderManager {
@@ -188,8 +186,8 @@ mod tests {
         // Setup: Initialize OrderManager with mock dependencies
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let execution_order_book = ExecutionOrderBook::default(); // Assumes default constructor
-        let venue_order_book = VenueOrderBook::default();
+        let execution_order_book = ExecutionOrderBook::new();
+        let venue_order_book = VenueOrderBook::new();
         let order_manager = OrderManager::builder()
             .identifier("test".to_string())
             .time(time.clone())
@@ -229,8 +227,8 @@ mod tests {
         // Setup: Initialize OrderManager with mock dependencies
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let execution_order_book = ExecutionOrderBook::default();
-        let venue_order_book = VenueOrderBook::default();
+        let execution_order_book = ExecutionOrderBook::new();
+        let venue_order_book = VenueOrderBook::new();
         let order_manager = OrderManager::builder()
             .identifier("test".to_string())
             .time(time.clone())

@@ -172,6 +172,7 @@ dependencies = [
  "sqlx",
  "strum",
  "test-log",
+ "thiserror 2.0.12",
  "time",
  "tokio",
  "tokio-util",

@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::{ledger::Ledger, Accounting, AccountingError, AccountingService};
+use crate::{Accounting, AccountingError, AccountingService};
 
 #[derive(TypedBuilder)]
 pub struct LedgerAccounting {
