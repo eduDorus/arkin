@@ -1,45 +1,66 @@
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{VenueOrder, VenueOrderId, VenueOrderStatus};
+use crate::{ExecutionOrderId, VenueOrder, VenueOrderId, VenueOrderStatus};
 
-#[derive(Default)]
+#[derive(Default, TypedBuilder)]
 pub struct VenueOrderBook {
     queue: DashMap<VenueOrderId, VenueOrder>,
+    #[builder(default = true)]
+    autoclean: bool,
 }
 
 impl VenueOrderBook {
-    pub fn new() -> Arc<Self> {
+    pub fn new(autoclean: bool) -> Arc<Self> {
         Self {
             queue: DashMap::new(),
+            autoclean,
         }
         .into()
     }
 
     pub fn insert(&self, order: VenueOrder) {
         if !matches!(order.status, VenueOrderStatus::New) {
-            warn!(target: "order_manager", "Adding order to order book that is not new");
+            warn!(target: "venue_order_book", "Adding order to order book that is not new");
         }
-        self.queue.insert(order.id, order);
+        self.queue.insert(order.id, order.to_owned());
+        info!(target: "venue_order_book", "inserted order {} in venue orderbook", order.id);
     }
 
     pub fn get(&self, id: Uuid) -> Option<VenueOrder> {
-        self.queue.get(&id).map(|entry| entry.value().clone())
+        self.queue.get(&id).map(|entry| entry.value().to_owned())
     }
 
     pub fn update(&self, order: VenueOrder) {
-        if let Some(mut o) = self.queue.get_mut(&order.id) {
-            *o = order;
+        let remove = if let Some(mut o) = self.queue.get_mut(&order.id) {
+            *o = order.to_owned();
+            info!(target: "venue_order_book", "updated order {} in venue orderbook to {}", order.id, order.status);
+
+            // autoclean
+            if self.autoclean && o.is_finalized() {
+                true
+            } else {
+                false
+            }
         } else {
-            error!(target: "order_manager", "Updating order that does not exist in the order book");
+            error!(target: "venue_order_book", "Updating order that does not exist in the order book");
+            false
+        };
+
+        if remove {
+            self.queue.remove(&order.id);
+            info!(target: "venue_order_book", "auto cleanup removed finalized order {} with state {}", order.id, order.status);
         }
     }
 
     pub fn remove(&self, id: Uuid) -> Option<(Uuid, VenueOrder)> {
-        self.queue.remove(&id)
+        let entry = self.queue.remove(&id);
+        info!(target: "venue_order_book", "removed order {} in venue orderbook", id);
+        entry
     }
 
     pub fn len(&self) -> usize {
@@ -47,16 +68,24 @@ impl VenueOrderBook {
     }
 
     pub fn list_orders(&self) -> Vec<VenueOrder> {
-        let mut orders: Vec<VenueOrder> = self.queue.iter().map(|entry| entry.value().clone()).collect();
+        let mut orders: Vec<VenueOrder> = self.queue.iter().map(|entry| entry.value().to_owned()).collect();
         orders.sort_by_key(|order| order.status);
         orders
+    }
+
+    pub fn list_orders_by_exec_id(&self, id: ExecutionOrderId) -> Vec<VenueOrder> {
+        self.queue
+            .iter()
+            .filter(|entry| entry.value().execution_order_id == Some(id))
+            .map(|entry| entry.value().to_owned())
+            .collect()
     }
 
     pub fn list_orders_by_status(&self, status: VenueOrderStatus) -> Vec<VenueOrder> {
         self.queue
             .iter()
             .filter(|entry| entry.value().status == status)
-            .map(|entry| entry.value().clone())
+            .map(|entry| entry.value().to_owned())
             .collect()
     }
 }

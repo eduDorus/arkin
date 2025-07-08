@@ -183,6 +183,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-exec-strat-market"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "dashmap",
+ "rand 0.9.1",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "test-log",
+ "time",
+ "tokio",
+ "tracing",
+ "typed-builder",
+ "uuid",
+]
+
+[[package]]
+name = "arkin-executor-binance"
+version = "0.1.0"
+
+[[package]]
 name = "arkin-executor-simulation"
 version = "0.1.0"
 dependencies = [

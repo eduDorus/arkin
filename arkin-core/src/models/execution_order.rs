@@ -17,7 +17,7 @@ pub type ExecutionOrderId = Uuid;
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "execution_order_type", rename_all = "snake_case")]
-pub enum ExecutionOrderType {
+pub enum ExecutionStrategyType {
     Maker,
     Taker,
     VWAP,
@@ -32,6 +32,7 @@ pub enum ExecutionOrderStatus {
     New,
     Active,
     Completed,
+    Cancelling,
     Cancelled,
     Expired,
 }
@@ -44,7 +45,7 @@ pub struct ExecutionOrder {
     pub strategy: Option<Arc<Strategy>>,
     #[builder(default = vec![])]
     pub venue_order_ids: Vec<VenueOrderId>,
-    pub order_type: ExecutionOrderType,
+    pub exec_strategy_type: ExecutionStrategyType,
     pub side: MarketSide,
     pub price: Price,
     pub quantity: Quantity,
@@ -139,7 +140,7 @@ impl fmt::Display for ExecutionOrder {
             "instrument={} side={} order_type={} price={} quantity={} total_value={} status={}",
             self.instrument,
             self.side,
-            self.order_type,
+            self.exec_strategy_type,
             self.price,
             self.quantity,
             self.total_value(),

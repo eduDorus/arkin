@@ -36,8 +36,11 @@ pub enum Event {
     CancelExecutionOrder(Arc<ExecutionOrder>),
     CancelAllExecutionOrders(OffsetDateTime),
 
-    // Order Manager
+    NewMakerExecutionOrder(Arc<ExecutionOrder>),
+    CancelMakerExecutionOrder(Arc<ExecutionOrder>),
+    CancelAllMakerExecutionOrders(OffsetDateTime),
 
+    // Order Manager
 
     // Execution Strategy
     NewVenueOrder(Arc<VenueOrder>),
@@ -85,6 +88,10 @@ impl Event {
             Event::NewExecutionOrder(event) => event.updated_at,
             Event::CancelExecutionOrder(event) => event.updated_at,
             Event::CancelAllExecutionOrders(ts) => *ts,
+
+            Event::NewMakerExecutionOrder(event) => event.updated_at,
+            Event::CancelMakerExecutionOrder(event) => event.updated_at,
+            Event::CancelAllMakerExecutionOrders(ts) => *ts,
 
             // Order Manger
 

@@ -1,0 +1,23 @@
+[package]
+name = "arkin-exec-strat-market"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-core = { path = "../arkin-core" }
+
+tokio = { workspace = true }
+async-trait = { workspace = true }
+rand = { workspace = true }
+tracing = { workspace = true }
+dashmap = { workspace = true }
+uuid = { workspace = true }
+time = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+typed-builder = { workspace = true }
+
+[dev-dependencies]
+test-log = { workspace = true }

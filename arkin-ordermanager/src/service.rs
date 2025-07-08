@@ -186,8 +186,8 @@ mod tests {
         // Setup: Initialize OrderManager with mock dependencies
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let execution_order_book = ExecutionOrderBook::new();
-        let venue_order_book = VenueOrderBook::new();
+        let execution_order_book = ExecutionOrderBook::new(true);
+        let venue_order_book = VenueOrderBook::new(true);
         let order_manager = OrderManager::builder()
             .identifier("test".to_string())
             .time(time.clone())
@@ -201,7 +201,7 @@ mod tests {
             .id(Uuid::new_v4())
             .strategy(Some(test_strategy_1()))
             .instrument(test_inst_binance_btc_usdt_perp())
-            .order_type(ExecutionOrderType::Maker)
+            .exec_strategy_type(ExecutionStrategyType::Maker)
             .side(MarketSide::Buy)
             .price(dec!(0))
             .quantity(dec!(1))
@@ -227,8 +227,8 @@ mod tests {
         // Setup: Initialize OrderManager with mock dependencies
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let execution_order_book = ExecutionOrderBook::new();
-        let venue_order_book = VenueOrderBook::new();
+        let execution_order_book = ExecutionOrderBook::new(true);
+        let venue_order_book = VenueOrderBook::new(true);
         let order_manager = OrderManager::builder()
             .identifier("test".to_string())
             .time(time.clone())
@@ -242,7 +242,7 @@ mod tests {
             .id(Uuid::new_v4())
             .strategy(Some(test_strategy_1()))
             .instrument(test_inst_binance_btc_usdt_perp())
-            .order_type(ExecutionOrderType::Maker)
+            .exec_strategy_type(ExecutionStrategyType::Maker)
             .side(MarketSide::Buy)
             .price(dec!(0))
             .quantity(dec!(1))
