@@ -17,30 +17,38 @@ pub enum Event {
     TickUpdate(Arc<Tick>),
     TradeUpdate(Arc<Trade>),
     BookUpdate(Arc<Book>),
+
     // Accounting
     BalanceUpdate(Arc<BalanceUpdate>),
     PositionUpdate(Arc<PositionUpdate>),
     AccountNew(Arc<AccountUpdate>),
     TransferNew(Arc<TransferGroup>),
+
     // Insights
     InsightsTick(Arc<InsightsTick>),
     InsightsUpdate(Arc<InsightsUpdate>),
-    // Strategy Signals
+
+    // Strategy
     SignalUpdate(Arc<Signal>),
+
     // Allocation Execution Orders
     NewExecutionOrder(Arc<ExecutionOrder>),
     CancelExecutionOrder(Arc<ExecutionOrder>),
     CancelAllExecutionOrders(OffsetDateTime),
 
-    // Order Manager Venue Orders
+    // Order Manager
+
+
+    // Execution Strategy
     NewVenueOrder(Arc<VenueOrder>),
     CancelVenueOrder(Arc<VenueOrder>),
     CancelAllVenueOrders(OffsetDateTime),
-    ExecutionOrderPlaced(Arc<ExecutionOrder>),
-    ExecutionOrderFilled(Arc<ExecutionOrder>),
+    ExecutionOrderActive(Arc<ExecutionOrder>),
+    ExecutionOrderCompleted(Arc<ExecutionOrder>),
     ExecutionOrderCancelled(Arc<ExecutionOrder>),
+    ExecutionOrderExpired(Arc<ExecutionOrder>),
 
-    // Execution Venue Orders
+    // Execution
     VenueOrderInflight(Arc<VenueOrder>),
     VenueOrderPlaced(Arc<VenueOrder>),
     VenueOrderRejected(Arc<VenueOrder>),
@@ -59,30 +67,37 @@ impl Event {
             Event::TickUpdate(event) => event.event_time,
             Event::TradeUpdate(event) => event.event_time,
             Event::BookUpdate(event) => event.event_time,
+
             // Accounting
             Event::BalanceUpdate(event) => event.event_time,
             Event::PositionUpdate(event) => event.event_time,
             Event::AccountNew(event) => event.event_time,
             Event::TransferNew(event) => event.event_time,
+
             // Insights
             Event::InsightsTick(event) => event.event_time,
             Event::InsightsUpdate(event) => event.event_time,
+
             // Strategy Signals
             Event::SignalUpdate(event) => event.event_time,
+
             // Allocation Execution Orders
             Event::NewExecutionOrder(event) => event.updated_at,
             Event::CancelExecutionOrder(event) => event.updated_at,
             Event::CancelAllExecutionOrders(ts) => *ts,
 
-            // Order Manager Venue Orders
+            // Order Manger
+
+            // Execution Strategy
             Event::NewVenueOrder(event) => event.updated_at,
             Event::CancelVenueOrder(event) => event.updated_at,
             Event::CancelAllVenueOrders(ts) => *ts,
-            Event::ExecutionOrderPlaced(event) => event.updated_at,
-            Event::ExecutionOrderFilled(event) => event.updated_at,
+            Event::ExecutionOrderActive(event) => event.updated_at,
+            Event::ExecutionOrderCompleted(event) => event.updated_at,
             Event::ExecutionOrderCancelled(event) => event.updated_at,
+            Event::ExecutionOrderExpired(event) => event.updated_at,
 
-            // Execution Venue Order Updates
+            // Execution
             Event::VenueOrderInflight(event) => event.updated_at,
             Event::VenueOrderPlaced(event) => event.updated_at,
             Event::VenueOrderRejected(event) => event.updated_at,
