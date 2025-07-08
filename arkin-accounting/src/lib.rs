@@ -1,14 +1,3 @@
-mod errors;
-mod ledger;
-mod services;
-mod traits;
+mod service;
 
-pub use errors::*;
-pub use services::*;
-pub use traits::*;
-
-pub mod prelude {
-    pub use crate::errors::*;
-    pub use crate::services::*;
-    pub use crate::traits::*;
-}
+pub use service::Accounting;

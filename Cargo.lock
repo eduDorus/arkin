@@ -147,6 +147,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-accounting"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-core",
+ "async-trait",
+ "dashmap",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "strum",
+ "test-log",
+ "thiserror 2.0.12",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "typed-builder",
+ "uuid",
+]
+
+[[package]]
 name = "arkin-audit"
 version = "0.1.0"
 dependencies = [
