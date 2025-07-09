@@ -1,5 +1,5 @@
 [package]
-name = "arkin-strategies"
+name = "arkin-strat-crossover"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true
@@ -18,9 +18,8 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 typed-builder = { workspace = true }
-
-# ort = { workspace = true }
-# ndarray = { workspace = true }
+dashmap = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }
