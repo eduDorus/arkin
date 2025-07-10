@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use time::OffsetDateTime;
-use tokio_util::sync::CancellationToken;
 
 use crate::{Event, ServiceCtx};
 
@@ -98,9 +97,4 @@ pub trait Subscriber: Send + Sync {
     async fn recv(&self) -> Option<Event>;
     fn needs_ack(&self) -> bool;
     async fn send_ack(&self);
-}
-
-#[async_trait]
-pub trait RunnableService: Send + Sync {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error>;
 }

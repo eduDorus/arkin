@@ -119,7 +119,7 @@ impl Ledger {
     }
 
     /// Finds an account by venue, asset, and account type, or creates it if it doesn't exist.
-    pub fn find_or_create(
+    pub fn find_or_create_account(
         &self,
         venue: &Arc<Venue>,
         asset: &Tradable,
@@ -133,12 +133,12 @@ impl Ledger {
     }
 
     /// Returns an account by ID.
-    pub fn account(&self, account_id: Uuid) -> Option<Arc<Account>> {
+    pub fn get_account(&self, account_id: Uuid) -> Option<Arc<Account>> {
         self.accounts.get(&account_id).map(|e| e.clone())
     }
 
     /// Returns all accounts in the ledger.
-    pub fn accounts(&self) -> Vec<Arc<Account>> {
+    pub fn list_accounts(&self) -> Vec<Arc<Account>> {
         self.accounts.iter().map(|e| e.clone()).collect()
     }
 
@@ -159,44 +159,46 @@ impl Ledger {
 
     /// Returns the net position amount for an account and strategy.
     pub async fn strategy_balance(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
-        let filter = |t: &&Arc<Transfer>| {
-            t.has_type(&TransferType::Trade)
-                && t.has_strategy(strategy)
-                && match instrument {
-                    Some(i) => t.has_instrument(i),
-                    None => true,
-                }
-        };
-
         let transfers = self.transfers.read().await;
-        transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
-            if t.credit_account.is_user_account() {
-                acc + t.amount
-            } else {
-                acc - t.amount
-            }
-        })
+        transfers
+            .iter()
+            .filter(|t| {
+                t.has_transfer_type(&TransferType::Trade)
+                    && t.has_strategy(strategy)
+                    && match instrument {
+                        Some(i) => t.has_instrument(i),
+                        None => true,
+                    }
+            })
+            .fold(Decimal::ZERO, |acc, t| {
+                if t.credit_account.is_user_account() {
+                    acc + t.amount
+                } else {
+                    acc - t.amount
+                }
+            })
     }
 
     /// Returns the net PnL for an account and strategy.
     pub async fn strategy_pnl(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
-        let filter = |t: &&Arc<Transfer>| {
-            t.has_type(&TransferType::Pnl)
-                && t.has_strategy(strategy)
-                && match instrument {
-                    Some(i) => t.has_instrument(i),
-                    None => true,
-                }
-        };
-
         let transfers = self.transfers.read().await;
-        transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
-            if t.credit_account.is_user_account() {
-                acc + t.amount
-            } else {
-                acc - t.amount
-            }
-        })
+        transfers
+            .iter()
+            .filter(|t| {
+                t.has_transfer_type(&TransferType::Pnl)
+                    && t.has_strategy(strategy)
+                    && match instrument {
+                        Some(i) => t.has_instrument(i),
+                        None => true,
+                    }
+            })
+            .fold(Decimal::ZERO, |acc, t| {
+                if t.credit_account.is_user_account() {
+                    acc + t.amount
+                } else {
+                    acc - t.amount
+                }
+            })
     }
 
     pub async fn strategy_net_value(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
@@ -216,7 +218,7 @@ impl Ledger {
         instrument: Option<&Arc<Instrument>>,
     ) -> (Decimal, Decimal) {
         let filter = |t: &&Arc<Transfer>| {
-            t.has_type(&TransferType::Trade)
+            t.has_transfer_type(&TransferType::Trade)
                 && t.has_strategy(strategy)
                 && match instrument {
                     Some(i) => t.has_instrument(i),
@@ -308,24 +310,28 @@ impl Ledger {
     }
 
     /// Returns the total margin posted for the current position.
-    pub async fn margin_posted(&self, strategy: &Arc<Strategy>, instrument: Option<&Arc<Instrument>>) -> Decimal {
-        let filter = |t: &&Arc<Transfer>| {
-            t.has_type(&TransferType::Margin)
-                && t.has_strategy(strategy)
-                && match instrument {
-                    Some(i) => t.has_instrument(i),
-                    None => true,
-                }
-        };
-
+    pub async fn margin_posted(&self, strategy: Option<Arc<Strategy>>, instrument: Option<Arc<Instrument>>) -> Decimal {
         let transfers = self.transfers.read().await;
-        transfers.iter().filter(filter).fold(Decimal::ZERO, |acc, t| {
-            if t.debit_account.is_user_account() {
-                acc + t.amount // Margin posted to venue
-            } else {
-                acc - t.amount // Margin released from venue
-            }
-        })
+        transfers
+            .iter()
+            .filter(|t| {
+                t.has_transfer_type(&TransferType::Margin)
+                    && match strategy.as_ref() {
+                        Some(s) => t.has_strategy(s),
+                        None => true,
+                    }
+                    && match instrument.as_ref() {
+                        Some(i) => t.has_instrument(i),
+                        None => true,
+                    }
+            })
+            .fold(Decimal::ZERO, |acc, t| {
+                if t.debit_account.is_user_account() {
+                    acc + t.amount // Margin posted to venue
+                } else {
+                    acc - t.amount // Margin released from venue
+                }
+            })
     }
 
     /// Returns all transfers in the ledger.

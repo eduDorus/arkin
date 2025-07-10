@@ -62,22 +62,16 @@ impl Transfer {
         &self.asset == asset
     }
 
-    pub fn has_type(&self, transfer_type: &TransferType) -> bool {
+    pub fn has_transfer_type(&self, transfer_type: &TransferType) -> bool {
         &self.transfer_type == transfer_type
     }
 
     pub fn has_strategy(&self, strategy: &Arc<Strategy>) -> bool {
-        match &self.strategy {
-            Some(s) => s == strategy,
-            None => false,
-        }
+        self.strategy == Some(strategy.clone())
     }
 
     pub fn has_instrument(&self, instrument: &Arc<Instrument>) -> bool {
-        match &self.instrument {
-            Some(i) => i == instrument,
-            None => false,
-        }
+        self.instrument == Some(instrument.clone())
     }
 }
 

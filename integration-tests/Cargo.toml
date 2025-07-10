@@ -1,0 +1,28 @@
+[package]
+name = "integration-tests"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-core = { path = "../arkin-core" }
+arkin-audit = { path = "../arkin-audit" }
+arkin-strat-crossover = { path = "../arkin-strat-crossover" }
+
+tokio = { workspace = true }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+kanal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+time = { workspace = true }
+reqwest = { workspace = true }
+clickhouse = { workspace = true }
+uuid = { workspace = true }
+statrs = { workspace = true }
+test-log = { workspace = true }
