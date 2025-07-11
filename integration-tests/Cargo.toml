@@ -9,6 +9,8 @@ license.workspace = true
 arkin-core = { path = "../arkin-core" }
 arkin-audit = { path = "../arkin-audit" }
 arkin-strat-crossover = { path = "../arkin-strat-crossover" }
+arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
+arkin-execution-sim = { path = "../arkin-execution-sim" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }

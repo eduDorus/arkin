@@ -1,5 +1,5 @@
 [package]
-name = "arkin-executor-simulation"
+name = "arkin-exec-strat-taker"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true
@@ -17,6 +17,7 @@ uuid = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
+typed-builder = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }

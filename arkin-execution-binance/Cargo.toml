@@ -1,5 +1,5 @@
 [package]
-name = "arkin-executor-binance"
+name = "arkin-execution-binance"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true
