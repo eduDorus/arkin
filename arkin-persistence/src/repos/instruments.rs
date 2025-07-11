@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -22,7 +22,7 @@ pub struct InstrumentDTO {
     pub quote_asset_id: Uuid,
     pub margin_asset_id: Uuid,
     pub strike: Option<Decimal>,
-    pub maturity: Option<OffsetDateTime>,
+    pub maturity: Option<UtcDateTime>,
     pub option_type: Option<InstrumentOptionType>,
     pub contract_size: Decimal,
     pub price_precision: i32,

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -59,8 +59,8 @@ impl MarketService {
     pub async fn read_ticks_range(
         &self,
         instrument_id: &[Uuid],
-        start: OffsetDateTime,
-        end: OffsetDateTime,
+        start: UtcDateTime,
+        end: UtcDateTime,
     ) -> Result<Vec<Arc<Tick>>, PersistenceError> {
         self.tick_store.read_range(instrument_id, start, end).await
     }
@@ -81,8 +81,8 @@ impl MarketService {
     pub async fn read_trades_range(
         &self,
         instruments: &[Arc<Instrument>],
-        start: OffsetDateTime,
-        end: OffsetDateTime,
+        start: UtcDateTime,
+        end: UtcDateTime,
     ) -> Result<Vec<Arc<Trade>>, PersistenceError> {
         self.trade_store.read_range(instruments, start, end).await
     }

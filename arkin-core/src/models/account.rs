@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use sqlx::Type;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -99,6 +99,6 @@ impl fmt::Display for Account {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct AccountUpdate {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub account: Arc<Account>,
 }

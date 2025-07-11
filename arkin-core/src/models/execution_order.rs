@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use rust_decimal::Decimal;
 use sqlx::Type;
 use strum::Display;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::warn;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -57,12 +57,12 @@ pub struct ExecutionOrder {
     pub total_commission: Commission,
     #[builder(default = ExecutionOrderStatus::New)]
     pub status: ExecutionOrderStatus,
-    pub created_at: OffsetDateTime,
-    pub updated_at: OffsetDateTime,
+    pub created_at: UtcDateTime,
+    pub updated_at: UtcDateTime,
 }
 
 impl ExecutionOrder {
-    pub fn add_fill(&mut self, event_time: OffsetDateTime, price: Price, quantity: Quantity, commission: Commission) {
+    pub fn add_fill(&mut self, event_time: UtcDateTime, price: Price, quantity: Quantity, commission: Commission) {
         self.fill_price =
             (self.fill_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
         self.filled_quantity += quantity;
@@ -74,7 +74,7 @@ impl ExecutionOrder {
         }
     }
 
-    pub fn update_status(&mut self, new_status: ExecutionOrderStatus, event_time: OffsetDateTime) {
+    pub fn update_status(&mut self, new_status: ExecutionOrderStatus, event_time: UtcDateTime) {
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
             self.updated_at = event_time;

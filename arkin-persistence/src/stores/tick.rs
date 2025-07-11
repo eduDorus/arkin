@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_stream::try_stream;
 use futures::{stream, Stream, StreamExt};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::sync::Mutex;
 use tokio_util::task::TaskTracker;
 use tracing::{debug, error, info};
@@ -90,8 +90,8 @@ impl TickStore {
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
+        from: UtcDateTime,
+        to: UtcDateTime,
     ) -> Result<Vec<Arc<Tick>>, PersistenceError> {
         let db_ticks = self.tick_repo.read_range(&instrument_ids, from, to).await?;
         let mut ticks = Vec::with_capacity(db_ticks.len());
@@ -114,8 +114,8 @@ impl TickStore {
     pub async fn stream_range(
         &self,
         instruments: &[Arc<Instrument>],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
+        from: UtcDateTime,
+        to: UtcDateTime,
     ) -> Result<impl Stream<Item = Result<Arc<Tick>, PersistenceError>> + '_, PersistenceError> {
         let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
         let mut cursor = self.tick_repo.stream_range(&ids, from, to).await?;
@@ -147,8 +147,8 @@ impl TickStore {
     pub async fn stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
-        start: OffsetDateTime,
-        end: OffsetDateTime,
+        start: UtcDateTime,
+        end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
     ) -> impl Stream<Item = Arc<Tick>> + 'static {

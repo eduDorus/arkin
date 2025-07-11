@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
 use yata::{
@@ -42,7 +42,7 @@ impl Feature for MovingAverageFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating {}...", self.ma_type);
 
         // Get data from state

@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc};
 
 use sqlx::Type;
 use strum::Display;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -87,12 +87,12 @@ pub struct VenueOrder {
     pub commission: Commission,
     #[builder(default = VenueOrderStatus::New)]
     pub status: VenueOrderStatus,
-    pub created_at: OffsetDateTime,
-    pub updated_at: OffsetDateTime,
+    pub created_at: UtcDateTime,
+    pub updated_at: UtcDateTime,
 }
 
 impl VenueOrder {
-    pub fn add_fill(&mut self, event_time: OffsetDateTime, price: Price, quantity: Quantity, commission: Commission) {
+    pub fn add_fill(&mut self, event_time: UtcDateTime, price: Price, quantity: Quantity, commission: Commission) {
         self.last_fill_price = price;
         self.last_fill_quantity = quantity;
         self.last_fill_commission = commission;
@@ -109,7 +109,7 @@ impl VenueOrder {
         };
     }
 
-    pub fn update_status(&mut self, new_status: VenueOrderStatus, time: OffsetDateTime) {
+    pub fn update_status(&mut self, new_status: VenueOrderStatus, time: UtcDateTime) {
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
             self.updated_at = time

@@ -6,7 +6,7 @@ use clickhouse::{sql::Identifier, Row};
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use time::macros::datetime;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -14,7 +14,7 @@ use arkin_core::prelude::*;
 #[derive(Debug, Clone, Serialize, Deserialize, Row)]
 pub struct InsightClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(with = "clickhouse::serde::uuid")]
     pub pipeline_id: Uuid,
     #[serde(with = "clickhouse::serde::uuid")]
@@ -27,7 +27,7 @@ pub struct InsightClickhouseDTO {
 #[derive(Debug, Serialize, Row)]
 pub struct TickClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(with = "clickhouse::serde::uuid")]
     pub instrument_id: Uuid,
     pub tick_id: u64,
@@ -44,7 +44,7 @@ pub struct TickClickhouseDTO {
 #[derive(Debug, Serialize, Deserialize, Row)]
 pub struct TradeClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(with = "clickhouse::serde::uuid")]
     pub instrument_id: Uuid,
     pub trade_id: u64,
@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
 
     // Create an instance of InsightClickhouseDTO
     // let dto = InsightClickhouseDTO {
-    //     event_time: OffsetDateTime::now_utc(),
+    //     event_time: UtcDateTime::now(),
     //     pipeline_id: Uuid::new_v4(),
     //     instrument_id: Uuid::new_v4(),
     //     feature_id: "feature_123".to_string(),
@@ -112,7 +112,7 @@ async fn main() -> Result<()> {
     // println!("Data inserted successfully.");
 
     // let tick_dto = TickClickhouseDTO {
-    //     event_time: OffsetDateTime::now_utc(),
+    //     event_time: UtcDateTime::now(),
     //     instrument_id: Uuid::new_v4(),
     //     tick_id: 123,
     //     bid_price: Decimal::new(123450, 1),
@@ -128,7 +128,7 @@ async fn main() -> Result<()> {
     // println!("Data inserted successfully.");
 
     // let trade_dto = TradeClickhouseDTO {
-    //     event_time: OffsetDateTime::now_utc(),
+    //     event_time: UtcDateTime::now(),
     //     instrument_id: Uuid::new_v4(),
     //     trade_id: 123,
     //     side: 1,

@@ -1,19 +1,19 @@
 use std::time::Duration;
 
 use futures::{stream, Stream};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::info;
 
 #[derive(Debug, Clone)]
 pub struct Clock {
-    start: OffsetDateTime,
-    end: OffsetDateTime,
+    start: UtcDateTime,
+    end: UtcDateTime,
     frequency_secs: Duration,
-    current_timestamp: OffsetDateTime,
+    current_timestamp: UtcDateTime,
 }
 
 impl Clock {
-    pub fn new(start: OffsetDateTime, end: OffsetDateTime, frequency_secs: Duration) -> Self {
+    pub fn new(start: UtcDateTime, end: UtcDateTime, frequency_secs: Duration) -> Self {
         info!(
             "Creating new clock with start: {}, end: {}, frequency_secs: {}",
             start,
@@ -28,7 +28,7 @@ impl Clock {
         }
     }
 
-    pub fn next(&mut self) -> Option<(OffsetDateTime, OffsetDateTime)> {
+    pub fn next(&mut self) -> Option<(UtcDateTime, UtcDateTime)> {
         if self.current_timestamp >= self.end {
             return None;
         }
@@ -38,7 +38,7 @@ impl Clock {
         Some((next_timestamp, next_timestamp + self.frequency_secs))
     }
 
-    pub fn to_stream(&mut self) -> impl Stream<Item = (OffsetDateTime, OffsetDateTime)> + Send + '_ {
+    pub fn to_stream(&mut self) -> impl Stream<Item = (UtcDateTime, UtcDateTime)> + Send + '_ {
         let mut intervals = Vec::new();
         while let Some((start, end)) = self.next() {
             intervals.push((start, end));
@@ -50,17 +50,17 @@ impl Clock {
         self.current_timestamp = self.start;
     }
 
-    pub fn start(&self) -> OffsetDateTime {
+    pub fn start(&self) -> UtcDateTime {
         self.start
     }
 
-    pub fn end(&self) -> OffsetDateTime {
+    pub fn end(&self) -> UtcDateTime {
         self.end
     }
 }
 
 impl Iterator for Clock {
-    type Item = (OffsetDateTime, OffsetDateTime);
+    type Item = (UtcDateTime, UtcDateTime);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next()

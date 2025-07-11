@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use uuid::Uuid;
 
 use crate::PersistenceError;
@@ -13,7 +13,7 @@ use crate::PersistenceError;
 #[derive(Debug, Clone)]
 pub struct VenueOrderDTO {
     pub id: VenueOrderId,
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub strategy_id: Uuid,
     pub instrument_id: Uuid,
     pub side: MarketSide,
@@ -29,7 +29,7 @@ pub struct VenueOrderDTO {
     pub commission_asset_id: Option<Uuid>,
     pub commission: Decimal,
     pub status: VenueOrderStatus,
-    pub updated_at: OffsetDateTime,
+    pub updated_at: UtcDateTime,
 }
 
 impl From<VenueOrder> for VenueOrderDTO {

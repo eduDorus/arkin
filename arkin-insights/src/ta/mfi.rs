@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use rust_decimal::prelude::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{debug, info, warn};
 
 use arkin_core::prelude::*;
@@ -38,7 +38,7 @@ impl Computation for RSIFeature {
     fn calculate(
         &self,
         instruments: &[Arc<Instrument>],
-        timestamp: OffsetDateTime,
+        timestamp: UtcDateTime,
         state: Arc<InsightsState>,
     ) -> Result<Vec<Insight>> {
         debug!("Calculating RSI");

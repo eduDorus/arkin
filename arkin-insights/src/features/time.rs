@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
 
@@ -33,7 +33,7 @@ impl Feature for TimeFeature {
         ]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating Time Features...");
 
         let day_of_week = event_time.weekday().number_from_monday();

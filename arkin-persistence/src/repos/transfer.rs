@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rust_decimal::Decimal;
 use sqlx::{FromRow, PgPool};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -15,7 +15,7 @@ const FIELD_COUNT: usize = 9;
 #[derive(Debug, FromRow)]
 pub struct TransferDTO {
     pub id: Uuid,
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub transfer_group_id: Uuid,
     pub debit_account_id: Uuid,
     pub credit_account_id: Uuid,

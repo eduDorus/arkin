@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::info;
 
 #[tokio::main(flavor = "multi_thread")]
@@ -20,7 +20,7 @@ async fn main() {
 
     tokio::time::sleep(Duration::from_secs(1)).await;
     let tick = InsightTick::builder()
-        .event_time(OffsetDateTime::now_utc())
+        .event_time(UtcDateTime::now())
         .insights(vec![])
         .instruments(vec![])
         .build()

@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 
@@ -29,7 +29,7 @@ pub struct PositionDetail {
     pub bid_notional: Decimal,
     pub ask_notional: Decimal,
     #[serde(with = "custom_serde::timestamp")]
-    pub update_time: OffsetDateTime,
+    pub update_time: UtcDateTime,
 }
 
 #[cfg(test)]

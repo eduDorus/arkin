@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use serde::{Deserialize, Serialize};
 use statrs::distribution::{ContinuousCDF, Normal};
 use strum::Display;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -212,7 +212,7 @@ impl Feature for NormalizeFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Robust scaling...");
 
         //  Get data

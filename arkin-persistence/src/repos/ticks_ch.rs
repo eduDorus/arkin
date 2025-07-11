@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use clickhouse::{query::RowCursor, sql::Identifier, Client, Row};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -14,7 +14,7 @@ use crate::PersistenceError;
 #[derive(Debug, Serialize, Deserialize, Row)]
 pub struct TickClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(with = "clickhouse::serde::uuid")]
     pub instrument_id: Uuid,
     pub tick_id: u64,
@@ -113,8 +113,8 @@ impl TickClickhouseRepo {
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],
-        from: OffsetDateTime,
-        till: OffsetDateTime,
+        from: UtcDateTime,
+        till: UtcDateTime,
     ) -> Result<Vec<TickClickhouseDTO>, PersistenceError> {
         let cursor = self
             .client
@@ -143,8 +143,8 @@ impl TickClickhouseRepo {
     pub async fn stream_range(
         &self,
         instrument_ids: &[Uuid],
-        from: OffsetDateTime,
-        till: OffsetDateTime,
+        from: UtcDateTime,
+        till: UtcDateTime,
     ) -> Result<RowCursor<TickClickhouseDTO>, PersistenceError> {
         let cursor = self
             .client
@@ -172,8 +172,8 @@ impl TickClickhouseRepo {
     pub async fn fetch_batch(
         &self,
         instrument_ids: &[Uuid],
-        day_start: OffsetDateTime,
-        day_end: OffsetDateTime,
+        day_start: UtcDateTime,
+        day_end: UtcDateTime,
     ) -> Result<Vec<TickClickhouseDTO>, PersistenceError> {
         let rows = self
             .client

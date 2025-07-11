@@ -5,7 +5,7 @@ use catboost_rs::Model;
 use dashmap::DashMap;
 use rayon::prelude::*;
 use rust_decimal::prelude::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
@@ -52,7 +52,7 @@ impl Computation for CatBoostFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating forecast...");
 
         // Retrieve the values for the feature over the window period

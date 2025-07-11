@@ -14,7 +14,7 @@ use futures::StreamExt;
 use models::BinanceUSDMMarketEvent;
 use rust_decimal::prelude::*;
 use strum::Display;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::{signal, sync::Mutex};
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -273,7 +273,7 @@ pub trait State: std::fmt::Debug + Send + Sync {
     async fn read_range_trades(
         &self,
         instrument: &Arc<Instrument>,
-        from: OffsetDateTime,
+        from: UtcDateTime,
         lookback: Duration,
     ) -> BTreeSet<Trade>;
 
@@ -283,7 +283,7 @@ pub trait State: std::fmt::Debug + Send + Sync {
     async fn read_range_ticks(
         &self,
         instrument: &Arc<Instrument>,
-        from: OffsetDateTime,
+        from: UtcDateTime,
         lookback: Duration,
     ) -> BTreeSet<Tick>;
 }
@@ -320,7 +320,7 @@ impl State for AppState {
     async fn read_range_trades(
         &self,
         instrument: &Arc<Instrument>,
-        from: OffsetDateTime,
+        from: UtcDateTime,
         lookback: Duration,
     ) -> BTreeSet<Trade> {
         let trades = self.trades.get(instrument).unwrap();
@@ -347,7 +347,7 @@ impl State for AppState {
     async fn read_range_ticks(
         &self,
         instrument: &Arc<Instrument>,
-        from: OffsetDateTime,
+        from: UtcDateTime,
         lookback: Duration,
     ) -> BTreeSet<Tick> {
         let ticks = self.ticks.get(instrument).unwrap();

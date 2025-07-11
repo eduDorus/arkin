@@ -1,6 +1,6 @@
 use anyhow::Result;
-use typed_builder::TypedBuilder;
 use sqlx::PgPool;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use arkin_core::prelude::*;
@@ -103,7 +103,7 @@ pub mod tests {
     use super::*;
     use rust_decimal_macros::dec;
     use test_log::test;
-    use time::OffsetDateTime;
+    use time::UtcDateTime;
     use uuid::Uuid;
 
     #[test(tokio::test)]
@@ -129,8 +129,8 @@ pub mod tests {
             .realized_pnl(dec!(0))
             .total_commission(dec!(0))
             .status(PositionStatus::Open)
-            .created_at(OffsetDateTime::now_utc())
-            .updated_at(OffsetDateTime::now_utc())
+            .created_at(UtcDateTime::now())
+            .updated_at(UtcDateTime::now())
             .build()
             .unwrap();
         repo.insert(position.clone()).await.unwrap();
@@ -140,7 +140,7 @@ pub mod tests {
         position.realized_pnl = dec!(10);
         position.total_commission = dec!(0.1);
         position.status = PositionStatus::Closed;
-        position.updated_at = OffsetDateTime::now_utc();
+        position.updated_at = UtcDateTime::now();
 
         repo.update(position.clone()).await.unwrap();
         repo.delete(position.id).await.unwrap();

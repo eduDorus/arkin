@@ -186,7 +186,7 @@ impl ExecutorService for SimulationExecutor {}
 //     use rust_decimal_macros::dec;
 //     use std::sync::Arc;
 //     use test_log::test;
-//     use time::OffsetDateTime;
+//     use time::UtcDateTime;
 //     use tokio::time::{timeout, Duration};
 
 //     #[test(tokio::test)]
@@ -203,13 +203,13 @@ impl ExecutorService for SimulationExecutor {}
 
 //         // Build an order.
 //         let order = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument))
 //             .side(MarketSide::Buy)
 //             .price(dec!(100))
 //             .quantity(dec!(1))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         let order_id = order.id.clone();
 //         let order_arc = Arc::new(order);
@@ -254,13 +254,13 @@ impl ExecutorService for SimulationExecutor {}
 //         let instrument = test_inst_binance_btc_usdt_perp();
 
 //         let order = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument))
 //             .side(MarketSide::Sell)
 //             .price(dec!(200))
 //             .quantity(dec!(2))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         let order_id = order.id.clone();
 
@@ -303,32 +303,32 @@ impl ExecutorService for SimulationExecutor {}
 
 //         // Create two orders with the same instrument...
 //         let order1 = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument_btc))
 //             .side(MarketSide::Buy)
 //             .price(dec!(150))
 //             .quantity(dec!(3))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         let order2 = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument_btc))
 //             .side(MarketSide::Sell)
 //             .price(dec!(155))
 //             .quantity(dec!(1))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         // ...and one order with a different instrument.
 //         let order3 = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument_eth))
 //             .side(MarketSide::Buy)
 //             .price(dec!(160))
 //             .quantity(dec!(2))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 
 //         {
@@ -379,22 +379,22 @@ impl ExecutorService for SimulationExecutor {}
 //         let instrument = test_inst_binance_btc_usdt_perp();
 
 //         let order1 = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument))
 //             .side(MarketSide::Buy)
 //             .price(dec!(100))
 //             .quantity(dec!(1))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         let order2 = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument))
 //             .side(MarketSide::Sell)
 //             .price(dec!(110))
 //             .quantity(dec!(2))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 
 //         {
@@ -442,27 +442,27 @@ impl ExecutorService for SimulationExecutor {}
 
 //         // Build a market buy order.
 //         let buy_order = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument))
 //             .side(MarketSide::Buy)
 //             .order_type(VenueOrderType::Market)
 //             .price(dec!(100)) // Price may be ignored for market orders.
 //             .quantity(dec!(1))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         let buy_order_id = buy_order.id.clone();
 
 //         // Build a market sell order.
 //         let sell_order = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument))
 //             .side(MarketSide::Sell)
 //             .order_type(VenueOrderType::Market)
 //             .price(dec!(100))
 //             .quantity(dec!(1))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         let sell_order_id = sell_order.id.clone();
 
@@ -478,7 +478,7 @@ impl ExecutorService for SimulationExecutor {}
 //         // - For buy orders, execution price should be the ask price (e.g., 105).
 //         // - For sell orders, execution price should be the bid price (e.g., 95).
 //         let tick = Tick::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .instrument(Arc::clone(&instrument))
 //             .tick_id(1)
 //             .ask_price(dec!(105))
@@ -527,27 +527,27 @@ impl ExecutorService for SimulationExecutor {}
 
 //         // Build a limit buy order with a limit price of 105.
 //         let buy_order = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument))
 //             .side(MarketSide::Buy)
 //             .order_type(VenueOrderType::Limit)
 //             .price(dec!(105))
 //             .quantity(dec!(1))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         let buy_order_id = buy_order.id.clone();
 
 //         // Build a limit sell order with a limit price of 95.
 //         let sell_order = VenueOrder::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .strategy(Arc::clone(&strategy))
 //             .instrument(Arc::clone(&instrument))
 //             .side(MarketSide::Sell)
 //             .order_type(VenueOrderType::Limit)
 //             .price(dec!(95))
 //             .quantity(dec!(1))
-//             .updated_at(OffsetDateTime::now_utc())
+//             .updated_at(UtcDateTime::now())
 //             .build();
 //         let sell_order_id = sell_order.id.clone();
 
@@ -560,7 +560,7 @@ impl ExecutorService for SimulationExecutor {}
 //         // For a buy limit order, tick.ask_price must be <= order.price.
 //         // Provide a tick with ask = 110 (> 105) and bid = 90 (< 95) for the sell order.
 //         let tick = Tick::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .instrument(Arc::clone(&instrument))
 //             .tick_id(1)
 //             .ask_price(dec!(110))
@@ -580,7 +580,7 @@ impl ExecutorService for SimulationExecutor {}
 //         // For the buy limit, use ask = 100 (<= 105).
 //         // For the sell limit, use bid = 100 (>= 95).
 //         let tick = Tick::builder()
-//             .event_time(OffsetDateTime::now_utc())
+//             .event_time(UtcDateTime::now())
 //             .instrument(Arc::clone(&instrument))
 //             .tick_id(1)
 //             .ask_price(dec!(100))

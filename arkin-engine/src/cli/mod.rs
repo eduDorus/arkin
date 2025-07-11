@@ -1,5 +1,5 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 use arkin_ingestors::prelude::*;
@@ -52,11 +52,11 @@ pub struct DownloadArgs {
 
     /// Start datetime in "YYYY-MM-DD HH:MM" format
     #[arg(long, value_parser = parse_datetime)]
-    pub start: OffsetDateTime,
+    pub start: UtcDateTime,
 
     /// End datetime in "YYYY-MM-DD HH:MM" format
     #[arg(long, value_parser = parse_datetime)]
-    pub end: OffsetDateTime,
+    pub end: UtcDateTime,
 
     /// Dry run
     #[arg(long)]
@@ -99,11 +99,11 @@ pub struct InsightsArgs {
 
     /// Start date in "YYYY-MM-DD HH:MM" format
     #[arg(long, short, value_parser = parse_datetime)]
-    pub start: OffsetDateTime,
+    pub start: UtcDateTime,
 
     /// End date in "YYYY-MM-DD HH:MM" format
     #[arg(long, short, value_parser = parse_datetime)]
-    pub end: OffsetDateTime,
+    pub end: UtcDateTime,
 
     /// Only normalized insights to save down
     #[arg(long)]
@@ -138,11 +138,11 @@ pub struct SimulationArgs {
 
     /// Start datetime in "YYYY-MM-DD HH:MM" format
     #[arg(long, short, value_parser = parse_datetime)]
-    pub start: OffsetDateTime,
+    pub start: UtcDateTime,
 
     /// End datetime in "YYYY-MM-DD HH:MM" format
     #[arg(long, short, value_parser = parse_datetime)]
-    pub end: OffsetDateTime,
+    pub end: UtcDateTime,
 
     /// Accounting
     #[arg(long, short, default_value = "ledger")]

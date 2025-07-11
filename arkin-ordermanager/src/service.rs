@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{info, instrument, warn};
 use typed_builder::TypedBuilder;
 
@@ -74,7 +74,7 @@ impl OrderManager {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn cancel_all_execution_orders(&self, _time: &OffsetDateTime) {
+    async fn cancel_all_execution_orders(&self, _time: &UtcDateTime) {
         info!(target: "order_manager", "received cancel all execution orders");
 
         for order in self.execution_order_book.list_orders() {

@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc, time::Duration};
 
 use strum::Display;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
 use crate::FeatureId;
@@ -10,7 +10,7 @@ use super::{Instrument, Pipeline};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct InsightsTick {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub instruments: Vec<Arc<Instrument>>,
     pub frequency: Duration,
 }
@@ -30,7 +30,7 @@ pub enum InsightType {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct Insight {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[builder(default)]
     pub pipeline: Option<Arc<Pipeline>>,
     #[builder(default)]
@@ -59,7 +59,7 @@ impl fmt::Display for Insight {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct InsightsUpdate {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub instruments: Vec<Arc<Instrument>>,
     pub insights: Vec<Arc<Insight>>,
 }

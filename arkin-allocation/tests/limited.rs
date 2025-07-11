@@ -4,7 +4,7 @@
 //     persistence.tick_store.get_last_tick().returning(|_, _| {
 //         Ok(Some(
 //             Tick::builder()
-//                 .event_time(OffsetDateTime::now_utc())
+//                 .event_time(UtcDateTime::now())
 //                 .instrument(test_inst_binance_btc_usdt_perp())
 //                 .tick_id(1234 as u64)
 //                 .ask_price(dec!(51))
@@ -30,7 +30,7 @@
 //         .expect("Failed to build LimitedAllocationOptim");
 
 //     // Create signal
-//     let event_time = OffsetDateTime::now_utc();
+//     let event_time = UtcDateTime::now();
 //     let signal = Signal::builder()
 //         .event_time(event_time)
 //         .instrument(test_inst_binance_btc_usdt_perp())

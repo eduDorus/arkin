@@ -3,7 +3,7 @@ use std::{
     fmt,
 };
 
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use crate::{
     models::{ExecutionOrder, Insight, Position, Signal, Tick, Trade},
@@ -11,14 +11,14 @@ use crate::{
 };
 
 pub struct MarketSnapshot {
-    timestamp: OffsetDateTime,
+    timestamp: UtcDateTime,
     ticks: HashMap<Instrument, Vec<Tick>>,
     trades: HashMap<Instrument, Vec<Trade>>,
 }
 
 impl MarketSnapshot {
     pub fn new(
-        timestamp: OffsetDateTime,
+        timestamp: UtcDateTime,
         ticks: HashMap<Instrument, Vec<Tick>>,
         trades: HashMap<Instrument, Vec<Trade>>,
     ) -> Self {
@@ -29,7 +29,7 @@ impl MarketSnapshot {
         }
     }
 
-    pub fn timestamp(&self) -> OffsetDateTime {
+    pub fn timestamp(&self) -> UtcDateTime {
         self.timestamp
     }
 
@@ -78,13 +78,13 @@ impl fmt::Display for MarketSnapshot {
 }
 
 pub struct PortfolioSnapshot {
-    timestamp: OffsetDateTime,
+    timestamp: UtcDateTime,
     capital: Notional,
     positions: Vec<Position>,
 }
 
 impl PortfolioSnapshot {
-    pub fn new(timestamp: OffsetDateTime, capital: Notional, positions: Vec<Position>) -> Self {
+    pub fn new(timestamp: UtcDateTime, capital: Notional, positions: Vec<Position>) -> Self {
         Self {
             timestamp,
             capital,
@@ -92,7 +92,7 @@ impl PortfolioSnapshot {
         }
     }
 
-    pub fn timestamp(&self) -> OffsetDateTime {
+    pub fn timestamp(&self) -> UtcDateTime {
         self.timestamp
     }
 
@@ -113,19 +113,19 @@ impl fmt::Display for PortfolioSnapshot {
 }
 
 pub struct InsightsSnapshot {
-    pub timestamp: OffsetDateTime,
+    pub timestamp: UtcDateTime,
     pub insights: Vec<Insight>,
 }
 
 impl InsightsSnapshot {
-    pub fn new(timestamp: OffsetDateTime, insights: Vec<Insight>) -> Self {
+    pub fn new(timestamp: UtcDateTime, insights: Vec<Insight>) -> Self {
         Self {
             timestamp,
             insights,
         }
     }
 
-    pub fn timestamp(&self) -> OffsetDateTime {
+    pub fn timestamp(&self) -> UtcDateTime {
         self.timestamp
     }
 
@@ -150,16 +150,16 @@ impl InsightsSnapshot {
 }
 
 pub struct StrategySnapshot {
-    pub timestamp: OffsetDateTime,
+    pub timestamp: UtcDateTime,
     pub signals: Vec<Signal>,
 }
 
 impl StrategySnapshot {
-    pub fn new(timestamp: OffsetDateTime, signals: Vec<Signal>) -> Self {
+    pub fn new(timestamp: UtcDateTime, signals: Vec<Signal>) -> Self {
         Self { timestamp, signals }
     }
 
-    pub fn timestamp(&self) -> OffsetDateTime {
+    pub fn timestamp(&self) -> UtcDateTime {
         self.timestamp
     }
 
@@ -176,16 +176,16 @@ impl fmt::Display for StrategySnapshot {
 }
 
 pub struct AllocationSnapshot {
-    pub timestamp: OffsetDateTime,
+    pub timestamp: UtcDateTime,
     pub orders: Vec<ExecutionOrder>,
 }
 
 impl AllocationSnapshot {
-    pub fn new(timestamp: OffsetDateTime, orders: Vec<ExecutionOrder>) -> Self {
+    pub fn new(timestamp: UtcDateTime, orders: Vec<ExecutionOrder>) -> Self {
         Self { timestamp, orders }
     }
 
-    pub fn timestamp(&self) -> OffsetDateTime {
+    pub fn timestamp(&self) -> UtcDateTime {
         self.timestamp
     }
 

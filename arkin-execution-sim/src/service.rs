@@ -495,6 +495,7 @@ mod tests {
 
         // Create a tick
         let tick = Tick::builder()
+            .event_time(time.now().await)
             .instrument(test_inst_binance_btc_usdt_perp())
             .tick_id(0 as u64)
             .bid_price(dec!(49000.0))
@@ -539,6 +540,7 @@ mod tests {
 
         // Create a tick
         let tick = Tick::builder()
+            .event_time(time.now().await)
             .instrument(test_inst_binance_btc_usdt_perp())
             .tick_id(0 as u64)
             .bid_price(dec!(50000.0))
@@ -655,6 +657,7 @@ mod tests {
 
         // Create a tick where buy limit (49500) >= ask (49500) and sell limit (49000) <= bid (49500)
         let tick = Tick::builder()
+            .event_time(time.now().await)
             .instrument(test_inst_binance_btc_usdt_perp())
             .tick_id(0 as u64)
             .bid_price(dec!(49400.0))
@@ -682,6 +685,7 @@ mod tests {
 
         // Create a tick where buy limit (49500) >= ask (49500) and sell limit (49000) <= bid (49500)
         let tick = Tick::builder()
+            .event_time(time.now().await)
             .instrument(test_inst_binance_btc_usdt_perp())
             .tick_id(1 as u64)
             .bid_price(dec!(48700.0))

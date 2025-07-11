@@ -1,9 +1,9 @@
 #![allow(unused)]
 use serde::{de, Deserialize, Deserializer, Serializer};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
-/// Serialize a `time::OffsetDateTime` to a nanosecond representation.
-pub fn serialize<S>(datetime: &OffsetDateTime, serializer: S) -> Result<S::Ok, S::Error>
+/// Serialize a `time::UtcDateTime` to a nanosecond representation.
+pub fn serialize<S>(datetime: &UtcDateTime, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -11,8 +11,8 @@ where
     serializer.serialize_i64(nanos)
 }
 
-/// Deserialize a `time::OffsetDateTime` from a variable-length timestamp.
-pub fn deserialize<'de, D>(deserializer: D) -> Result<OffsetDateTime, D::Error>
+/// Deserialize a `time::UtcDateTime` from a variable-length timestamp.
+pub fn deserialize<'de, D>(deserializer: D) -> Result<UtcDateTime, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -34,7 +34,7 @@ where
     };
 
     let timestamp_nanos = timestamp_nanos.parse::<i128>().map_err(de::Error::custom)?;
-    OffsetDateTime::from_unix_timestamp_nanos(timestamp_nanos).map_err(de::Error::custom)
+    UtcDateTime::from_unix_timestamp_nanos(timestamp_nanos).map_err(de::Error::custom)
 }
 
 #[derive(Deserialize)]
@@ -50,13 +50,13 @@ mod tests {
     use super::*;
     use serde::Serialize;
     use serde_json;
-    use time::OffsetDateTime;
+    use time::UtcDateTime;
 
     // Assuming MyStruct is the struct that uses the custom serialization/deserialization
     #[derive(Serialize, Deserialize)]
     struct MyStruct {
         #[serde(with = "crate::utils::timestamp")]
-        timestamp: OffsetDateTime,
+        timestamp: UtcDateTime,
     }
 
     #[test]

@@ -8,7 +8,7 @@ use arrow::{
 use datafusion::{execution::object_store::ObjectStoreUrl, prelude::*, scalar::ScalarValue};
 use object_store::local::LocalFileSystem;
 use rust_decimal::prelude::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -62,8 +62,8 @@ impl TradeParquetRepo {
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
+        from: UtcDateTime,
+        to: UtcDateTime,
     ) -> Result<Vec<TradeDTO>, PersistenceError> {
         // instrument_id as FixedSizeBinary(16)
         let instrument_id_exprs: Vec<_> = instrument_ids
@@ -139,7 +139,7 @@ impl TradeParquetRepo {
             for i in 0..batch.num_rows() {
                 let us_val = event_time_arr.value(i);
                 let nanos = us_val as i128 * 1000;
-                let odt = OffsetDateTime::from_unix_timestamp_nanos(nanos).unwrap();
+                let odt = UtcDateTime::from_unix_timestamp_nanos(nanos).unwrap();
 
                 let bytes = instrument_id_arr.value(i);
                 let inst_id = Uuid::from_bytes(bytes.try_into().unwrap());

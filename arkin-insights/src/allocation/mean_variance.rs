@@ -6,7 +6,7 @@ use clarabel::algebra::*;
 use clarabel::solver::*;
 use rust_decimal::prelude::*;
 use statrs::statistics::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::debug;
 use tracing::info;
 use tracing::warn;
@@ -62,7 +62,7 @@ impl Computation for MeanVarianceFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
         info!("Calculating Mean Variance Portfolio at {}", event_time);
 
         let mut w_prev = instruments

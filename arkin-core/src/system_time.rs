@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::sync::RwLock;
 use tracing::error;
 
@@ -17,11 +17,11 @@ impl LiveSystemTime {
 
 #[async_trait]
 impl SystemTime for LiveSystemTime {
-    async fn now(&self) -> OffsetDateTime {
-        OffsetDateTime::now_utc()
+    async fn now(&self) -> UtcDateTime {
+        UtcDateTime::now()
     }
 
-    async fn advance_time(&self, _time: OffsetDateTime) {
+    async fn advance_time(&self, _time: UtcDateTime) {
         // No-op in production mode
         error!("advance_time is a no-op in production mode");
     }
@@ -40,12 +40,12 @@ impl SystemTime for LiveSystemTime {
 }
 
 pub struct SimulationSystemTime {
-    current_time: Arc<RwLock<OffsetDateTime>>,
-    end_time: OffsetDateTime,
+    current_time: Arc<RwLock<UtcDateTime>>,
+    end_time: UtcDateTime,
 }
 
 impl SimulationSystemTime {
-    pub fn new(start_time: OffsetDateTime, end_time: OffsetDateTime) -> Arc<Self> {
+    pub fn new(start_time: UtcDateTime, end_time: UtcDateTime) -> Arc<Self> {
         Self {
             current_time: Arc::new(RwLock::new(start_time)),
             end_time,
@@ -56,11 +56,11 @@ impl SimulationSystemTime {
 
 #[async_trait]
 impl SystemTime for SimulationSystemTime {
-    async fn now(&self) -> OffsetDateTime {
+    async fn now(&self) -> UtcDateTime {
         self.current_time.read().await.clone()
     }
 
-    async fn advance_time(&self, time: OffsetDateTime) {
+    async fn advance_time(&self, time: UtcDateTime) {
         self.current_time.write().await.clone_from(&time);
     }
 
@@ -87,14 +87,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_simulation_clock() {
-        let start_time = datetime!(2023-10-01 12:00:00 UTC);
-        let end_time = datetime!(2023-10-01 14:00:00 UTC);
+        let start_time = datetime!(2023-10-01 12:00:00 UTC).to_utc();
+        let end_time = datetime!(2023-10-01 14:00:00 UTC).to_utc();
         let clock = SimulationSystemTime::new(start_time, end_time);
 
         assert_eq!(clock.now().await, start_time);
         assert!(!clock.is_finished().await);
 
-        let new_time = datetime!(2023-10-01 13:00:00 UTC);
+        let new_time = datetime!(2023-10-01 13:00:00 UTC).to_utc();
         clock.advance_time(new_time).await;
 
         assert_eq!(clock.now().await, new_time);

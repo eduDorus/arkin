@@ -2,7 +2,7 @@ use std::{cmp::Ordering, fmt, sync::Arc};
 
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -18,8 +18,7 @@ use super::{Insight, InsightType, Instrument};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct Tick {
-    #[builder(default = OffsetDateTime::now_utc())]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub instrument: Arc<Instrument>,
     pub tick_id: u64,
     pub bid_price: Price,
@@ -30,7 +29,7 @@ pub struct Tick {
 
 impl Tick {
     pub fn new(
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         instrument: Arc<Instrument>,
         tick_id: u64,
         bid_price: Price,

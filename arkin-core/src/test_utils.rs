@@ -3,7 +3,7 @@ use std::{str::FromStr, sync::Arc};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use time::{macros::datetime, OffsetDateTime};
+use time::{macros::datetime, OffsetDateTime, UtcDateTime};
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
@@ -15,13 +15,13 @@ use crate::{
 
 // Define this in a test module or separate utils file for reuse
 pub struct MockTime {
-    current_time: RwLock<OffsetDateTime>,
+    current_time: RwLock<UtcDateTime>,
 }
 
 impl MockTime {
     pub fn new() -> Arc<Self> {
         Self {
-            current_time: RwLock::new(datetime!(2025-01-01 00:00:00).assume_utc()),
+            current_time: RwLock::new(datetime!(2025-01-01 00:00:00 UTC).to_utc()),
         }
         .into()
     }
@@ -29,11 +29,11 @@ impl MockTime {
 
 #[async_trait]
 impl SystemTime for MockTime {
-    async fn now(&self) -> OffsetDateTime {
+    async fn now(&self) -> UtcDateTime {
         self.current_time.read().await.clone()
     }
 
-    async fn advance_time(&self, time: OffsetDateTime) {
+    async fn advance_time(&self, time: UtcDateTime) {
         *self.current_time.write().await = time;
     }
 
@@ -76,8 +76,8 @@ impl Publisher for MockPublisher {
 
 pub fn test_pubsub() -> Arc<PubSub> {
     let clock = SimulationSystemTime::new(
-        datetime!(2025-03-01 00:00:00).assume_utc(),
-        datetime!(2025-03-02 00:00:00).assume_utc(),
+        datetime!(2025-03-01 00:00:00 UTC).to_utc(),
+        datetime!(2025-03-02 00:00:00 UTC).to_utc(),
     );
     let pubsub = PubSub::new(clock, true);
     pubsub
@@ -208,6 +208,7 @@ pub fn test_tick(
     ask_quantity: Quantity,
 ) -> Arc<Tick> {
     let tick = Tick::builder()
+        .event_time(OffsetDateTime::now_utc().to_utc())
         .instrument(instrument)
         .tick_id(0 as u64)
         .bid_price(bid_price)
@@ -248,7 +249,7 @@ pub fn test_strategy_2() -> Arc<Strategy> {
 // pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
 //     let order = ExecutionOrder::builder()
 //         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-//         .event_time(OffsetDateTime::now_utc())
+//         .event_time(UtcDateTime::now())
 //         .strategy(Some(test_strategy_1()))
 //         .instrument(test_inst_binance_btc_usdt_perp())
 //         .order_type(ExecutionOrderType::Maker)
@@ -256,7 +257,7 @@ pub fn test_strategy_2() -> Arc<Strategy> {
 //         .price(dec!(0))
 //         .quantity(dec!(1))
 //         .status(ExecutionOrderStatus::New)
-//         .updated_at(OffsetDateTime::now_utc())
+//         .updated_at(UtcDateTime::now())
 //         .build();
 //     Arc::new(order)
 // }
@@ -264,7 +265,7 @@ pub fn test_strategy_2() -> Arc<Strategy> {
 // pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
 //     let order = ExecutionOrder::builder()
 //         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-//         .event_time(OffsetDateTime::now_utc())
+//         .event_time(UtcDateTime::now())
 //         .strategy(Some(test_strategy_1()))
 //         .instrument(test_inst_binance_btc_usdt_perp())
 //         .order_type(ExecutionOrderType::Maker)
@@ -275,11 +276,11 @@ pub fn test_strategy_2() -> Arc<Strategy> {
 //         .filled_quantity(dec!(1))
 //         .total_commission(dec!(0.2))
 //         .status(ExecutionOrderStatus::Filled)
-//         .updated_at(OffsetDateTime::now_utc())
+//         .updated_at(UtcDateTime::now())
 //         .build();
 //     Arc::new(order)
 // }
-// pub fn test_venue_market_order_new(time: OffsetDateTime, instrument: Arc<Instrument>, side: MarketSide) -> VenueOrder {
+// pub fn test_venue_market_order_new(time: UtcDateTime, instrument: Arc<Instrument>, side: MarketSide) -> VenueOrder {
 //     VenueOrder::builder()
 //         .id(Uuid::new_v4())
 //         .strategy(Some(test_strategy_1()))
@@ -295,7 +296,7 @@ pub fn test_strategy_2() -> Arc<Strategy> {
 // }
 
 pub fn test_venue_limit_order_new(
-    time: OffsetDateTime,
+    time: UtcDateTime,
     instrument: Arc<Instrument>,
     price: Decimal,
     side: MarketSide,

@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::pin;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -19,8 +19,8 @@ pub struct SimIngestor {
     tick_frequency: Duration,
     #[builder(default = 3)]
     buffer_size: usize,
-    start: OffsetDateTime,
-    end: OffsetDateTime,
+    start: UtcDateTime,
+    end: UtcDateTime,
 }
 
 #[async_trait]

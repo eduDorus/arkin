@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 
@@ -42,7 +42,7 @@ pub struct AssetInfo {
     #[serde(default)]
     pub margin_available: Option<bool>,
     #[serde(with = "custom_serde::timestamp")]
-    pub update_time: OffsetDateTime,
+    pub update_time: UtcDateTime,
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,7 +58,7 @@ pub struct PositionInfo {
     pub initial_margin: Decimal,
     pub maint_margin: Decimal,
     #[serde(with = "custom_serde::timestamp")]
-    pub update_time: OffsetDateTime,
+    pub update_time: UtcDateTime,
 }
 
 #[cfg(test)]

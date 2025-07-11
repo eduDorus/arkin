@@ -5,14 +5,14 @@ use std::{
     collections::HashMap,
     time::{Duration, Instant, UNIX_EPOCH},
 };
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{debug, error, info};
 
 use crate::{config::ClockConfig, constants::TIMESTAMP_FORMAT};
 
 pub struct Clock {
-    pub subscribers: RwLock<HashMap<Duration, Sender<OffsetDateTime>>>,
+    pub subscribers: RwLock<HashMap<Duration, Sender<UtcDateTime>>>,
     pub tick_frequency: Duration,
 }
 
@@ -46,8 +46,8 @@ impl Clock {
         }
     }
 
-    pub fn calculate_next_tick(&self, interval: Duration) -> (Instant, OffsetDateTime) {
-        let now = OffsetDateTime::now_utc();
+    pub fn calculate_next_tick(&self, interval: Duration) -> (Instant, UtcDateTime) {
+        let now = UtcDateTime::now();
 
         // Calculate the difference between now and the epoch
         let difference = now - UNIX_EPOCH;
@@ -58,7 +58,7 @@ impl Clock {
 
         // Calculate the next tick
         let next_tick = difference - tick_difference + interval;
-        let next_tick_time = OffsetDateTime::from_unix_timestamp_nanos(next_tick.whole_nanoseconds()).unwrap();
+        let next_tick_time = UtcDateTime::from_unix_timestamp_nanos(next_tick.whole_nanoseconds()).unwrap();
         debug!("Next Tick in: {:?}", next_tick);
         debug!("Next Tick for new interval: {:?}", next_tick_time.format(TIMESTAMP_FORMAT));
 
@@ -71,7 +71,7 @@ impl Clock {
         (start, next_tick_time)
     }
 
-    pub fn subscribe(&self, frequency: Duration) -> Receiver<OffsetDateTime> {
+    pub fn subscribe(&self, frequency: Duration) -> Receiver<UtcDateTime> {
         info!("Subscribing to time component with frequency: {:?}", frequency);
         if let Some(sender) = self.subscribers.read().get(&frequency) {
             info!("Found existing subscriber for frequency: {:?}", frequency);

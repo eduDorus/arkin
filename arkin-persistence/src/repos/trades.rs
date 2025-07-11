@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rust_decimal::Decimal;
 use sqlx::{FromRow, PgPool};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -14,7 +14,7 @@ const FIELD_COUNT: usize = 6;
 
 #[derive(Debug, FromRow)]
 pub struct TradeDTO {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub instrument_id: Uuid,
     pub trade_id: i64,
     pub side: MarketSide,
@@ -99,8 +99,8 @@ impl TradeRepo {
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
+        from: UtcDateTime,
+        to: UtcDateTime,
     ) -> Result<Vec<TradeDTO>, PersistenceError> {
         let trades = sqlx::query_as!(
             TradeDTO,

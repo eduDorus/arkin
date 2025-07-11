@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use uuid::Uuid;
 
 use crate::PersistenceError;
@@ -13,7 +13,7 @@ use crate::PersistenceError;
 #[derive(Debug, Clone)]
 pub struct ExecutionOrderDTO {
     pub id: Uuid,
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub strategy_id: Option<Uuid>,
     pub instrument_id: Uuid,
     pub order_type: ExecutionOrderType,
@@ -24,7 +24,7 @@ pub struct ExecutionOrderDTO {
     pub filled_quantity: Decimal,
     pub total_commission: Decimal,
     pub status: ExecutionOrderStatus,
-    pub updated_at: OffsetDateTime,
+    pub updated_at: UtcDateTime,
 }
 
 impl From<ExecutionOrder> for ExecutionOrderDTO {

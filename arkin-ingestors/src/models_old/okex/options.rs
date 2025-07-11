@@ -1,7 +1,7 @@
 use crate::utils::custom_serde;
 use serde::Deserialize;
 use serde_this_or_that::{as_f64, as_u64};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 // https://api.tardis.dev/v1/exchanges
 // {
@@ -55,7 +55,7 @@ pub struct OkexOptionsTradeArg {
 #[derive(Debug, Deserialize)]
 pub struct OkexOptionsTradeData {
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "instId")]
     pub instrument: String,
     #[serde(rename = "tradeId", deserialize_with = "as_u64")]
@@ -86,7 +86,7 @@ pub struct OkexOptionsBookArg {
 #[serde(rename_all = "camelCase")]
 pub struct OkexOptionsBookData {
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub checksum: i64,
     pub seq_id: i64,
     pub prev_seq_id: i64,
@@ -127,7 +127,7 @@ pub struct OkexOptionsOpenInterestArg {
 #[derive(Debug, Deserialize)]
 pub struct OkexOptionsOpenInterestData {
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "instId")]
     pub instrument: String,
     #[serde(rename = "instType")]
@@ -155,7 +155,7 @@ pub struct OkexOptionsTickArg {
 #[serde(rename_all = "camelCase")]
 pub struct OkexOptionsTickData {
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "instId")]
     pub instrument: String,
     #[serde(rename = "instType")]

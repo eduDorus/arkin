@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_stream::try_stream;
 use futures::{stream, Stream, StreamExt};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::sync::Mutex;
 use tokio_util::task::TaskTracker;
 use tracing::{debug, error, info};
@@ -89,8 +89,8 @@ impl TradeStore {
     pub async fn read_range(
         &self,
         instruments: &[Arc<Instrument>],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
+        from: UtcDateTime,
+        to: UtcDateTime,
     ) -> Result<Vec<Arc<Trade>>, PersistenceError> {
         let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
         let dto = self.trade_repo.read_range(&ids, from, to).await?;
@@ -114,8 +114,8 @@ impl TradeStore {
     pub async fn stream_range(
         &self,
         instruments: &[Arc<Instrument>],
-        from: OffsetDateTime,
-        to: OffsetDateTime,
+        from: UtcDateTime,
+        to: UtcDateTime,
     ) -> Result<impl Stream<Item = Result<Arc<Trade>, PersistenceError>> + '_, PersistenceError> {
         // We do not `async` here, because returning `impl Stream` + `'a` from an `async fn`
         // is not yet stable. Instead, we return a non-async function that constructs the stream.
@@ -151,8 +151,8 @@ impl TradeStore {
     pub async fn stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
-        start: OffsetDateTime,
-        end: OffsetDateTime,
+        start: UtcDateTime,
+        end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
     ) -> impl Stream<Item = Arc<Trade>> + 'static {

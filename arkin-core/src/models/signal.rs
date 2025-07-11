@@ -1,6 +1,6 @@
 use std::{fmt, sync::Arc};
 
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
 use crate::Weight;
@@ -9,7 +9,7 @@ use super::{Instrument, Strategy};
 
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
 pub struct Signal {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub strategy: Arc<Strategy>,
     pub instrument: Arc<Instrument>,
     pub weight: Weight,

@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use arkin_core::prelude::*;
 
 use serde::Deserialize;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -158,27 +158,27 @@ pub enum BinanceUSDMUserStreamEvent {
     #[serde(rename = "ORDER_TRADE_UPDATE")]
     OrderTradeUpdate {
         #[serde(rename = "E", with = "custom_serde::timestamp")]
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         #[serde(rename = "T", with = "custom_serde::timestamp")]
-        transaction_time: OffsetDateTime,
+        transaction_time: UtcDateTime,
         #[serde(rename = "o")]
         order: OrderData,
     },
     #[serde(rename = "ACCOUNT_UPDATE")]
     AccountUpdate {
         #[serde(rename = "E", with = "custom_serde::timestamp")]
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         #[serde(rename = "T", with = "custom_serde::timestamp")]
-        transaction_time: OffsetDateTime,
+        transaction_time: UtcDateTime,
         #[serde(rename = "a")]
         account: AccountUpdateData,
     },
     #[serde(rename = "TRADE_LITE")]
     TradeLite {
         #[serde(rename = "E", with = "custom_serde::timestamp")]
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         #[serde(rename = "T", with = "custom_serde::timestamp")]
-        transaction_time: OffsetDateTime,
+        transaction_time: UtcDateTime,
         #[serde(rename = "s")]
         symbol: String,
         #[serde(rename = "q")]
@@ -203,7 +203,7 @@ pub enum BinanceUSDMUserStreamEvent {
     #[serde(rename = "MARGIN_CALL")]
     MarginCall {
         #[serde(rename = "E", with = "custom_serde::timestamp")]
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         #[serde(rename = "cw")]
         cross_wallet_balance: String,
         #[serde(rename = "p")]
@@ -248,7 +248,7 @@ pub struct OrderData {
     #[serde(rename = "n")]
     pub commission: Option<Decimal>,
     #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub order_trade_time: OffsetDateTime,
+    pub order_trade_time: UtcDateTime,
     #[serde(rename = "t")]
     pub trade_id: i64,
     #[serde(rename = "b")]
@@ -413,11 +413,11 @@ mod tests {
         {
             assert_eq!(
                 event_time,
-                OffsetDateTime::from_unix_timestamp_nanos(1733989303534 * 1_000_000).unwrap()
+                UtcDateTime::from_unix_timestamp_nanos(1733989303534 * 1_000_000).unwrap()
             );
             assert_eq!(
                 transaction_time,
-                OffsetDateTime::from_unix_timestamp_nanos(1733989303533 * 1_000_000).unwrap()
+                UtcDateTime::from_unix_timestamp_nanos(1733989303533 * 1_000_000).unwrap()
             );
             assert_eq!(order.symbol, "ETHUSDT");
             assert_eq!(order.side, BinanceOrderSide::Sell);
@@ -470,11 +470,11 @@ mod tests {
         {
             assert_eq!(
                 event_time,
-                OffsetDateTime::from_unix_timestamp_nanos(1733988745974 * 1_000_000).unwrap()
+                UtcDateTime::from_unix_timestamp_nanos(1733988745974 * 1_000_000).unwrap()
             );
             assert_eq!(
                 transaction_time,
-                OffsetDateTime::from_unix_timestamp_nanos(1733988745973 * 1_000_000).unwrap()
+                UtcDateTime::from_unix_timestamp_nanos(1733988745973 * 1_000_000).unwrap()
             );
             assert_eq!(account.event_reason_type, AccountUpdateReason::Order);
             assert_eq!(account.balances.len(), 1);
@@ -524,11 +524,11 @@ mod tests {
         {
             assert_eq!(
                 event_time,
-                OffsetDateTime::from_unix_timestamp_nanos(1733988745974 * 1_000_000).unwrap()
+                UtcDateTime::from_unix_timestamp_nanos(1733988745974 * 1_000_000).unwrap()
             );
             assert_eq!(
                 transaction_time,
-                OffsetDateTime::from_unix_timestamp_nanos(1733988745973 * 1_000_000).unwrap()
+                UtcDateTime::from_unix_timestamp_nanos(1733988745973 * 1_000_000).unwrap()
             );
             assert_eq!(symbol, "ETHUSDT");
             assert_eq!(original_quantity, dec!(0.006));

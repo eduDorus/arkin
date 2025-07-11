@@ -3,7 +3,7 @@ use core::fmt;
 
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 #[derive(Debug, Deserialize)]
 pub struct BinanceUSDMMarketStreamEvent {
@@ -55,9 +55,9 @@ pub struct BinanceSwapsTradeData {
     // #[serde(rename = "e")]
     // pub event_type: String,
     #[serde(rename = "E", with = "crate::utils::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "T", with = "crate::utils::timestamp")]
-    pub transaction_time: OffsetDateTime,
+    pub transaction_time: UtcDateTime,
     #[serde(rename = "s")]
     pub instrument: String,
     #[serde(rename = "t")]
@@ -83,9 +83,9 @@ pub struct BinanceSwapsAggTradeData {
     // #[serde(rename = "e")]
     // pub event_type: String,
     #[serde(rename = "E", with = "crate::utils::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "T", with = "crate::utils::timestamp")]
-    pub transaction_time: OffsetDateTime,
+    pub transaction_time: UtcDateTime,
     #[serde(rename = "s")]
     pub instrument: String,
     #[serde(rename = "a")]
@@ -107,9 +107,9 @@ pub struct BinanceSwapsBookData {
     // #[serde(rename = "e")]
     // pub event_type: String,
     #[serde(rename = "E", with = "crate::utils::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "T", with = "crate::utils::timestamp")]
-    pub transaction_time: OffsetDateTime,
+    pub transaction_time: UtcDateTime,
     #[serde(rename = "s")]
     pub instrument: String,
     #[serde(rename = "U")]
@@ -147,9 +147,9 @@ pub struct BinanceSwapsTickData {
     // #[serde(rename = "e")]
     // pub event_type: String,
     #[serde(rename = "E", with = "crate::utils::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "T", with = "crate::utils::timestamp")]
-    pub transaction_time: OffsetDateTime,
+    pub transaction_time: UtcDateTime,
     #[serde(rename = "u")]
     pub update_id: u64,
     #[serde(rename = "s")]

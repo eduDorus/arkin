@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use serde_this_or_that::{as_f64, as_u64};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use crate::utils::custom_serde;
 
@@ -71,7 +71,7 @@ pub struct OkexSwapsTradeData {
     pub quantity: u64,
     pub side: String,
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
 }
 
 // https://www.okx.com/docs-v5/en/#order-book-trading-market-data-ws-order-book-channel
@@ -95,7 +95,7 @@ pub struct OkexSwapsBookData {
     pub asks: Vec<OkexSwapsBookUpdate>,
     pub bids: Vec<OkexSwapsBookUpdate>,
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub checksum: i32,
     pub seq_id: i64,
     pub prev_seq_id: i64,
@@ -134,7 +134,7 @@ pub struct OkexSwapsOpenInterestArg {
 #[derive(Debug, Deserialize)]
 pub struct OkexSwapsOpenInterestData {
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "instId")]
     pub instrument: String,
     #[serde(rename = "instType")]
@@ -162,7 +162,7 @@ pub struct OkexSwapsFundingRateArg {
 #[serde(rename_all = "camelCase")]
 pub struct OkexSwapsFundingRateData {
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "instId")]
     pub instrument: String,
     #[serde(rename = "instType")]
@@ -170,7 +170,7 @@ pub struct OkexSwapsFundingRateData {
     #[serde(deserialize_with = "as_f64")]
     pub funding_rate: f64,
     #[serde(with = "custom_serde::timestamp")]
-    pub funding_time: OffsetDateTime,
+    pub funding_time: UtcDateTime,
     #[serde(deserialize_with = "as_f64")]
     pub max_funding_rate: f64,
     #[serde(deserialize_with = "as_f64")]
@@ -178,7 +178,7 @@ pub struct OkexSwapsFundingRateData {
     #[serde(deserialize_with = "as_f64")]
     pub next_funding_rate: f64,
     #[serde(with = "custom_serde::timestamp")]
-    pub next_funding_time: OffsetDateTime,
+    pub next_funding_time: UtcDateTime,
     #[serde(deserialize_with = "as_f64")]
     pub sett_funding_rate: f64,
     pub sett_state: String,

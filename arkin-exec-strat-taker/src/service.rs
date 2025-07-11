@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 use async_trait::async_trait;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{info, instrument, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -97,7 +97,7 @@ impl ExecutionStrategy {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn cancel_all_maker_execution_orders(&self, _time: &OffsetDateTime) {
+    async fn cancel_all_maker_execution_orders(&self, _time: &UtcDateTime) {
         info!(target: "exec_strategy", "received cancel all execution orders");
 
         // Change all exec orders to cancelling

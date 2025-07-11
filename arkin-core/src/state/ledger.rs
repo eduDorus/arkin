@@ -2,7 +2,7 @@ use dashmap::DashMap;
 use rust_decimal::prelude::*;
 use std::sync::Arc;
 use thiserror::Error;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::sync::RwLock;
 use tracing::info;
 use typed_builder::TypedBuilder;
@@ -345,7 +345,7 @@ impl Ledger {
     /// This is a helper function since transfers are quite common.
     pub async fn transfer(
         &self,
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         debit_account: &Arc<Account>,
         credit_account: &Arc<Account>,
         amount: Decimal,
@@ -461,16 +461,16 @@ mod tests {
 
         let amount = dec!(100);
         ledger
-            .transfer(OffsetDateTime::now_utc(), &account_l, &account_a, amount)
+            .transfer(UtcDateTime::now(), &account_l, &account_a, amount)
             .await
             .unwrap();
         ledger
-            .transfer(OffsetDateTime::now_utc(), &account_a, &account_b, amount)
+            .transfer(UtcDateTime::now(), &account_a, &account_b, amount)
             .await
             .unwrap();
         let half_amount = amount / dec!(2);
         ledger
-            .transfer(OffsetDateTime::now_utc(), &account_b, &account_a, half_amount)
+            .transfer(UtcDateTime::now(), &account_b, &account_a, half_amount)
             .await
             .unwrap();
 
@@ -515,12 +515,10 @@ mod tests {
         );
 
         ledger
-            .transfer(OffsetDateTime::now_utc(), &account_l, &account_a, dec!(1000))
+            .transfer(UtcDateTime::now(), &account_l, &account_a, dec!(1000))
             .await
             .unwrap();
-        let result = ledger
-            .transfer(OffsetDateTime::now_utc(), &account_a, &account_l, dec!(1001))
-            .await;
+        let result = ledger.transfer(UtcDateTime::now(), &account_a, &account_l, dec!(1001)).await;
         assert!(matches!(result, Err(AccountingError::InsufficientBalance(_))));
 
         assert_eq!(ledger.balance(account_l.id).await, dec!(-1000));
@@ -548,14 +546,10 @@ mod tests {
             AccountType::Margin,
         );
 
-        let result_zero = ledger
-            .transfer(OffsetDateTime::now_utc(), &account_a, &account_b, dec!(0))
-            .await;
+        let result_zero = ledger.transfer(UtcDateTime::now(), &account_a, &account_b, dec!(0)).await;
         assert!(matches!(result_zero, Err(AccountingError::InvalidTransferAmount(_))));
 
-        let result_negative = ledger
-            .transfer(OffsetDateTime::now_utc(), &account_a, &account_b, dec!(-10))
-            .await;
+        let result_negative = ledger.transfer(UtcDateTime::now(), &account_a, &account_b, dec!(-10)).await;
         assert!(matches!(result_negative, Err(AccountingError::InvalidTransferAmount(_))));
     }
 
@@ -576,9 +570,7 @@ mod tests {
         let account_btc =
             ledger.add_account(binance_venue.clone(), btc.clone().into(), AccountOwner::User, AccountType::Spot);
 
-        let result = ledger
-            .transfer(OffsetDateTime::now_utc(), &account_usd, &account_btc, dec!(100))
-            .await;
+        let result = ledger.transfer(UtcDateTime::now(), &account_usd, &account_btc, dec!(100)).await;
         assert!(matches!(result, Err(AccountingError::CurrencyMismatch(_))));
     }
 
@@ -595,9 +587,7 @@ mod tests {
             AccountOwner::User,
             AccountType::Spot,
         );
-        let result = ledger
-            .transfer(OffsetDateTime::now_utc(), &account_a, &account_a, dec!(100))
-            .await;
+        let result = ledger.transfer(UtcDateTime::now(), &account_a, &account_a, dec!(100)).await;
         assert!(matches!(result, Err(AccountingError::SameAccount(_))));
     }
 }

@@ -91,7 +91,7 @@ pub mod tests {
     use super::*;
     use rust_decimal_macros::dec;
     use test_log::test;
-    use time::OffsetDateTime;
+    use time::UtcDateTime;
 
     #[test(tokio::test)]
     async fn test_venue_order_fill_repo() {
@@ -103,7 +103,7 @@ pub mod tests {
         let order = test_venue_order();
 
         let fill = VenueOrderFill::builder()
-            .event_time(OffsetDateTime::now_utc())
+            .event_time(UtcDateTime::now())
             .instance(instance.clone())
             .venue_order(order.clone())
             .instrument(instrument.clone())

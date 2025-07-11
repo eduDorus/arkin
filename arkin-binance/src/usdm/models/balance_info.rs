@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 
@@ -16,7 +16,7 @@ pub struct BalanceDetails {
     pub max_withdraw_amount: Decimal,
     pub margin_available: bool,
     #[serde(with = "custom_serde::timestamp")]
-    pub update_time: OffsetDateTime,
+    pub update_time: UtcDateTime,
 }
 
 #[cfg(test)]
@@ -52,7 +52,7 @@ mod tests {
         assert!(bal.margin_available);
         assert_eq!(
             bal.update_time,
-            OffsetDateTime::from_unix_timestamp_nanos(1617939110373 * 1_000_000).unwrap()
+            UtcDateTime::from_unix_timestamp_nanos(1617939110373 * 1_000_000).unwrap()
         );
     }
 }

@@ -1,5 +1,5 @@
 use std::time::Duration;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::time::Duration as StdDuration;
 use tokio::time::Interval;
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
@@ -20,10 +20,10 @@ impl TickHelper {
     }
 
     fn create_interval(interval: Duration) -> Interval {
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         debug!("Now: {:?}", now);
 
-        let epoch = OffsetDateTime::UNIX_EPOCH;
+        let epoch = UtcDateTime::UNIX_EPOCH;
 
         // Calculate the difference between now and the next hour
         let difference = now - epoch;
@@ -44,9 +44,9 @@ impl TickHelper {
         interval
     }
 
-    pub async fn tick(&mut self) -> (OffsetDateTime, Duration) {
+    pub async fn tick(&mut self) -> (UtcDateTime, Duration) {
         self.interval.tick().await;
-        let mut ts = OffsetDateTime::now_utc();
+        let mut ts = UtcDateTime::now();
         // Round to nearest second (Tick can be off by a few nanoseconds in either direction)
         if ts.nanosecond() > 500_000_000 {
             ts = ts + Duration::from_secs(1);

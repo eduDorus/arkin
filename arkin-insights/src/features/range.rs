@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use serde::Deserialize;
 use strum::Display;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
 
@@ -68,7 +68,7 @@ impl Feature for RangeFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating {}...", self.method);
 
         // Get data

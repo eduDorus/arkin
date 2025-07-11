@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
 use yata::{
@@ -35,7 +35,7 @@ impl Feature for AverageDirectionalIndexFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating ADX...");
 
         // Get data from state

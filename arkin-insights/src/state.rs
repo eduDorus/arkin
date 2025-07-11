@@ -2,7 +2,7 @@
 use std::{collections::VecDeque, sync::Arc, time::Duration};
 
 use dashmap::DashMap;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 use typed_builder::TypedBuilder;
@@ -10,7 +10,7 @@ use yata::core::Candle;
 
 #[derive(Debug)]
 struct BoundedBuffer {
-    data: VecDeque<(OffsetDateTime, f64)>,
+    data: VecDeque<(UtcDateTime, f64)>,
     capacity: usize,
 }
 
@@ -29,7 +29,7 @@ impl BoundedBuffer {
     /// Insert new (CompositeIndex, f64). Assume mostly ascending timestamps.
     /// If there's already an item at exactly the same CompositeIndex,
     /// we increment sub_index. Then push_back. If we exceed capacity, pop_front.
-    fn push(&mut self, idx: OffsetDateTime, val: f64) {
+    fn push(&mut self, idx: UtcDateTime, val: f64) {
         if let Some(last) = self.data.back() {
             if idx >= last.0 {
                 self.data.push_back((idx, val));
@@ -50,7 +50,7 @@ impl BoundedBuffer {
     }
 
     /// Remove any items older than `event_time` (exclusive).
-    fn remove_before(&mut self, cutoff: OffsetDateTime) {
+    fn remove_before(&mut self, cutoff: UtcDateTime) {
         while let Some(front) = self.data.front() {
             if front.0 < cutoff {
                 self.data.pop_front();
@@ -62,7 +62,7 @@ impl BoundedBuffer {
 
     /// Return the last value <= timestamp.
     /// That is, from the back, find the first item whose time <= timestamp.
-    fn last_inclusive(&self, timestamp: OffsetDateTime) -> Option<f64> {
+    fn last_inclusive(&self, timestamp: UtcDateTime) -> Option<f64> {
         for &(idx, val) in self.data.iter().rev() {
             if idx <= timestamp {
                 return Some(val);
@@ -73,7 +73,7 @@ impl BoundedBuffer {
 
     /// Return the last value <= timestamp.
     /// That is, from the back, find the first item whose time <= timestamp.
-    fn last_exclusive(&self, timestamp: OffsetDateTime) -> Option<f64> {
+    fn last_exclusive(&self, timestamp: UtcDateTime) -> Option<f64> {
         for &(idx, val) in self.data.iter().rev() {
             if idx < timestamp {
                 return Some(val);
@@ -83,7 +83,7 @@ impl BoundedBuffer {
     }
 
     /// Return a window of values in [start_time=..end_time).
-    fn window(&self, start_time: OffsetDateTime, end_time: OffsetDateTime) -> Vec<f64> {
+    fn window(&self, start_time: UtcDateTime, end_time: UtcDateTime) -> Vec<f64> {
         let mut result = Vec::new();
         for &(idx, val) in self.data.iter().rev() {
             if idx >= start_time && idx < end_time {
@@ -99,7 +99,7 @@ impl BoundedBuffer {
     }
 
     /// Return the last `intervals` values up to `timestamp`.
-    fn intervals(&self, timestamp: OffsetDateTime, intervals: usize) -> Vec<f64> {
+    fn intervals(&self, timestamp: UtcDateTime, intervals: usize) -> Vec<f64> {
         let mut result = Vec::new();
         // Go from the back and pick up to `periods` items with time <= timestamp
         for &(idx, val) in self.data.iter().rev() {
@@ -116,7 +116,7 @@ impl BoundedBuffer {
     }
 
     /// Returns the last value + lag periods.
-    fn lag(&self, timestamp: OffsetDateTime, lag: usize) -> Option<f64> {
+    fn lag(&self, timestamp: UtcDateTime, lag: usize) -> Option<f64> {
         let mut count = 0;
         for &(idx, val) in self.data.iter().rev() {
             if idx <= timestamp {
@@ -160,7 +160,7 @@ impl InsightsState {
         }
     }
 
-    pub fn last_candle(&self, instrument: Arc<Instrument>, timestamp: OffsetDateTime) -> Option<Candle> {
+    pub fn last_candle(&self, instrument: Arc<Instrument>, timestamp: UtcDateTime) -> Option<Candle> {
         let open = self.last(Some(instrument.clone()), FeatureId::new("open".into()), timestamp)?;
         let high = self.last(Some(instrument.clone()), FeatureId::new("high".into()), timestamp)?;
         let low = self.last(Some(instrument.clone()), FeatureId::new("low".into()), timestamp)?;
@@ -181,7 +181,7 @@ impl InsightsState {
         &self,
         instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
-        timestamp: OffsetDateTime,
+        timestamp: UtcDateTime,
     ) -> Option<f64> {
         let key = (instrument, feature_id);
         let val = self.features.get(&key).and_then(|buf| buf.last_inclusive(timestamp));
@@ -193,7 +193,7 @@ impl InsightsState {
         &self,
         instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
-        timestamp: OffsetDateTime,
+        timestamp: UtcDateTime,
         lag: usize,
     ) -> Option<f64> {
         let key = (instrument, feature_id);
@@ -206,7 +206,7 @@ impl InsightsState {
         &self,
         instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
-        timestamp: OffsetDateTime,
+        timestamp: UtcDateTime,
     ) -> Option<f64> {
         let key = (instrument, feature_id);
         let val = self.features.get(&key).and_then(|buf| buf.last_exclusive(timestamp));
@@ -218,7 +218,7 @@ impl InsightsState {
         &self,
         instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
-        timestamp: OffsetDateTime,
+        timestamp: UtcDateTime,
         window: Duration,
     ) -> Vec<f64> {
         let start_time = timestamp - window;
@@ -236,7 +236,7 @@ impl InsightsState {
         &self,
         instrument: Option<Arc<Instrument>>,
         feature_id: FeatureId,
-        timestamp: OffsetDateTime,
+        timestamp: UtcDateTime,
         intervals: usize,
     ) -> Vec<f64> {
         let key = (instrument, feature_id);
@@ -251,12 +251,12 @@ impl InsightsState {
 mod tests {
     use super::*;
     use test_log::test;
-    use time::OffsetDateTime;
+    use time::UtcDateTime;
 
     #[test]
     fn test_push_out_of_order() {
         let mut buffer = BoundedBuffer::new(5);
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         buffer.push(now, 1.0);
         buffer.push(now - Duration::from_secs(1), 0.5); // older
         buffer.push(now + Duration::from_secs(1), 1.5); // newer
@@ -281,7 +281,7 @@ mod tests {
     #[test]
     fn test_capacity_limit() {
         let mut buffer = BoundedBuffer::new(3);
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         buffer.push(now - Duration::from_secs(3), 0.0);
         buffer.push(now - Duration::from_secs(2), 1.0);
         buffer.push(now - Duration::from_secs(1), 2.0);
@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn test_last_inclusive() {
         let mut buffer = BoundedBuffer::new(5);
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         buffer.push(now - Duration::from_secs(2), 0.0);
         buffer.push(now - Duration::from_secs(1), 1.0);
         buffer.push(now, 2.0);
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn test_window() {
         let mut buffer = BoundedBuffer::new(5);
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         buffer.push(now - Duration::from_secs(4), 0.0);
         buffer.push(now - Duration::from_secs(3), 1.0);
         buffer.push(now - Duration::from_secs(2), 2.0);
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn test_intervals() {
         let mut buffer = BoundedBuffer::new(5);
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         buffer.push(now - Duration::from_secs(4), 0.0);
         buffer.push(now - Duration::from_secs(3), 1.0);
         buffer.push(now - Duration::from_secs(2), 2.0);
@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn test_lag() {
         let mut buffer = BoundedBuffer::new(5);
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         buffer.push(now - Duration::from_secs(4), 0.0);
         buffer.push(now - Duration::from_secs(3), 1.0);
         buffer.push(now - Duration::from_secs(2), 2.0);
@@ -354,7 +354,7 @@ mod tests {
     #[test(test)]
     fn test_insert_and_last() {
         let state = InsightsState::builder().build();
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let pipeline = test_pipeline();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -419,7 +419,7 @@ mod tests {
     #[test]
     fn test_window_includes_start_excludes_end() {
         let state = InsightsState::builder().build();
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let pipeline = test_pipeline();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -472,7 +472,7 @@ mod tests {
     #[test]
     fn test_periods() {
         let state = InsightsState::builder().build();
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let pipeline = test_pipeline();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -510,7 +510,7 @@ mod tests {
     #[test]
     fn test_last_candle() {
         let state = InsightsState::builder().build();
-        let now = OffsetDateTime::now_utc();
+        let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let pipeline = test_pipeline();
 

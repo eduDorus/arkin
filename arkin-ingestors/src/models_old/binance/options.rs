@@ -1,7 +1,7 @@
 use crate::utils::custom_serde;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 // https://binance-docs.github.io/apidocs/voptions/en/#websocket-market-streams
 // https://api.tardis.dev/v1/exchanges
@@ -29,9 +29,9 @@ pub struct BinanceOptionsTrade {
 #[derive(Debug, Deserialize)]
 pub struct BinanceOptionsTradeData {
     #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub transaction_time: OffsetDateTime,
+    pub transaction_time: UtcDateTime,
     #[serde(rename = "e")]
     pub event_type: String,
     #[serde(rename = "s")]
@@ -59,9 +59,9 @@ pub struct BinanceOptionsBook {
 #[derive(Debug, Deserialize)]
 pub struct BinanceOptionsBookData {
     #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub transaction_time: OffsetDateTime,
+    pub transaction_time: UtcDateTime,
     #[serde(rename = "e")]
     pub event_type: String,
     #[serde(rename = "s")]
@@ -91,9 +91,9 @@ pub struct BinanceOptionsTick {
 #[derive(Debug, Deserialize)]
 pub struct BinanceOptionsTickData {
     #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub transaction_time: OffsetDateTime,
+    pub transaction_time: UtcDateTime,
     #[serde(rename = "e")]
     pub event_type: String,
     #[serde(rename = "s")]
@@ -164,7 +164,7 @@ pub struct BinanceOptionsOpenInterest {
 #[serde(rename_all = "camelCase")]
 pub struct BinanceOptionsOpenInterestData {
     #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "e")]
     pub event_type: String,
     #[serde(rename = "s")]

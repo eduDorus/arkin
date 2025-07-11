@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use rust_decimal::Decimal;
 use sqlx::prelude::Type;
 use strum::Display;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
 use crate::{Price, Quantity};
@@ -30,7 +30,7 @@ impl From<MarketSide> for PositionSide {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct PositionUpdate {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub instrument: Arc<Instrument>,
     pub entry_price: Price,
     pub quantity: Quantity,

@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use rust_decimal::Decimal;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -11,7 +11,7 @@ use super::{Instrument, Portfolio, Signal, Strategy};
 pub struct Allocation {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub group_id: Uuid,
     pub portfolio: Arc<Portfolio>,
     pub strategy: Arc<Strategy>,

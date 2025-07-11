@@ -9,7 +9,7 @@ use reqwest::{
     Client,
 };
 use serde::Serialize;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{debug, error};
 use typed_builder::TypedBuilder;
 
@@ -27,7 +27,7 @@ impl TardisHttpClient {
         exchange: String,
         channel: String,
         symbols: Vec<String>,
-        date: OffsetDateTime,
+        date: UtcDateTime,
         offset: i64,
     ) -> Result<Bytes> {
         let url = format!("{}/{}", self.base_url, exchange);
@@ -104,7 +104,7 @@ pub struct QueryParams {
 }
 
 impl QueryParams {
-    pub fn new(channel: String, symbols: Vec<String>, date: OffsetDateTime, offset: i64) -> Self {
+    pub fn new(channel: String, symbols: Vec<String>, date: UtcDateTime, offset: i64) -> Self {
         Self {
             from: date.date().to_string(),
             offset,

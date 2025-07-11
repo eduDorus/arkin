@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, fmt, sync::Arc};
 
 use rust_decimal::prelude::*;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -15,7 +15,7 @@ use super::{InsightType, Instrument, MarketSide};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct Trade {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub instrument: Arc<Instrument>,
     pub trade_id: u64,
     pub side: MarketSide,
@@ -25,7 +25,7 @@ pub struct Trade {
 
 impl Trade {
     pub fn new(
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         instrument: Arc<Instrument>,
         trade_id: u64,
         side: MarketSide,

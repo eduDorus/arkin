@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use sqlx::{FromRow, PgPool};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -13,7 +13,7 @@ const FIELD_COUNT: usize = 7;
 
 #[derive(Debug, FromRow)]
 pub struct TickDTO {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub instrument_id: Uuid,
     pub tick_id: i64,
     pub bid_price: Price,
@@ -100,7 +100,7 @@ impl TickRepo {
 
     pub async fn read_tick(
         &self,
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         instrument_id: Uuid,
     ) -> Result<Option<TickDTO>, PersistenceError> {
         let tick = sqlx::query_as!(
@@ -130,8 +130,8 @@ impl TickRepo {
     pub async fn read_range(
         &self,
         instrument_ids: &[Uuid],
-        start: OffsetDateTime,
-        end: OffsetDateTime,
+        start: UtcDateTime,
+        end: UtcDateTime,
     ) -> Result<Vec<TickDTO>, PersistenceError> {
         let ticks = sqlx::query_as!(
             TickDTO,

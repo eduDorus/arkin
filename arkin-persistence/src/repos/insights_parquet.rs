@@ -114,7 +114,7 @@ mod tests {
     use super::*;
     use crate::repos::InsightDTO;
     use rust_decimal::Decimal;
-    use time::OffsetDateTime;
+    use time::UtcDateTime;
     use uuid::Uuid;
 
     #[tokio::test]
@@ -123,14 +123,14 @@ mod tests {
 
         let insights = vec![
             InsightDTO {
-                event_time: OffsetDateTime::now_utc(),
+                event_time: UtcDateTime::now(),
                 pipeline_id: Uuid::new_v4(),
                 instrument_id: Some(Uuid::new_v4()),
                 feature_id: "feature1".to_string(),
                 value: Decimal::new(123, 2),
             },
             InsightDTO {
-                event_time: OffsetDateTime::now_utc(),
+                event_time: UtcDateTime::now(),
                 pipeline_id: Uuid::new_v4(),
                 instrument_id: Some(Uuid::new_v4()),
                 feature_id: "feature2".to_string(),

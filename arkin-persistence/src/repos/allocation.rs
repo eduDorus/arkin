@@ -3,7 +3,7 @@ use std::sync::Arc;
 use arkin_core::prelude::*;
 use rust_decimal::Decimal;
 use sqlx::{prelude::*, PgPool};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -14,7 +14,7 @@ const FIELD_COUNT: usize = 8;
 #[derive(FromRow)]
 pub struct AllocationDTO {
     pub id: Uuid,
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub group_id: Uuid,
     pub portfolio_id: Uuid,
     pub strategy_id: Uuid,

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use ndarray::Array;
 use ort::session::{builder::GraphOptimizationLevel, Session};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
@@ -42,7 +42,7 @@ impl Feature for OnnxFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: OffsetDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating forecast...");
 
         // Get the model

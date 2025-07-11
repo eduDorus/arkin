@@ -1,5 +1,5 @@
 use anyhow::Result;
-use time::{Duration, OffsetDateTime, Time};
+use time::{Duration, Time, UtcDateTime};
 
 pub enum Frequency {
     Hourly,
@@ -8,12 +8,12 @@ pub enum Frequency {
     Weekly,
 }
 
-fn next_boundary(dt: OffsetDateTime, frequency: &Frequency) -> OffsetDateTime {
+fn next_boundary(dt: UtcDateTime, frequency: &Frequency) -> UtcDateTime {
     match frequency {
         Frequency::Daily => {
             // Get the date and move to the next day at midnight
             let next_date = dt.date() + Duration::days(1);
-            next_date.midnight().assume_offset(dt.offset())
+            next_date.midnight().as_utc()
         }
         Frequency::HalfDaily => {
             // If before noon, move to noon; otherwise, move to the next day at midnight
@@ -21,7 +21,7 @@ fn next_boundary(dt: OffsetDateTime, frequency: &Frequency) -> OffsetDateTime {
                 dt.replace_time(Time::from_hms(12, 0, 0).unwrap())
             } else {
                 let next_date = dt.date() + Duration::days(1);
-                next_date.midnight().assume_offset(dt.offset())
+                next_date.midnight().as_utc()
             }
         }
         Frequency::Hourly => {
@@ -42,10 +42,10 @@ fn next_boundary(dt: OffsetDateTime, frequency: &Frequency) -> OffsetDateTime {
 }
 
 pub fn datetime_chunks(
-    start: OffsetDateTime,
-    end: OffsetDateTime,
+    start: UtcDateTime,
+    end: UtcDateTime,
     frequency: Frequency,
-) -> Result<Vec<(OffsetDateTime, OffsetDateTime)>, anyhow::Error> {
+) -> Result<Vec<(UtcDateTime, UtcDateTime)>, anyhow::Error> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -69,7 +69,7 @@ pub fn datetime_chunks(
     Ok(chunks)
 }
 
-pub fn datetime_range_minute(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
+pub fn datetime_range_minute(start: UtcDateTime, end: UtcDateTime) -> Result<Vec<UtcDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -90,7 +90,7 @@ pub fn datetime_range_minute(start: OffsetDateTime, end: OffsetDateTime) -> Resu
     Ok(datetimes)
 }
 
-pub fn datetime_range_hourly(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
+pub fn datetime_range_hourly(start: UtcDateTime, end: UtcDateTime) -> Result<Vec<UtcDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -109,7 +109,7 @@ pub fn datetime_range_hourly(start: OffsetDateTime, end: OffsetDateTime) -> Resu
     Ok(datetimes)
 }
 
-pub fn datetime_range_daily(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
+pub fn datetime_range_daily(start: UtcDateTime, end: UtcDateTime) -> Result<Vec<UtcDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -128,7 +128,7 @@ pub fn datetime_range_daily(start: OffsetDateTime, end: OffsetDateTime) -> Resul
     Ok(datetimes)
 }
 
-pub fn datetime_range_weekly(start: OffsetDateTime, end: OffsetDateTime) -> Result<Vec<OffsetDateTime>> {
+pub fn datetime_range_weekly(start: UtcDateTime, end: UtcDateTime) -> Result<Vec<UtcDateTime>> {
     if start > end {
         anyhow::bail!("Start date cannot be greater than end date");
     }
@@ -148,7 +148,7 @@ pub fn datetime_range_weekly(start: OffsetDateTime, end: OffsetDateTime) -> Resu
     Ok(datetimes)
 }
 
-pub fn round_to_minute(datetime: OffsetDateTime) -> Result<OffsetDateTime> {
+pub fn round_to_minute(datetime: UtcDateTime) -> Result<UtcDateTime> {
     let mut datetime = datetime;
     datetime = datetime.replace_second(0)?;
     datetime = datetime.replace_nanosecond(0)?;
@@ -162,60 +162,60 @@ mod tests {
 
     #[test]
     fn test_datetime_range_minute() {
-        let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
-        let end = datetime!(2023 - 06 - 09 12:26:03).assume_utc();
+        let start = datetime!(2023 - 06 - 09 12:23:03 UTC).to_utc();
+        let end = datetime!(2023 - 06 - 09 12:26:03 UTC).to_utc();
 
         let dates = datetime_range_minute(start, end).unwrap();
 
         assert_eq!(dates.len(), 4);
-        assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:23:00).assume_utc());
-        assert_eq!(dates[1], datetime!(2023 - 06 - 09 12:24:00).assume_utc());
-        assert_eq!(dates[2], datetime!(2023 - 06 - 09 12:25:00).assume_utc());
-        assert_eq!(dates[3], datetime!(2023 - 06 - 09 12:26:00).assume_utc());
+        assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:23:00 UTC).to_utc());
+        assert_eq!(dates[1], datetime!(2023 - 06 - 09 12:24:00 UTC).to_utc());
+        assert_eq!(dates[2], datetime!(2023 - 06 - 09 12:25:00 UTC).to_utc());
+        assert_eq!(dates[3], datetime!(2023 - 06 - 09 12:26:00 UTC).to_utc());
     }
 
     #[test]
     fn test_datetime_range_minute_same_tme() {
-        let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
-        let end = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
+        let start = datetime!(2023 - 06 - 09 12:23:03 UTC).to_utc();
+        let end = datetime!(2023 - 06 - 09 12:23:03 UTC).to_utc();
 
         let dates = datetime_range_minute(start, end).unwrap();
 
         assert_eq!(dates.len(), 1);
-        assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:23:00).assume_utc());
+        assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:23:00 UTC).to_utc());
     }
 
     #[test]
     fn test_datetime_range_hourly() {
-        let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
-        let end = datetime!(2023 - 06 - 09 15:43:13).assume_utc();
+        let start = datetime!(2023 - 06 - 09 12:23:03 UTC).to_utc();
+        let end = datetime!(2023 - 06 - 09 15:43:13 UTC).to_utc();
 
         let dates = datetime_range_hourly(start, end).unwrap();
 
         assert_eq!(dates.len(), 4);
-        assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:00:00).assume_utc());
-        assert_eq!(dates[1], datetime!(2023 - 06 - 09 13:00:00).assume_utc());
-        assert_eq!(dates[2], datetime!(2023 - 06 - 09 14:00:00).assume_utc());
-        assert_eq!(dates[3], datetime!(2023 - 06 - 09 15:00:00).assume_utc());
+        assert_eq!(dates[0], datetime!(2023 - 06 - 09 12:00:00 UTC).to_utc());
+        assert_eq!(dates[1], datetime!(2023 - 06 - 09 13:00:00 UTC).to_utc());
+        assert_eq!(dates[2], datetime!(2023 - 06 - 09 14:00:00 UTC).to_utc());
+        assert_eq!(dates[3], datetime!(2023 - 06 - 09 15:00:00 UTC).to_utc());
     }
 
     #[test]
     fn test_datetime_range_daily() {
-        let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
-        let end = datetime!(2023 - 06 - 11 22:23:03).assume_utc();
+        let start = datetime!(2023 - 06 - 09 12:23:03 UTC).to_utc();
+        let end = datetime!(2023 - 06 - 11 22:23:03 UTC).to_utc();
 
         let dates = datetime_range_daily(start, end).unwrap();
 
         assert_eq!(dates.len(), 3);
-        assert_eq!(dates[0], datetime!(2023 - 06 - 09 00:00:00).assume_utc());
-        assert_eq!(dates[1], datetime!(2023 - 06 - 10 00:00:00).assume_utc());
-        assert_eq!(dates[2], datetime!(2023 - 06 - 11 00:00:00).assume_utc());
+        assert_eq!(dates[0], datetime!(2023 - 06 - 09 00:00:00 UTC).to_utc());
+        assert_eq!(dates[1], datetime!(2023 - 06 - 10 00:00:00 UTC).to_utc());
+        assert_eq!(dates[2], datetime!(2023 - 06 - 11 00:00:00 UTC).to_utc());
     }
 
     #[test]
     fn test_datetime_range_weekly() {
-        let start = datetime!(2023 - 01 - 01 12:23:03).assume_utc();
-        let end = datetime!(2023 - 02 - 15 22:23:03).assume_utc();
+        let start = datetime!(2023 - 01 - 01 12:23:03 UTC).to_utc();
+        let end = datetime!(2023 - 02 - 15 22:23:03 UTC).to_utc();
 
         let dates = datetime_range_weekly(start, end).unwrap();
 
@@ -225,35 +225,35 @@ mod tests {
 
     #[test]
     fn test_round_to_minute() {
-        let datetime = datetime!(2023 - 06 - 09 12:23:03.430239483).assume_utc();
+        let datetime = datetime!(2023 - 06 - 09 12:23:03.430239483 UTC).to_utc();
         let rounded = round_to_minute(datetime).unwrap();
-        assert_eq!(rounded, datetime!(2023 - 06 - 09 12:23:00).assume_utc());
+        assert_eq!(rounded, datetime!(2023 - 06 - 09 12:23:00 UTC).to_utc());
     }
 
     #[test]
     fn test_datetime_range_chunker() {
-        let start = datetime!(2023 - 06 - 09 12:23:03).assume_utc();
-        let end = datetime!(2023 - 06 - 11 22:23:03).assume_utc();
+        let start = datetime!(2023 - 06 - 09 12:23:03 UTC).to_utc();
+        let end = datetime!(2023 - 06 - 11 22:23:03 UTC).to_utc();
 
         let dates = datetime_chunks(start, end, Frequency::Hourly).unwrap();
         assert_eq!(dates.len(), 59);
         assert_eq!(dates[0].0, start);
-        assert_eq!(dates[0].1, datetime!(2023 - 06 - 09 13:00:00).assume_utc());
-        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 22:00:00).assume_utc());
+        assert_eq!(dates[0].1, datetime!(2023 - 06 - 09 13:00:00 UTC).to_utc());
+        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 22:00:00 UTC).to_utc());
         assert_eq!(dates[dates.len() - 1].1, end);
 
         let dates = datetime_chunks(start, end, Frequency::HalfDaily).unwrap();
         assert_eq!(dates.len(), 5);
         assert_eq!(dates[0].0, start);
-        assert_eq!(dates[0].1, datetime!(2023 - 06 - 10 00:00:00).assume_utc());
-        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 12:00:00).assume_utc());
+        assert_eq!(dates[0].1, datetime!(2023 - 06 - 10 00:00:00 UTC).to_utc());
+        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 12:00:00 UTC).to_utc());
         assert_eq!(dates[dates.len() - 1].1, end);
 
         let dates = datetime_chunks(start, end, Frequency::Daily).unwrap();
         assert_eq!(dates.len(), 3);
         assert_eq!(dates[0].0, start);
-        assert_eq!(dates[0].1, datetime!(2023 - 06 - 10 00:00:00).assume_utc());
-        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 00:00:00).assume_utc());
+        assert_eq!(dates[0].1, datetime!(2023 - 06 - 10 00:00:00 UTC).to_utc());
+        assert_eq!(dates[dates.len() - 1].0, datetime!(2023 - 06 - 11 00:00:00 UTC).to_utc());
         assert_eq!(dates[dates.len() - 1].1, end);
     }
 }

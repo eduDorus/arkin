@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use crate::utils::custom_serde;
 
@@ -13,9 +13,9 @@ pub struct BinanceSpotAggTrade {
 #[derive(Debug, Deserialize)]
 pub struct BinanceSpotAggTradeData {
     #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub transaction_time: OffsetDateTime,
+    pub transaction_time: UtcDateTime,
     #[serde(rename = "e")]
     pub event_type: String,
     #[serde(rename = "s")]

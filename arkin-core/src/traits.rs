@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use crate::{Event, ServiceCtx};
 
 #[async_trait]
 pub trait SystemTime: Send + Sync {
-    async fn now(&self) -> OffsetDateTime;
-    async fn advance_time(&self, time: OffsetDateTime);
+    async fn now(&self) -> UtcDateTime;
+    async fn advance_time(&self, time: UtcDateTime);
     async fn is_final_hour(&self) -> bool;
     async fn is_finished(&self) -> bool;
     async fn is_live(&self) -> bool;

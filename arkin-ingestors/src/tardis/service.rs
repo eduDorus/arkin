@@ -11,7 +11,7 @@ use bytes::Bytes;
 use futures::{stream, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use time::macros::format_description;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::pin;
 use tokio_util::sync::CancellationToken;
@@ -175,8 +175,8 @@ pub struct TardisRequest {
     pub exchange: TardisExchange,
     pub channel: TardisChannel,
     pub instruments: Vec<String>,
-    pub start: OffsetDateTime,
-    pub end: OffsetDateTime,
+    pub start: UtcDateTime,
+    pub end: UtcDateTime,
 }
 
 impl TardisRequest {
@@ -184,8 +184,8 @@ impl TardisRequest {
         exchange: TardisExchange,
         channel: TardisChannel,
         instruments: Vec<String>,
-        start: OffsetDateTime,
-        end: OffsetDateTime,
+        start: UtcDateTime,
+        end: UtcDateTime,
     ) -> Self {
         TardisRequest {
             exchange: exchange.to_owned(),
@@ -206,15 +206,15 @@ pub struct TardisIngestor {
     pub venue: TardisExchange,
     pub channel: TardisChannel,
     pub instruments: Vec<String>,
-    pub start: OffsetDateTime,
-    pub end: OffsetDateTime,
+    pub start: UtcDateTime,
+    pub end: UtcDateTime,
 }
 
 impl TardisIngestor {
     pub fn download_stream(
         &self,
         req: TardisRequest,
-    ) -> impl Stream<Item = impl Future<Output = Result<Vec<(OffsetDateTime, String)>>> + '_> + '_ {
+    ) -> impl Stream<Item = impl Future<Output = Result<Vec<(UtcDateTime, String)>>> + '_> + '_ {
         let dates = datetime_range_minute(req.start, req.end).expect("Invalid date range");
         stream::iter(dates.into_iter().map(move |datetime| {
             let client = self.client.clone();
@@ -246,7 +246,7 @@ impl TardisIngestor {
         }))
     }
 
-    pub fn stream(&self, req: TardisRequest) -> impl Stream<Item = (OffsetDateTime, String)> + '_ {
+    pub fn stream(&self, req: TardisRequest) -> impl Stream<Item = (UtcDateTime, String)> + '_ {
         self.download_stream(req)
             .buffer_unordered(self.max_concurrent_requests)
             .filter_map(|result| async move {
@@ -264,7 +264,7 @@ impl TardisIngestor {
     pub fn stream_parsed<T: DeserializeOwned + 'static>(
         &self,
         req: TardisRequest,
-    ) -> impl Stream<Item = (OffsetDateTime, T)> + '_ {
+    ) -> impl Stream<Item = (UtcDateTime, T)> + '_ {
         self.download_stream(req)
             .buffer_unordered(self.max_concurrent_requests)
             .filter_map(|result| async move {
@@ -291,7 +291,7 @@ impl TardisIngestor {
     }
 }
 
-fn parse_line(line: &str) -> Result<(OffsetDateTime, String)> {
+fn parse_line(line: &str) -> Result<(UtcDateTime, String)> {
     let mut parts = line.splitn(2, ' ');
 
     // Timestamp part

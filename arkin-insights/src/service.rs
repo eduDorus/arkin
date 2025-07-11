@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 
 use async_trait::async_trait;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
@@ -45,7 +45,7 @@ impl InsightsService {
 
     pub async fn process(
         &self,
-        event_time: OffsetDateTime,
+        event_time: UtcDateTime,
         instruments: &[Arc<Instrument>],
         publish: bool,
     ) -> Result<Vec<Arc<Insight>>, InsightsError> {

@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use rust_decimal::Decimal;
 use sqlx::Type;
 use strum::Display;
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -34,7 +34,7 @@ pub struct Transfer {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
     /// The event time of this transfer.
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     /// The ID of the transfer group this transfer belongs to.
     pub transfer_group_id: Uuid,
     /// The account that is debited (balance goes down).
@@ -87,6 +87,6 @@ impl fmt::Display for Transfer {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct TransferGroup {
-    pub event_time: OffsetDateTime,
+    pub event_time: UtcDateTime,
     pub transfers: Vec<Arc<Transfer>>,
 }

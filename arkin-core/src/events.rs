@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use strum::{Display, EnumDiscriminants, EnumIter};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 
 use crate::{
     AccountUpdate, BalanceUpdate, Book, ExecutionOrder, InsightsTick, InsightsUpdate, PositionUpdate, Signal, Tick,
@@ -34,18 +34,18 @@ pub enum Event {
     // Allocation Execution Orders
     NewExecutionOrder(Arc<ExecutionOrder>),
     CancelExecutionOrder(Arc<ExecutionOrder>),
-    CancelAllExecutionOrders(OffsetDateTime),
+    CancelAllExecutionOrders(UtcDateTime),
 
     NewMakerExecutionOrder(Arc<ExecutionOrder>),
     CancelMakerExecutionOrder(Arc<ExecutionOrder>),
-    CancelAllMakerExecutionOrders(OffsetDateTime),
+    CancelAllMakerExecutionOrders(UtcDateTime),
 
     // Order Manager
 
     // Execution Strategy
     NewVenueOrder(Arc<VenueOrder>),
     CancelVenueOrder(Arc<VenueOrder>),
-    CancelAllVenueOrders(OffsetDateTime),
+    CancelAllVenueOrders(UtcDateTime),
     ExecutionOrderActive(Arc<ExecutionOrder>),
     ExecutionOrderCompleted(Arc<ExecutionOrder>),
     ExecutionOrderCancelled(Arc<ExecutionOrder>),
@@ -60,11 +60,11 @@ pub enum Event {
     VenueOrderExpired(Arc<VenueOrder>),
 
     // Other
-    Finished(OffsetDateTime),
+    Finished(UtcDateTime),
 }
 
 impl Event {
-    pub fn timestamp(&self) -> OffsetDateTime {
+    pub fn timestamp(&self) -> UtcDateTime {
         match self {
             // Market Data
             Event::TickUpdate(event) => event.event_time,
