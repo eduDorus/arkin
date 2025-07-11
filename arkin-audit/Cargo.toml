@@ -10,3 +10,5 @@ arkin-core = { path = "../arkin-core" }
 
 tracing = { workspace = true }
 async-trait = { workspace = true }
+dashmap = { workspace = true }
+time = { workspace = true }

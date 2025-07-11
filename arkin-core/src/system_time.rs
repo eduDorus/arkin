@@ -21,9 +21,13 @@ impl SystemTime for LiveSystemTime {
         UtcDateTime::now()
     }
 
-    async fn advance_time(&self, _time: UtcDateTime) {
+    async fn advance_time_to(&self, _time: UtcDateTime) {
         // No-op in production mode
-        error!("advance_time is a no-op in production mode");
+        error!("advance time to is a no-op in production mode");
+    }
+
+    async fn advance_time_by(&self, _duration: Duration) {
+        error!("advance time by is a no-op in production mode");
     }
 
     async fn is_final_hour(&self) -> bool {
@@ -60,8 +64,12 @@ impl SystemTime for SimulationSystemTime {
         self.current_time.read().await.clone()
     }
 
-    async fn advance_time(&self, time: UtcDateTime) {
+    async fn advance_time_to(&self, time: UtcDateTime) {
         self.current_time.write().await.clone_from(&time);
+    }
+
+    async fn advance_time_by(&self, duration: Duration) {
+        *self.current_time.write().await += duration;
     }
 
     async fn is_final_hour(&self) -> bool {
@@ -95,12 +103,12 @@ mod tests {
         assert!(!clock.is_finished().await);
 
         let new_time = datetime!(2023-10-01 13:00:00 UTC).to_utc();
-        clock.advance_time(new_time).await;
+        clock.advance_time_to(new_time).await;
 
         assert_eq!(clock.now().await, new_time);
         assert!(!clock.is_finished().await);
 
-        clock.advance_time(end_time).await;
+        clock.advance_time_to(end_time).await;
         assert_eq!(clock.now().await, end_time);
         assert!(clock.is_finished().await);
     }

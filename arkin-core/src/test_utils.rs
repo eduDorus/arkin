@@ -1,10 +1,11 @@
-use std::{str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use time::{macros::datetime, OffsetDateTime, UtcDateTime};
 use tokio::sync::{Mutex, RwLock};
+use tracing::{info, instrument};
 use uuid::Uuid;
 
 use crate::{
@@ -33,8 +34,16 @@ impl SystemTime for MockTime {
         self.current_time.read().await.clone()
     }
 
-    async fn advance_time(&self, time: UtcDateTime) {
+    #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
+    async fn advance_time_to(&self, time: UtcDateTime) {
         *self.current_time.write().await = time;
+        info!(target: "mock-time", "advanced time to {}", time);
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
+    async fn advance_time_by(&self, duration: Duration) {
+        *self.current_time.write().await += duration;
+        info!(target: "mock-time", "advanced time by {:?}", duration);
     }
 
     async fn is_final_hour(&self) -> bool {

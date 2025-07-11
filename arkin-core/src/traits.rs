@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use time::UtcDateTime;
@@ -8,7 +8,8 @@ use crate::{Event, ServiceCtx};
 #[async_trait]
 pub trait SystemTime: Send + Sync {
     async fn now(&self) -> UtcDateTime;
-    async fn advance_time(&self, time: UtcDateTime);
+    async fn advance_time_to(&self, time: UtcDateTime);
+    async fn advance_time_by(&self, duration: Duration);
     async fn is_final_hour(&self) -> bool;
     async fn is_finished(&self) -> bool;
     async fn is_live(&self) -> bool;

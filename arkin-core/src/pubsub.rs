@@ -243,7 +243,8 @@ impl PubSub {
                     info!(target: "pubsub", "processing event: {}", event);
                 }
                 if !self.time.is_live().await {
-                    self.time.advance_time(event.timestamp()).await;
+                    info!(target: "pubsub", "advancing time to {}", event.timestamp());
+                    self.time.advance_time_to(event.timestamp()).await;
                 }
                 self.broadcast_event(event).await;
             } else {
