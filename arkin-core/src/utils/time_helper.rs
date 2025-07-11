@@ -1,6 +1,7 @@
 use anyhow::Result;
 use time::{Duration, Time, UtcDateTime};
 
+#[derive(Clone, Copy)]
 pub enum Frequency {
     Hourly,
     HalfDaily,

@@ -13,6 +13,7 @@ pub enum InstanceType {
     Simulation,
     Insights,
     Utility,
+    Test,
 }
 
 #[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]

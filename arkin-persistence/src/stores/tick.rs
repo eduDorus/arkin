@@ -98,7 +98,7 @@ impl TickStore {
         for dto in &db_ticks {
             let instrument = self.instrument_store.read_by_id(&dto.instrument_id).await?;
             let tick = Tick::builder()
-                .event_time(dto.event_time)
+                .event_time(dto.event_time.to_utc())
                 .instrument(instrument)
                 .tick_id(dto.tick_id as u64)
                 .bid_price(dto.bid_price)
@@ -129,7 +129,7 @@ impl TickStore {
                 // For each row, do your transformations.
                 let instrument = self.instrument_store.read_by_id(&row.instrument_id).await?;
                 let tick = Tick::builder()
-                .event_time(row.event_time)
+                .event_time(row.event_time.to_utc())
                 .instrument(instrument)
                 .tick_id(row.tick_id as u64)
                 .bid_price(row.bid_price)
@@ -182,7 +182,7 @@ impl TickStore {
                 for dto in batch {
                     let instrument = local_instrument_lookup.get(&dto.instrument_id).cloned().unwrap();
                     let tick = Tick::builder()
-                        .event_time(dto.event_time)
+                        .event_time(dto.event_time.to_utc())
                         .instrument(instrument)
                         .tick_id(dto.tick_id as u64)
                         .bid_price(dto.bid_price)

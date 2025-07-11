@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
-use time::UtcDateTime;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::PersistenceError;
@@ -13,8 +13,8 @@ use crate::PersistenceError;
 #[derive(Debug, Clone)]
 pub struct VenueOrderDTO {
     pub id: VenueOrderId,
-    pub event_time: UtcDateTime,
-    pub strategy_id: Uuid,
+    pub event_time: OffsetDateTime,
+    pub strategy_id: Option<Uuid>,
     pub instrument_id: Uuid,
     pub side: MarketSide,
     pub order_type: VenueOrderType,
@@ -29,15 +29,15 @@ pub struct VenueOrderDTO {
     pub commission_asset_id: Option<Uuid>,
     pub commission: Decimal,
     pub status: VenueOrderStatus,
-    pub updated_at: UtcDateTime,
+    pub updated_at: OffsetDateTime,
 }
 
 impl From<VenueOrder> for VenueOrderDTO {
     fn from(order: VenueOrder) -> Self {
         Self {
             id: order.id,
-            event_time: order.event_time,
-            strategy_id: order.strategy.id,
+            event_time: order.created_at.into(),
+            strategy_id: order.strategy.map(|o| o.id),
             instrument_id: order.instrument.id,
             side: order.side,
             order_type: order.order_type,
@@ -52,7 +52,7 @@ impl From<VenueOrder> for VenueOrderDTO {
             commission_asset_id: order.commission_asset.as_ref().map(|asset| asset.id),
             commission: order.commission,
             status: order.status,
-            updated_at: order.updated_at,
+            updated_at: order.updated_at.into(),
         }
     }
 }
@@ -61,8 +61,8 @@ impl From<Arc<VenueOrder>> for VenueOrderDTO {
     fn from(order: Arc<VenueOrder>) -> Self {
         Self {
             id: order.id,
-            event_time: order.event_time,
-            strategy_id: order.strategy.id,
+            event_time: order.created_at.into(),
+            strategy_id: order.strategy.as_ref().map(|o| o.id),
             instrument_id: order.instrument.id,
             side: order.side,
             order_type: order.order_type,
@@ -77,7 +77,7 @@ impl From<Arc<VenueOrder>> for VenueOrderDTO {
             commission_asset_id: order.commission_asset.as_ref().map(|asset| asset.id),
             commission: order.commission,
             status: order.status,
-            updated_at: order.updated_at,
+            updated_at: order.updated_at.into(),
         }
     }
 }

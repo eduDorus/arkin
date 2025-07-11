@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rust_decimal::Decimal;
 use sqlx::{FromRow, PgPool};
-use time::UtcDateTime;
+use time::OffsetDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
 
@@ -15,7 +15,7 @@ const FIELD_COUNT: usize = 5;
 
 #[derive(Debug, FromRow)]
 pub struct SignalDTO {
-    pub event_time: UtcDateTime,
+    pub event_time: OffsetDateTime,
     pub strategy_id: Uuid,
     pub instrument_id: Uuid,
     pub weight: Decimal,
@@ -24,7 +24,7 @@ pub struct SignalDTO {
 impl From<Arc<Signal>> for SignalDTO {
     fn from(signal: Arc<Signal>) -> Self {
         Self {
-            event_time: signal.event_time,
+            event_time: signal.event_time.into(),
             instrument_id: signal.instrument.id,
             strategy_id: signal.strategy.id,
             weight: signal.weight,

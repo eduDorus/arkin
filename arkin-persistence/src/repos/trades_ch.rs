@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use clickhouse::{query::RowCursor, sql::Identifier, Client, Row};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use time::UtcDateTime;
+use time::{OffsetDateTime, UtcDateTime};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -14,7 +14,7 @@ use crate::PersistenceError;
 #[derive(Debug, Serialize, Deserialize, Row)]
 pub struct TradeClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
-    pub event_time: UtcDateTime,
+    pub event_time: OffsetDateTime,
     #[serde(with = "clickhouse::serde::uuid")]
     pub instrument_id: Uuid,
     pub trade_id: u64,
@@ -28,7 +28,7 @@ pub struct TradeClickhouseDTO {
 impl From<Arc<Trade>> for TradeClickhouseDTO {
     fn from(trade: Arc<Trade>) -> Self {
         Self {
-            event_time: trade.event_time,
+            event_time: trade.event_time.into(),
             instrument_id: trade.instrument.id,
             trade_id: trade.trade_id,
             side: trade.side.into(),

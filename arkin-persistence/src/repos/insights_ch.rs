@@ -4,7 +4,7 @@ use std::sync::Arc;
 use arkin_core::Insight;
 use clickhouse::{sql::Identifier, Client, Row};
 use serde::{Deserialize, Serialize};
-use time::UtcDateTime;
+use time::OffsetDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -13,7 +13,7 @@ use crate::PersistenceError;
 #[derive(Debug, Clone, Serialize, Deserialize, Row)]
 pub struct InsightClickhouseDTO {
     #[serde(with = "clickhouse::serde::time::datetime64::millis")]
-    pub event_time: UtcDateTime,
+    pub event_time: OffsetDateTime,
     #[serde(with = "clickhouse::serde::uuid")]
     pub pipeline_id: Uuid,
     #[serde(with = "clickhouse::serde::uuid")]
@@ -26,7 +26,7 @@ pub struct InsightClickhouseDTO {
 impl From<Arc<Insight>> for InsightClickhouseDTO {
     fn from(insight: Arc<Insight>) -> Self {
         Self {
-            event_time: insight.event_time,
+            event_time: insight.event_time.into(),
             pipeline_id: insight.pipeline.as_ref().map(|p| p.id).unwrap(),
             instrument_id: insight.instrument.as_ref().map(|i| i.id).unwrap(),
             feature_id: insight.feature_id.to_string(),

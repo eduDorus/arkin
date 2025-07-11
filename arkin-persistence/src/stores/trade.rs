@@ -99,7 +99,7 @@ impl TradeStore {
         for trade in &dto {
             let instrument = self.instrument_store.read_by_id(&trade.instrument_id).await?;
             let trade = Trade::builder()
-                .event_time(trade.event_time)
+                .event_time(trade.event_time.to_utc())
                 .instrument(instrument)
                 .trade_id(trade.trade_id as u64)
                 .side(trade.side.into())
@@ -133,7 +133,7 @@ impl TradeStore {
                 // For each row, do your transformations.
                 let instrument = self.instrument_store.read_by_id(&row.instrument_id).await?;
                 let trade = Trade::builder()
-                    .event_time(row.event_time)
+                    .event_time(row.event_time.to_utc())
                     .instrument(instrument)
                     .trade_id(row.trade_id as u64)
                     .side(row.side.into())
@@ -186,7 +186,7 @@ impl TradeStore {
                 for dto in batch {
                     let instrument = local_instrument_lookup.get(&dto.instrument_id).cloned().unwrap();
                     let trade = Trade::builder()
-                        .event_time(dto.event_time)
+                        .event_time(dto.event_time.to_utc())
                         .instrument(instrument)
                         .trade_id(dto.trade_id as u64)
                         .side(dto.side.into())

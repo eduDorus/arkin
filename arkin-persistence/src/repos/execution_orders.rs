@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
-use time::UtcDateTime;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::PersistenceError;
@@ -13,10 +13,10 @@ use crate::PersistenceError;
 #[derive(Debug, Clone)]
 pub struct ExecutionOrderDTO {
     pub id: Uuid,
-    pub event_time: UtcDateTime,
+    pub event_time: OffsetDateTime,
     pub strategy_id: Option<Uuid>,
     pub instrument_id: Uuid,
-    pub order_type: ExecutionOrderType,
+    pub exec_strategy_type: ExecutionStrategyType,
     pub side: MarketSide,
     pub price: Decimal,
     pub quantity: Decimal,
@@ -24,17 +24,17 @@ pub struct ExecutionOrderDTO {
     pub filled_quantity: Decimal,
     pub total_commission: Decimal,
     pub status: ExecutionOrderStatus,
-    pub updated_at: UtcDateTime,
+    pub updated_at: OffsetDateTime,
 }
 
 impl From<ExecutionOrder> for ExecutionOrderDTO {
     fn from(order: ExecutionOrder) -> Self {
         Self {
             id: order.id,
-            event_time: order.event_time,
+            event_time: order.created_at.into(),
             strategy_id: order.strategy.as_ref().map(|s| s.id),
             instrument_id: order.instrument.id,
-            order_type: order.order_type,
+            exec_strategy_type: order.exec_strategy_type,
             side: order.side,
             price: order.price,
             quantity: order.quantity,
@@ -42,7 +42,7 @@ impl From<ExecutionOrder> for ExecutionOrderDTO {
             filled_quantity: order.filled_quantity,
             total_commission: order.total_commission,
             status: order.status,
-            updated_at: order.updated_at,
+            updated_at: order.updated_at.into(),
         }
     }
 }
@@ -51,10 +51,10 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
     fn from(order: Arc<ExecutionOrder>) -> Self {
         Self {
             id: order.id,
-            event_time: order.event_time,
+            event_time: order.created_at.into(),
             strategy_id: order.strategy.as_ref().map(|s| s.id),
             instrument_id: order.instrument.id,
-            order_type: order.order_type,
+            exec_strategy_type: order.exec_strategy_type,
             side: order.side,
             price: order.price,
             quantity: order.quantity,
@@ -62,7 +62,7 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
             filled_quantity: order.filled_quantity,
             total_commission: order.total_commission,
             status: order.status,
-            updated_at: order.updated_at,
+            updated_at: order.updated_at.into(),
         }
     }
 }
@@ -100,7 +100,7 @@ impl ExecutionOrderRepo {
             self.instance.id,
             order.strategy_id,
             order.instrument_id,
-            order.order_type as ExecutionOrderType,
+            order.exec_strategy_type as ExecutionStrategyType,
             order.side as MarketSide,
             order.price,
             order.quantity,

@@ -8,6 +8,9 @@ license.workspace = true
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 arkin-audit = { path = "../arkin-audit" }
+arkin-accounting = { path = "../arkin-accounting" }
+arkin-persistence = { path = "../arkin-persistence" }
+arkin-ingestor-binance = { path = "../arkin-ingestor-binance" }
 arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
 arkin-execution-sim = { path = "../arkin-execution-sim" }

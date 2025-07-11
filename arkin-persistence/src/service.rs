@@ -4,9 +4,7 @@ use async_trait::async_trait;
 use clickhouse::Client;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use sqlx::ConnectOptions;
-use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
-use tracing::{error, info};
+use tracing::{error, info, instrument, warn};
 
 use arkin_core::prelude::*;
 
@@ -14,8 +12,8 @@ use crate::repos::*;
 use crate::stores::*;
 use crate::{PersistenceConfig, PersistenceError};
 
-pub struct PersistenceService {
-    pub pubsub: PubSubSubscriber,
+pub struct Persistence {
+    pub identifier: String,
     pub mode: InstanceType,
     pub dry_run: bool,
     pub only_normalized: bool,
@@ -37,9 +35,8 @@ pub struct PersistenceService {
     pub trade_store: Arc<TradeStore>,
 }
 
-impl PersistenceService {
+impl Persistence {
     pub async fn new(
-        pubsub: PubSubSubscriber,
         config: &PersistenceConfig,
         instance: Instance,
         only_normalized: bool,
@@ -160,8 +157,8 @@ impl PersistenceService {
                 .build(),
         );
 
-        let service = Self {
-            pubsub,
+        Self {
+            identifier: "persistence".to_owned(),
             mode: instance.instance_type,
             dry_run,
             only_normalized,
@@ -181,8 +178,8 @@ impl PersistenceService {
             venue_order_store,
             tick_store,
             trade_store,
-        };
-        Arc::new(service)
+        }
+        .into()
     }
 
     pub async fn flush(&self) -> Result<(), PersistenceError> {
@@ -199,150 +196,87 @@ impl PersistenceService {
 }
 
 #[async_trait]
-impl RunnableService for PersistenceService {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
-        info!("Starting persistence service...");
+impl Runnable for Persistence {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
 
-        let (event_buffer_tx, event_buffer_rx) = kanal::bounded_async(100000);
-
-        // Spawn a task to persist events
-        let mode = self.mode.clone();
-        let tick_store = self.tick_store.clone();
-        let trade_store = self.trade_store.clone();
-        let insights_store = self.insights_store.clone();
-        let signal_store = self.signal_store.clone();
-        let execution_order_store = self.execution_order_store.clone();
-        let venue_order_store = self.venue_order_store.clone();
-        let account_store = self.account_store.clone();
-        let transfer_store = self.transfer_store.clone();
-        let task_tracker = TaskTracker::new();
-        let shutdown_clone = shutdown.clone();
-        task_tracker.spawn(async move {
-            loop {
-                if event_buffer_rx.is_empty() && shutdown_clone.is_cancelled() {
-                    info!("Event buffer is empty and shutdown is cancelled");
-                    break;
-                }
-                match event_buffer_rx.try_recv() {
-                    Ok(Some(event)) => {
-                        let res = match event {
-                            Event::TickUpdate(tick) => {
-                                // Persist only if not in Live mode
-                                if mode == InstanceType::Live || mode == InstanceType::Utility {
-                                    tick_store.insert_buffered(tick).await
-                                } else {
-                                    Ok(())
-                                }
-                            }
-                            Event::TradeUpdate(trade) => {
-                                // Persist only if not in Live mode
-                                if mode == InstanceType::Live || mode == InstanceType::Utility {
-                                    trade_store.insert_buffered(trade).await
-                                } else {
-                                    Ok(())
-                                }
-                            }
-                            Event::InsightsUpdate(tick) => {
-                                insights_store.insert_buffered_vec(tick.insights.clone()).await
-                            }
-                            Event::SignalUpdate(signal) => signal_store.insert(signal).await,
-                            Event::ExecutionOrderNew(order) => execution_order_store.insert(order).await,
-                            Event::ExecutionOrderStatusUpdate(order) => execution_order_store.update(order).await,
-                            Event::VenueOrderNew(order) => venue_order_store.insert(order).await,
-                            Event::VenueOrderFillUpdate(order) => venue_order_store.update(order).await,
-                            Event::AccountNew(account) => account_store.insert(account).await,
-                            Event::TransferNew(transfer) => transfer_store.insert_batch(transfer).await,
-                            _ => Ok(()),
-                        };
-                        if let Err(e) = res {
-                            error!("Failed to persist event: {:?}", e);
-                        }
-                    }
-                    Ok(None) => {
-                        // No event to process
-                        tokio::time::sleep(Duration::from_millis(1)).await;
-                    }
-                    Err(e) => match e {
-                        kanal::ReceiveError::SendClosed => {
-                            info!("Event buffer closed");
-                            // Print if there are any events left in the buffer
-                            if event_buffer_rx.len() > 0 {
-                                info!("Remaining events in buffer: {}", event_buffer_rx.len());
-                            }
-                            break;
-                        }
-                        kanal::ReceiveError::Closed => {
-                            info!("Event buffer closed");
-                            if event_buffer_rx.len() > 0 {
-                                info!("Remaining events in buffer: {}", event_buffer_rx.len());
-                            }
-                            break;
-                        }
-                    },
-                }
-            }
-            info!("Flushing event buffer on shutdown...");
-            if let Err(e) = tick_store.flush().await {
-                error!("Failed to flush tick store: {:?}", e);
-            }
-            if let Err(e) = trade_store.flush().await {
-                error!("Failed to flush trade store: {:?}", e);
-            }
-            if let Err(e) = insights_store.flush().await {
-                error!("Failed to flush insights store: {:?}", e);
-            }
-            info!("Persistence service event buffer task stopped.");
-        });
-
-        loop {
-            tokio::select! {
-                    Some(mut event) = self.pubsub.recv() => {
-                        // If we do a dry run we don't save any data
-                        if self.dry_run {
-                            self.pubsub.ack().await;
-                            continue;
-                        }
-
-                        // Filter out non normalized insights from insight tick
-                        if self.only_normalized {
-                            if let Event::InsightsUpdate(t) = event {
-                                let insights = t.insights.iter().filter(|i| i.insight_type == InsightType::Normalized).cloned().collect::<Vec<_>>();
-                                event = Event::InsightsUpdate(InsightsUpdate::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
-                            }
-                        }
-
-                        // Filter out non prediction insights from insight tick
-                        if self.only_predictions {
-                            if let Event::InsightsUpdate(t) = event {
-                                let insights = t.insights.iter().filter(|i| i.insight_type == InsightType::Prediction).cloned().collect::<Vec<_>>();
-                                event = Event::InsightsUpdate(InsightsUpdate::builder().event_time(t.event_time).instruments(t.instruments.clone()).insights(insights).build().into());
-                            }
-                        }
-
-                        if let Err(e) = event_buffer_tx.send(event).await {
-                            error!("Failed to send event to persistence buffer: {:?}", e);
-                        }
-
-                        self.pubsub.ack().await;
-                    }
-                    _ = shutdown.cancelled() => {
-                        info!("Persistence service shutdown...");
-                        task_tracker.close();
-                        task_tracker.wait().await;
-                        info!("Flushing persistence service on shutdown...");
-                        if let Err(e) = self.flush().await {
-                            error!("Failed to commit persistence service on shutdown: {}", e);
-                        }
-                        if let Err(e) = self.close().await {
-                            error!("Failed to close persistence service on shutdown: {}", e);
-                        }
-                        info!("Chilling for 5 seconds before stopping...");
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                        break;
-                    }
-            }
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn handle_event(&self, event: Event) {
+        if self.dry_run {
+            return;
         }
-        info!("Persistence service stopped.");
-        Ok(())
+
+        match event {
+            Event::TickUpdate(tick) => {
+                // Persist only if not in Live mode
+                if self.mode == InstanceType::Live || self.mode == InstanceType::Utility {
+                    self.tick_store.insert_buffered(tick).await.expect("Handeled by the module");
+                }
+            }
+            Event::TradeUpdate(trade) => {
+                // Persist only if not in Live mode
+                if self.mode == InstanceType::Live || self.mode == InstanceType::Utility {
+                    self.trade_store.insert_buffered(trade).await.expect("Handeled by the module");
+                }
+            }
+            Event::InsightsUpdate(tick) => {
+                // Filter out non normalized insights from insight tick
+                if self.only_normalized {
+                    let insights = tick
+                        .insights
+                        .iter()
+                        .filter(|i| i.insight_type == InsightType::Normalized)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    self.insights_store
+                        .insert_buffered_vec(insights)
+                        .await
+                        .expect("Handeled by the module")
+                } else if self.only_predictions {
+                    let insights = tick
+                        .insights
+                        .iter()
+                        .filter(|i| i.insight_type == InsightType::Prediction)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    self.insights_store
+                        .insert_buffered_vec(insights)
+                        .await
+                        .expect("Handeled by the module")
+                } else {
+                    self.insights_store
+                        .insert_buffered_vec(tick.insights.clone())
+                        .await
+                        .expect("Handeled by the module")
+                }
+            }
+            Event::SignalUpdate(signal) => self.signal_store.insert(signal).await.expect("Handeled by the module"),
+            // Event::ExecutionOrderNew(order) => self.execution_order_store.insert(order).await,
+            // Event::ExecutionOrderStatusUpdate(order) => self.execution_order_store.update(order).await,
+            // Event::VenueOrderNew(order) => self.venue_order_store.insert(order).await,
+            // Event::VenueOrderFillUpdate(order) => self.venue_order_store.update(order).await,
+            Event::AccountNew(account) => self.account_store.insert(account).await.expect("Handeled by the module"),
+            Event::TransferNew(transfer) => self
+                .transfer_store
+                .insert_batch(transfer)
+                .await
+                .expect("Handeled by the module"),
+
+            e => warn!(target: "persistence", "received unused event {}", e.event_type()),
+        }
+    }
+
+    async fn teardown(&self, _ctx: Arc<ServiceCtx>) {
+        info!(target: "persistence", "service teardown...");
+        info!(target: "persistence", "flushing persistence service on teardown...");
+        if let Err(e) = self.flush().await {
+            error!(target: "persistence", "failed to commit persistence service on shutdown: {}", e);
+        }
+        if let Err(e) = self.close().await {
+            error!(target: "persistence", "failed to close persistence service on shutdown: {}", e);
+        }
+        info!(target: "persistence", "chilling for 5 seconds before stopping...");
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 }
