@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use async_trait::async_trait;
 use time::UtcDateTime;
 use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
@@ -33,6 +34,7 @@ pub struct OHLCVFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for OHLCVFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input_price.clone(), self.input_quantity.clone()]
@@ -58,7 +60,7 @@ impl Feature for OHLCVFeature {
         ]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Calculating OHLCV");
 
         // Get data
@@ -151,8 +153,7 @@ impl Feature for OHLCVFeature {
                 .value(open)
                 .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -163,8 +164,7 @@ impl Feature for OHLCVFeature {
                 .value(high)
                 .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -175,8 +175,7 @@ impl Feature for OHLCVFeature {
                 .value(low)
                 .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -187,8 +186,7 @@ impl Feature for OHLCVFeature {
                 .value(close)
                 .insight_type(InsightType::Ohlcv)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -199,8 +197,7 @@ impl Feature for OHLCVFeature {
                 .value(typical_price)
                 .insight_type(InsightType::Price)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -211,8 +208,7 @@ impl Feature for OHLCVFeature {
                 .value(vwap)
                 .insight_type(InsightType::Price)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -223,8 +219,7 @@ impl Feature for OHLCVFeature {
                 .value(volume)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -235,8 +230,7 @@ impl Feature for OHLCVFeature {
                 .value(buy_volume)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -247,8 +241,7 @@ impl Feature for OHLCVFeature {
                 .value(sell_volume)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -259,8 +252,7 @@ impl Feature for OHLCVFeature {
                 .value(notional_volume)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -271,8 +263,7 @@ impl Feature for OHLCVFeature {
                 .value(buy_notional_volume)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -283,8 +274,7 @@ impl Feature for OHLCVFeature {
                 .value(sell_notional_volume)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -295,8 +285,7 @@ impl Feature for OHLCVFeature {
                 .value(trade_count as f64)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -307,8 +296,7 @@ impl Feature for OHLCVFeature {
                 .value(buy_trade_count as f64)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
         insights.push(
             Insight::builder()
@@ -319,10 +307,13 @@ impl Feature for OHLCVFeature {
                 .value(sell_trade_count as f64)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         );
 
         Some(insights)
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }

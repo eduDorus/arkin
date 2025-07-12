@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use dashmap::DashMap;
 use time::UtcDateTime;
 use tracing::debug;
@@ -27,6 +28,7 @@ pub struct ChaikinOscillatorFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for ChaikinOscillatorFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
@@ -36,7 +38,7 @@ impl Feature for ChaikinOscillatorFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Calculating Chaikin Oscillator...");
 
         // Get data from state
@@ -57,8 +59,7 @@ impl Feature for ChaikinOscillatorFeature {
                 .value(value)
                 .persist(self.persist)
                 .insight_type(InsightType::Continuous)
-                .build()
-                .into();
+                .build();
             Some(vec![insight])
         } else {
             let res = ChaikinOscillator {
@@ -77,5 +78,9 @@ impl Feature for ChaikinOscillatorFeature {
             }
             None
         }
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }

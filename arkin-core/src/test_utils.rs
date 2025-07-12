@@ -15,34 +15,49 @@ use crate::{
 };
 
 // Define this in a test module or separate utils file for reuse
+#[derive(Clone, Copy, Debug)]
+struct MockTimeState {
+    current: UtcDateTime,
+    next_tick: UtcDateTime,
+}
+
 pub struct MockTime {
-    current_time: RwLock<UtcDateTime>,
+    state: RwLock<MockTimeState>,
+    tick_frequency: Duration,
 }
 
 impl MockTime {
     pub fn new() -> Arc<Self> {
-        Self {
-            current_time: RwLock::new(datetime!(2025-01-01 00:00:00 UTC).to_utc()),
-        }
-        .into()
+        let start_time = datetime!(2025-01-01 00:00:00 UTC).to_utc();
+        let tick_frequency = Duration::from_secs(60);
+        let next_tick = start_time + tick_frequency;
+        Arc::new(Self {
+            state: RwLock::new(MockTimeState {
+                current: start_time,
+                next_tick,
+            }),
+            tick_frequency,
+        })
     }
 }
 
 #[async_trait]
 impl SystemTime for MockTime {
     async fn now(&self) -> UtcDateTime {
-        self.current_time.read().await.clone()
+        self.state.read().await.current
     }
 
     #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
     async fn advance_time_to(&self, time: UtcDateTime) {
-        *self.current_time.write().await = time;
+        let mut guard = self.state.write().await;
+        guard.current = time;
         info!(target: "mock-time", "advanced time to {}", time);
     }
 
     #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
     async fn advance_time_by(&self, duration: Duration) {
-        *self.current_time.write().await += duration;
+        let mut guard = self.state.write().await;
+        guard.current += duration;
         info!(target: "mock-time", "advanced time by {:?}", duration);
     }
 
@@ -56,6 +71,16 @@ impl SystemTime for MockTime {
 
     async fn is_live(&self) -> bool {
         false
+    }
+
+    async fn check_interval(&self) -> Vec<UtcDateTime> {
+        let mut guard = self.state.write().await;
+        let mut ticks = Vec::new();
+        while guard.current >= guard.next_tick {
+            ticks.push(guard.next_tick);
+            guard.next_tick += self.tick_frequency;
+        }
+        ticks
     }
 }
 

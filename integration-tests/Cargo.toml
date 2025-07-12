@@ -11,6 +11,7 @@ arkin-audit = { path = "../arkin-audit" }
 arkin-accounting = { path = "../arkin-accounting" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-ingestor-binance = { path = "../arkin-ingestor-binance" }
+arkin-insights = { path = "../arkin-insights" }
 arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
 arkin-execution-sim = { path = "../arkin-execution-sim" }
@@ -31,3 +32,5 @@ clickhouse = { workspace = true }
 uuid = { workspace = true }
 statrs = { workspace = true }
 test-log = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }

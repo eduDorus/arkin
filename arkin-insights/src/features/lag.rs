@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use serde::Deserialize;
 use strum::Display;
 use time::UtcDateTime;
@@ -32,6 +33,7 @@ pub struct LagFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for LagFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
@@ -41,7 +43,7 @@ impl Feature for LagFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Calculating {} change...", self.method);
 
         //  Get data
@@ -93,9 +95,12 @@ impl Feature for LagFeature {
             .value(change)
             .insight_type(InsightType::Continuous)
             .persist(self.persist)
-            .build()
-            .into();
+            .build();
 
         Some(vec![insight])
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }

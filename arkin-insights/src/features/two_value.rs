@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use serde::Deserialize;
 use strum::Display;
 use time::UtcDateTime;
@@ -30,6 +31,7 @@ pub struct TwoValueFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for TwoValueFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input_1.clone(), self.input_2.clone()]
@@ -39,7 +41,7 @@ impl Feature for TwoValueFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Calculating {}...", self.method);
 
         //  Get data
@@ -97,9 +99,12 @@ impl Feature for TwoValueFeature {
             .value(change)
             .insight_type(InsightType::Continuous)
             .persist(self.persist)
-            .build()
-            .into();
+            .build();
 
         Some(vec![insight])
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }

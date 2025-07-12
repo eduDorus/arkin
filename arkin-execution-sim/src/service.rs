@@ -2,7 +2,7 @@ use std::{cmp::min, sync::Arc};
 
 use async_trait::async_trait;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
-use tracing::{info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 
 use arkin_core::prelude::*;
 
@@ -30,16 +30,16 @@ impl Executor {
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn place_order(&self, order: &VenueOrder) {
-        info!(target: "executor::simulation", "received new order");
+        info!(target: "executor-simulation", "received new order");
 
-        info!(target: "executor::simulation", "change order to inflight and add order {} to orderbook", order.id);
+        info!(target: "executor-simulation", "change order to inflight and add order {} to orderbook", order.id);
         let mut order = order.clone();
         let time = self.time.now().await;
         order.update_status(VenueOrderStatus::Inflight, time);
         self.orderbook.insert(order.clone());
         self.publisher.publish(Event::VenueOrderInflight(order.clone().into())).await;
 
-        info!(target: "executor::simulation", "change order to placed and sending placed event for order {}", order.id);
+        info!(target: "executor-simulation", "change order to placed and sending placed event for order {}", order.id);
         let time = self.time.now().await;
         order.update_status(VenueOrderStatus::Placed, time);
         self.orderbook.update(order.clone());
@@ -48,38 +48,38 @@ impl Executor {
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn cancel_order(&self, order: &VenueOrder) {
-        info!(target: "executor::simulation", "received cancel order");
+        info!(target: "executor-simulation", "received cancel order");
 
         if let Some((_, order)) = self.orderbook.remove(order.id) {
-            info!(target: "executor::simulation", "order {} successfully cancelled", order.id);
+            info!(target: "executor-simulation", "order {} successfully cancelled", order.id);
             self.publisher.publish(Event::VenueOrderCancelled(order.into())).await;
         } else {
-            warn!(target: "executor::simulation", "order {} not in order book, could not cancel", order.id);
+            warn!(target: "executor-simulation", "order {} not in order book, could not cancel", order.id);
         }
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn cancel_all(&self) {
-        info!(target: "executor::simulation", "received cancel all orders");
+        info!(target: "executor-simulation", "received cancel all orders");
 
         let orders = self.orderbook.list_orders();
         for order in orders {
             if let Some((_, order)) = self.orderbook.remove(order.id) {
                 self.publisher.publish(Event::VenueOrderCancelled(order.into())).await;
             } else {
-                warn!(target: "executor::simulation", "order {} not in order book, could not cancel", order.id);
+                warn!(target: "executor-simulation", "order {} not in order book, could not cancel", order.id);
             }
         }
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn tick_update(&self, tick: &Tick) {
-        info!(target: "executor::simulation", "received tick update");
+        debug!(target: "executor-simulation", "received tick update");
 
         for order in self.orderbook.list_orders() {
             if order.instrument.id == tick.instrument.id {
-                info!(target: "executor::simulation", "checking order {}", order);
-                info!(target: "executor::simulation", "best Bid {}, best ask {}", tick.bid_price(), tick.ask_price());
+                info!(target: "executor-simulation", "checking order {}", order);
+                info!(target: "executor-simulation", "best Bid {}, best ask {}", tick.bid_price(), tick.ask_price());
                 let (matched, price, quantity) = match order.order_type {
                     VenueOrderType::Market => match order.side {
                         MarketSide::Buy => (true, tick.ask_price(), min(order.remaining_quantity(), tick.ask_quantity)),
@@ -100,25 +100,25 @@ impl Executor {
                         ),
                     },
                     _ => {
-                        warn!(target: "executor::simulation", "unsupported order type: {}", order.order_type);
+                        warn!(target: "executor-simulation", "unsupported order type: {}", order.order_type);
                         continue;
                     }
                 };
 
-                info!(target: "executor::simulation", "order {} matched {}", order.id, matched);
+                info!(target: "executor-simulation", "order {} matched {}", order.id, matched);
                 if matched {
                     // Update order
                     let mut order = order;
                     let commission = price * quantity * self.commission_rate;
                     order.add_fill(self.time.now().await, price, quantity, commission);
-                    info!(target: "executor::simulation", "matched order {} at {} with {} commissions {}", order.id, order.last_fill_quantity, order.last_fill_price, order.last_fill_commission);
+                    info!(target: "executor-simulation", "matched order {} at {} with {} commissions {}", order.id, order.last_fill_quantity, order.last_fill_price, order.last_fill_commission);
 
                     // Check if the order is fully filled
                     if order.remaining_quantity().is_zero() {
-                        info!(target: "executor::simulation", "order {} filled with total of {}@{} commission {}", order.id, order.quantity, order.filled_price, order.commission);
+                        info!(target: "executor-simulation", "order {} filled with total of {}@{} commission {}", order.id, order.quantity, order.filled_price, order.commission);
                         self.orderbook.remove(order.id);
                     } else {
-                        info!(target: "executor::simulation", "order {} partially filled {} with total of {}/{}", order.id, order.last_fill_quantity, order.filled_quantity, order.quantity);
+                        info!(target: "executor-simulation", "order {} partially filled {} with total of {}/{}", order.id, order.last_fill_quantity, order.filled_quantity, order.quantity);
                         self.orderbook.update(order.clone());
                     }
 
@@ -142,23 +142,23 @@ impl Runnable for Executor {
             Event::CancelVenueOrder(o) => self.cancel_order(o).await,
             Event::CancelAllVenueOrders(_) => self.cancel_all().await,
             Event::TickUpdate(t) => self.tick_update(t).await,
-            e => warn!(target: "executor::simulation", "received unused event {}", e),
+            e => warn!(target: "executor-simulation", "received unused event {}", e),
         }
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn start_tasks(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {
-        info!(target: "executor::simulation", "starting tasks");
+        info!(target: "executor-simulation", "starting tasks");
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn stop_tasks(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {
-        info!(target: "executor::simulation", "stopping tasks");
+        info!(target: "executor-simulation", "stopping tasks");
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn teardown(&self, _ctx: Arc<ServiceCtx>) {
-        info!(target: "executor::simulation", "teardown");
+        info!(target: "executor-simulation", "teardown");
     }
 }
 

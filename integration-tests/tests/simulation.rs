@@ -3,8 +3,13 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 use arkin_accounting::Accounting;
 use arkin_audit::Audit;
 use arkin_core::prelude::*;
+use arkin_exec_strat_taker::ExecutionStrategy;
+use arkin_execution_sim::Executor;
 use arkin_ingestor_binance::SimBinanceIngestor;
+use arkin_insights::{prelude::InsightsConfig, Insights};
 use arkin_persistence::{Persistence, PersistenceConfig};
+use arkin_strat_crossover::CrossoverStrategy;
+use rust_decimal_macros::dec;
 use tracing::info;
 use uuid::Uuid;
 
@@ -63,14 +68,101 @@ async fn test_simulation() {
     );
     let binance_ingestor_service = Service::new(binance_ingestor, None);
 
+    // Insights service
+    let pipeline_config = load::<InsightsConfig>();
+    let pipeline_info = Pipeline::builder()
+        .id(Uuid::new_v4())
+        .name("pipeline-test".to_owned())
+        .description("Pipeline used for test purpuse".to_owned())
+        .build();
+    let insights = Insights::new(
+        pubsub.publisher(),
+        pipeline_info.into(),
+        &pipeline_config.insights_service.pipeline,
+    )
+    .await;
+    let insights_service = Service::new(
+        insights,
+        Some(pubsub.subscribe(EventFilter::Events(vec![
+            EventType::TradeUpdate,
+            EventType::TickUpdate,
+            EventType::InsightsTick,
+        ]))),
+    );
+
+    // Crossover strategy
+    let strategy = Strategy::builder()
+        .id(Uuid::from_str("1fce35ce-1583-4334-a410-bc0f71c7469b").expect("Invalid UUID"))
+        .name("crossover_strategy".into())
+        .description(Some("This strategy is only for testing".into()))
+        .build();
+    let strategy_name = Arc::new(strategy);
+    let crossover_strategy = Arc::new(
+        CrossoverStrategy::builder()
+            .identifier("crossover_strategy".into())
+            .publisher(pubsub.publisher())
+            .time(time.to_owned())
+            .strategy(strategy_name)
+            .allocation_limit_per_instrument(dec!(10000))
+            .fast_ma(FeatureId::new("vwap_price_ema_10".into()))
+            .slow_ma(FeatureId::new("vwap_price_ema_60".into()))
+            .build(),
+    );
+    let strategy_service = Service::new(
+        crossover_strategy,
+        Some(pubsub.subscribe(EventFilter::Events(vec![EventType::InsightsUpdate]))),
+    );
+
+    // Exec Strategy
+    let execution_order_book = ExecutionOrderBook::new(true);
+    let venue_order_book = VenueOrderBook::new(true);
+    let exec_strategy = Arc::new(
+        ExecutionStrategy::builder()
+            .identifier("exec-strat-taker".to_string())
+            .time(time.to_owned())
+            .publisher(pubsub.publisher())
+            .exec_order_book(execution_order_book.to_owned())
+            .venue_order_book(venue_order_book.to_owned())
+            .build(),
+    );
+    let exec_strategy_service = Service::new(
+        exec_strategy,
+        Some(pubsub.subscribe(EventFilter::Events(vec![
+            EventType::NewMakerExecutionOrder,
+            EventType::CancelMakerExecutionOrder,
+            EventType::CancelAllMakerExecutionOrders,
+            EventType::VenueOrderInflight,
+            EventType::VenueOrderPlaced,
+            EventType::VenueOrderRejected,
+            EventType::VenueOrderFill,
+            EventType::VenueOrderCancelled,
+            EventType::VenueOrderExpired,
+        ]))),
+    );
+
+    // Executor
+    let execution = Executor::new("exec-sim", time.clone(), pubsub.publisher());
+    let execution_service = Service::new(
+        execution,
+        Some(pubsub.subscribe(EventFilter::Events(vec![
+            EventType::NewVenueOrder,
+            EventType::CancelVenueOrder,
+            EventType::CancelAllVenueOrders,
+            EventType::TickUpdate,
+        ]))),
+    );
+
     // Setup engine
-    // let demo_publisher = pubsub.publisher();
     let engine = Engine::new();
-    engine.register(pubsub_service, 0, 10).await;
     engine.register(persistence_service, 0, 10).await;
     engine.register(audit_service, 0, 10).await;
     engine.register(accounting_service, 0, 10).await;
-    engine.register(binance_ingestor_service, 1, 9).await;
+    engine.register(binance_ingestor_service, 0, 10).await;
+    engine.register(insights_service, 0, 10).await;
+    engine.register(strategy_service, 0, 10).await;
+    engine.register(exec_strategy_service, 0, 10).await;
+    engine.register(execution_service, 0, 10).await;
+    engine.register(pubsub_service, 0, 10).await;
 
     engine.start().await;
 

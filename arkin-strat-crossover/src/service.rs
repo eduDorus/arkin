@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
-use tracing::{info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -13,12 +13,10 @@ use uuid::Uuid;
 #[derive(TypedBuilder)]
 #[allow(unused)]
 pub struct CrossoverStrategy {
-    #[builder(default = String::from("accounting"))]
+    #[builder(default = String::from("strat-crossover"))]
     identifier: String,
     time: Arc<dyn SystemTime>,
     publisher: Arc<dyn Publisher>,
-    #[builder(default = Ledger::new())]
-    ledger: Arc<Ledger>,
     strategy: Arc<Strategy>,
     #[builder(default = DashMap::new())]
     current_weights: DashMap<Arc<Instrument>, Decimal>,
@@ -29,7 +27,7 @@ pub struct CrossoverStrategy {
 
 impl CrossoverStrategy {
     async fn insight_tick(&self, tick: &InsightsUpdate) {
-        info!(target: "strategy::crossover", "received insight tick");
+        debug!(target: "strat-crossover", "received insight tick");
 
         // Calculate the crossover signals for each instrument in the tick
         let mut new_weights = HashMap::new();
@@ -66,13 +64,13 @@ impl CrossoverStrategy {
         for (instrument, new_weight) in new_weights {
             if let Some(current_weight) = self.current_weights.get(instrument) {
                 if *current_weight != new_weight {
-                    info!(target: "strategy::crossover", "weight change detected for {} from {} to {}", instrument, *current_weight, new_weight);
+                    info!(target: "strat-crossover", "weight change detected for {} from {} to {}", instrument, *current_weight, new_weight);
                     // Calculate the allocation change
                     let allocation_change = new_weight - *current_weight;
                     allocations.insert(instrument.clone(), allocation_change);
                 }
             } else {
-                info!(target: "strategy::crossover", "new weight for {} is {}", instrument, new_weight);
+                info!(target: "strat-crossover", "new weight for {} is {}", instrument, new_weight);
                 if !new_weight.is_zero() {
                     allocations.insert(instrument.clone(), new_weight);
                 }
@@ -90,14 +88,14 @@ impl CrossoverStrategy {
                 .id(Uuid::new_v4())
                 .strategy(Some(self.strategy.to_owned()))
                 .instrument(instrument.to_owned())
-                .exec_strategy_type(ExecutionStrategyType::Maker)
+                .exec_strategy_type(ExecutionStrategyType::Taker)
                 .side(if weight.is_sign_positive() {
                     MarketSide::Buy
                 } else {
                     MarketSide::Sell
                 })
                 .price(dec!(0))
-                .quantity(self.allocation_limit_per_instrument * weight.abs())
+                .quantity(weight.abs())
                 .status(ExecutionOrderStatus::New)
                 .created_at(self.time.now().await)
                 .updated_at(self.time.now().await)
@@ -109,9 +107,8 @@ impl CrossoverStrategy {
             self.publisher
                 .publish(Event::NewMakerExecutionOrder(order.to_owned().into()))
                 .await;
-            info!(target: "strategies::crossover", "send {} execution order for {} to execution strategy {} for a quantity of {}", order.side, order.instrument, order.exec_strategy_type, order.quantity);
+            info!(target: "strat-crossover", "send {} execution order for {} to execution strategy {} for a quantity of {}", order.side, order.instrument, order.exec_strategy_type, order.quantity);
         }
-        info!(target: "strategies::crossover", "send {} execution orders", execution_orders.len());
     }
 }
 
@@ -125,7 +122,7 @@ impl Runnable for CrossoverStrategy {
     async fn handle_event(&self, event: Event) {
         match &event {
             Event::InsightsUpdate(vo) => self.insight_tick(vo).await,
-            e => warn!(target: "strategies::crossover", "received unused event {}", e),
+            e => warn!(target: "strat-crossover", "received unused event {}", e),
         }
     }
 }

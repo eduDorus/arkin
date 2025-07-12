@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
 use time::UtcDateTime;
@@ -33,6 +34,7 @@ pub struct MovingAverageFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for MovingAverageFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
@@ -42,7 +44,7 @@ impl Feature for MovingAverageFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Calculating {}...", self.ma_type);
 
         // Get data from state
@@ -108,11 +110,14 @@ impl Feature for MovingAverageFeature {
                 .persist(self.persist)
                 .value(value)
                 .insight_type(InsightType::MovingAverage)
-                .build()
-                .into();
+                .build();
             Some(vec![insight])
         } else {
             None
         }
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }

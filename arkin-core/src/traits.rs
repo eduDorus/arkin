@@ -13,6 +13,7 @@ pub trait SystemTime: Send + Sync {
     async fn is_final_hour(&self) -> bool;
     async fn is_finished(&self) -> bool;
     async fn is_live(&self) -> bool;
+    async fn check_interval(&self) -> Vec<UtcDateTime>;
 }
 
 /// A trait for defining the lifecycle of a service in the system.

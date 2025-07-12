@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 use parking_lot::Mutex;
+use parking_lot::RwLock;
 use petgraph::graph::NodeIndex;
 use petgraph::{
     algo::toposort,
@@ -11,7 +12,6 @@ use petgraph::{
 };
 use rayon::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
-use time::UtcDateTime;
 use tracing::debug;
 
 use crate::config::PipelineConfig;
@@ -24,6 +24,7 @@ pub struct PipelineGraph {
     state: Arc<InsightsState>,
     graph: Arc<DiGraph<Arc<dyn Feature>, ()>>,
     order: Vec<NodeIndex>,
+    indegrees: Vec<i32>,
     pool: ThreadPool,
 }
 
@@ -77,28 +78,33 @@ impl PipelineGraph {
 
         debug!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
 
+        let mut indegrees = vec![0; graph.node_count()];
+        for edge in graph.edge_indices() {
+            let target = graph.edge_endpoints(edge).unwrap().1;
+            indegrees[target.index()] += 1;
+        }
+
         PipelineGraph {
             state,
             graph: graph.into(),
             order,
+            indegrees,
             pool: ThreadPoolBuilder::default().build().expect("Failed to create thread pool"),
         }
     }
 
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
-    pub fn calculate(&self, instruments: &[Arc<Instrument>], timestamp: UtcDateTime) -> Vec<Arc<Insight>> {
+    pub fn calculate(&self, tick: &InsightsTick) -> Vec<Arc<Insight>> {
+        let instruments = tick.instruments.clone();
+        let timestamp = tick.event_time.clone();
+
         // Step 1: Calculate in-degrees
-        let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
-        for edge in self.graph.edge_indices() {
-            let target = self.graph.edge_endpoints(edge).unwrap().1;
-            in_degrees.lock()[target.index()] += 1;
-        }
-        debug!("In-Degree count: {}", in_degrees.lock().iter().fold(0, |acc, x| acc + x));
+        let in_degrees = Arc::new(RwLock::new(self.indegrees.clone()));
 
         // Step 2: Enqueue nodes with zero in-degree
         let (queue_tx, queue_rx) = kanal::unbounded();
         for node in &self.order {
-            if in_degrees.lock()[node.index()] == 0 {
+            if in_degrees.read()[node.index()] == 0 {
                 debug!("Ready node: {}", node.index());
                 queue_tx.send(Some(*node)).expect("Failed to send ready node");
             }
@@ -108,6 +114,7 @@ impl PipelineGraph {
         let pipeline_result = Arc::new(Mutex::new(Vec::new()));
         self.pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
+                let instruments = instruments.clone();
                 let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);
                 let queue_tx = queue_tx.clone();
@@ -123,12 +130,11 @@ impl PipelineGraph {
                         .par_iter()
                         .filter_map(|instrument| feature.calculate(instrument, timestamp))
                         .flatten()
-                        .map(|i| {
+                        .map(|mut i| {
                             let value = (i.value * 1_000_000.0).round() / 1_000_000.0;
                             // Clone the insight and set the value
-                            let mut insight = i.as_ref().clone();
-                            insight.value = value;
-                            insight.into()
+                            i.value = value;
+                            i.into()
                         })
                         .collect::<Vec<_>>();
                     state.insert_batch(&insights);
@@ -136,7 +142,7 @@ impl PipelineGraph {
 
                     // Update in-degrees of neighbors and enqueue new zero in-degree nodes
                     for neighbor in graph.neighbors_directed(node, petgraph::Outgoing) {
-                        let mut in_degrees = in_degrees.lock();
+                        let mut in_degrees = in_degrees.write();
                         in_degrees[neighbor.index()] -= 1;
                         if in_degrees[neighbor.index()] == 0 {
                             debug!("Ready node: {}", neighbor.index());
@@ -144,7 +150,7 @@ impl PipelineGraph {
                         }
                     }
                     debug!("Dependency count: {:?}", in_degrees);
-                    if in_degrees.lock().iter().all(|&x| x == 0) {
+                    if in_degrees.read().iter().all(|&x| x == 0) {
                         debug!("All nodes processed");
                         queue_tx.send(None).expect("Failed to send exit message");
                     }
@@ -156,67 +162,66 @@ impl PipelineGraph {
         let res = std::mem::take(&mut *lock);
         res
     }
+
+    // pub async fn calculate_async(&self, tick: &InsightsTick) -> Vec<Arc<Insight>> {
+    //     // Step 1: Calculate in-degrees
+    //     let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
+    //     for edge in self.graph.edge_indices() {
+    //         let target = self.graph.edge_endpoints(edge).unwrap().1;
+    //         in_degrees.lock()[target.index()] += 1;
+    //     }
+    //     debug!("In-Degree count: {:?}", in_degrees);
+
+    //     // Step 2: Enqueue nodes with zero in-degree
+    //     let (queue_tx, queue_rx) = kanal::unbounded_async();
+    //     for node in &self.order {
+    //         if in_degrees.lock()[node.index()] == 0 {
+    //             debug!("Ready node: {:?}", self.graph[*node]);
+    //             queue_tx.send(Some(*node)).await.expect("Failed to send ready node");
+    //         }
+    //     }
+
+    //     // Step 3: Parallel processing
+    //     let mut tasks = Vec::with_capacity(self.graph.node_count());
+    //     while let Some(node_index) = queue_rx.recv().await.expect("Failed to receive ready node") {
+    //         let instruments = instruments.clone();
+    //         let graph = Arc::clone(&self.graph);
+    //         let in_degrees = Arc::clone(&in_degrees);
+    //         let queue_tx = queue_tx.clone();
+
+    //         let task = tokio::spawn(async move {
+    //             // Calculate the feature
+    //             let feature = &graph[node_index];
+    //             feature.async_calculate().await;
+
+    //             // Update dependencies and push ready nodes to the queue
+    //             for neighbor in graph.neighbors_directed(node_index, petgraph::Outgoing) {
+    //                 let mut count = in_degrees.lock()[neighbor.index()];
+    //                 count -= 1;
+    //                 in_degrees.lock()[neighbor.index()] = count;
+
+    //                 if count == 0 {
+    //                     debug!("Ready node: {:?}", graph[neighbor]);
+    //                     queue_tx.send(Some(neighbor)).await.expect("Failed to send ready node");
+
+    //                     debug!("Dependency count: {:?}", in_degrees);
+    //                     if in_degrees.lock().iter().all(|&x| x == 0) {
+    //                         queue_tx.send(None).await.expect("Failed to send ready node");
+    //                     }
+    //                 }
+    //             }
+    //         });
+    //         tasks.push(task);
+    //     }
+
+    //     // Wait on all tasks to finish
+    //     for task in tasks {
+    //         let _ = task.await;
+    //     }
+
+    //     info!("Finished graph calculation");
+    // }
 }
-
-// COULD BE USED IN THE FUTURE IF WE HAVE ASYNC FEATURES
-// pub async fn calculate_async(&self) {
-//     // Step 1: Calculate in-degrees
-//     let in_degrees = Arc::new(Mutex::new(vec![0; self.graph.node_count()]));
-//     for edge in self.graph.edge_indices() {
-//         let target = self.graph.edge_endpoints(edge).unwrap().1;
-//         in_degrees.lock()[target.index()] += 1;
-//     }
-//     debug!("In-Degree count: {:?}", in_degrees);
-
-//     // Step 2: Enqueue nodes with zero in-degree
-//     let (queue_tx, queue_rx) = flume::unbounded();
-//     for node in &self.order {
-//         if in_degrees.lock()[node.index()] == 0 {
-//             debug!("Ready node: {:?}", self.graph[*node]);
-//             queue_tx.send(Some(*node)).expect("Failed to send ready node");
-//         }
-//     }
-
-//     // Step 3: Parallel processing
-//     let mut tasks = Vec::with_capacity(self.graph.node_count());
-//     while let Some(node_index) = queue_rx.recv_async().await.expect("Failed to receive ready node") {
-//         let graph = Arc::clone(&self.graph);
-//         let in_degrees = Arc::clone(&in_degrees);
-//         let queue_tx = queue_tx.clone();
-
-//         let task = tokio::spawn(async move {
-//             // Calculate the feature
-//             let feature = &graph[node_index];
-//             feature.calculate_async().await;
-
-//             // Update dependencies and push ready nodes to the queue
-//             for neighbor in graph.neighbors_directed(node_index, petgraph::Outgoing) {
-//                 let mut count = in_degrees.lock()[neighbor.index()];
-//                 count -= 1;
-//                 in_degrees.lock()[neighbor.index()] = count;
-
-//                 if count == 0 {
-//                     debug!("Ready node: {:?}", graph[neighbor]);
-//                     queue_tx.send_async(Some(neighbor)).await.expect("Failed to send ready node");
-
-//                     debug!("Dependency count: {:?}", in_degrees);
-//                     if in_degrees.lock().iter().all(|&x| x == 0) {
-//                         queue_tx.send_async(None).await.expect("Failed to send ready node");
-//                     }
-//                 }
-//             }
-//         });
-//         tasks.push(task);
-//     }
-
-//     // Wait on all tasks to finish
-//     for task in tasks {
-//         let _ = task.await;
-//     }
-
-//     info!("Finished graph calculation");
-// }
-// }
 
 // #[cfg(test)]
 // mod tests {

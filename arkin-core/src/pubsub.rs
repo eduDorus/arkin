@@ -10,10 +10,11 @@ use kanal::{AsyncReceiver, AsyncSender};
 use strum::{IntoDiscriminant, IntoEnumIterator};
 use tokio::sync::Mutex;
 use tokio::time::timeout;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
+use crate::prelude::test_inst_binance_btc_usdt_perp;
 use crate::utils::PeekableReceiver;
-use crate::{Event, EventType, Publisher, Runnable, ServiceCtx, Subscriber, SystemTime};
+use crate::{Event, EventType, InsightsTick, Publisher, Runnable, ServiceCtx, Subscriber, SystemTime};
 
 pub enum EventFilter {
     All,
@@ -28,7 +29,7 @@ pub struct PubSubPublisher {
 #[async_trait]
 impl Publisher for PubSubPublisher {
     async fn publish(&self, event: Event) {
-        info!(target: "publisher", "publishing event {}", event);
+        debug!(target: "publisher", "publishing event {}", event);
         if let Err(e) = self.tx.send(event.into()).await {
             error!("Failed to publish event: {}", e);
         }
@@ -239,12 +240,29 @@ impl PubSub {
             // let length = self.event_queue.lock().await.len();
             // info!(target: "pubsub", "event queue length: {}", length);
             if let Some(Reverse(event)) = self.event_queue.lock().await.pop() {
-                if !event.is_market_data() {
-                    info!(target: "pubsub", "processing event: {}", event);
-                }
+                //  I think we don't need this anymore
+                // if !event.is_market_data() {
+                //     info!(target: "pubsub", "processing event: {}", event);
+                // }
+
+                // Advance time in simulation
                 if !self.time.is_live().await {
                     info!(target: "pubsub", "advancing time to {}", event.timestamp());
                     self.time.advance_time_to(event.timestamp()).await;
+                }
+
+                // Post tick events
+                let intervals = self.time.check_interval().await;
+                if !intervals.is_empty() {
+                    for ts in intervals {
+                        let tick = InsightsTick::builder()
+                            .event_time(ts)
+                            .instruments(vec![test_inst_binance_btc_usdt_perp()])
+                            .frequency(Duration::from_secs(60))
+                            .build();
+                        let tick_event = Event::InsightsTick(tick.into());
+                        self.broadcast_event(tick_event).await;
+                    }
                 }
                 self.broadcast_event(event).await;
             } else {

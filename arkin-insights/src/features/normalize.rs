@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use statrs::distribution::{ContinuousCDF, Normal};
 use strum::Display;
@@ -203,6 +204,7 @@ pub struct NormalizeFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for NormalizeFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         self.input.clone()
@@ -212,7 +214,7 @@ impl Feature for NormalizeFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Robust scaling...");
 
         //  Get data
@@ -248,12 +250,15 @@ impl Feature for NormalizeFeature {
                         .value(altered_value)
                         .insight_type(InsightType::Normalized)
                         .persist(self.persist)
-                        .build()
-                        .into(),
+                        .build(),
                 )
             })
             .collect::<Vec<_>>();
 
         Some(insights)
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }

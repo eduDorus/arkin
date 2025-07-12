@@ -292,6 +292,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-insights"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-core",
+ "async-trait",
+ "dashmap",
+ "kanal",
+ "parking_lot",
+ "petgraph",
+ "rayon",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "statrs",
+ "strum",
+ "test-log",
+ "thiserror 2.0.12",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "typed-builder",
+ "uuid",
+ "yata",
+]
+
+[[package]]
 name = "arkin-ordermanager"
 version = "0.1.0"
 dependencies = [
@@ -1038,6 +1067,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixedbitset"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
+
+[[package]]
 name = "flate2"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1604,6 +1639,7 @@ dependencies = [
  "arkin-exec-strat-taker",
  "arkin-execution-sim",
  "arkin-ingestor-binance",
+ "arkin-insights",
  "arkin-persistence",
  "arkin-strat-crossover",
  "clickhouse",
@@ -1611,6 +1647,8 @@ dependencies = [
  "kanal",
  "rand 0.9.1",
  "reqwest",
+ "rust_decimal",
+ "rust_decimal_macros",
  "serde",
  "serde_json",
  "statrs",
@@ -2064,6 +2102,17 @@ checksum = "edd1101f170f5903fde0914f899bb503d9ff5271d7ba76bbb70bea63690cc0d5"
 dependencies = [
  "pest",
  "sha2",
+]
+
+[[package]]
+name = "petgraph"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54acf3a685220b533e437e264e4d932cfbdc4cc7ec0cd232ed73c08d03b8a7ca"
+dependencies = [
+ "fixedbitset",
+ "hashbrown 0.15.4",
+ "indexmap",
 ]
 
 [[package]]
@@ -4063,6 +4112,15 @@ dependencies = [
  "arraydeque",
  "encoding_rs",
  "hashlink",
+]
+
+[[package]]
+name = "yata"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b4ef8ddfa3ccd93454262c0e60a43a2bbf403d404174e1815f7581d5028229f"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

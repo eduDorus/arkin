@@ -41,6 +41,10 @@ impl SystemTime for LiveSystemTime {
     async fn is_live(&self) -> bool {
         true
     }
+
+    async fn check_interval(&self) -> Vec<UtcDateTime> {
+        vec![]
+    }
 }
 
 pub struct SimulationSystemTime {
@@ -85,6 +89,10 @@ impl SystemTime for SimulationSystemTime {
 
     async fn is_live(&self) -> bool {
         false
+    }
+
+    async fn check_interval(&self) -> Vec<UtcDateTime> {
+        vec![]
     }
 }
 

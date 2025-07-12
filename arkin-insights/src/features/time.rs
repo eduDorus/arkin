@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use time::UtcDateTime;
 use tracing::debug;
 use typed_builder::TypedBuilder;
@@ -19,6 +20,7 @@ pub struct TimeFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for TimeFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
@@ -33,7 +35,7 @@ impl Feature for TimeFeature {
         ]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Calculating Time Features...");
 
         let day_of_week = event_time.weekday().number_from_monday();
@@ -85,5 +87,9 @@ impl Feature for TimeFeature {
         ];
 
         Some(insights)
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }

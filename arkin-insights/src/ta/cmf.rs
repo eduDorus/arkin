@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use dashmap::DashMap;
 use time::UtcDateTime;
 use tracing::debug;
@@ -25,6 +26,7 @@ pub struct ChaikinMoneyFlowFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for ChaikinMoneyFlowFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
@@ -34,7 +36,7 @@ impl Feature for ChaikinMoneyFlowFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Calculating Chaikin Money Flow...");
 
         // Get data from state
@@ -55,8 +57,7 @@ impl Feature for ChaikinMoneyFlowFeature {
                 .value(value)
                 .persist(self.persist)
                 .insight_type(InsightType::Continuous)
-                .build()
-                .into();
+                .build();
             Some(vec![insight])
         } else {
             let cmf = ChaikinMoneyFlow {
@@ -67,5 +68,9 @@ impl Feature for ChaikinMoneyFlowFeature {
             self.store.insert(instrument.clone(), cmf);
             None
         }
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }

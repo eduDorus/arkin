@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use dashmap::DashMap;
 use time::UtcDateTime;
 use tracing::debug;
@@ -27,6 +28,7 @@ pub struct RelativeStrengthIndexFeature {
     persist: bool,
 }
 
+#[async_trait]
 impl Feature for RelativeStrengthIndexFeature {
     fn inputs(&self) -> Vec<FeatureId> {
         vec![self.input.clone()]
@@ -36,7 +38,7 @@ impl Feature for RelativeStrengthIndexFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Arc<Insight>>> {
+    fn calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
         debug!("Calculating RSI...");
 
         // Get data from state
@@ -71,5 +73,9 @@ impl Feature for RelativeStrengthIndexFeature {
             self.store.insert(instrument.clone(), rsi);
             None
         }
+    }
+
+    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+        self.calculate(instrument, timestamp)
     }
 }
