@@ -22,8 +22,8 @@ impl From<MarketSide> for f64 {
 impl From<MarketSide> for Decimal {
     fn from(side: MarketSide) -> Decimal {
         match side {
-            MarketSide::Buy => Decimal::from(1),
-            MarketSide::Sell => Decimal::from(-1),
+            MarketSide::Buy => Decimal::ONE,
+            MarketSide::Sell => Decimal::NEGATIVE_ONE,
         }
     }
 }

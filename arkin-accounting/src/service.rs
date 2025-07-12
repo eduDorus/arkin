@@ -9,6 +9,31 @@ use tracing::{error, info, instrument, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Copy)]
+enum UpdateMode {
+    Initial,
+    Recon,
+    Delta,
+}
+
+impl UpdateMode {
+    fn transfer_group_type(&self) -> TransferGroupType {
+        match self {
+            UpdateMode::Initial => TransferGroupType::Initial,
+            UpdateMode::Recon => TransferGroupType::Reconciliation,
+            UpdateMode::Delta => TransferGroupType::Trade,
+        }
+    }
+
+    fn warn_diffs(&self) -> bool {
+        matches!(self, UpdateMode::Recon)
+    }
+
+    fn force_full(&self) -> bool {
+        matches!(self, UpdateMode::Initial | UpdateMode::Recon)
+    }
+}
+
 #[derive(TypedBuilder)]
 pub struct Accounting {
     #[builder(default = String::from("accounting"))]
@@ -17,560 +42,147 @@ pub struct Accounting {
     publisher: Arc<dyn Publisher>,
     #[builder(default = Ledger::new())]
     ledger: Arc<Ledger>,
+    // user_account: Arc<Account>,
 }
 
 impl Accounting {
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn initial_account_update(&self, update: &AccountUpdate) {
-        info!(target: "accounting", "received initial account update");
+    async fn process_update(&self, update: &AccountUpdate, mode: UpdateMode) {
+        info!(target: "accounting", "processing account update: reason {}", update.reason);
 
         let event_time = self.time.now().await;
+        let venue = update.venue.clone();
         let transfer_group_id = Uuid::new_v4();
         let mut transfers = Vec::new();
+        let mut diffs = Vec::new(); // (item: String, diff, current) for warns
 
-        // Apply balances first
+        let user_account =
+            self.ledger
+                .find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, event_time);
+        let venue_account =
+            self.ledger
+                .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Margin, event_time);
+
+        // Balances
         for bal in &update.balances {
-            let venue = bal.venue.to_owned();
-            let asset = Tradable::Asset(bal.asset.clone());
-            let user_account = self.ledger.find_or_create_account(
-                &venue,
-                &asset,
-                AccountOwner::User,
-                bal.account_type,
-                self.time.now().await,
-            );
-            let current_balance = self.ledger.balance(user_account.id).await;
-            let diff = bal.quantity - current_balance;
-            if diff == Decimal::ZERO {
+            let asset = bal.asset.clone();
+            let current = self.ledger.balance(&user_account, &asset).await;
+            let diff = if mode.force_full() {
+                bal.quantity - current
+            } else {
+                bal.quantity_change
+            };
+            diffs.push((format!("Asset {}", asset), diff, current));
+            if diff == Decimal::ZERO && !mode.force_full() {
                 continue;
             }
-            let obe = self.ledger.find_or_create_account(
-                &venue,
-                &asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
             let (debit, credit, amount) = if diff > Decimal::ZERO {
-                (obe, user_account, diff)
+                (venue_account.clone(), user_account.clone(), diff)
             } else {
-                (user_account, obe, -diff)
+                (user_account.clone(), venue_account.clone(), -diff)
             };
             transfers.push(
                 Transfer::builder()
                     .event_time(event_time)
                     .transfer_group_id(transfer_group_id)
-                    .asset(asset)
+                    .transfer_group_type(mode.transfer_group_type())
                     .debit_account(debit)
                     .credit_account(credit)
                     .amount(amount)
                     .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Initial)
+                    .transfer_type(TransferType::Margin)
+                    .strategy(None)
+                    .instrument(None)
+                    .asset(Some(asset))
                     .build()
                     .into(),
             );
         }
 
-        // Then positions
+        // Positions
         for pos in &update.positions {
-            let venue = pos.instrument.venue.to_owned();
-            let instrument_asset = Tradable::Asset(pos.instrument.base_asset.clone());
-            let quote_asset = Tradable::Asset(pos.instrument.quote_asset.clone());
-            let position_account = self.ledger.find_or_create_account(
-                &venue,
-                &instrument_asset,
-                AccountOwner::User,
-                AccountType::Instrument,
-                self.time.now().await,
-            );
-            let qty_diff = pos.quantity - self.ledger.balance(position_account.id).await;
-            let realized_pnl_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::User,
-                AccountType::Margin,
-                self.time.now().await,
-            );
-            let realized_diff = pos.realized_pnl - self.ledger.balance(realized_pnl_account.id).await;
-            let unrealized_pnl_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::User,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let unrealized_diff = pos.unrealized_pnl - self.ledger.balance(unrealized_pnl_account.id).await;
-
-            if qty_diff != Decimal::ZERO {
-                let venue_position = self.ledger.find_or_create_account(
-                    &venue,
-                    &instrument_asset,
-                    AccountOwner::Venue,
-                    AccountType::Instrument,
-                    self.time.now().await,
-                );
+            let instr = pos.instrument.clone();
+            let quote_asset = pos.instrument.quote_asset.clone(); // Assume Arc<Asset>
+            let qty_current = self.ledger.position(&user_account, &instr).await;
+            let qty_diff = if mode.force_full() {
+                pos.quantity - qty_current
+            } else {
+                pos.quantity - qty_current
+            }; // For delta, assume pos.quantity is new total
+            diffs.push((format!("Instr {}", instr.symbol), qty_diff, qty_current));
+            if qty_diff != Decimal::ZERO || mode.force_full() {
                 let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
-                    (venue_position.clone(), position_account.clone(), qty_diff)
+                    (venue_account.clone(), user_account.clone(), qty_diff)
                 } else {
-                    (position_account.clone(), venue_position.clone(), -qty_diff)
+                    (user_account.clone(), venue_account.clone(), -qty_diff)
                 };
                 transfers.push(
                     Transfer::builder()
                         .event_time(event_time)
                         .transfer_group_id(transfer_group_id)
-                        .asset(instrument_asset.clone())
+                        .transfer_group_type(mode.transfer_group_type())
                         .debit_account(debit)
                         .credit_account(credit)
-                        .amount(amount)
+                        .amount(amount.abs())
                         .unit_price(pos.entry_price)
-                        .transfer_type(TransferType::Initial)
+                        .transfer_type(TransferType::Transfer) // Or Position
+                        .strategy(None)
+                        .instrument(Some(instr.clone()))
+                        .asset(None)
                         .build()
                         .into(),
                 );
             }
 
-            if realized_diff != Decimal::ZERO {
-                let obe = self.ledger.find_or_create_account(
-                    &venue,
-                    &quote_asset,
-                    AccountOwner::Venue,
-                    AccountType::Equity,
-                    self.time.now().await,
-                );
-                let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
-                    (obe.clone(), realized_pnl_account.clone(), realized_diff)
+            // Realized PNL
+            let rpnl_current = self.ledger.balance(&user_account, &quote_asset).await; // Assume separate realized cache or tag; here approx
+            diffs.push((format!("RPNL {}", quote_asset), pos.realized_pnl, rpnl_current));
+            if pos.realized_pnl != Decimal::ZERO {
+                let (debit, credit, amount) = if pos.realized_pnl > Decimal::ZERO {
+                    (venue_account.clone(), user_account.clone(), pos.realized_pnl)
                 } else {
-                    (realized_pnl_account.clone(), obe.clone(), -realized_diff)
+                    (user_account.clone(), venue_account.clone(), pos.realized_pnl)
                 };
                 transfers.push(
                     Transfer::builder()
                         .event_time(event_time)
                         .transfer_group_id(transfer_group_id)
-                        .asset(quote_asset.clone())
+                        .transfer_group_type(mode.transfer_group_type())
                         .debit_account(debit)
                         .credit_account(credit)
-                        .amount(amount)
+                        .amount(amount.abs())
                         .unit_price(Decimal::ONE)
-                        .transfer_type(TransferType::Initial)
+                        .transfer_type(TransferType::Pnl)
+                        .strategy(None)
+                        .instrument(None)
+                        .asset(Some(quote_asset.clone()))
                         .build()
                         .into(),
                 );
             }
 
-            if unrealized_diff != Decimal::ZERO {
-                let obe = self.ledger.find_or_create_account(
-                    &venue,
-                    &quote_asset,
-                    AccountOwner::Venue,
-                    AccountType::Equity,
-                    self.time.now().await,
-                );
-                let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
-                    (obe.clone(), unrealized_pnl_account.clone(), unrealized_diff)
+            // Unrealized PNL (similar to realized)
+            let upnl_current = self.ledger.balance(&user_account, &quote_asset).await; // Separate if needed
+            diffs.push((format!("UPNL {}", quote_asset), pos.unrealized_pnl, upnl_current));
+            if pos.unrealized_pnl != Decimal::ZERO {
+                let (debit, credit, amount) = if pos.unrealized_pnl > Decimal::ZERO {
+                    (venue_account.clone(), user_account.clone(), pos.unrealized_pnl)
                 } else {
-                    (unrealized_pnl_account.clone(), obe.clone(), -unrealized_diff)
+                    (user_account.clone(), venue_account.clone(), pos.unrealized_pnl)
                 };
                 transfers.push(
                     Transfer::builder()
                         .event_time(event_time)
                         .transfer_group_id(transfer_group_id)
-                        .asset(quote_asset.clone())
+                        .transfer_group_type(mode.transfer_group_type())
                         .debit_account(debit)
                         .credit_account(credit)
-                        .amount(amount)
+                        .amount(amount.abs())
                         .unit_price(Decimal::ONE)
-                        .transfer_type(TransferType::Initial)
-                        .build()
-                        .into(),
-                );
-            }
-        }
-
-        if !transfers.is_empty() {
-            let res = self.ledger.apply_transfers(&transfers).await;
-            match res {
-                Ok(_) => info!(target: "accounting", "Initial account update applied"),
-                Err(e) => error!(target: "accounting", "Failed initial account update: {}", e),
-            }
-        }
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn initial_balance_update(&self, update: &BalanceUpdate) {
-        info!(target: "accounting", "received initial balance update");
-
-        let venue = update.venue.to_owned();
-        let asset = Tradable::Asset(update.asset.clone());
-
-        let user_account = self.ledger.find_or_create_account(
-            &venue,
-            &asset,
-            AccountOwner::User,
-            update.account_type,
-            self.time.now().await,
-        );
-
-        let current_balance = self.ledger.balance(user_account.id).await;
-        let diff = update.quantity - current_balance;
-
-        if diff == Decimal::ZERO {
-            info!(target: "accounting", "Initial balance already set");
-            return;
-        }
-
-        let obe_account = self.ledger.find_or_create_account(
-            &venue,
-            &asset,
-            AccountOwner::Venue,
-            AccountType::Equity,
-            self.time.now().await,
-        );
-
-        let event_time = self.time.now().await;
-        let transfer_group_id = Uuid::new_v4();
-
-        let (debit_account, credit_account, amount) = if diff > Decimal::ZERO {
-            (obe_account.clone(), user_account.clone(), diff)
-        } else {
-            (user_account.clone(), obe_account.clone(), -diff)
-        };
-
-        let transfer = Transfer::builder()
-            .event_time(event_time)
-            .transfer_group_id(transfer_group_id)
-            .asset(asset)
-            .debit_account(debit_account)
-            .credit_account(credit_account)
-            .amount(amount)
-            .unit_price(Decimal::ONE)
-            .transfer_type(TransferType::Initial)
-            .build()
-            .into();
-
-        let res = self.ledger.apply_transfers(&[transfer]).await;
-        match res {
-            Ok(_) => info!(target: "accounting", "Initial balance set: {}", update.quantity),
-            Err(e) => error!(target: "accounting", "Failed initial balance: {}", e),
-        }
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn initial_position_update(&self, update: &PositionUpdate) {
-        info!(target: "accounting", "received initial position update");
-
-        let venue = update.instrument.venue.to_owned(); // Assume added to PositionUpdate
-        let instrument_asset = Tradable::Asset(update.instrument.base_asset.clone()); // Base for quantity
-        let quote_asset = Tradable::Asset(update.instrument.quote_asset.clone()); // For PNL (assume USDT)
-
-        // Position quantity account
-        let position_account = self.ledger.find_or_create_account(
-            &venue,
-            &instrument_asset,
-            AccountOwner::User,
-            AccountType::Instrument,
-            self.time.now().await,
-        );
-
-        let current_quantity = self.ledger.balance(position_account.id).await; // Assume balance tracks qty
-        let qty_diff = update.quantity - current_quantity;
-
-        // Realized PNL equity
-        let realized_pnl_account = self.ledger.find_or_create_account(
-            &venue,
-            &quote_asset,
-            AccountOwner::User,
-            AccountType::Margin, // Name it "RealizedPNL" via extension if needed
-            self.time.now().await,
-        );
-
-        // Unrealized PNL equity
-        let unrealized_pnl_account = self.ledger.find_or_create_account(
-            &venue,
-            &quote_asset,
-            AccountOwner::User,
-            AccountType::Equity, // "UnrealizedPNL"
-            self.time.now().await,
-        );
-
-        let event_time = self.time.now().await;
-        let transfer_group_id = Uuid::new_v4();
-        let mut transfers = Vec::new();
-
-        // Quantity diff (use venue counterpart for position entry)
-        if qty_diff != Decimal::ZERO {
-            let venue_position_account = self.ledger.find_or_create_account(
-                &venue,
-                &instrument_asset,
-                AccountOwner::Venue,
-                AccountType::Instrument,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
-                (venue_position_account.clone(), position_account.clone(), qty_diff)
-            } else {
-                (position_account.clone(), venue_position_account.clone(), -qty_diff)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(instrument_asset.clone())
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(update.entry_price) // Use entry for cost basis
-                    .transfer_type(TransferType::Initial)
-                    .build()
-                    .into(),
-            );
-        }
-
-        // Realized PNL (assume no current; full set)
-        if update.realized_pnl != Decimal::ZERO {
-            let obe_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if update.realized_pnl > Decimal::ZERO {
-                (obe_account.clone(), realized_pnl_account.clone(), update.realized_pnl)
-            } else {
-                (realized_pnl_account.clone(), obe_account.clone(), -update.realized_pnl)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(quote_asset.clone())
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Initial)
-                    .build()
-                    .into(),
-            );
-        }
-
-        // Unrealized PNL (similar)
-        if update.unrealized_pnl != Decimal::ZERO {
-            let obe_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if update.unrealized_pnl > Decimal::ZERO {
-                (obe_account.clone(), unrealized_pnl_account.clone(), update.unrealized_pnl)
-            } else {
-                (unrealized_pnl_account.clone(), obe_account.clone(), -update.unrealized_pnl)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(quote_asset)
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Initial)
-                    .build()
-                    .into(),
-            );
-        }
-
-        if !transfers.is_empty() {
-            let res = self.ledger.apply_transfers(&transfers).await;
-            match res {
-                Ok(_) => info!(target: "accounting", "Initial position set"),
-                Err(e) => error!(target: "accounting", "Failed initial position: {}", e),
-            }
-        }
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn reconcile_account_update(&self, update: &AccountUpdate) {
-        info!(target: "accounting", "received reconcile account update");
-
-        let event_time = self.time.now().await;
-        let transfer_group_id = Uuid::new_v4();
-        let mut transfers = Vec::new();
-        let mut diffs = Vec::new(); // To collect diffs for warnings
-
-        // Apply balances first
-        for bal in &update.balances {
-            let venue = bal.venue.to_owned();
-            let asset = Tradable::Asset(bal.asset.clone());
-            let user_account = self.ledger.find_or_create_account(
-                &venue,
-                &asset,
-                AccountOwner::User,
-                bal.account_type,
-                self.time.now().await,
-            );
-            let current_balance = self.ledger.balance(user_account.id).await;
-            let diff = bal.quantity - current_balance;
-            diffs.push((asset.clone(), diff, current_balance));
-            if diff == Decimal::ZERO {
-                continue;
-            }
-            let recon = self.ledger.find_or_create_account(
-                &venue,
-                &asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-
-            let (debit, credit, amount) = if diff > Decimal::ZERO {
-                (recon, user_account, diff)
-            } else {
-                (user_account, recon, -diff)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(asset)
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Reconciliation)
-                    .build()
-                    .into(),
-            );
-        }
-
-        // Then positions
-        for pos in &update.positions {
-            let venue = pos.instrument.venue.to_owned();
-            let instrument_asset = Tradable::Instrument(pos.instrument.clone());
-            let quote_asset = Tradable::Asset(pos.instrument.quote_asset.clone());
-            let position_account = self.ledger.find_or_create_account(
-                &venue,
-                &instrument_asset,
-                AccountOwner::User,
-                AccountType::Instrument,
-                self.time.now().await,
-            );
-            let qty_diff = pos.quantity - self.ledger.balance(position_account.id).await;
-            let realized_pnl_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::User,
-                AccountType::Margin,
-                self.time.now().await,
-            );
-            let realized_diff = pos.realized_pnl;
-            let unrealized_pnl_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::User,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let unrealized_diff = pos.unrealized_pnl;
-
-            diffs.push((
-                instrument_asset.clone(),
-                qty_diff,
-                self.ledger.balance(position_account.id).await,
-            ));
-            diffs.push((
-                quote_asset.clone(),
-                realized_diff,
-                self.ledger.balance(realized_pnl_account.id).await,
-            ));
-            diffs.push((
-                quote_asset.clone(),
-                unrealized_diff,
-                self.ledger.balance(unrealized_pnl_account.id).await,
-            ));
-
-            if qty_diff != Decimal::ZERO {
-                let venue_position = self.ledger.find_or_create_account(
-                    &venue,
-                    &instrument_asset,
-                    AccountOwner::Venue,
-                    AccountType::Instrument,
-                    self.time.now().await,
-                );
-                let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
-                    (venue_position.clone(), position_account.clone(), qty_diff)
-                } else {
-                    (position_account.clone(), venue_position.clone(), -qty_diff)
-                };
-                transfers.push(
-                    Transfer::builder()
-                        .event_time(event_time)
-                        .transfer_group_id(transfer_group_id)
-                        .asset(instrument_asset.clone())
-                        .debit_account(debit)
-                        .credit_account(credit)
-                        .amount(amount)
-                        .unit_price(pos.entry_price)
-                        .transfer_type(TransferType::Reconciliation)
-                        .build()
-                        .into(),
-                );
-            }
-
-            if realized_diff != Decimal::ZERO {
-                let recon = self.ledger.find_or_create_account(
-                    &venue,
-                    &quote_asset,
-                    AccountOwner::Venue,
-                    AccountType::Equity,
-                    self.time.now().await,
-                );
-                let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
-                    (recon.clone(), realized_pnl_account.clone(), realized_diff)
-                } else {
-                    (realized_pnl_account.clone(), recon.clone(), -realized_diff)
-                };
-                transfers.push(
-                    Transfer::builder()
-                        .event_time(event_time)
-                        .transfer_group_id(transfer_group_id)
-                        .asset(quote_asset.clone())
-                        .debit_account(debit)
-                        .credit_account(credit)
-                        .amount(amount)
-                        .unit_price(Decimal::ONE)
-                        .transfer_type(TransferType::Reconciliation)
-                        .build()
-                        .into(),
-                );
-            }
-
-            if unrealized_diff != Decimal::ZERO {
-                let recon = self.ledger.find_or_create_account(
-                    &venue,
-                    &quote_asset,
-                    AccountOwner::Venue,
-                    AccountType::Equity,
-                    self.time.now().await,
-                );
-                let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
-                    (recon.clone(), unrealized_pnl_account.clone(), unrealized_diff)
-                } else {
-                    (unrealized_pnl_account.clone(), recon.clone(), -unrealized_diff)
-                };
-                transfers.push(
-                    Transfer::builder()
-                        .event_time(event_time)
-                        .transfer_group_id(transfer_group_id)
-                        .asset(quote_asset.clone())
-                        .debit_account(debit)
-                        .credit_account(credit)
-                        .amount(amount)
-                        .unit_price(Decimal::ONE)
-                        .transfer_type(TransferType::Reconciliation)
+                        .transfer_type(TransferType::UnrealizedPNL)
+                        .strategy(None)
+                        .instrument(None)
+                        .asset(Some(quote_asset))
                         .build()
                         .into(),
                 );
@@ -581,719 +193,148 @@ impl Accounting {
             let res = self.ledger.apply_transfers(&transfers).await;
             match res {
                 Ok(_) => {
-                    info!(target: "accounting", "Reconcile account update applied");
-                    for (asset, diff, current) in diffs {
-                        let threshold = current.abs() * dec!(0.0001);
-                        if diff.abs() > threshold {
-                            warn!(target: "accounting", "Large recon diff for {}: {} (threshold {})", asset, diff, threshold);
+                    info!(target: "accounting", "Account update applied (mode: {:?})", mode);
+                    if mode.warn_diffs() {
+                        for (item, diff, current) in diffs {
+                            let threshold = current.abs() * dec!(0.0001);
+                            if diff.abs() > threshold {
+                                warn!(target: "accounting", "Large diff for {}: {} (threshold {})", item, diff, threshold);
+                            }
                         }
                     }
                 }
-                Err(e) => error!(target: "accounting", "Failed recon account update: {}", e),
-            }
-        } else {
-            info!(target: "accounting", "Account in sync");
-        }
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn reconcile_balance_update(&self, update: &BalanceUpdate) {
-        info!(target: "accounting", "received reconcile balance update");
-
-        let venue = update.venue.to_owned();
-        let asset = Tradable::Asset(update.asset.clone());
-
-        let user_account = self.ledger.find_or_create_account(
-            &venue,
-            &asset,
-            AccountOwner::User,
-            update.account_type,
-            self.time.now().await,
-        );
-
-        let current_balance = self.ledger.balance(user_account.id).await;
-        let diff = update.quantity - current_balance;
-
-        if diff == Decimal::ZERO {
-            info!(target: "accounting", "Balance in sync");
-            return;
-        }
-
-        let recon_account = self.ledger.find_or_create_account(
-            &venue,
-            &asset,
-            AccountOwner::Venue,
-            AccountType::Equity,
-            self.time.now().await,
-        );
-
-        let event_time = self.time.now().await;
-        let transfer_group_id = Uuid::new_v4();
-
-        let (debit_account, credit_account, amount) = if diff > Decimal::ZERO {
-            (recon_account.clone(), user_account.clone(), diff)
-        } else {
-            (user_account.clone(), recon_account.clone(), -diff)
-        };
-
-        let transfer = Transfer::builder()
-            .event_time(event_time)
-            .transfer_group_id(transfer_group_id)
-            .asset(asset)
-            .debit_account(debit_account)
-            .credit_account(credit_account)
-            .amount(amount)
-            .unit_price(Decimal::ONE)
-            .transfer_type(TransferType::Reconciliation)
-            .build()
-            .into();
-
-        let res = self.ledger.apply_transfers(&[transfer]).await;
-        match res {
-            Ok(_) => {
-                info!(target: "accounting", "Reconciliation applied: diff {}", diff);
-                let threshold = current_balance * dec!(0.0001);
-                if diff.abs() > threshold {
-                    warn!(target: "accounting", "Large reconciliation diff: {} (threshold {})", diff, threshold);
-                }
-            }
-            Err(e) => error!(target: "accounting", "Failed reconciliation: {}", e),
-        }
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn reconcile_position_update(&self, update: &PositionUpdate) {
-        info!(target: "accounting", "received reconcile position update");
-
-        let venue = update.instrument.venue.to_owned();
-        let instrument_asset = Tradable::Asset(update.instrument.base_asset.clone());
-        let quote_asset = Tradable::Asset(update.instrument.quote_asset.clone());
-
-        let position_account = self.ledger.find_or_create_account(
-            &venue,
-            &instrument_asset,
-            AccountOwner::User,
-            AccountType::Instrument,
-            self.time.now().await,
-        );
-
-        let current_quantity = self.ledger.balance(position_account.id).await;
-        let qty_diff = update.quantity - current_quantity;
-
-        let realized_pnl_account = self.ledger.find_or_create_account(
-            &venue,
-            &quote_asset,
-            AccountOwner::User,
-            AccountType::Equity,
-            self.time.now().await,
-        );
-
-        let current_realized = self.ledger.balance(realized_pnl_account.id).await; // Assume tracks cumulative
-        let realized_diff = update.realized_pnl - current_realized;
-
-        let unrealized_pnl_account = self.ledger.find_or_create_account(
-            &venue,
-            &quote_asset,
-            AccountOwner::User,
-            AccountType::Equity,
-            self.time.now().await,
-        );
-
-        let current_unrealized = self.ledger.balance(unrealized_pnl_account.id).await;
-        let unrealized_diff = update.unrealized_pnl - current_unrealized;
-
-        let event_time = self.time.now().await;
-        let transfer_group_id = Uuid::new_v4();
-        let mut transfers = Vec::new();
-
-        if qty_diff != Decimal::ZERO {
-            let venue_position_account = self.ledger.find_or_create_account(
-                &venue,
-                &instrument_asset,
-                AccountOwner::Venue,
-                AccountType::Instrument,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
-                (venue_position_account.clone(), position_account.clone(), qty_diff)
-            } else {
-                (position_account.clone(), venue_position_account.clone(), -qty_diff)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(instrument_asset.clone())
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(update.entry_price)
-                    .transfer_type(TransferType::Reconciliation)
-                    .build()
-                    .into(),
-            );
-        }
-
-        if realized_diff != Decimal::ZERO {
-            let recon_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
-                (recon_account.clone(), realized_pnl_account.clone(), realized_diff)
-            } else {
-                (realized_pnl_account.clone(), recon_account.clone(), -realized_diff)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(quote_asset.clone())
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Reconciliation)
-                    .build()
-                    .into(),
-            );
-        }
-
-        if unrealized_diff != Decimal::ZERO {
-            let recon_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
-                (recon_account.clone(), unrealized_pnl_account.clone(), unrealized_diff)
-            } else {
-                (unrealized_pnl_account.clone(), recon_account.clone(), -unrealized_diff)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(quote_asset)
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Reconciliation)
-                    .build()
-                    .into(),
-            );
-        }
-
-        if !transfers.is_empty() {
-            let res = self.ledger.apply_transfers(&transfers).await;
-            match res {
-                Ok(_) => info!(target: "accounting", "Position reconciled"),
-                Err(e) => error!(target: "accounting", "Failed position reconciliation: {}", e),
-            }
-        }
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn account_update(&self, update: &AccountUpdate) {
-        info!(target: "accounting", "received account update: reason {}", update.reason);
-
-        let event_time = self.time.now().await;
-        let transfer_group_id = Uuid::new_v4();
-        let mut transfers = Vec::new();
-
-        // Apply balances first
-        for bal in &update.balances {
-            // Mirror balance_update logic, but collect transfers
-            if bal.quantity_change == Decimal::ZERO {
-                info!(target: "accounting", "received balance update with no change");
-                continue;
-            }
-            let venue = bal.venue.to_owned();
-            let asset = Tradable::Asset(bal.asset.clone());
-            let user_account = self.ledger.find_or_create_account(
-                &venue,
-                &asset,
-                AccountOwner::User,
-                bal.account_type,
-                self.time.now().await,
-            );
-            let venue_funding = self.ledger.find_or_create_account(
-                &venue,
-                &asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if bal.quantity_change > Decimal::ZERO {
-                (venue_funding, user_account, bal.quantity_change)
-            } else {
-                (user_account, venue_funding, -bal.quantity_change)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(asset)
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Trade) // TODO: Probably depending on update reason
-                    .build()
-                    .into(),
-            );
-        }
-
-        // Then positions
-        for pos in &update.positions {
-            // Mirror position_update logic, collect transfers
-            let venue = pos.instrument.venue.to_owned();
-            let instrument_asset = Tradable::Instrument(pos.instrument.clone());
-            let quote_asset = Tradable::Asset(pos.instrument.quote_asset.clone());
-            let position_account = self.ledger.find_or_create_account(
-                &venue,
-                &instrument_asset,
-                AccountOwner::User,
-                AccountType::Instrument,
-                self.time.now().await,
-            );
-            let qty_diff = pos.quantity - self.ledger.balance(position_account.id).await;
-            let realized_pnl_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::User,
-                AccountType::Margin,
-                self.time.now().await,
-            );
-            let realized_diff = pos.realized_pnl;
-            let unrealized_pnl_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::User,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let unrealized_diff = pos.unrealized_pnl;
-
-            if qty_diff != Decimal::ZERO {
-                let venue_position = self.ledger.find_or_create_account(
-                    &venue,
-                    &instrument_asset,
-                    AccountOwner::Venue,
-                    AccountType::Instrument,
-                    self.time.now().await,
-                );
-                let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
-                    (venue_position.clone(), position_account.clone(), qty_diff)
-                } else {
-                    (position_account.clone(), venue_position.clone(), -qty_diff)
-                };
-                transfers.push(
-                    Transfer::builder()
-                        .event_time(event_time)
-                        .transfer_group_id(transfer_group_id)
-                        .asset(instrument_asset)
-                        .debit_account(debit)
-                        .credit_account(credit)
-                        .amount(amount)
-                        .unit_price(pos.entry_price)
-                        .transfer_type(TransferType::Trade)
-                        .build()
-                        .into(),
-                );
-            }
-
-            if realized_diff != Decimal::ZERO {
-                let funding = self.ledger.find_or_create_account(
-                    &venue,
-                    &quote_asset,
-                    AccountOwner::Venue,
-                    AccountType::Equity,
-                    self.time.now().await,
-                );
-                let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
-                    (funding.clone(), realized_pnl_account.clone(), realized_diff)
-                } else {
-                    (realized_pnl_account.clone(), funding.clone(), -realized_diff)
-                };
-                transfers.push(
-                    Transfer::builder()
-                        .event_time(event_time)
-                        .transfer_group_id(transfer_group_id)
-                        .asset(quote_asset.clone())
-                        .debit_account(debit)
-                        .credit_account(credit)
-                        .amount(amount)
-                        .unit_price(Decimal::ONE)
-                        .transfer_type(TransferType::Pnl)
-                        .build()
-                        .into(),
-                );
-            }
-
-            if unrealized_diff != Decimal::ZERO {
-                let funding = self.ledger.find_or_create_account(
-                    &venue,
-                    &quote_asset,
-                    AccountOwner::Venue,
-                    AccountType::Equity,
-                    self.time.now().await,
-                );
-                let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
-                    (funding.clone(), unrealized_pnl_account.clone(), unrealized_diff)
-                } else {
-                    (unrealized_pnl_account.clone(), funding.clone(), -unrealized_diff)
-                };
-                transfers.push(
-                    Transfer::builder()
-                        .event_time(event_time)
-                        .transfer_group_id(transfer_group_id)
-                        .asset(quote_asset)
-                        .debit_account(debit)
-                        .credit_account(credit)
-                        .amount(amount)
-                        .unit_price(Decimal::ONE)
-                        .transfer_type(TransferType::UnrealizedPNL)
-                        .build()
-                        .into(),
-                );
-            }
-        }
-
-        if !transfers.is_empty() {
-            let res = self.ledger.apply_transfers(&transfers).await;
-            match res {
-                Ok(_) => info!(target: "accounting", "Account update applied"),
                 Err(e) => error!(target: "accounting", "Failed account update: {}", e),
             }
+        } else if mode.force_full() {
+            info!(target: "accounting", "Account in sync (no changes)");
         }
     }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn balance_update(&self, update: &BalanceUpdate) {
-        info!(target: "accounting", "received balance update");
-
-        if update.quantity_change == Decimal::ZERO {
-            info!(target: "accounting", "received balance update with no change");
-            return;
-        }
-
-        let venue = update.venue.to_owned();
-        let asset = Tradable::Asset(update.asset.clone());
-
-        let user_account = self.ledger.find_or_create_account(
-            &venue,
-            &asset,
-            AccountOwner::User,
-            update.account_type,
-            self.time.now().await,
-        );
-
-        let venue_funding_account = self.ledger.find_or_create_account(
-            &venue,
-            &asset,
-            AccountOwner::Venue,
-            AccountType::Equity,
-            self.time.now().await,
-        );
-
-        let event_time = self.time.now().await;
-        let transfer_group_id = Uuid::new_v4();
-
-        let (debit_account, credit_account, amount) = if update.quantity_change > Decimal::ZERO {
-            (venue_funding_account, user_account, update.quantity_change)
-        } else {
-            (user_account, venue_funding_account, -update.quantity_change)
-        };
-
-        let transfer = Transfer::builder()
-            .event_time(event_time)
-            .transfer_group_id(transfer_group_id)
-            .asset(asset)
-            .debit_account(debit_account)
-            .credit_account(credit_account)
-            .amount(amount)
-            .unit_price(Decimal::ONE)
-            .transfer_type(TransferType::Adjustment)
-            .build()
-            .into();
-
-        let res = self.ledger.apply_transfers(&[transfer]).await;
-        match res {
-            Ok(_) => info!(target: "accounting", "Balance adjustment applied"),
-            Err(e) => error!(target: "accounting", "Failed balance adjustment: {}", e),
-        }
+    // Wrappers
+    pub async fn initial_account_update(&self, update: &AccountUpdate) {
+        self.process_update(update, UpdateMode::Initial).await;
     }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn position_update(&self, update: &PositionUpdate) {
-        info!(target: "accounting", "received position update");
-
-        let venue = update.instrument.venue.to_owned();
-        let instrument_asset = Tradable::Asset(update.instrument.base_asset.clone());
-        let quote_asset = Tradable::Asset(update.instrument.quote_asset.clone());
-
-        let position_account = self.ledger.find_or_create_account(
-            &venue,
-            &instrument_asset,
-            AccountOwner::User,
-            AccountType::Instrument,
-            self.time.now().await,
-        );
-
-        let current_quantity = self.ledger.balance(position_account.id).await;
-        let qty_diff = update.quantity - current_quantity;
-
-        let realized_pnl_account = self.ledger.find_or_create_account(
-            &venue,
-            &quote_asset,
-            AccountOwner::User,
-            AccountType::Margin,
-            self.time.now().await,
-        );
-
-        let current_realized = self.ledger.balance(realized_pnl_account.id).await;
-        let realized_diff = update.realized_pnl - current_realized;
-
-        let unrealized_pnl_account = self.ledger.find_or_create_account(
-            &venue,
-            &quote_asset,
-            AccountOwner::User,
-            AccountType::Equity,
-            self.time.now().await,
-        );
-
-        let current_unrealized = self.ledger.balance(unrealized_pnl_account.id).await;
-        let unrealized_diff = update.unrealized_pnl - current_unrealized;
-
-        let event_time = self.time.now().await;
-        let transfer_group_id = Uuid::new_v4();
-        let mut transfers = Vec::new();
-
-        if qty_diff != Decimal::ZERO {
-            let venue_position_account = self.ledger.find_or_create_account(
-                &venue,
-                &instrument_asset,
-                AccountOwner::Venue,
-                AccountType::Instrument,
-                self.time.now().await,
-            );
-
-            let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
-                (venue_position_account.clone(), position_account.clone(), qty_diff)
-            } else {
-                (position_account.clone(), venue_position_account.clone(), -qty_diff)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(instrument_asset.clone())
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(update.entry_price)
-                    .transfer_type(TransferType::Adjustment)
-                    .build()
-                    .into(),
-            );
-        }
-
-        if realized_diff != Decimal::ZERO {
-            let funding_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
-                (funding_account.clone(), realized_pnl_account.clone(), realized_diff)
-            } else {
-                (realized_pnl_account.clone(), funding_account.clone(), -realized_diff)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(quote_asset.clone())
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Pnl)
-                    .build()
-                    .into(),
-            );
-        }
-
-        if unrealized_diff != Decimal::ZERO {
-            let funding_account = self.ledger.find_or_create_account(
-                &venue,
-                &quote_asset,
-                AccountOwner::Venue,
-                AccountType::Equity,
-                self.time.now().await,
-            );
-            let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
-                (funding_account.clone(), unrealized_pnl_account.clone(), unrealized_diff)
-            } else {
-                (unrealized_pnl_account.clone(), funding_account.clone(), -unrealized_diff)
-            };
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(quote_asset)
-                    .debit_account(debit)
-                    .credit_account(credit)
-                    .amount(amount)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Pnl)
-                    .build()
-                    .into(),
-            );
-        }
-
-        if !transfers.is_empty() {
-            let res = self.ledger.apply_transfers(&transfers).await;
-            match res {
-                Ok(_) => info!(target: "accounting", "Position update applied"),
-                Err(e) => error!(target: "accounting", "Failed position update: {}", e),
-            }
-        }
+    pub async fn reconcile_account_update(&self, update: &AccountUpdate) {
+        self.process_update(update, UpdateMode::Recon).await;
     }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn venue_order_fill(&self, order: &VenueOrder) {
-        let transfer_group_id = Uuid::new_v4();
-        let event_time = self.time.now().await;
-
-        let venue = order.instrument.venue.clone();
-        let (credit_asset, debit_asset) = if order.side == MarketSide::Buy {
-            (
-                Tradable::Asset(order.instrument.base_asset.clone()),
-                Tradable::Asset(order.instrument.quote_asset.clone()),
-            )
-        } else {
-            (
-                Tradable::Asset(order.instrument.quote_asset.clone()),
-                Tradable::Asset(order.instrument.base_asset.clone()),
-            )
-        };
-
-        let (credit_amount, debit_amount) = if order.side == MarketSide::Buy {
-            (order.quantity, order.quantity * order.price)
-        } else {
-            (order.quantity * order.price, order.quantity)
-        };
-
-        let mut transfers = vec![];
-
-        // Debit transfer
-        let debit_account = self.ledger.find_or_create_account(
-            &venue,
-            &debit_asset,
-            AccountOwner::User,
-            AccountType::Spot,
-            self.time.now().await,
-        );
-        let credit_account = self.ledger.find_or_create_account(
-            &venue,
-            &debit_asset,
-            AccountOwner::Venue,
-            AccountType::Spot,
-            self.time.now().await,
-        );
-
-        transfers.push(
-            Transfer::builder()
-                .event_time(event_time)
-                .transfer_group_id(transfer_group_id)
-                .asset(debit_asset.clone())
-                .debit_account(debit_account)
-                .credit_account(credit_account)
-                .amount(debit_amount)
-                .unit_price(Decimal::ONE)
-                .transfer_type(TransferType::Exchange)
-                .build()
-                .into(),
-        );
-
-        // Credit transfer
-        let debit_account = self.ledger.find_or_create_account(
-            &venue,
-            &credit_asset,
-            AccountOwner::Venue,
-            AccountType::Spot,
-            self.time.now().await,
-        );
-        let credit_account = self.ledger.find_or_create_account(
-            &venue,
-            &credit_asset,
-            AccountOwner::User,
-            AccountType::Spot,
-            self.time.now().await,
-        );
-
-        transfers.push(
-            Transfer::builder()
-                .event_time(event_time)
-                .transfer_group_id(transfer_group_id)
-                .asset(credit_asset)
-                .debit_account(debit_account)
-                .credit_account(credit_account)
-                .amount(credit_amount)
-                .unit_price(Decimal::ONE)
-                .transfer_type(TransferType::Exchange)
-                .build()
-                .into(),
-        );
-
-        // Commission (assume order has commission field; stub 0.1% quote)
-        let commission = (debit_amount * dec!(0.001)).max(dec!(0.01)); // Placeholder
-        if commission > Decimal::ZERO {
-            let user_quote_account = self.ledger.find_or_create_account(
-                &venue,
-                &Tradable::Asset(order.instrument.quote_asset.clone()),
-                AccountOwner::User,
-                AccountType::Spot,
-                self.time.now().await,
-            );
-            let commission_account = self.ledger.find_or_create_account(
-                &venue,
-                &Tradable::Asset(order.instrument.quote_asset.clone()),
-                AccountOwner::Venue,
-                AccountType::Equity, // Commission expense
-                self.time.now().await,
-            );
-            transfers.push(
-                Transfer::builder()
-                    .event_time(event_time)
-                    .transfer_group_id(transfer_group_id)
-                    .asset(Tradable::Asset(order.instrument.quote_asset.clone()))
-                    .debit_account(user_quote_account)
-                    .credit_account(commission_account)
-                    .amount(commission)
-                    .unit_price(Decimal::ONE)
-                    .transfer_type(TransferType::Commission)
-                    .build()
-                    .into(),
-            );
-        }
-
-        let res = self.ledger.apply_transfers(&transfers).await;
-        match res {
-            Ok(_) => info!(target: "accounting", "Transfers applied successfully"),
-            Err(e) => error!(target: "accounting", "Failed to apply transfers: {}", e),
-        }
+    pub async fn account_update(&self, update: &AccountUpdate) {
+        self.process_update(update, UpdateMode::Delta).await;
     }
+
+    // #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    // pub async fn venue_order_fill(&self, order: &VenueOrder) {
+    //     let transfer_group_id = Uuid::new_v4();
+    //     let event_time = self.time.now().await;
+
+    //     let venue = order.instrument.venue.clone();
+    //     let (credit_asset, debit_asset) = if order.side == MarketSide::Buy {
+    //         (order.instrument.base_asset.clone(), order.instrument.quote_asset.clone())
+    //     } else {
+    //         (order.instrument.quote_asset.clone(), order.instrument.base_asset.clone())
+    //     };
+
+    //     let (credit_amount, debit_amount) = if order.side == MarketSide::Buy {
+    //         (order.quantity, order.quantity * order.price)
+    //     } else {
+    //         (order.quantity * order.price, order.quantity)
+    //     };
+
+    //     let mut transfers = vec![];
+
+    //     // Debit transfer
+    //     let debit_account =
+    //         self.ledger
+    //             .find_or_create_account(&venue, AccountOwner::User, AccountType::Spot, self.time.now().await);
+    //     let credit_account =
+    //         self.ledger
+    //             .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Spot, self.time.now().await);
+
+    //     transfers.push(
+    //         Transfer::builder()
+    //             .event_time(event_time)
+    //             .transfer_group_id(transfer_group_id)
+    //             .debit_account(debit_account)
+    //             .credit_account(credit_account)
+    //             .amount(debit_amount)
+    //             .unit_price(Decimal::ONE)
+    //             .transfer_type(TransferType::Exchange)
+    //             .asset(debit_asset.clone())
+    //             .instrument(None)
+    //             .strategy(None)
+    //             .build()
+    //             .into(),
+    //     );
+
+    //     // Credit transfer
+    //     let debit_account = self.ledger.find_or_create_account(
+    //         &venue,
+    //         &credit_asset,
+    //         AccountOwner::Venue,
+    //         AccountType::Spot,
+    //         self.time.now().await,
+    //     );
+    //     let credit_account = self.ledger.find_or_create_account(
+    //         &venue,
+    //         &credit_asset,
+    //         AccountOwner::User,
+    //         AccountType::Spot,
+    //         self.time.now().await,
+    //     );
+
+    //     transfers.push(
+    //         Transfer::builder()
+    //             .event_time(event_time)
+    //             .transfer_group_id(transfer_group_id)
+    //             .asset(credit_asset)
+    //             .debit_account(debit_account)
+    //             .credit_account(credit_account)
+    //             .amount(credit_amount)
+    //             .unit_price(Decimal::ONE)
+    //             .transfer_type(TransferType::Exchange)
+    //             .build()
+    //             .into(),
+    //     );
+
+    //     // Commission (assume order has commission field; stub 0.1% quote)
+    //     let commission = (debit_amount * dec!(0.001)).max(dec!(0.01)); // Placeholder
+    //     if commission > Decimal::ZERO {
+    //         let user_quote_account = self.ledger.find_or_create_account(
+    //             &venue,
+    //             &Tradable::Asset(order.instrument.quote_asset.clone()),
+    //             AccountOwner::User,
+    //             AccountType::Spot,
+    //             self.time.now().await,
+    //         );
+    //         let commission_account = self.ledger.find_or_create_account(
+    //             &venue,
+    //             &Tradable::Asset(order.instrument.quote_asset.clone()),
+    //             AccountOwner::Venue,
+    //             AccountType::Equity, // Commission expense
+    //             self.time.now().await,
+    //         );
+    //         transfers.push(
+    //             Transfer::builder()
+    //                 .event_time(event_time)
+    //                 .transfer_group_id(transfer_group_id)
+    //                 .asset(Tradable::Asset(order.instrument.quote_asset.clone()))
+    //                 .debit_account(user_quote_account)
+    //                 .credit_account(commission_account)
+    //                 .amount(commission)
+    //                 .unit_price(Decimal::ONE)
+    //                 .transfer_type(TransferType::Commission)
+    //                 .build()
+    //                 .into(),
+    //         );
+    //     }
+
+    //     let res = self.ledger.apply_transfers(&transfers).await;
+    //     match res {
+    //         Ok(_) => info!(target: "accounting", "Transfers applied successfully"),
+    //         Err(e) => error!(target: "accounting", "Failed to apply transfers: {}", e),
+    //     }
+    // }
 }
 
 #[async_trait]
@@ -1311,19 +352,24 @@ impl Runnable for Accounting {
             Event::AccountUpdate(au) => self.account_update(au).await,
 
             // Balance
-            Event::InitialBalanceUpdate(u) => self.initial_balance_update(u).await,
-            Event::ReconcileBalanceUpdate(u) => self.reconcile_balance_update(u).await,
-            Event::ReconcilePositionUpdate(u) => self.reconcile_position_update(u).await,
+            // Event::InitialBalanceUpdate(u) => self.initial_balance_update(u).await,
+            // Event::ReconcileBalanceUpdate(u) => self.reconcile_balance_update(u).await,
+            // Event::ReconcilePositionUpdate(u) => self.reconcile_position_update(u).await,
 
-            // Position
-            Event::InitialPositionUpdate(u) => self.initial_position_update(u).await,
-            Event::BalanceUpdate(u) => self.balance_update(u).await,
-            Event::PositionUpdate(u) => self.position_update(u).await,
+            // // Position
+            // Event::InitialPositionUpdate(u) => self.initial_position_update(u).await,
+            // Event::BalanceUpdate(u) => self.balance_update(u).await,
+            // Event::PositionUpdate(u) => self.position_update(u).await,
 
             // Fill (Will probably delete since this is handled with account updates)
-            Event::VenueOrderFill(vo) => self.venue_order_fill(vo).await,
+            // Event::VenueOrderFill(vo) => self.venue_order_fill(vo).await,
             e => warn!(target: "accounting", "received unused event {}", e),
         }
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn teardown(&self, _ctx: Arc<ServiceCtx>) {
+        self.ledger.dump_state(1000).await;
     }
 }
 
@@ -1344,9 +390,9 @@ mod tests {
         let ledger = Ledger::new();
         let accounting = Accounting::builder()
             .identifier("test".to_string())
-            .time(time.to_owned())
-            .publisher(publisher.to_owned())
-            .ledger(ledger.to_owned())
+            .time(time.clone())
+            .publisher(publisher.clone())
+            .ledger(ledger.clone())
             .build();
 
         let venue = test_binance_venue();
@@ -1354,10 +400,14 @@ mod tests {
         let btc_perp = test_inst_binance_btc_usdt_perp(); // Assume leverage=20
         let eth_perp = test_inst_binance_eth_usdt_perp(); // Assume leverage=20
 
+        let user_account =
+            ledger.find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, time.now().await);
+
         // Step 1: Initial (100k USDT margin, no positions)
         let initial = AccountUpdate::builder()
             .id(Uuid::new_v4())
             .event_time(time.now().await)
+            .venue(venue.clone())
             .balances(vec![BalanceUpdate::builder()
                 .event_time(time.now().await)
                 .venue(venue.clone())
@@ -1369,16 +419,10 @@ mod tests {
             .positions(vec![])
             .reason("INITIAL".to_string())
             .build();
-        accounting.handle_event(Event::InitialAccountUpdate(initial.into())).await;
 
-        let margin_acct = ledger.find_or_create_account(
-            &venue,
-            &Tradable::Asset(usdt.clone()),
-            AccountOwner::User,
-            AccountType::Margin,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(margin_acct.id).await, dec!(100000));
+        accounting.handle_event(Event::ReconcileAccountUpdate(initial.into())).await;
+
+        assert_eq!(ledger.balance(&user_account, &usdt).await, dec!(100000));
         ledger.dump_state(100).await;
 
         // Step 2: Long BTC perp (qty=1 @10000, unreal=0, deduct margin=10000/20=500)
@@ -1386,6 +430,7 @@ mod tests {
         let after_long = AccountUpdate::builder()
             .id(Uuid::new_v4())
             .event_time(time.now().await)
+            .venue(venue.clone())
             .balances(vec![BalanceUpdate::builder()
                 .event_time(time.now().await)
                 .venue(venue.clone())
@@ -1408,15 +453,8 @@ mod tests {
             .build();
         accounting.handle_event(Event::AccountUpdate(after_long.into())).await;
 
-        let btc_pos_acct = ledger.find_or_create_account(
-            &venue,
-            &Tradable::Instrument(btc_perp.clone()),
-            AccountOwner::User,
-            AccountType::Instrument,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(btc_pos_acct.id).await, dec!(1));
-        assert_eq!(ledger.balance(margin_acct.id).await, dec!(99500));
+        assert_eq!(ledger.position(&user_account, &btc_perp).await, dec!(1));
+        assert_eq!(ledger.balance(&user_account, &usdt).await, dec!(99500));
         ledger.dump_state(100).await;
 
         // Step 3: Short ETH perp (qty=-2 @2000, unreal=0, deduct margin=abs(-2)*2000/20=200)
@@ -1424,6 +462,7 @@ mod tests {
         let after_short = AccountUpdate::builder()
             .id(Uuid::new_v4())
             .event_time(time.now().await)
+            .venue(venue.clone())
             .balances(vec![BalanceUpdate::builder()
                 .event_time(time.now().await)
                 .venue(venue.clone())
@@ -1446,15 +485,8 @@ mod tests {
             .build();
         accounting.handle_event(Event::AccountUpdate(after_short.into())).await;
 
-        let eth_pos_acct = ledger.find_or_create_account(
-            &venue,
-            &Tradable::Instrument(eth_perp.clone()),
-            AccountOwner::User,
-            AccountType::Instrument,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(eth_pos_acct.id).await, dec!(-2));
-        assert_eq!(ledger.balance(margin_acct.id).await, dec!(99300));
+        assert_eq!(ledger.position(&user_account, &eth_perp).await, dec!(-2));
+        assert_eq!(ledger.balance(&user_account, &usdt).await, dec!(99300));
         ledger.dump_state(100).await;
 
         // Step 4: Reconciliation (small mismatch, e.g., balance 99301 due to funding fee, BTC qty 1.001 drift)
@@ -1462,6 +494,7 @@ mod tests {
         let recon = AccountUpdate::builder()
             .id(Uuid::new_v4())
             .event_time(time.now().await)
+            .venue(venue.clone())
             .balances(vec![BalanceUpdate::builder()
                 .event_time(time.now().await)
                 .venue(venue.clone())
@@ -1484,8 +517,8 @@ mod tests {
             .build();
         accounting.handle_event(Event::ReconcileAccountUpdate(recon.into())).await;
 
-        assert_eq!(ledger.balance(margin_acct.id).await, dec!(99301));
-        assert_eq!(ledger.balance(btc_pos_acct.id).await, dec!(1.001));
+        assert_eq!(ledger.balance(&user_account, &usdt).await, dec!(99301));
+        assert_eq!(ledger.position(&user_account, &btc_perp).await, dec!(1.001));
         ledger.dump_state(100).await;
 
         // Step 5: Sell BTC long with gain (close to qty=0, realized +1000, release margin 10000/20=500 + gain to margin)
@@ -1493,6 +526,7 @@ mod tests {
         let sell_btc = AccountUpdate::builder()
             .id(Uuid::new_v4())
             .event_time(time.now().await)
+            .venue(venue.clone())
             .balances(vec![BalanceUpdate::builder()
                 .event_time(time.now().await)
                 .venue(venue.clone())
@@ -1515,8 +549,8 @@ mod tests {
             .build();
         accounting.handle_event(Event::AccountUpdate(sell_btc.into())).await;
 
-        assert_eq!(ledger.balance(btc_pos_acct.id).await, dec!(0));
-        assert_eq!(ledger.balance(margin_acct.id).await, dec!(100801));
+        assert_eq!(ledger.position(&user_account, &btc_perp).await, dec!(0));
+        assert_eq!(ledger.balance(&user_account, &usdt).await, dec!(100801));
         ledger.dump_state(100).await;
 
         // Step 6: Buy back ETH short with loss (close to qty=0, realized -500, release margin 4000/20=200 - loss from margin)
@@ -1524,6 +558,7 @@ mod tests {
         let buy_eth = AccountUpdate::builder()
             .id(Uuid::new_v4())
             .event_time(time.now().await)
+            .venue(venue.clone())
             .balances(vec![BalanceUpdate::builder()
                 .event_time(time.now().await)
                 .venue(venue.clone())
@@ -1546,141 +581,130 @@ mod tests {
             .build();
         accounting.handle_event(Event::AccountUpdate(buy_eth.into())).await;
 
-        assert_eq!(ledger.balance(eth_pos_acct.id).await, dec!(0));
-        assert_eq!(ledger.balance(margin_acct.id).await, dec!(100501));
-        ledger.dump_state(100).await;
-
-        // Final ledger check (dump or asserts)
-        let realized_pnl_acct = ledger.find_or_create_account(
-            &venue,
-            &Tradable::Asset(usdt.clone()),
-            AccountOwner::User,
-            AccountType::Margin,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(realized_pnl_acct.id).await, dec!(100501)); // Net +1000 -500
-        ledger.dump_state(100).await; // For visibility
-    }
-
-    #[tokio::test]
-    #[test_log::test]
-    #[ignore]
-    async fn test_accounting() {
-        let time = MockTime::new();
-        let publisher = MockPublisher::new();
-        let ledger = Ledger::new();
-        let accounting = Accounting::builder()
-            .identifier("test".to_string())
-            .time(time.to_owned())
-            .publisher(publisher.to_owned())
-            .ledger(ledger.to_owned())
-            .build();
-
-        // Initial zero assertion
-        let usdt_account = ledger.find_or_create_account(
-            &test_binance_venue(),
-            &Tradable::Asset(test_usdt_asset()),
-            AccountOwner::User,
-            AccountType::Margin,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(usdt_account.id).await, dec!(0));
-
-        let init_balance_update_1 = BalanceUpdate::builder()
-            .id(Uuid::new_v4())
-            .event_time(time.now().await)
-            .venue(test_binance_venue())
-            .account_type(AccountType::Margin)
-            .asset(test_usdt_asset())
-            .quantity_change(dec!(0))
-            .quantity(dec!(100000))
-            .build();
-
-        accounting
-            .handle_event(Event::InitialBalanceUpdate(init_balance_update_1.clone().into()))
-            .await;
-
-        assert_eq!(ledger.balance(usdt_account.id).await, dec!(100000));
-
-        let init_position_update_1 = PositionUpdate::builder()
-            .id(Uuid::new_v4())
-            .event_time(time.now().await)
-            .account_type(AccountType::Margin)
-            .instrument(test_inst_binance_btc_usdt_perp())
-            .entry_price(dec!(10000))
-            .quantity(dec!(1))
-            .realized_pnl(dec!(0))
-            .unrealized_pnl(dec!(100))
-            .position_side(PositionSide::Long)
-            .build();
-
-        accounting
-            .handle_event(Event::InitialPositionUpdate(init_position_update_1.clone().into()))
-            .await;
-
-        let btc_position_account = ledger.find_or_create_account(
-            &test_binance_venue(),
-            &Tradable::Asset(test_btc_asset()), // Assume base
-            AccountOwner::User,
-            AccountType::Instrument,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(btc_position_account.id).await, dec!(1));
-
-        let unrealized_pnl_account = ledger.find_or_create_account(
-            &test_binance_venue(),
-            &Tradable::Asset(test_usdt_asset()),
-            AccountOwner::User,
-            AccountType::Equity,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(unrealized_pnl_account.id).await, dec!(100));
-
-        // We realize some pnl
-        let init_position_update_2 = PositionUpdate::builder()
-            .id(Uuid::new_v4())
-            .event_time(time.now().await)
-            .account_type(AccountType::Margin)
-            .instrument(test_inst_binance_btc_usdt_perp())
-            .entry_price(dec!(10000))
-            .quantity(dec!(0.5))
-            .realized_pnl(dec!(50))
-            .unrealized_pnl(dec!(50))
-            .position_side(PositionSide::Long)
-            .build();
-
-        accounting
-            .handle_event(Event::PositionUpdate(init_position_update_2.clone().into()))
-            .await;
-
-        let btc_position_account = ledger.find_or_create_account(
-            &test_binance_venue(),
-            &Tradable::Asset(test_btc_asset()), // Assume base
-            AccountOwner::User,
-            AccountType::Instrument,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(btc_position_account.id).await, dec!(0.5));
-
-        let unrealized_pnl_account = ledger.find_or_create_account(
-            &test_binance_venue(),
-            &Tradable::Asset(test_usdt_asset()),
-            AccountOwner::User,
-            AccountType::Equity,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(unrealized_pnl_account.id).await, dec!(50));
-
-        let margin_account = ledger.find_or_create_account(
-            &test_binance_venue(),
-            &Tradable::Asset(test_usdt_asset()),
-            AccountOwner::User,
-            AccountType::Margin,
-            time.now().await,
-        );
-        assert_eq!(ledger.balance(margin_account.id).await, dec!(100050));
+        assert_eq!(ledger.position(&user_account, &eth_perp).await, dec!(0));
+        assert_eq!(ledger.balance(&user_account, &usdt).await, dec!(100501));
         ledger.dump_state(100).await;
     }
+
+    // #[tokio::test]
+    // #[test_log::test]
+    // #[ignore]
+    // async fn test_accounting() {
+    //     let time = MockTime::new();
+    //     let publisher = MockPublisher::new();
+    //     let ledger = Ledger::new();
+    //     let accounting = Accounting::builder()
+    //         .identifier("test".to_string())
+    //         .time(time.clone())
+    //         .publisher(publisher.clone())
+    //         .ledger(ledger.clone())
+    //         .build();
+
+    //     // Initial zero assertion
+    //     let usdt_account = ledger.find_or_create_account(
+    //         &test_binance_venue(),
+    //         &Tradable::Asset(test_usdt_asset()),
+    //         AccountOwner::User,
+    //         AccountType::Margin,
+    //         time.now().await,
+    //     );
+    //     assert_eq!(ledger.balance(usdt_account.id).await, dec!(0));
+
+    //     let init_balance_update_1 = BalanceUpdate::builder()
+    //         .id(Uuid::new_v4())
+    //         .event_time(time.now().await)
+    //         .venue(test_binance_venue())
+    //         .account_type(AccountType::Margin)
+    //         .asset(test_usdt_asset())
+    //         .quantity_change(dec!(0))
+    //         .quantity(dec!(100000))
+    //         .build();
+
+    //     accounting
+    //         .handle_event(Event::InitialBalanceUpdate(init_balance_update_1.clone().into()))
+    //         .await;
+
+    //     assert_eq!(ledger.balance(usdt_account.id).await, dec!(100000));
+
+    //     let init_position_update_1 = PositionUpdate::builder()
+    //         .id(Uuid::new_v4())
+    //         .event_time(time.now().await)
+    //         .account_type(AccountType::Margin)
+    //         .instrument(test_inst_binance_btc_usdt_perp())
+    //         .entry_price(dec!(10000))
+    //         .quantity(dec!(1))
+    //         .realized_pnl(dec!(0))
+    //         .unrealized_pnl(dec!(100))
+    //         .position_side(PositionSide::Long)
+    //         .build();
+
+    //     accounting
+    //         .handle_event(Event::InitialPositionUpdate(init_position_update_1.clone().into()))
+    //         .await;
+
+    //     let btc_position_account = ledger.find_or_create_account(
+    //         &test_binance_venue(),
+    //         &Tradable::Asset(test_btc_asset()), // Assume base
+    //         AccountOwner::User,
+    //         AccountType::Instrument,
+    //         time.now().await,
+    //     );
+    //     assert_eq!(ledger.balance(btc_position_account.id).await, dec!(1));
+
+    //     let unrealized_pnl_account = ledger.find_or_create_account(
+    //         &test_binance_venue(),
+    //         &Tradable::Asset(test_usdt_asset()),
+    //         AccountOwner::User,
+    //         AccountType::Equity,
+    //         time.now().await,
+    //     );
+    //     assert_eq!(ledger.balance(unrealized_pnl_account.id).await, dec!(100));
+
+    //     // We realize some pnl
+    //     let init_position_update_2 = PositionUpdate::builder()
+    //         .id(Uuid::new_v4())
+    //         .event_time(time.now().await)
+    //         .account_type(AccountType::Margin)
+    //         .instrument(test_inst_binance_btc_usdt_perp())
+    //         .entry_price(dec!(10000))
+    //         .quantity(dec!(0.5))
+    //         .realized_pnl(dec!(50))
+    //         .unrealized_pnl(dec!(50))
+    //         .position_side(PositionSide::Long)
+    //         .build();
+
+    //     accounting
+    //         .handle_event(Event::PositionUpdate(init_position_update_2.clone().into()))
+    //         .await;
+
+    //     let btc_position_account = ledger.find_or_create_account(
+    //         &test_binance_venue(),
+    //         &Tradable::Asset(test_btc_asset()), // Assume base
+    //         AccountOwner::User,
+    //         AccountType::Instrument,
+    //         time.now().await,
+    //     );
+    //     assert_eq!(ledger.balance(btc_position_account.id).await, dec!(0.5));
+
+    //     let unrealized_pnl_account = ledger.find_or_create_account(
+    //         &test_binance_venue(),
+    //         &Tradable::Asset(test_usdt_asset()),
+    //         AccountOwner::User,
+    //         AccountType::Equity,
+    //         time.now().await,
+    //     );
+    //     assert_eq!(ledger.balance(unrealized_pnl_account.id).await, dec!(50));
+
+    //     let margin_account = ledger.find_or_create_account(
+    //         &test_binance_venue(),
+    //         &Tradable::Asset(test_usdt_asset()),
+    //         AccountOwner::User,
+    //         AccountType::Margin,
+    //         time.now().await,
+    //     );
+    //     assert_eq!(ledger.balance(margin_account.id).await, dec!(100050));
+    //     ledger.dump_state(100).await;
+    // }
 }
 
 // pub async fn margin_fill(&self, order: &VenueOrder) {

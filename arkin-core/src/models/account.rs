@@ -6,9 +6,9 @@ use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use super::{Tradable, Venue};
+use super::Venue;
 
-#[derive(Debug, Clone, Copy, PartialEq, Type, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Type, Display, Hash)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "account_owner", rename_all = "snake_case")]
 pub enum AccountOwner {
@@ -16,23 +16,18 @@ pub enum AccountOwner {
     Venue,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Type, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Type, Display, Hash)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "account_type", rename_all = "snake_case")]
 pub enum AccountType {
     Spot,
     Margin,
-    Instrument,
     Equity,
 }
 
-/// Each account references a specific currency.
-/// We'll store the balance as a Decimal, but you could use integer
-/// amounts of "cents" or "atomic units" for real usage.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, Hash)]
 pub struct Account {
     pub id: Uuid,
-    pub asset: Tradable,
     pub venue: Arc<Venue>,
     pub owner: AccountOwner,
     pub account_type: AccountType,
@@ -42,44 +37,40 @@ pub struct Account {
 
 impl Account {
     pub fn is_user_account(&self) -> bool {
-        match self.owner {
-            AccountOwner::User => true,
-            _ => false,
-        }
+        self.owner == AccountOwner::User
     }
 
     pub fn is_venue_account(&self) -> bool {
-        match self.owner {
-            AccountOwner::Venue => true,
-            _ => false,
-        }
+        self.owner == AccountOwner::Venue
     }
 
     pub fn is_spot_account(&self) -> bool {
-        match self.account_type {
-            AccountType::Spot => true,
-            _ => false,
-        }
+        self.account_type == AccountType::Spot
     }
 
     pub fn is_margin_account(&self) -> bool {
-        match self.account_type {
-            AccountType::Margin => true,
-            _ => false,
-        }
+        self.account_type == AccountType::Margin
+    }
+
+    pub fn is_equity_account(&self) -> bool {
+        self.account_type == AccountType::Equity
     }
 
     pub fn is_venue(&self, venue: &Arc<Venue>) -> bool {
         self.venue == *venue
     }
+}
 
-    pub fn has_asset(&self, asset: &Tradable) -> bool {
-        self.asset == *asset
+impl PartialEq for Account {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
     }
 }
 
+impl Eq for Account {}
+
 impl fmt::Display for Account {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}_{}_{}_{}", self.owner, self.venue, self.account_type, self.asset)
+        write!(f, "{}_{}_{}", self.owner, self.venue, self.account_type)
     }
 }

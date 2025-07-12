@@ -1,29 +1,58 @@
 use std::{cmp::min, sync::Arc};
 
 use async_trait::async_trait;
-use rust_decimal::{prelude::FromPrimitive, Decimal};
+use dashmap::DashMap;
+use rust_decimal::prelude::*;
+use rust_decimal_macros::dec;
 use tracing::{debug, info, instrument, warn};
 
 use arkin_core::prelude::*;
 
 use crate::book::ExchangeBook;
 
+#[derive(Clone, Default)]
+struct InternalAccount {
+    balances: DashMap<Arc<Asset>, Decimal>,                  // asset -> wallet balance
+    positions: DashMap<Arc<Instrument>, (Decimal, Decimal)>, // instrument -> (entry_price, position)
+}
+
+impl InternalAccount {
+    fn update_balance(&self, asset: &Arc<Asset>, quantity: Decimal) {
+        *self.balances.entry(asset.to_owned()).or_insert(Decimal::ZERO) += quantity;
+    }
+
+    fn update_position(&self, instrument: &Arc<Instrument>, entry_price: Decimal, quantity: Decimal) {
+        *self
+            .positions
+            .entry(instrument.to_owned())
+            .or_insert((Decimal::ZERO, Decimal::ZERO)) = (entry_price, quantity);
+    }
+}
+
 pub struct Executor {
     identifier: String,
     time: Arc<dyn SystemTime>,
     publisher: Arc<dyn Publisher>,
+    venue: Arc<Venue>,
     orderbook: ExchangeBook,
+    account: InternalAccount,
     commission_rate: Decimal,
+    leverage: Decimal,
 }
 
 impl Executor {
     pub fn new(identifier: &str, time: Arc<dyn SystemTime>, publisher: Arc<dyn Publisher>) -> Arc<Self> {
+        let account = InternalAccount::default();
+        account.update_balance(&test_usdt_asset(), dec!(100000));
         Self {
             identifier: identifier.to_owned(),
             time,
             publisher,
+            venue: test_binance_venue(), // TODO: This will not work in prod
             orderbook: ExchangeBook::default(),
-            commission_rate: Decimal::from_f64(0.0005).unwrap(),
+            account,
+            commission_rate: dec!(0.0005),
+            leverage: dec!(10),
         }
         .into()
     }
@@ -73,6 +102,149 @@ impl Executor {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    fn check_market_order(&self, tick: &Tick, order: &VenueOrder) -> (bool, Decimal, Decimal) {
+        match order.side {
+            MarketSide::Buy => (true, tick.ask_price(), min(order.remaining_quantity(), tick.ask_quantity)),
+            MarketSide::Sell => (true, tick.bid_price(), min(order.remaining_quantity(), tick.bid_quantity)),
+        }
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    fn check_limit_order(&self, tick: &Tick, order: &VenueOrder) -> (bool, Decimal, Decimal) {
+        match order.side {
+            MarketSide::Buy => (
+                tick.ask_price() <= order.price,
+                tick.ask_price(),
+                min(order.remaining_quantity(), tick.ask_quantity),
+            ),
+            MarketSide::Sell => (
+                tick.bid_price() >= order.price,
+                tick.bid_price(),
+                min(order.remaining_quantity(), tick.bid_quantity),
+            ),
+        }
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn fill_update(&self, order: &VenueOrder, price: Decimal, quantity: Decimal, commission: Decimal) {
+        info!(target: "executor-simulation", "matched order {} at {} with {} commissions {}", order.id, order.last_fill_quantity, order.last_fill_price, order.last_fill_commission);
+
+        // Add the fill
+        let mut order = order.clone();
+        order.add_fill(self.time.now().await, price, quantity, commission);
+
+        // Check if the order is fully filled
+        if order.remaining_quantity().is_zero() {
+            info!(target: "executor-simulation", "order {} filled with total of {}@{} commission {}", order.id, order.quantity, order.filled_price, order.commission);
+            self.orderbook.remove(order.id);
+        } else {
+            info!(target: "executor-simulation", "order {} partially filled {} with total of {}/{}", order.id, order.last_fill_quantity, order.filled_quantity, order.quantity);
+            self.orderbook.update(order.clone());
+        }
+
+        self.publisher.publish(Event::VenueOrderFill(order.to_owned().into())).await;
+        info!(target: "executor-simulation", "published fill update for {}", order.id);
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn account_update(&self, order: &VenueOrder, price: Decimal, quantity: Decimal, commission: Decimal) {
+        let instrument = order.instrument.clone();
+        let margin_asset = order.instrument.margin_asset.clone();
+        let side_sign: Decimal = order.side.into();
+        let qty_delta = quantity * side_sign;
+
+        // Get current pos/entry
+        let (entry, current_qty) = self
+            .account
+            .positions
+            .get(&instrument)
+            .map_or((dec!(0), dec!(0)), |p| *p.value());
+
+        // Calc closed amt/PNL if reducing
+        let amt_closed = if current_qty.signum() != qty_delta.signum() || current_qty.abs() < quantity {
+            current_qty.abs().min(quantity)
+        } else {
+            dec!(0)
+        };
+        let pnl = if amt_closed > dec!(0) {
+            let pnl_sign = if current_qty > dec!(0) {
+                dec!(1)
+            } else {
+                dec!(-1)
+            };
+            (price - entry) * amt_closed * pnl_sign
+        } else {
+            dec!(0)
+        };
+
+        // New qty/entry
+        let new_qty = current_qty + qty_delta;
+        let new_entry = if new_qty == dec!(0) {
+            dec!(0)
+        } else if amt_closed == current_qty.abs() {
+            // Flip: new entry = price
+            price
+        } else {
+            // Avg
+            (entry * current_qty.abs() + price * (quantity - amt_closed)) / new_qty.abs()
+        };
+
+        // Margin delta (change to wallet: negative for post, positive for release)
+        let margin_release = if amt_closed > dec!(0) {
+            amt_closed * entry / self.leverage
+        } else {
+            dec!(0)
+        };
+        let margin_post = if qty_delta.abs() > amt_closed {
+            (qty_delta.abs() - amt_closed) * price / self.leverage
+        } else {
+            dec!(0)
+        };
+        let margin_delta = margin_release - margin_post;
+
+        // Update internal
+        self.account.update_balance(&margin_asset, pnl + margin_delta - commission); // Net to balance
+        self.account.update_position(&instrument, new_entry, new_qty);
+
+        // Publish AccountUpdate
+        let bal_change = pnl + margin_delta - commission;
+        let new_bal = self.account.balances.get(&margin_asset).map_or(dec!(0), |b| *b.value());
+        let bal_update = BalanceUpdate::builder()
+            .event_time(self.time.now().await)
+            .venue(instrument.venue.clone())
+            .asset(margin_asset)
+            .account_type(AccountType::Margin)
+            .quantity_change(bal_change)
+            .quantity(new_bal)
+            .build();
+
+        let pos_update = PositionUpdate::builder()
+            .event_time(self.time.now().await)
+            .instrument(instrument)
+            .account_type(AccountType::Margin)
+            .entry_price(new_entry)
+            .quantity(new_qty)
+            .realized_pnl(pnl) // Incremental
+            .unrealized_pnl(dec!(0)) // Sim no mark
+            .position_side(if new_qty > dec!(0) {
+                PositionSide::Long
+            } else {
+                PositionSide::Short
+            })
+            .build();
+
+        let au = AccountUpdate::builder()
+            .event_time(self.time.now().await)
+            .venue(self.venue.to_owned())
+            .balances(vec![bal_update])
+            .positions(vec![pos_update])
+            .reason("ORDER".to_string())
+            .build();
+        self.publisher.publish(Event::AccountUpdate(au.to_owned().into())).await;
+        info!(target: "executor-simulation", "published account update {}", au);
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn tick_update(&self, tick: &Tick) {
         debug!(target: "executor-simulation", "received tick update");
 
@@ -81,24 +253,8 @@ impl Executor {
                 info!(target: "executor-simulation", "checking order {}", order);
                 info!(target: "executor-simulation", "best Bid {}, best ask {}", tick.bid_price(), tick.ask_price());
                 let (matched, price, quantity) = match order.order_type {
-                    VenueOrderType::Market => match order.side {
-                        MarketSide::Buy => (true, tick.ask_price(), min(order.remaining_quantity(), tick.ask_quantity)),
-                        MarketSide::Sell => {
-                            (true, tick.bid_price(), min(order.remaining_quantity(), tick.bid_quantity))
-                        }
-                    },
-                    VenueOrderType::Limit => match order.side {
-                        MarketSide::Buy => (
-                            tick.ask_price() <= order.price,
-                            tick.ask_price(),
-                            min(order.remaining_quantity(), tick.ask_quantity),
-                        ),
-                        MarketSide::Sell => (
-                            tick.bid_price() >= order.price,
-                            tick.bid_price(),
-                            min(order.remaining_quantity(), tick.bid_quantity),
-                        ),
-                    },
+                    VenueOrderType::Market => self.check_market_order(tick, &order),
+                    VenueOrderType::Limit => self.check_limit_order(tick, &order),
                     _ => {
                         warn!(target: "executor-simulation", "unsupported order type: {}", order.order_type);
                         continue;
@@ -107,22 +263,9 @@ impl Executor {
 
                 info!(target: "executor-simulation", "order {} matched {}", order.id, matched);
                 if matched {
-                    // Update order
-                    let mut order = order;
                     let commission = price * quantity * self.commission_rate;
-                    order.add_fill(self.time.now().await, price, quantity, commission);
-                    info!(target: "executor-simulation", "matched order {} at {} with {} commissions {}", order.id, order.last_fill_quantity, order.last_fill_price, order.last_fill_commission);
-
-                    // Check if the order is fully filled
-                    if order.remaining_quantity().is_zero() {
-                        info!(target: "executor-simulation", "order {} filled with total of {}@{} commission {}", order.id, order.quantity, order.filled_price, order.commission);
-                        self.orderbook.remove(order.id);
-                    } else {
-                        info!(target: "executor-simulation", "order {} partially filled {} with total of {}/{}", order.id, order.last_fill_quantity, order.filled_quantity, order.quantity);
-                        self.orderbook.update(order.clone());
-                    }
-
-                    self.publisher.publish(Event::VenueOrderFill(order.into())).await;
+                    self.fill_update(&order, price, quantity, commission).await;
+                    self.account_update(&order, price, quantity, commission).await;
                 }
             }
         }
@@ -144,6 +287,58 @@ impl Runnable for Executor {
             Event::TickUpdate(t) => self.tick_update(t).await,
             e => warn!(target: "executor-simulation", "received unused event {}", e),
         }
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn setup(&self, _ctx: Arc<ServiceCtx>) {
+        // Send inital balance update
+
+        let mut balances = Vec::new();
+        for entry in self.account.balances.iter() {
+            let asset = entry.key();
+            let balance = entry.value();
+            balances.push(
+                BalanceUpdate::builder()
+                    .event_time(self.time.now().await)
+                    .venue(test_binance_venue())
+                    .asset(asset.to_owned())
+                    .account_type(AccountType::Margin)
+                    .quantity_change(balance.to_owned())
+                    .quantity(balance.to_owned())
+                    .build(),
+            );
+        }
+
+        let mut positions = Vec::new();
+        for entry in self.account.positions.iter() {
+            let inst = entry.key();
+            let (entry, qty) = entry.value();
+            positions.push(
+                PositionUpdate::builder()
+                    .event_time(self.time.now().await)
+                    .instrument(inst.to_owned())
+                    .account_type(AccountType::Margin)
+                    .entry_price(entry.to_owned())
+                    .quantity(qty.to_owned())
+                    .realized_pnl(dec!(0)) // Incremental; cumulate in full impl
+                    .unrealized_pnl(dec!(0)) // Sim no mark
+                    .position_side(if qty.to_owned() > dec!(0) {
+                        PositionSide::Long
+                    } else {
+                        PositionSide::Short
+                    })
+                    .build(),
+            );
+        }
+        let au = AccountUpdate::builder()
+            .event_time(self.time.now().await)
+            .venue(self.venue.to_owned())
+            .balances(balances)
+            .positions(positions)
+            .reason("INIT".to_string())
+            .build();
+        self.publisher.publish(Event::InitialAccountUpdate(au.to_owned().into())).await;
+        info!(target: "executor-simulation", "published initial account update {}", au);
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
@@ -509,7 +704,11 @@ mod tests {
 
         // Verify events after tick update (additional 2 Filled events)
         let events = publisher.get_events().await;
-        assert_eq!(events.len(), 6, "Expected six events total (4 from placing, 2 from filling)");
+        assert_eq!(
+            events.len(),
+            8,
+            "Expected six events total (4 from placing, 2 from fill updates, 2 from account updates)"
+        );
 
         // Check buy order filled event
         buy_order.status = VenueOrderStatus::PartiallyFilled;
@@ -526,7 +725,7 @@ mod tests {
         sell_order.filled_price = dec!(49000.0); // Filled at bid price
         sell_order.filled_quantity = tick.ask_quantity;
         assert_eq!(
-            events[5],
+            events[6],
             Event::VenueOrderFill(sell_order.clone().into()),
             "Sell order should be partially filled at bid price"
         );
@@ -554,14 +753,18 @@ mod tests {
 
         // Verify events after tick update (additional 2 Filled events)
         let events = publisher.get_events().await;
-        assert_eq!(events.len(), 8, "Expected six events total (4 from placing, 2 from filling)");
+        assert_eq!(
+            events.len(),
+            12,
+            "Expected six events total (4 from placing, 4 from filling, 4 from account updates)"
+        );
 
         // Check buy order filled event
         buy_order.status = VenueOrderStatus::Filled;
         buy_order.filled_price = dec!(50000.0); // Filled at ask price
         buy_order.filled_quantity = tick.bid_quantity;
         assert_eq!(
-            events[6],
+            events[8],
             Event::VenueOrderFill(buy_order.clone().into()),
             "Buy order should be Filled at ask price"
         );
@@ -571,7 +774,7 @@ mod tests {
         sell_order.filled_price = dec!(49000.0); // Filled at bid price
         sell_order.filled_quantity = tick.ask_quantity;
         assert_eq!(
-            events[7],
+            events[10],
             Event::VenueOrderFill(sell_order.clone().into()),
             "Sell order should be Filled at bid price"
         );
@@ -671,14 +874,18 @@ mod tests {
 
         // Verify events after tick update (additional 2 Filled events)
         let events = publisher.get_events().await;
-        assert_eq!(events.len(), 5, "Expected six events total (4 from placing, 1 from filling)");
+        assert_eq!(
+            events.len(),
+            6,
+            "Expected six events total (4 from placing, 1 from filling, 1 account update)"
+        );
 
         // Check buy order filled event
         buy_order.status = VenueOrderStatus::Filled;
         buy_order.filled_price = dec!(49400.0); // Filled at ask price
         buy_order.filled_quantity = buy_order.quantity;
         assert_eq!(
-            events[4],
+            events[5],
             Event::VenueOrderFill(buy_order.clone().into()),
             "Buy order should be Filled at ask price"
         );
@@ -699,14 +906,18 @@ mod tests {
 
         // Verify events after tick update (additional 2 Filled events)
         let events = publisher.get_events().await;
-        assert_eq!(events.len(), 6, "Expected six events total (4 from placing, 2 from filling)");
+        assert_eq!(
+            events.len(),
+            8,
+            "Expected six events total (4 from placing, 2 from filling, 2 account updates)"
+        );
 
         // Check sell order filled event
         sell_order.status = VenueOrderStatus::Filled;
         sell_order.filled_price = dec!(48900.0); // Filled at bid price
         sell_order.filled_quantity = sell_order.quantity;
         assert_eq!(
-            events[5],
+            events[7],
             Event::VenueOrderFill(sell_order.clone().into()),
             "Sell order should be Filled at bid price"
         );

@@ -1,15 +1,17 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{BalanceUpdate, PositionUpdate};
+use crate::{BalanceUpdate, PositionUpdate, Venue};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct AccountUpdate {
+    #[builder(default)]
     pub id: Uuid,
     pub event_time: UtcDateTime,
+    pub venue: Arc<Venue>,
     pub balances: Vec<BalanceUpdate>,
     pub positions: Vec<PositionUpdate>,
     pub reason: String, // "m" from stream, e.g., "ORDER"
@@ -25,11 +27,32 @@ impl Eq for AccountUpdate {}
 
 impl fmt::Display for AccountUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "balance_updates={} position_updates={}",
-            self.balances.len(),
-            self.positions.len()
-        )
+            "Account Update (ID: {}, Time: {}, Reason: {})",
+            self.id, self.event_time, self.reason
+        )?;
+        writeln!(f, "Balances:")?;
+        for bal in &self.balances {
+            writeln!(
+                f,
+                "  - Asset: {}, Change: {}, Quantity: {}, Type: {:?}",
+                bal.asset, bal.quantity_change, bal.quantity, bal.account_type
+            )?;
+        }
+        writeln!(f, "Positions:")?;
+        for pos in &self.positions {
+            writeln!(
+                f,
+                "  - Instrument: {}, Entry: {}, Qty: {}, Realized PNL: {}, Unreal PNL: {}, Side: {:?}",
+                pos.instrument.symbol,
+                pos.entry_price,
+                pos.quantity,
+                pos.realized_pnl,
+                pos.unrealized_pnl,
+                pos.position_side
+            )?;
+        }
+        Ok(())
     }
 }

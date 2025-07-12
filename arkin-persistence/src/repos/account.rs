@@ -10,7 +10,6 @@ use crate::PersistenceError;
 #[derive(FromRow)]
 pub struct AccountDTO {
     pub id: Uuid,
-    pub asset_id: Uuid,
     pub venue_id: Uuid,
     pub owner: AccountOwner,
     pub account_type: AccountType,
@@ -20,7 +19,6 @@ impl From<Arc<Account>> for AccountDTO {
     fn from(account: Arc<Account>) -> Self {
         Self {
             id: account.id,
-            asset_id: account.asset.id(),
             venue_id: account.venue.id,
             owner: account.owner.clone(),
             account_type: account.account_type.clone(),
@@ -42,15 +40,13 @@ impl AccountRepo {
             (
                 id, 
                 instance_id,
-                asset_id, 
                 venue_id,
                 owner,
                 account_type
-            ) VALUES ($1, $2, $3, $4, $5, $6)
+            ) VALUES ($1, $2, $3, $4, $5)
             "#,
             account.id,
             self.instance.id,
-            account.asset_id,
             account.venue_id,
             account.owner as AccountOwner,
             account.account_type as AccountType,
@@ -66,7 +62,6 @@ impl AccountRepo {
             r#"
             SELECT
                 id, 
-                asset_id, 
                 venue_id,
                 owner AS "owner:AccountOwner",
                 account_type AS "account_type:AccountType"
@@ -90,7 +85,6 @@ impl AccountRepo {
             r#"
             SELECT
                 id, 
-                asset_id, 
                 venue_id,
                 owner AS "owner:AccountOwner",
                 account_type AS "account_type:AccountType"

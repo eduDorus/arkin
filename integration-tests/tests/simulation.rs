@@ -22,7 +22,7 @@ async fn test_simulation() {
 
     // Start and end time
     let start_time = time.now().await;
-    let end_time = start_time + Duration::from_secs(3600);
+    let end_time = start_time + Duration::from_secs(43200);
 
     // Init pubsub
     let pubsub = PubSub::new(time.clone(), true);
@@ -47,7 +47,10 @@ async fn test_simulation() {
     );
     let accounting_service = Service::new(
         accounting.to_owned(),
-        Some(pubsub.subscribe(EventFilter::Events(vec![EventType::VenueOrderFill]))),
+        Some(pubsub.subscribe(EventFilter::Events(vec![
+            EventType::InitialAccountUpdate,
+            EventType::AccountUpdate,
+        ]))),
     );
 
     // Init audit
@@ -60,7 +63,7 @@ async fn test_simulation() {
             .identifier("sim-binance-ingestor".to_owned())
             ._time(time.to_owned())
             .start(start_time)
-            .end(end_time + Duration::from_secs(1))
+            .end(end_time + Duration::from_secs(3600))
             .instruments(vec![test_inst_binance_btc_usdt_perp()])
             .persistence(persistence.to_owned())
             .publisher(pubsub.publisher())
@@ -166,19 +169,12 @@ async fn test_simulation() {
 
     engine.start().await;
 
-    // Publish some demo events
-    // for _ in 0..5 {
-    //     demo_publisher
-    //         .publish(Event::Finished(time.now().await + Duration::from_secs(1)))
-    //         .await;
-    //     tokio::time::sleep(Duration::from_secs(1)).await;
-    //     // time.advance_time_by(Duration::from_secs(1)).await;
-    // }
-
     while time.now().await < end_time {
         info!(target: "integration-test", "Current time: {} end time: {} diff: {}", time.now().await, end_time, end_time - time.now().await);
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+
+    engine.stop().await;
 
     info!(target: "integration-test", " --- LOG REVIEW ---");
     let event_log = audit.event_log();
@@ -186,6 +182,4 @@ async fn test_simulation() {
     // for event in event_log {
     //     info!(target: "integration-test", " - {} Event: {}",event.timestamp(), event.event_type());
     // }
-
-    engine.stop().await;
 }

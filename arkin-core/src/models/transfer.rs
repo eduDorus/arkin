@@ -7,26 +7,35 @@ use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use super::{Account, Instrument, Strategy, Tradable};
+use crate::Asset;
 
-#[derive(Debug, Display, Clone, PartialEq, Type)]
-#[sqlx(type_name = "transfer_type", rename_all = "snake_case")]
-pub enum TransferType {
+use super::{Account, Instrument, Strategy};
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, Type)]
+#[sqlx(type_name = "transfer_group_type", rename_all = "snake_case")]
+pub enum TransferGroupType {
     Initial,
     Deposit,
     Withdrawal,
     Trade,
-    Pnl,
-    UnrealizedPNL,
     Exchange,
-    Margin,
-    Commission,
     Interest,
     Funding,
     Settlement,
     Liquidation,
-    Rebate,
     Adjustment,
+    Reconciliation,
+}
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, Type)]
+#[sqlx(type_name = "transfer_type", rename_all = "snake_case")]
+pub enum TransferType {
+    Transfer,
+    Pnl,
+    UnrealizedPNL,
+    Margin,
+    Commission,
+    Rebate,
     Reconciliation,
 }
 
@@ -40,12 +49,12 @@ pub struct Transfer {
     pub event_time: UtcDateTime,
     /// The ID of the transfer group this transfer belongs to.
     pub transfer_group_id: Uuid,
+    /// Type of transfer group
+    pub transfer_group_type: TransferGroupType,
     /// The account that is debited (balance goes down).
     pub debit_account: Arc<Account>,
     /// The account that is credited (balance goes up).
     pub credit_account: Arc<Account>,
-    /// The asset being transferred.
-    pub asset: Tradable,
     /// The amount of this transfer.
     pub amount: Decimal,
     /// The Unit Price of the asset being transferred.
@@ -53,28 +62,28 @@ pub struct Transfer {
     /// Transfer type (e.g. deposit, withdrawal, trade, etc.)
     pub transfer_type: TransferType,
     /// strategy that initiated this transfer.
-    #[builder(default)]
     pub strategy: Option<Arc<Strategy>>,
     /// Instrument that this transfer is related to.
-    #[builder(default)]
     pub instrument: Option<Arc<Instrument>>,
+    /// The asset being transferred.
+    pub asset: Option<Arc<Asset>>,
 }
 
 impl Transfer {
-    pub fn has_asset(&self, asset: &Tradable) -> bool {
-        &self.asset == asset
-    }
-
     pub fn has_transfer_type(&self, transfer_type: &TransferType) -> bool {
         &self.transfer_type == transfer_type
     }
 
     pub fn has_strategy(&self, strategy: &Arc<Strategy>) -> bool {
-        self.strategy == Some(strategy.clone())
+        self.strategy.as_ref() == Some(strategy)
     }
 
     pub fn has_instrument(&self, instrument: &Arc<Instrument>) -> bool {
-        self.instrument == Some(instrument.clone())
+        self.instrument.as_ref() == Some(instrument)
+    }
+
+    pub fn has_asset(&self, asset: &Arc<Asset>) -> bool {
+        self.asset.as_ref() == Some(&asset)
     }
 }
 
@@ -82,8 +91,21 @@ impl fmt::Display for Transfer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{}: {} -> {} {} @ {}",
-            self.transfer_type, self.debit_account, self.credit_account, self.amount, self.unit_price
+            "{} {}: {} -> {} {}{} {} @ {}",
+            self.event_time,
+            self.transfer_type,
+            self.debit_account,
+            self.credit_account,
+            match &self.asset {
+                Some(asset) => format!("{}", asset),
+                None => "".to_string(),
+            },
+            match &self.instrument {
+                Some(inst) => format!("{}", inst),
+                None => "".to_string(),
+            },
+            self.amount,
+            self.unit_price
         )
     }
 }

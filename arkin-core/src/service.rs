@@ -138,6 +138,7 @@ impl Service {
     pub async fn start_service(&self) {
         info!(target: "service", "starting");
         self.ctx.starting().await;
+        self.service.setup(self.ctx.to_owned()).await;
         if self.subscriber.is_some() {
             self.event_loop().await;
         }
@@ -153,6 +154,7 @@ impl Service {
         self.service.clone().stop_tasks(self.ctx.clone()).await;
         self.ctx.signal_shutdown();
         self.ctx.wait().await;
+        self.service.teardown(self.ctx.to_owned()).await;
         self.ctx.stopped().await;
         info!(target: "service", "stopped");
     }

@@ -19,12 +19,12 @@ pub struct TransferDTO {
     pub transfer_group_id: Uuid,
     pub debit_account_id: Uuid,
     pub credit_account_id: Uuid,
-    pub asset_id: Uuid,
     pub amount: Decimal,
     pub unit_price: Decimal,
     pub transfer_type: TransferType,
     pub strategy_id: Option<Uuid>,
     pub instrument_id: Option<Uuid>,
+    pub asset_id: Option<Uuid>,
 }
 
 impl From<Arc<Transfer>> for TransferDTO {
@@ -35,12 +35,12 @@ impl From<Arc<Transfer>> for TransferDTO {
             transfer_group_id: transfer.transfer_group_id,
             debit_account_id: transfer.debit_account.id,
             credit_account_id: transfer.credit_account.id,
-            asset_id: transfer.asset.id(),
             amount: transfer.amount,
             unit_price: transfer.unit_price,
             transfer_type: transfer.transfer_type.clone(),
             strategy_id: transfer.strategy.as_ref().map(|s| s.id),
             instrument_id: transfer.instrument.as_ref().map(|i| i.id),
+            asset_id: transfer.asset.as_ref().map(|a| a.id),
         }
     }
 }
