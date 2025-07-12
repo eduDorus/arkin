@@ -1,4 +1,5 @@
 mod account;
+mod account_update;
 mod asset;
 mod balance;
 mod book;
@@ -19,6 +20,7 @@ mod venue;
 mod venue_order;
 
 pub use account::*;
+pub use account_update::*;
 pub use asset::*;
 pub use balance::*;
 pub use book::*;

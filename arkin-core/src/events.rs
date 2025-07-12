@@ -19,8 +19,18 @@ pub enum Event {
     BookUpdate(Arc<Book>),
 
     // Accounting
+    InitialAccountUpdate(Arc<AccountUpdate>),
+    ReconcileAccountUpdate(Arc<AccountUpdate>),
+    AccountUpdate(Arc<AccountUpdate>),
+
+    InitialBalanceUpdate(Arc<BalanceUpdate>),
+    ReconcileBalanceUpdate(Arc<BalanceUpdate>),
     BalanceUpdate(Arc<BalanceUpdate>),
+
+    InitialPositionUpdate(Arc<PositionUpdate>),
+    ReconcilePositionUpdate(Arc<PositionUpdate>),
     PositionUpdate(Arc<PositionUpdate>),
+
     AccountNew(Arc<AccountUpdate>),
     TransferNew(Arc<TransferGroup>),
 
@@ -72,8 +82,18 @@ impl Event {
             Event::BookUpdate(event) => event.event_time,
 
             // Accounting
+            Event::InitialAccountUpdate(event) => event.event_time,
+            Event::ReconcileAccountUpdate(event) => event.event_time,
+            Event::AccountUpdate(event) => event.event_time,
+
+            Event::InitialBalanceUpdate(event) => event.event_time,
+            Event::ReconcileBalanceUpdate(event) => event.event_time,
             Event::BalanceUpdate(event) => event.event_time,
+
+            Event::InitialPositionUpdate(event) => event.event_time,
+            Event::ReconcilePositionUpdate(event) => event.event_time,
             Event::PositionUpdate(event) => event.event_time,
+
             Event::AccountNew(event) => event.event_time,
             Event::TransferNew(event) => event.event_time,
 

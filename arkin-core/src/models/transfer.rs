@@ -12,10 +12,12 @@ use super::{Account, Instrument, Strategy, Tradable};
 #[derive(Debug, Display, Clone, PartialEq, Type)]
 #[sqlx(type_name = "transfer_type", rename_all = "snake_case")]
 pub enum TransferType {
+    Initial,
     Deposit,
     Withdrawal,
     Trade,
     Pnl,
+    UnrealizedPNL,
     Exchange,
     Margin,
     Commission,
@@ -25,6 +27,7 @@ pub enum TransferType {
     Liquidation,
     Rebate,
     Adjustment,
+    Reconciliation,
 }
 
 /// A single same-currency "transfer" in double-entry style.

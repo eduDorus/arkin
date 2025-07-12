@@ -1,44 +1,28 @@
 use std::{fmt, sync::Arc};
 
 use sqlx::Type;
-use time::UtcDateTime;
+use strum::Display;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use super::{Tradable, Venue};
 
-#[derive(Debug, Clone, PartialEq, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Type, Display)]
+#[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "account_owner", rename_all = "snake_case")]
 pub enum AccountOwner {
     User,
     Venue,
 }
 
-impl fmt::Display for AccountOwner {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AccountOwner::User => write!(f, "U"),
-            AccountOwner::Venue => write!(f, "V"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Type, Display)]
+#[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "account_type", rename_all = "snake_case")]
 pub enum AccountType {
     Spot,
     Margin,
     Instrument,
-}
-
-impl fmt::Display for AccountType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AccountType::Spot => write!(f, "S"),
-            AccountType::Margin => write!(f, "M"),
-            AccountType::Instrument => write!(f, "I"),
-        }
-    }
+    Equity,
 }
 
 /// Each account references a specific currency.
@@ -93,12 +77,6 @@ impl Account {
 
 impl fmt::Display for Account {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}_{}_{}", self.account_type, self.venue, self.asset)
+        write!(f, "{}_{}_{}_{}", self.owner, self.venue, self.account_type, self.asset)
     }
-}
-
-#[derive(Debug, Clone, TypedBuilder)]
-pub struct AccountUpdate {
-    pub event_time: UtcDateTime,
-    pub account: Arc<Account>,
 }

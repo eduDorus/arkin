@@ -42,7 +42,7 @@ async fn test_simulation() {
     let accounting = Arc::new(
         Accounting::builder()
             .time(time.to_owned())
-            ._publisher(pubsub.publisher())
+            .publisher(pubsub.publisher())
             .build(),
     );
     let accounting_service = Service::new(

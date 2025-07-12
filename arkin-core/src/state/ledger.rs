@@ -67,6 +67,9 @@ pub struct Ledger {
     // We store completed transfers here, or you could store them in a DB, etc.
     #[builder(default = RwLock::new(Vec::new()))]
     transfers: RwLock<Vec<Arc<Transfer>>>,
+    // Cached balances for O(1) access
+    #[builder(default)]
+    balances: DashMap<Uuid, Decimal>,
 }
 
 impl Ledger {
@@ -74,6 +77,7 @@ impl Ledger {
         Self {
             accounts: DashMap::new(),
             transfers: RwLock::new(Vec::new()),
+            balances: DashMap::new(),
         }
         .into()
     }
@@ -86,7 +90,7 @@ impl Ledger {
         owner: AccountOwner,
         account_type: AccountType,
     ) -> Arc<Account> {
-        match self.find_account(&venue, &asset, &owner, &account_type) {
+        match self.find_account(&venue, &asset, owner, account_type) {
             Some(account) => account,
             None => {
                 let account: Arc<Account> = Account::builder()
@@ -97,7 +101,8 @@ impl Ledger {
                     .account_type(account_type)
                     .build()
                     .into();
-                self.accounts.insert(account.id.clone(), account.clone());
+                self.accounts.insert(account.id, account.clone());
+                self.balances.insert(account.id, Decimal::ZERO);
                 info!("Added account: {} {}", account.id, account);
                 account
             }
@@ -109,12 +114,12 @@ impl Ledger {
         &self,
         venue: &Arc<Venue>,
         asset: &Tradable,
-        owner: &AccountOwner,
-        account_type: &AccountType,
+        owner: AccountOwner,
+        account_type: AccountType,
     ) -> Option<Arc<Account>> {
         self.accounts
             .iter()
-            .find(|a| a.venue == *venue && a.asset == *asset && a.owner == *owner && a.account_type == *account_type)
+            .find(|a| a.venue == *venue && a.asset == *asset && a.owner == owner && a.account_type == account_type)
             .map(|e| e.value().clone())
     }
 
@@ -123,12 +128,12 @@ impl Ledger {
         &self,
         venue: &Arc<Venue>,
         asset: &Tradable,
-        owner: &AccountOwner,
-        account_type: &AccountType,
+        owner: AccountOwner,
+        account_type: AccountType,
     ) -> Arc<Account> {
         match self.find_account(venue, asset, owner, account_type) {
             Some(account) => account,
-            None => self.add_account(venue.clone(), asset.clone(), owner.clone(), account_type.clone()),
+            None => self.add_account(venue.clone(), asset.clone(), owner, account_type),
         }
     }
 
@@ -145,16 +150,7 @@ impl Ledger {
     /// Returns the global balance for an account.
     /// This is the sum of all debit and credit transfers from the account.
     pub async fn balance(&self, account_id: Uuid) -> Decimal {
-        let transfers = self.transfers.read().await;
-        transfers.iter().fold(Decimal::ZERO, |acc, t| {
-            if t.credit_account.id == account_id {
-                acc + t.amount
-            } else if t.debit_account.id == account_id {
-                acc - t.amount
-            } else {
-                acc
-            }
-        })
+        self.balances.get(&account_id).map_or(Decimal::ZERO, |v| v.value().clone())
     }
 
     /// Returns the net position amount for an account and strategy.
@@ -404,6 +400,14 @@ impl Ledger {
         for t in transfers {
             info!("Applying transfer: {}", t);
             tx_log_lock.push(t.clone());
+
+            // Update caches
+            if let Some(mut db) = self.balances.get_mut(&t.debit_account.id) {
+                *db -= t.amount;
+            }
+            if let Some(mut cb) = self.balances.get_mut(&t.credit_account.id) {
+                *cb += t.amount;
+            }
         }
         drop(tx_log_lock);
 
@@ -415,6 +419,38 @@ impl Ledger {
             .into();
 
         Ok(transfer_group)
+    }
+
+    /// Dumps the current state of the ledger as a formatted string for debugging.
+    /// Includes all accounts with balances and the last N transfers.
+    pub async fn dump_state(&self, max_transfers: usize) {
+        let mut accts: Vec<_> = self.accounts.iter().map(|e| (e.key().clone(), e.value().clone())).collect();
+        // User Accounts section
+        info!(target: "ledger", "=== User Balances ===");
+        accts.sort_by_key(|(id, _)| *id); // Deterministic order
+        for (id, acct) in accts.iter().filter(|(_, a)| a.is_user_account()) {
+            let bal = self.balance(*id).await;
+            info!(target: "ledger", "{} | Balance: {}", acct, bal);
+        }
+
+        // Venue Accounts section
+        info!(target: "ledger", "=== Venue Balances ===");
+        accts.sort_by_key(|(id, _)| *id); // Deterministic order
+        for (id, acct) in accts.iter().filter(|(_, a)| a.is_venue_account()) {
+            let bal = self.balance(*id).await;
+            info!(target: "ledger", "{} | Balance: {}", acct, bal);
+        }
+
+        // Transfers section (last max_transfers, newest first)
+        info!(target: "ledger", "=== Recent Transfers (Oldest First) ===");
+        let tx_lock = self.transfers.read().await;
+        let recent: Vec<_> = tx_lock.iter().take(max_transfers).cloned().collect();
+        for tx in recent {
+            info!(target: "ledger", "{}", tx);
+        }
+        if tx_lock.len() > max_transfers {
+            info!(target: "ledger", "... ({} more transfers omitted)", tx_lock.len() - max_transfers);
+        }
     }
 }
 

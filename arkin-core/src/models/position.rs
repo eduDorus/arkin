@@ -5,8 +5,9 @@ use sqlx::prelude::Type;
 use strum::Display;
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
-use crate::{Price, Quantity};
+use crate::{AccountType, Price, Quantity};
 
 use super::{Instrument, MarketSide};
 
@@ -30,8 +31,11 @@ impl From<MarketSide> for PositionSide {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct PositionUpdate {
+    #[builder(default)]
+    pub id: Uuid,
     pub event_time: UtcDateTime,
     pub instrument: Arc<Instrument>,
+    pub account_type: AccountType,
     pub entry_price: Price,
     pub quantity: Quantity,
     pub realized_pnl: Decimal,
@@ -49,6 +53,14 @@ impl PositionUpdate {
         self.entry_price * self.quantity.abs() * self.instrument.contract_size
     }
 }
+
+impl PartialEq for PositionUpdate {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for PositionUpdate {}
 
 impl fmt::Display for PositionUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

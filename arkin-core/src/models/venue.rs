@@ -25,6 +25,6 @@ pub struct Venue {
 
 impl fmt::Display for Venue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.name)
+        write!(f, "{}", self.name.to_lowercase())
     }
 }
