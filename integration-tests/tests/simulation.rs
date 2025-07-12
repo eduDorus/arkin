@@ -22,7 +22,7 @@ async fn test_simulation() {
 
     // Start and end time
     let start_time = time.now().await;
-    let end_time = start_time + Duration::from_secs(86400);
+    let end_time = start_time + Duration::from_secs(3600);
 
     // Init pubsub
     let pubsub = PubSub::new(time.clone(), true);

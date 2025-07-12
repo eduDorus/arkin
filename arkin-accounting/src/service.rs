@@ -32,17 +32,25 @@ impl Accounting {
         for bal in &update.balances {
             let venue = bal.venue.to_owned();
             let asset = Tradable::Asset(bal.asset.clone());
-            let user_account = self
-                .ledger
-                .find_or_create_account(&venue, &asset, AccountOwner::User, bal.account_type);
+            let user_account = self.ledger.find_or_create_account(
+                &venue,
+                &asset,
+                AccountOwner::User,
+                bal.account_type,
+                self.time.now().await,
+            );
             let current_balance = self.ledger.balance(user_account.id).await;
             let diff = bal.quantity - current_balance;
             if diff == Decimal::ZERO {
                 continue;
             }
-            let obe = self
-                .ledger
-                .find_or_create_account(&venue, &asset, AccountOwner::Venue, AccountType::Equity);
+            let obe = self.ledger.find_or_create_account(
+                &venue,
+                &asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let (debit, credit, amount) = if diff > Decimal::ZERO {
                 (obe, user_account, diff)
             } else {
@@ -73,15 +81,24 @@ impl Accounting {
                 &instrument_asset,
                 AccountOwner::User,
                 AccountType::Instrument,
+                self.time.now().await,
             );
             let qty_diff = pos.quantity - self.ledger.balance(position_account.id).await;
-            let realized_pnl_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Margin);
+            let realized_pnl_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::User,
+                AccountType::Margin,
+                self.time.now().await,
+            );
             let realized_diff = pos.realized_pnl - self.ledger.balance(realized_pnl_account.id).await;
-            let unrealized_pnl_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Equity);
+            let unrealized_pnl_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::User,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let unrealized_diff = pos.unrealized_pnl - self.ledger.balance(unrealized_pnl_account.id).await;
 
             if qty_diff != Decimal::ZERO {
@@ -90,6 +107,7 @@ impl Accounting {
                     &instrument_asset,
                     AccountOwner::Venue,
                     AccountType::Instrument,
+                    self.time.now().await,
                 );
                 let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
                     (venue_position.clone(), position_account.clone(), qty_diff)
@@ -112,9 +130,13 @@ impl Accounting {
             }
 
             if realized_diff != Decimal::ZERO {
-                let obe =
-                    self.ledger
-                        .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+                let obe = self.ledger.find_or_create_account(
+                    &venue,
+                    &quote_asset,
+                    AccountOwner::Venue,
+                    AccountType::Equity,
+                    self.time.now().await,
+                );
                 let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
                     (obe.clone(), realized_pnl_account.clone(), realized_diff)
                 } else {
@@ -136,9 +158,13 @@ impl Accounting {
             }
 
             if unrealized_diff != Decimal::ZERO {
-                let obe =
-                    self.ledger
-                        .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+                let obe = self.ledger.find_or_create_account(
+                    &venue,
+                    &quote_asset,
+                    AccountOwner::Venue,
+                    AccountType::Equity,
+                    self.time.now().await,
+                );
                 let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
                     (obe.clone(), unrealized_pnl_account.clone(), unrealized_diff)
                 } else {
@@ -176,9 +202,13 @@ impl Accounting {
         let venue = update.venue.to_owned();
         let asset = Tradable::Asset(update.asset.clone());
 
-        let user_account = self
-            .ledger
-            .find_or_create_account(&venue, &asset, AccountOwner::User, update.account_type);
+        let user_account = self.ledger.find_or_create_account(
+            &venue,
+            &asset,
+            AccountOwner::User,
+            update.account_type,
+            self.time.now().await,
+        );
 
         let current_balance = self.ledger.balance(user_account.id).await;
         let diff = update.quantity - current_balance;
@@ -188,9 +218,13 @@ impl Accounting {
             return;
         }
 
-        let obe_account = self
-            .ledger
-            .find_or_create_account(&venue, &asset, AccountOwner::Venue, AccountType::Equity);
+        let obe_account = self.ledger.find_or_create_account(
+            &venue,
+            &asset,
+            AccountOwner::Venue,
+            AccountType::Equity,
+            self.time.now().await,
+        );
 
         let event_time = self.time.now().await;
         let transfer_group_id = Uuid::new_v4();
@@ -229,9 +263,13 @@ impl Accounting {
         let quote_asset = Tradable::Asset(update.instrument.quote_asset.clone()); // For PNL (assume USDT)
 
         // Position quantity account
-        let position_account =
-            self.ledger
-                .find_or_create_account(&venue, &instrument_asset, AccountOwner::User, AccountType::Instrument);
+        let position_account = self.ledger.find_or_create_account(
+            &venue,
+            &instrument_asset,
+            AccountOwner::User,
+            AccountType::Instrument,
+            self.time.now().await,
+        );
 
         let current_quantity = self.ledger.balance(position_account.id).await; // Assume balance tracks qty
         let qty_diff = update.quantity - current_quantity;
@@ -242,6 +280,7 @@ impl Accounting {
             &quote_asset,
             AccountOwner::User,
             AccountType::Margin, // Name it "RealizedPNL" via extension if needed
+            self.time.now().await,
         );
 
         // Unrealized PNL equity
@@ -250,6 +289,7 @@ impl Accounting {
             &quote_asset,
             AccountOwner::User,
             AccountType::Equity, // "UnrealizedPNL"
+            self.time.now().await,
         );
 
         let event_time = self.time.now().await;
@@ -263,6 +303,7 @@ impl Accounting {
                 &instrument_asset,
                 AccountOwner::Venue,
                 AccountType::Instrument,
+                self.time.now().await,
             );
             let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
                 (venue_position_account.clone(), position_account.clone(), qty_diff)
@@ -286,9 +327,13 @@ impl Accounting {
 
         // Realized PNL (assume no current; full set)
         if update.realized_pnl != Decimal::ZERO {
-            let obe_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+            let obe_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let (debit, credit, amount) = if update.realized_pnl > Decimal::ZERO {
                 (obe_account.clone(), realized_pnl_account.clone(), update.realized_pnl)
             } else {
@@ -311,9 +356,13 @@ impl Accounting {
 
         // Unrealized PNL (similar)
         if update.unrealized_pnl != Decimal::ZERO {
-            let obe_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+            let obe_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let (debit, credit, amount) = if update.unrealized_pnl > Decimal::ZERO {
                 (obe_account.clone(), unrealized_pnl_account.clone(), update.unrealized_pnl)
             } else {
@@ -356,18 +405,27 @@ impl Accounting {
         for bal in &update.balances {
             let venue = bal.venue.to_owned();
             let asset = Tradable::Asset(bal.asset.clone());
-            let user_account = self
-                .ledger
-                .find_or_create_account(&venue, &asset, AccountOwner::User, bal.account_type);
+            let user_account = self.ledger.find_or_create_account(
+                &venue,
+                &asset,
+                AccountOwner::User,
+                bal.account_type,
+                self.time.now().await,
+            );
             let current_balance = self.ledger.balance(user_account.id).await;
             let diff = bal.quantity - current_balance;
             diffs.push((asset.clone(), diff, current_balance));
             if diff == Decimal::ZERO {
                 continue;
             }
-            let recon = self
-                .ledger
-                .find_or_create_account(&venue, &asset, AccountOwner::Venue, AccountType::Equity);
+            let recon = self.ledger.find_or_create_account(
+                &venue,
+                &asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
+
             let (debit, credit, amount) = if diff > Decimal::ZERO {
                 (recon, user_account, diff)
             } else {
@@ -398,15 +456,24 @@ impl Accounting {
                 &instrument_asset,
                 AccountOwner::User,
                 AccountType::Instrument,
+                self.time.now().await,
             );
             let qty_diff = pos.quantity - self.ledger.balance(position_account.id).await;
-            let realized_pnl_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Margin);
+            let realized_pnl_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::User,
+                AccountType::Margin,
+                self.time.now().await,
+            );
             let realized_diff = pos.realized_pnl;
-            let unrealized_pnl_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Equity);
+            let unrealized_pnl_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::User,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let unrealized_diff = pos.unrealized_pnl;
 
             diffs.push((
@@ -431,6 +498,7 @@ impl Accounting {
                     &instrument_asset,
                     AccountOwner::Venue,
                     AccountType::Instrument,
+                    self.time.now().await,
                 );
                 let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
                     (venue_position.clone(), position_account.clone(), qty_diff)
@@ -453,9 +521,13 @@ impl Accounting {
             }
 
             if realized_diff != Decimal::ZERO {
-                let recon =
-                    self.ledger
-                        .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+                let recon = self.ledger.find_or_create_account(
+                    &venue,
+                    &quote_asset,
+                    AccountOwner::Venue,
+                    AccountType::Equity,
+                    self.time.now().await,
+                );
                 let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
                     (recon.clone(), realized_pnl_account.clone(), realized_diff)
                 } else {
@@ -477,9 +549,13 @@ impl Accounting {
             }
 
             if unrealized_diff != Decimal::ZERO {
-                let recon =
-                    self.ledger
-                        .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+                let recon = self.ledger.find_or_create_account(
+                    &venue,
+                    &quote_asset,
+                    AccountOwner::Venue,
+                    AccountType::Equity,
+                    self.time.now().await,
+                );
                 let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
                     (recon.clone(), unrealized_pnl_account.clone(), unrealized_diff)
                 } else {
@@ -527,9 +603,13 @@ impl Accounting {
         let venue = update.venue.to_owned();
         let asset = Tradable::Asset(update.asset.clone());
 
-        let user_account = self
-            .ledger
-            .find_or_create_account(&venue, &asset, AccountOwner::User, update.account_type);
+        let user_account = self.ledger.find_or_create_account(
+            &venue,
+            &asset,
+            AccountOwner::User,
+            update.account_type,
+            self.time.now().await,
+        );
 
         let current_balance = self.ledger.balance(user_account.id).await;
         let diff = update.quantity - current_balance;
@@ -539,9 +619,13 @@ impl Accounting {
             return;
         }
 
-        let recon_account =
-            self.ledger
-                .find_or_create_account(&venue, &asset, AccountOwner::Venue, AccountType::Equity);
+        let recon_account = self.ledger.find_or_create_account(
+            &venue,
+            &asset,
+            AccountOwner::Venue,
+            AccountType::Equity,
+            self.time.now().await,
+        );
 
         let event_time = self.time.now().await;
         let transfer_group_id = Uuid::new_v4();
@@ -585,23 +669,35 @@ impl Accounting {
         let instrument_asset = Tradable::Asset(update.instrument.base_asset.clone());
         let quote_asset = Tradable::Asset(update.instrument.quote_asset.clone());
 
-        let position_account =
-            self.ledger
-                .find_or_create_account(&venue, &instrument_asset, AccountOwner::User, AccountType::Instrument);
+        let position_account = self.ledger.find_or_create_account(
+            &venue,
+            &instrument_asset,
+            AccountOwner::User,
+            AccountType::Instrument,
+            self.time.now().await,
+        );
 
         let current_quantity = self.ledger.balance(position_account.id).await;
         let qty_diff = update.quantity - current_quantity;
 
-        let realized_pnl_account =
-            self.ledger
-                .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Equity);
+        let realized_pnl_account = self.ledger.find_or_create_account(
+            &venue,
+            &quote_asset,
+            AccountOwner::User,
+            AccountType::Equity,
+            self.time.now().await,
+        );
 
         let current_realized = self.ledger.balance(realized_pnl_account.id).await; // Assume tracks cumulative
         let realized_diff = update.realized_pnl - current_realized;
 
-        let unrealized_pnl_account =
-            self.ledger
-                .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Equity);
+        let unrealized_pnl_account = self.ledger.find_or_create_account(
+            &venue,
+            &quote_asset,
+            AccountOwner::User,
+            AccountType::Equity,
+            self.time.now().await,
+        );
 
         let current_unrealized = self.ledger.balance(unrealized_pnl_account.id).await;
         let unrealized_diff = update.unrealized_pnl - current_unrealized;
@@ -616,6 +712,7 @@ impl Accounting {
                 &instrument_asset,
                 AccountOwner::Venue,
                 AccountType::Instrument,
+                self.time.now().await,
             );
             let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
                 (venue_position_account.clone(), position_account.clone(), qty_diff)
@@ -638,9 +735,13 @@ impl Accounting {
         }
 
         if realized_diff != Decimal::ZERO {
-            let recon_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+            let recon_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
                 (recon_account.clone(), realized_pnl_account.clone(), realized_diff)
             } else {
@@ -662,9 +763,13 @@ impl Accounting {
         }
 
         if unrealized_diff != Decimal::ZERO {
-            let recon_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+            let recon_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
                 (recon_account.clone(), unrealized_pnl_account.clone(), unrealized_diff)
             } else {
@@ -711,12 +816,20 @@ impl Accounting {
             }
             let venue = bal.venue.to_owned();
             let asset = Tradable::Asset(bal.asset.clone());
-            let user_account = self
-                .ledger
-                .find_or_create_account(&venue, &asset, AccountOwner::User, bal.account_type);
-            let venue_funding =
-                self.ledger
-                    .find_or_create_account(&venue, &asset, AccountOwner::Venue, AccountType::Equity);
+            let user_account = self.ledger.find_or_create_account(
+                &venue,
+                &asset,
+                AccountOwner::User,
+                bal.account_type,
+                self.time.now().await,
+            );
+            let venue_funding = self.ledger.find_or_create_account(
+                &venue,
+                &asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let (debit, credit, amount) = if bal.quantity_change > Decimal::ZERO {
                 (venue_funding, user_account, bal.quantity_change)
             } else {
@@ -748,15 +861,24 @@ impl Accounting {
                 &instrument_asset,
                 AccountOwner::User,
                 AccountType::Instrument,
+                self.time.now().await,
             );
             let qty_diff = pos.quantity - self.ledger.balance(position_account.id).await;
-            let realized_pnl_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Margin);
+            let realized_pnl_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::User,
+                AccountType::Margin,
+                self.time.now().await,
+            );
             let realized_diff = pos.realized_pnl;
-            let unrealized_pnl_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Equity);
+            let unrealized_pnl_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::User,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let unrealized_diff = pos.unrealized_pnl;
 
             if qty_diff != Decimal::ZERO {
@@ -765,6 +887,7 @@ impl Accounting {
                     &instrument_asset,
                     AccountOwner::Venue,
                     AccountType::Instrument,
+                    self.time.now().await,
                 );
                 let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
                     (venue_position.clone(), position_account.clone(), qty_diff)
@@ -787,9 +910,13 @@ impl Accounting {
             }
 
             if realized_diff != Decimal::ZERO {
-                let funding =
-                    self.ledger
-                        .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+                let funding = self.ledger.find_or_create_account(
+                    &venue,
+                    &quote_asset,
+                    AccountOwner::Venue,
+                    AccountType::Equity,
+                    self.time.now().await,
+                );
                 let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
                     (funding.clone(), realized_pnl_account.clone(), realized_diff)
                 } else {
@@ -811,9 +938,13 @@ impl Accounting {
             }
 
             if unrealized_diff != Decimal::ZERO {
-                let funding =
-                    self.ledger
-                        .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+                let funding = self.ledger.find_or_create_account(
+                    &venue,
+                    &quote_asset,
+                    AccountOwner::Venue,
+                    AccountType::Equity,
+                    self.time.now().await,
+                );
                 let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
                     (funding.clone(), unrealized_pnl_account.clone(), unrealized_diff)
                 } else {
@@ -856,13 +987,21 @@ impl Accounting {
         let venue = update.venue.to_owned();
         let asset = Tradable::Asset(update.asset.clone());
 
-        let user_account = self
-            .ledger
-            .find_or_create_account(&venue, &asset, AccountOwner::User, update.account_type);
+        let user_account = self.ledger.find_or_create_account(
+            &venue,
+            &asset,
+            AccountOwner::User,
+            update.account_type,
+            self.time.now().await,
+        );
 
-        let venue_funding_account =
-            self.ledger
-                .find_or_create_account(&venue, &asset, AccountOwner::Venue, AccountType::Equity);
+        let venue_funding_account = self.ledger.find_or_create_account(
+            &venue,
+            &asset,
+            AccountOwner::Venue,
+            AccountType::Equity,
+            self.time.now().await,
+        );
 
         let event_time = self.time.now().await;
         let transfer_group_id = Uuid::new_v4();
@@ -900,23 +1039,35 @@ impl Accounting {
         let instrument_asset = Tradable::Asset(update.instrument.base_asset.clone());
         let quote_asset = Tradable::Asset(update.instrument.quote_asset.clone());
 
-        let position_account =
-            self.ledger
-                .find_or_create_account(&venue, &instrument_asset, AccountOwner::User, AccountType::Instrument);
+        let position_account = self.ledger.find_or_create_account(
+            &venue,
+            &instrument_asset,
+            AccountOwner::User,
+            AccountType::Instrument,
+            self.time.now().await,
+        );
 
         let current_quantity = self.ledger.balance(position_account.id).await;
         let qty_diff = update.quantity - current_quantity;
 
-        let realized_pnl_account =
-            self.ledger
-                .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Margin);
+        let realized_pnl_account = self.ledger.find_or_create_account(
+            &venue,
+            &quote_asset,
+            AccountOwner::User,
+            AccountType::Margin,
+            self.time.now().await,
+        );
 
         let current_realized = self.ledger.balance(realized_pnl_account.id).await;
         let realized_diff = update.realized_pnl - current_realized;
 
-        let unrealized_pnl_account =
-            self.ledger
-                .find_or_create_account(&venue, &quote_asset, AccountOwner::User, AccountType::Equity);
+        let unrealized_pnl_account = self.ledger.find_or_create_account(
+            &venue,
+            &quote_asset,
+            AccountOwner::User,
+            AccountType::Equity,
+            self.time.now().await,
+        );
 
         let current_unrealized = self.ledger.balance(unrealized_pnl_account.id).await;
         let unrealized_diff = update.unrealized_pnl - current_unrealized;
@@ -931,7 +1082,9 @@ impl Accounting {
                 &instrument_asset,
                 AccountOwner::Venue,
                 AccountType::Instrument,
+                self.time.now().await,
             );
+
             let (debit, credit, amount) = if qty_diff > Decimal::ZERO {
                 (venue_position_account.clone(), position_account.clone(), qty_diff)
             } else {
@@ -953,9 +1106,13 @@ impl Accounting {
         }
 
         if realized_diff != Decimal::ZERO {
-            let funding_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+            let funding_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let (debit, credit, amount) = if realized_diff > Decimal::ZERO {
                 (funding_account.clone(), realized_pnl_account.clone(), realized_diff)
             } else {
@@ -977,9 +1134,13 @@ impl Accounting {
         }
 
         if unrealized_diff != Decimal::ZERO {
-            let funding_account =
-                self.ledger
-                    .find_or_create_account(&venue, &quote_asset, AccountOwner::Venue, AccountType::Equity);
+            let funding_account = self.ledger.find_or_create_account(
+                &venue,
+                &quote_asset,
+                AccountOwner::Venue,
+                AccountType::Equity,
+                self.time.now().await,
+            );
             let (debit, credit, amount) = if unrealized_diff > Decimal::ZERO {
                 (funding_account.clone(), unrealized_pnl_account.clone(), unrealized_diff)
             } else {
@@ -1036,12 +1197,20 @@ impl Accounting {
         let mut transfers = vec![];
 
         // Debit transfer
-        let debit_account =
-            self.ledger
-                .find_or_create_account(&venue, &debit_asset, AccountOwner::User, AccountType::Spot);
-        let credit_account =
-            self.ledger
-                .find_or_create_account(&venue, &debit_asset, AccountOwner::Venue, AccountType::Spot);
+        let debit_account = self.ledger.find_or_create_account(
+            &venue,
+            &debit_asset,
+            AccountOwner::User,
+            AccountType::Spot,
+            self.time.now().await,
+        );
+        let credit_account = self.ledger.find_or_create_account(
+            &venue,
+            &debit_asset,
+            AccountOwner::Venue,
+            AccountType::Spot,
+            self.time.now().await,
+        );
 
         transfers.push(
             Transfer::builder()
@@ -1058,12 +1227,20 @@ impl Accounting {
         );
 
         // Credit transfer
-        let debit_account =
-            self.ledger
-                .find_or_create_account(&venue, &credit_asset, AccountOwner::Venue, AccountType::Spot);
-        let credit_account =
-            self.ledger
-                .find_or_create_account(&venue, &credit_asset, AccountOwner::User, AccountType::Spot);
+        let debit_account = self.ledger.find_or_create_account(
+            &venue,
+            &credit_asset,
+            AccountOwner::Venue,
+            AccountType::Spot,
+            self.time.now().await,
+        );
+        let credit_account = self.ledger.find_or_create_account(
+            &venue,
+            &credit_asset,
+            AccountOwner::User,
+            AccountType::Spot,
+            self.time.now().await,
+        );
 
         transfers.push(
             Transfer::builder()
@@ -1087,12 +1264,14 @@ impl Accounting {
                 &Tradable::Asset(order.instrument.quote_asset.clone()),
                 AccountOwner::User,
                 AccountType::Spot,
+                self.time.now().await,
             );
             let commission_account = self.ledger.find_or_create_account(
                 &venue,
                 &Tradable::Asset(order.instrument.quote_asset.clone()),
                 AccountOwner::Venue,
                 AccountType::Equity, // Commission expense
+                self.time.now().await,
             );
             transfers.push(
                 Transfer::builder()
@@ -1197,6 +1376,7 @@ mod tests {
             &Tradable::Asset(usdt.clone()),
             AccountOwner::User,
             AccountType::Margin,
+            time.now().await,
         );
         assert_eq!(ledger.balance(margin_acct.id).await, dec!(100000));
         ledger.dump_state(100).await;
@@ -1233,6 +1413,7 @@ mod tests {
             &Tradable::Instrument(btc_perp.clone()),
             AccountOwner::User,
             AccountType::Instrument,
+            time.now().await,
         );
         assert_eq!(ledger.balance(btc_pos_acct.id).await, dec!(1));
         assert_eq!(ledger.balance(margin_acct.id).await, dec!(99500));
@@ -1270,6 +1451,7 @@ mod tests {
             &Tradable::Instrument(eth_perp.clone()),
             AccountOwner::User,
             AccountType::Instrument,
+            time.now().await,
         );
         assert_eq!(ledger.balance(eth_pos_acct.id).await, dec!(-2));
         assert_eq!(ledger.balance(margin_acct.id).await, dec!(99300));
@@ -1374,6 +1556,7 @@ mod tests {
             &Tradable::Asset(usdt.clone()),
             AccountOwner::User,
             AccountType::Margin,
+            time.now().await,
         );
         assert_eq!(ledger.balance(realized_pnl_acct.id).await, dec!(100501)); // Net +1000 -500
         ledger.dump_state(100).await; // For visibility
@@ -1399,6 +1582,7 @@ mod tests {
             &Tradable::Asset(test_usdt_asset()),
             AccountOwner::User,
             AccountType::Margin,
+            time.now().await,
         );
         assert_eq!(ledger.balance(usdt_account.id).await, dec!(0));
 
@@ -1439,6 +1623,7 @@ mod tests {
             &Tradable::Asset(test_btc_asset()), // Assume base
             AccountOwner::User,
             AccountType::Instrument,
+            time.now().await,
         );
         assert_eq!(ledger.balance(btc_position_account.id).await, dec!(1));
 
@@ -1447,6 +1632,7 @@ mod tests {
             &Tradable::Asset(test_usdt_asset()),
             AccountOwner::User,
             AccountType::Equity,
+            time.now().await,
         );
         assert_eq!(ledger.balance(unrealized_pnl_account.id).await, dec!(100));
 
@@ -1472,6 +1658,7 @@ mod tests {
             &Tradable::Asset(test_btc_asset()), // Assume base
             AccountOwner::User,
             AccountType::Instrument,
+            time.now().await,
         );
         assert_eq!(ledger.balance(btc_position_account.id).await, dec!(0.5));
 
@@ -1480,6 +1667,7 @@ mod tests {
             &Tradable::Asset(test_usdt_asset()),
             AccountOwner::User,
             AccountType::Equity,
+            time.now().await,
         );
         assert_eq!(ledger.balance(unrealized_pnl_account.id).await, dec!(50));
 
@@ -1488,6 +1676,7 @@ mod tests {
             &Tradable::Asset(test_usdt_asset()),
             AccountOwner::User,
             AccountType::Margin,
+            time.now().await,
         );
         assert_eq!(ledger.balance(margin_account.id).await, dec!(100050));
         ledger.dump_state(100).await;

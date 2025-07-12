@@ -4,8 +4,8 @@ use strum::{Display, EnumDiscriminants, EnumIter};
 use time::UtcDateTime;
 
 use crate::{
-    AccountUpdate, BalanceUpdate, Book, ExecutionOrder, InsightsTick, InsightsUpdate, PositionUpdate, Signal, Tick,
-    Trade, TransferGroup, VenueOrder,
+    Account, AccountUpdate, BalanceUpdate, Book, ExecutionOrder, InsightsTick, InsightsUpdate, PositionUpdate, Signal,
+    Tick, Trade, TransferGroup, VenueOrder,
 };
 
 #[derive(Debug, Display, Clone, EnumDiscriminants)]
@@ -31,7 +31,7 @@ pub enum Event {
     ReconcilePositionUpdate(Arc<PositionUpdate>),
     PositionUpdate(Arc<PositionUpdate>),
 
-    AccountNew(Arc<AccountUpdate>),
+    AccountNew(Arc<Account>),
     TransferNew(Arc<TransferGroup>),
 
     // Insights
@@ -94,7 +94,7 @@ impl Event {
             Event::ReconcilePositionUpdate(event) => event.event_time,
             Event::PositionUpdate(event) => event.event_time,
 
-            Event::AccountNew(event) => event.event_time,
+            Event::AccountNew(event) => event.updated_at,
             Event::TransferNew(event) => event.event_time,
 
             // Insights

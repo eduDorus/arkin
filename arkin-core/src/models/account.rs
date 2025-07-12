@@ -2,6 +2,7 @@ use std::{fmt, sync::Arc};
 
 use sqlx::Type;
 use strum::Display;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -35,6 +36,8 @@ pub struct Account {
     pub venue: Arc<Venue>,
     pub owner: AccountOwner,
     pub account_type: AccountType,
+    pub created_at: UtcDateTime,
+    pub updated_at: UtcDateTime,
 }
 
 impl Account {

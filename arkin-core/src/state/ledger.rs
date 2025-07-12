@@ -89,6 +89,7 @@ impl Ledger {
         asset: Tradable,
         owner: AccountOwner,
         account_type: AccountType,
+        timestamp: UtcDateTime,
     ) -> Arc<Account> {
         match self.find_account(&venue, &asset, owner, account_type) {
             Some(account) => account,
@@ -99,6 +100,8 @@ impl Ledger {
                     .asset(asset.clone())
                     .owner(owner)
                     .account_type(account_type)
+                    .created_at(timestamp)
+                    .updated_at(timestamp)
                     .build()
                     .into();
                 self.accounts.insert(account.id, account.clone());
@@ -130,10 +133,11 @@ impl Ledger {
         asset: &Tradable,
         owner: AccountOwner,
         account_type: AccountType,
+        timestamp: UtcDateTime,
     ) -> Arc<Account> {
         match self.find_account(venue, asset, owner, account_type) {
             Some(account) => account,
-            None => self.add_account(venue.clone(), asset.clone(), owner, account_type),
+            None => self.add_account(venue.clone(), asset.clone(), owner, account_type, timestamp),
         }
     }
 
@@ -460,11 +464,12 @@ mod tests {
 
     use rust_decimal_macros::dec;
 
-    use crate::test_utils;
+    use crate::{prelude::MockTime, test_utils, SystemTime};
 
     #[tokio::test]
     #[test_log::test]
     async fn test_successful_transfer() {
+        let time = MockTime::new();
         let ledger = Ledger::builder().build();
 
         let personal_venue = test_utils::test_personal_venue();
@@ -479,6 +484,7 @@ mod tests {
             usdt.clone().into(),
             AccountOwner::Venue,
             AccountType::Spot,
+            time.now().await,
         );
 
         // Create two Strategy accounts for USD
@@ -487,12 +493,14 @@ mod tests {
             usdt.clone().into(),
             AccountOwner::User,
             AccountType::Spot,
+            time.now().await,
         );
         let account_b = ledger.add_account(
             binance_venue.clone(),
             usdt.clone().into(),
             AccountOwner::User,
             AccountType::Margin,
+            time.now().await,
         );
 
         let amount = dec!(100);
@@ -529,6 +537,7 @@ mod tests {
     #[tokio::test]
     #[test_log::test]
     async fn test_insufficient_balance_client_spot() {
+        let time = MockTime::new();
         let ledger = Ledger::builder().build();
         let personal_venue = test_utils::test_personal_venue();
         let binance_venue = test_utils::test_binance_venue();
@@ -540,6 +549,7 @@ mod tests {
             usdt.clone().into(),
             AccountOwner::Venue,
             AccountType::Spot,
+            time.now().await,
         );
 
         // Create two Strategy accounts for USD
@@ -548,6 +558,7 @@ mod tests {
             usdt.clone().into(),
             AccountOwner::User,
             AccountType::Spot,
+            time.now().await,
         );
 
         ledger
@@ -564,6 +575,7 @@ mod tests {
     #[tokio::test]
     #[test_log::test]
     async fn test_invalid_amount() {
+        let time = MockTime::new();
         let ledger = Ledger::builder().build();
         let binance_venue = test_utils::test_binance_venue();
         let usdt = test_utils::test_usdt_asset();
@@ -574,12 +586,14 @@ mod tests {
             usdt.clone().into(),
             AccountOwner::User,
             AccountType::Spot,
+            time.now().await,
         );
         let account_b = ledger.add_account(
             binance_venue.clone(),
             usdt.clone().into(),
             AccountOwner::User,
             AccountType::Margin,
+            time.now().await,
         );
 
         let result_zero = ledger.transfer(UtcDateTime::now(), &account_a, &account_b, dec!(0)).await;
@@ -592,6 +606,7 @@ mod tests {
     #[tokio::test]
     #[test_log::test]
     async fn test_currency_mismatch() {
+        let time = MockTime::new();
         let ledger = Ledger::builder().build();
         let binance_venue = test_utils::test_binance_venue();
         let usdt = test_utils::test_usdt_asset();
@@ -602,9 +617,15 @@ mod tests {
             usdt.clone().into(),
             AccountOwner::User,
             AccountType::Spot,
+            time.now().await,
         );
-        let account_btc =
-            ledger.add_account(binance_venue.clone(), btc.clone().into(), AccountOwner::User, AccountType::Spot);
+        let account_btc = ledger.add_account(
+            binance_venue.clone(),
+            btc.clone().into(),
+            AccountOwner::User,
+            AccountType::Spot,
+            time.now().await,
+        );
 
         let result = ledger.transfer(UtcDateTime::now(), &account_usd, &account_btc, dec!(100)).await;
         assert!(matches!(result, Err(AccountingError::CurrencyMismatch(_))));
@@ -613,6 +634,7 @@ mod tests {
     #[tokio::test]
     #[test_log::test]
     async fn test_same_account() {
+        let time = MockTime::new();
         let ledger = Ledger::builder().build();
         let binance_venue = test_utils::test_binance_venue();
         let usdt = test_utils::test_usdt_asset();
@@ -622,6 +644,7 @@ mod tests {
             usdt.clone().into(),
             AccountOwner::User,
             AccountType::Spot,
+            time.now().await,
         );
         let result = ledger.transfer(UtcDateTime::now(), &account_a, &account_a, dec!(100)).await;
         assert!(matches!(result, Err(AccountingError::SameAccount(_))));
