@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.5
+    image: clickhouse/clickhouse-server:25.6
     container_name: arkin-clickhouse
     hostname: clickhouse
     ports:
@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
   
   triton:
-    image: nvcr.io/nvidia/tritonserver:25.05-pyt-python-py3
+    image: nvcr.io/nvidia/tritonserver:25.06-pyt-python-py3
     container_name: arkin-triton
     hostname: triton
     ports:
@@ -63,6 +63,10 @@ services:
     volumes:
       - /Users/dj/repos/arkin-research/trition-server:/models
     command: tritonserver --model-repository=/models --model-control-mode=poll --repository-poll-secs=60
+    networks:
+      - network
+    restart: unless-stopped
+
         
   # arkin-binance-ingestor:
   #  image: arkin:v1.0.0  # Replace with your image name, e.g., arkin:1.0 or a registry path
