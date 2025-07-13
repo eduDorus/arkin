@@ -26,6 +26,7 @@ serde_json = { workspace = true }
 typed-builder = { workspace = true }
 kanal = { workspace = true }
 dashmap = { workspace = true }
+moka2 = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }

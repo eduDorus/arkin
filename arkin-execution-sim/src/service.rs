@@ -68,6 +68,7 @@ impl Executor {
         self.orderbook.insert(order.clone());
         self.publisher.publish(Event::VenueOrderInflight(order.clone().into())).await;
 
+        // TODO: Check if we have enough funds
         info!(target: "executor-simulation", "change order to placed and sending placed event for order {}", order.id);
         let time = self.time.now().await;
         order.update_status(VenueOrderStatus::Placed, time);

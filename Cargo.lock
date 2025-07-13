@@ -207,6 +207,7 @@ dependencies = [
  "dashmap",
  "futures",
  "kanal",
+ "moka2",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",

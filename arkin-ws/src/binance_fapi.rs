@@ -1,14 +1,16 @@
 #![allow(unused)]
 use core::fmt;
+use std::fmt::write;
 
 use arkin_core::prelude::*;
 use rust_decimal::Decimal;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use time::UtcDateTime;
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum BinanceSwapEvent {
+    SubscribeResponse(SubscribeResponse),
     AggTrade(BinanceSwapsAggTradeData),
     Tick(BinanceSwapsTickData),
     Trade(BinanceSwapsTradeData),
@@ -20,8 +22,9 @@ impl BinanceSwapEvent {
         match self {
             BinanceSwapEvent::AggTrade(data) => data.instrument.clone(),
             BinanceSwapEvent::Tick(data) => data.instrument.clone(),
-            BinanceSwapsEvent::Trade(data) => data.instrument.clone(),
-            BinanceSwapsEvent::Book(data) => data.instrument.clone(),
+            BinanceSwapEvent::Trade(data) => data.instrument.clone(),
+            BinanceSwapEvent::Book(data) => data.instrument.clone(),
+            _ => "None".to_string(),
         }
     }
 }
@@ -29,12 +32,20 @@ impl BinanceSwapEvent {
 impl fmt::Display for BinanceSwapEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            BinanceSwapEvent::SubscribeResponse(_) => write!(f, "subscribe confirmed"),
             BinanceSwapEvent::AggTrade(data) => write!(f, "{}", data),
             BinanceSwapEvent::Tick(data) => write!(f, "{}", data),
-            BinanceSwapsEvent::Trade(data) => write!(f, "{:?}", data),
-            BinanceSwapsEvent::Book(data) => write!(f, "{:?}", data),
+            BinanceSwapEvent::Trade(data) => write!(f, "{:?}", data),
+            BinanceSwapEvent::Book(data) => write!(f, "{:?}", data),
         }
     }
+}
+
+// {"result":null,"id":0}
+#[derive(Debug, Deserialize)]
+pub struct SubscribeResponse {
+    result: Option<String>,
+    id: u64,
 }
 
 // https://api.tardis.dev/v1/exchanges
