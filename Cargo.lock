@@ -196,6 +196,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-binance"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-core",
+ "async-trait",
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "flate2",
+ "futures",
+ "hex",
+ "hmac",
+ "http",
+ "kanal",
+ "once_cell",
+ "openssl",
+ "rand 0.9.1",
+ "regex",
+ "reqwest",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sha2",
+ "signature",
+ "test-log",
+ "thiserror 2.0.12",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tracing",
+ "typed-builder",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "arkin-core"
 version = "0.1.0"
 dependencies = [
@@ -236,44 +274,6 @@ dependencies = [
  "tokio",
  "tracing",
  "typed-builder",
- "uuid",
-]
-
-[[package]]
-name = "arkin-execution-binance"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arkin-core",
- "async-trait",
- "base64 0.22.1",
- "ed25519-dalek",
- "flate2",
- "futures",
- "hex",
- "hmac",
- "http",
- "kanal",
- "once_cell",
- "openssl",
- "rand 0.9.1",
- "regex",
- "reqwest",
- "rust_decimal",
- "serde",
- "serde_json",
- "sha2",
- "signature",
- "test-log",
- "thiserror 2.0.12",
- "time",
- "tokio",
- "tokio-rustls",
- "tokio-tungstenite",
- "tokio-util",
- "tracing",
- "typed-builder",
- "url",
  "uuid",
 ]
 
