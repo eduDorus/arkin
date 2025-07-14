@@ -79,6 +79,7 @@ mod tests {
 
     #[tokio::test]
     #[test_log::test]
+    #[ignore]
     async fn subscribe_binance_agg_trades() -> Result<()> {
         // Build WebSocket Streams config
         let ws_streams_conf = ConfigurationWebsocketStreams::builder().build();

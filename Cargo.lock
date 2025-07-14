@@ -395,10 +395,42 @@ dependencies = [
 [[package]]
 name = "arkin-risk"
 version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "futures",
+ "kanal",
+ "rust_decimal",
+ "test-log",
+ "thiserror 2.0.12",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+ "typed-builder",
+ "uuid",
+]
 
 [[package]]
 name = "arkin-strat-agent"
 version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "futures",
+ "kanal",
+ "rust_decimal",
+ "test-log",
+ "thiserror 2.0.12",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+ "typed-builder",
+ "uuid",
+]
 
 [[package]]
 name = "arkin-strat-crossover"

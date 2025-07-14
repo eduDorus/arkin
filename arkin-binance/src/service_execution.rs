@@ -138,6 +138,7 @@ mod tests {
 
     #[tokio::test]
     #[test_log::test]
+    #[ignore]
     async fn subscribe_user_stream() -> Result<()> {
         // Load credentials from env
         let api_key = env::var("API_KEY").expect("API_KEY must be set in the environment");
