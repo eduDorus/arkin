@@ -25,6 +25,7 @@ pub struct CrossoverStrategy {
 }
 
 impl CrossoverStrategy {
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn insight_tick(&self, tick: &InsightsUpdate) {
         debug!(target: "strat-crossover", "received insight tick");
 
