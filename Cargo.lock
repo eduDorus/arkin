@@ -294,6 +294,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-forecast"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "futures",
+ "kanal",
+ "reqwest",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "test-log",
+ "thiserror 2.0.12",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+ "typed-builder",
+ "uuid",
+]
+
+[[package]]
 name = "arkin-ingestor-binance"
 version = "0.1.0"
 dependencies = [

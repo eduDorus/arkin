@@ -8,65 +8,48 @@ use typed_builder::TypedBuilder;
 use arkin_core::prelude::*;
 
 #[derive(TypedBuilder)]
-pub struct AgentStrategy {
+pub struct Forecast {
     identifier: String,
     _time: Arc<dyn SystemTime>,
     _publisher: Arc<dyn Publisher>,
     client: reqwest::Client,
 }
 
-impl AgentStrategy {
+impl Forecast {
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn insight_tick(&self, _tick: &InsightsUpdate) {
         // Define constants
         const BATCH_SIZE: usize = 1;
-        const SEQUENCE_LENGTH: usize = 36;
-        const NUM_FEATURES_OBS: usize = 40; // Assuming len(FEATURE_COLUMNS) = 5
-        const NUM_FEATURES_STATE: usize = 2;
-        const NUM_MASK: usize = 3;
+        const FORECAST_SEQ_LEN: usize = 512;
+        const FORECAST_NUM_FEATURES: usize = 40; // Assuming len(FEATURE_COLUMNS) = 5
 
         // Step 1: Generate and prepare the input data
-        let input_data_flat_0: Vec<f32> = (0..BATCH_SIZE * SEQUENCE_LENGTH * NUM_FEATURES_OBS).map(|_| 0.0).collect();
-        let input_data_flat_1: Vec<f32> = (0..BATCH_SIZE * SEQUENCE_LENGTH * NUM_FEATURES_STATE).map(|_| 0.0).collect();
-        let input_data_flat_2: Vec<bool> = vec![true; BATCH_SIZE * NUM_MASK];
+        let input_data: Vec<f32> = (0..BATCH_SIZE * FORECAST_SEQ_LEN * FORECAST_NUM_FEATURES)
+            .map(|_| 0.0)
+            .collect();
 
         // Define shapes
-        let shape_0 = vec![BATCH_SIZE, SEQUENCE_LENGTH, NUM_FEATURES_OBS];
-        let shape_1 = vec![BATCH_SIZE, SEQUENCE_LENGTH, NUM_FEATURES_STATE];
-        let shape_2 = vec![BATCH_SIZE, NUM_MASK];
+        let shape = vec![BATCH_SIZE, FORECAST_SEQ_LEN, FORECAST_NUM_FEATURES];
 
         // Step 2: Construct the inference request
         let infer_request = json!({
             "inputs": [
                 {
-                    "name": "OBSERVATION",
-                    "shape": shape_0,
+                    "name": "INPUT0",
+                    "shape": shape,
                     "datatype": "FP32",
-                    "data": input_data_flat_0
-                },
-                {
-                    "name": "STATE",
-                    "shape": shape_1,
-                    "datatype": "FP32",
-                    "data": input_data_flat_1
-                },
-                {
-                    "name": "MASK",
-                    "shape": shape_2,
-                    "datatype": "BOOL",
-                    "data": input_data_flat_2
+                    "data": input_data
                 }
             ],
             "outputs": [
-                {"name": "ACTION"},
-                {"name": "ACTION_SPACE"},
-                {"name": "WEIGHT"},
-                {"name": "PROBABILITY"}
+                {"name": "OUTPUT0"},
+                {"name": "OUTPUT1"},
+                {"name": "OUTPUT2"}
             ]
         });
 
         // Step 3: Send the request and handle the response
-        let url = "http://localhost:8000/v2/models/agent/infer";
+        let url = "http://localhost:8000/v2/models/forecast/infer";
         let start = Instant::now();
 
         let response = match self.client.post(url).json(&infer_request).send().await {
@@ -105,8 +88,8 @@ impl AgentStrategy {
         };
 
         // Match Python output order: ACTION (0), ACTION_SPACE (1), PROBABILITY (3), WEIGHT (2)
-        let output_order = [0, 1, 3, 2];
-        let output_names = ["ACTION", "ACTION_SPACE", "WEIGHT", "PROBABILITY"];
+        let output_order = [0, 1, 2];
+        let output_names = ["OUTPUT0", "OUTPUT1", "OUTPUT2"];
 
         println!("Inference successful!");
         for (idx, &output_idx) in output_order.iter().enumerate() {
@@ -140,7 +123,7 @@ impl AgentStrategy {
 }
 
 #[async_trait]
-impl Runnable for AgentStrategy {
+impl Runnable for Forecast {
     fn identifier(&self) -> &str {
         &self.identifier
     }
@@ -149,7 +132,7 @@ impl Runnable for AgentStrategy {
     async fn handle_event(&self, event: Event) {
         match &event {
             Event::InsightsUpdate(vo) => self.insight_tick(vo).await,
-            e => warn!(target: "strat::agent", "received unused event {}", e),
+            e => warn!(target: "forecast", "received unused event {}", e),
         }
     }
 }
