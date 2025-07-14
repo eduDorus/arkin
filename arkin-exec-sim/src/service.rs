@@ -35,7 +35,8 @@ pub struct Executor {
     venue: Arc<Venue>,
     orderbook: ExchangeBook,
     account: InternalAccount,
-    commission_rate: Decimal,
+    taker_commission: Decimal,
+    maker_commission: Decimal,
     leverage: Decimal,
 }
 
@@ -50,7 +51,8 @@ impl Executor {
             venue: test_binance_venue(), // TODO: This will not work in prod
             orderbook: ExchangeBook::default(),
             account,
-            commission_rate: dec!(0.0005),
+            taker_commission: dec!(0.0005),
+            maker_commission: dec!(0.0002),
             leverage: dec!(10),
         }
         .into()
@@ -102,16 +104,18 @@ impl Executor {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    fn check_market_order(&self, tick: &Tick, order: &VenueOrder) -> (bool, Decimal, Decimal) {
-        match order.side {
+    fn check_market_order(&self, tick: &Tick, order: &VenueOrder) -> (bool, Decimal, Decimal, Decimal) {
+        let (matched, price, quantity) = match order.side {
             MarketSide::Buy => (true, tick.ask_price(), min(order.remaining_quantity(), tick.ask_quantity)),
             MarketSide::Sell => (true, tick.bid_price(), min(order.remaining_quantity(), tick.bid_quantity)),
-        }
+        };
+        let commission = price * quantity * self.taker_commission;
+        (matched, price, quantity, commission)
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    fn check_limit_order(&self, tick: &Tick, order: &VenueOrder) -> (bool, Decimal, Decimal) {
-        match order.side {
+    fn check_limit_order(&self, tick: &Tick, order: &VenueOrder) -> (bool, Decimal, Decimal, Decimal) {
+        let (matched, price, quantity) = match order.side {
             MarketSide::Buy => (
                 tick.ask_price() <= order.price,
                 tick.ask_price(),
@@ -122,7 +126,9 @@ impl Executor {
                 tick.bid_price(),
                 min(order.remaining_quantity(), tick.bid_quantity),
             ),
-        }
+        };
+        let commission = price * quantity * self.maker_commission;
+        (matched, price, quantity, commission)
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
@@ -252,7 +258,7 @@ impl Executor {
             if order.instrument.id == tick.instrument.id {
                 info!(target: "executor-simulation", "checking order {}", order);
                 info!(target: "executor-simulation", "best Bid {}, best ask {}", tick.bid_price(), tick.ask_price());
-                let (matched, price, quantity) = match order.order_type {
+                let (matched, price, quantity, commission) = match order.order_type {
                     VenueOrderType::Market => self.check_market_order(tick, &order),
                     VenueOrderType::Limit => self.check_limit_order(tick, &order),
                     _ => {
@@ -263,7 +269,6 @@ impl Executor {
 
                 info!(target: "executor-simulation", "order {} matched {}", order.id, matched);
                 if matched {
-                    let commission = price * quantity * self.commission_rate;
                     self.fill_update(&order, price, quantity, commission).await;
                     self.account_update(&order, price, quantity, commission).await;
                 }

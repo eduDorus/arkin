@@ -261,6 +261,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-exec-sim"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "dashmap",
+ "rand 0.9.1",
+ "rust_decimal",
+ "test-log",
+ "time",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "arkin-exec-strat-taker"
 version = "0.1.0"
 dependencies = [
@@ -274,22 +290,6 @@ dependencies = [
  "tokio",
  "tracing",
  "typed-builder",
- "uuid",
-]
-
-[[package]]
-name = "arkin-execution-sim"
-version = "0.1.0"
-dependencies = [
- "arkin-core",
- "async-trait",
- "dashmap",
- "rand 0.9.1",
- "rust_decimal",
- "test-log",
- "time",
- "tokio",
- "tracing",
  "uuid",
 ]
 
@@ -391,6 +391,14 @@ dependencies = [
  "typed-builder",
  "uuid",
 ]
+
+[[package]]
+name = "arkin-risk"
+version = "0.1.0"
+
+[[package]]
+name = "arkin-strat-agent"
+version = "0.1.0"
 
 [[package]]
 name = "arkin-strat-crossover"
@@ -1714,8 +1722,8 @@ dependencies = [
  "arkin-accounting",
  "arkin-audit",
  "arkin-core",
+ "arkin-exec-sim",
  "arkin-exec-strat-taker",
- "arkin-execution-sim",
  "arkin-ingestor-binance",
  "arkin-insights",
  "arkin-persistence",
