@@ -50,6 +50,7 @@ impl Insights {
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn process_tick(&self, tick: &InsightsTick) {
+        // TODO: We might want to span this calculation with spawn blocking
         let insights = self.graph.calculate(tick);
         info!(target: "insights", "calculated {} insights", insights.len());
         let insights_tick = InsightsUpdate::builder()

@@ -1,6 +1,5 @@
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 use std::sync::Arc;
 use thiserror::Error;
 use time::UtcDateTime;

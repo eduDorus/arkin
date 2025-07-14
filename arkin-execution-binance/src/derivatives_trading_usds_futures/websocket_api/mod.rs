@@ -1,0 +1,778 @@
+#![allow(unused_imports)]
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+use std::{collections::BTreeMap, sync::Arc};
+
+use crate::common::config::ConfigurationWebsocketApi;
+use crate::common::errors::WebsocketError;
+use crate::common::models::WebsocketApiResponse;
+use crate::common::models::{WebsocketEvent, WebsocketMode};
+use crate::common::utils::random_string;
+use crate::common::websocket::{
+    create_stream_handler, Subscription, WebsocketApi as WebsocketApiBase, WebsocketBase, WebsocketMessageSendOptions,
+    WebsocketStream,
+};
+
+mod apis;
+mod handle;
+mod models;
+
+pub use apis::*;
+pub use handle::*;
+pub use models::*;
+
+const HAS_TIME_UNIT: bool = false;
+
+pub struct WebsocketApi {
+    websocket_api_base: Arc<WebsocketApiBase>,
+
+    account_api_client: AccountApiClient,
+    market_data_api_client: MarketDataApiClient,
+    trade_api_client: TradeApiClient,
+    user_data_streams_api_client: UserDataStreamsApiClient,
+}
+
+impl WebsocketApi {
+    pub(crate) async fn connect(
+        config: ConfigurationWebsocketApi,
+        mode: Option<WebsocketMode>,
+    ) -> anyhow::Result<Self> {
+        let mut cfg = config;
+        if let Some(m) = mode {
+            cfg.mode = m;
+        }
+        if !HAS_TIME_UNIT {
+            cfg.time_unit = None;
+        }
+
+        let websocket_api_base = WebsocketApiBase::new(cfg, vec![]);
+        websocket_api_base.clone().connect().await?;
+
+        Ok(Self {
+            websocket_api_base: websocket_api_base.clone(),
+            account_api_client: AccountApiClient::new(websocket_api_base.clone()),
+            market_data_api_client: MarketDataApiClient::new(websocket_api_base.clone()),
+            trade_api_client: TradeApiClient::new(websocket_api_base.clone()),
+            user_data_streams_api_client: UserDataStreamsApiClient::new(websocket_api_base.clone()),
+        })
+    }
+
+    /// Subscribes to WebSocket events with a provided callback function.
+    ///
+    /// # Arguments
+    ///
+    /// * `callback` - A mutable function that will be called when a WebSocket event is received.
+    ///   The callback takes a `WebsocketEvent` as its parameter.
+    ///
+    /// # Returns
+    ///
+    /// A `Subscription` that can be used to manage the event subscription.
+    ///
+    /// # Examples
+    ///
+    ///
+    /// let subscription = `websocket_api.subscribe_on_ws_events(|event`| {
+    ///     // Handle WebSocket event
+    /// });
+    ///
+    pub fn subscribe_on_ws_events<F>(&self, callback: F) -> Subscription
+    where
+        F: FnMut(WebsocketEvent) + Send + 'static,
+    {
+        let base = Arc::clone(&self.websocket_api_base);
+        base.common.events.subscribe(callback)
+    }
+
+    /// Unsubscribes from WebSocket events using the provided `Subscription`.
+    ///
+    /// # Arguments
+    ///
+    /// * `subscription` - The `Subscription` to unsubscribe from WebSocket events.
+    ///
+    /// # Examples
+    ///
+    ///
+    /// let subscription = `websocket_api.subscribe_on_ws_events(|event`| {
+    ///     // Handle WebSocket event
+    /// });
+    /// `websocket_api.unsubscribe_from_ws_events(subscription)`;
+    ///
+    pub fn unsubscribe_from_ws_events(&self, subscription: Subscription) {
+        subscription.unsubscribe();
+    }
+
+    /// Disconnects the WebSocket connection.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating whether the disconnection was successful.
+    /// Returns an error if the disconnection fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the connection fails.
+    ///
+    /// # Examples
+    ///
+    ///
+    /// let result = `websocket_api.disconnect().await`;
+    ///
+    pub async fn disconnect(&self) -> anyhow::Result<()> {
+        self.websocket_api_base.disconnect().await.map_err(anyhow::Error::msg)
+    }
+
+    /// Sends a ping message to the WebSocket server to check the connection status.
+    ///
+    /// # Examples
+    ///
+    ///
+    /// `websocket_api.ping_server().await`;
+    ///
+    ///
+    /// This method sends a lightweight ping request to verify the WebSocket connection is still active.
+    pub async fn ping_server(&self) {
+        self.websocket_api_base.ping_server().await;
+    }
+
+    /// Checks if the WebSocket connection is currently active.
+    ///
+    /// # Returns
+    ///
+    /// A `bool` indicating whether the WebSocket connection is established and active.
+    ///
+    /// # Examples
+    ///
+    ///
+    /// let `is_active` = `websocket_api.is_connected().await`;
+    /// if `is_active` {
+    ///     // WebSocket connection is active
+    /// }
+    ///
+    ///
+    /// This method provides a way to check the current status of the WebSocket connection.
+    pub async fn is_connected(&self) -> bool {
+        self.websocket_api_base.is_connected().await
+    }
+
+    /// Sends an unsigned WebSocket message with the specified method and payload.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The response type to deserialize the message into.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The WebSocket method to invoke.
+    /// * `payload` - A map of key-value pairs representing the message payload.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the deserialized response or a `WebsocketError`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `WebsocketError` if the WebSocket connection fails or the response cannot be deserialized.
+    ///
+    /// # Examples
+    ///
+    ///
+    /// let response = `websocket_api.send_message::`<ResponseType>("`method_name`", payload).await;
+    ///
+    pub async fn send_message<R: DeserializeOwned + Send + Sync + 'static>(
+        &self,
+        method: &str,
+        payload: BTreeMap<String, Value>,
+    ) -> Result<WebsocketApiResponse<R>, WebsocketError> {
+        self.websocket_api_base
+            .send_message::<R>(
+                method,
+                payload,
+                WebsocketMessageSendOptions {
+                    with_api_key: false,
+                    is_signed: false,
+                },
+            )
+            .await
+    }
+
+    /// Sends a signed WebSocket message with the specified method and payload.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The response type to deserialize the message into.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The WebSocket method to invoke.
+    /// * `payload` - A map of key-value pairs representing the message payload.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the deserialized response or a `WebsocketError`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `WebsocketError` if the WebSocket connection fails or the response cannot be deserialized.
+    ///
+    /// # Examples
+    ///
+    ///
+    /// let response = `websocket_api.send_signed_message::`<ResponseType>("`method_name`", payload).await;
+    ///
+    pub async fn send_signed_message<R: DeserializeOwned + Send + Sync + 'static>(
+        &self,
+        method: &str,
+        payload: BTreeMap<String, Value>,
+    ) -> Result<WebsocketApiResponse<R>, WebsocketError> {
+        self.websocket_api_base
+            .send_message::<R>(
+                method,
+                payload,
+                WebsocketMessageSendOptions {
+                    with_api_key: false,
+                    is_signed: true,
+                },
+            )
+            .await
+    }
+
+    /// Account `Information(USER_DATA)`
+    ///
+    /// Get current account information. User in single-asset/ multi-assets mode will see different value, see comments in response section for detail.
+    ///
+    /// Weight: 5
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`AccountInformationParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::AccountInformationResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/account/websocket-api/Account-Information).
+    ///
+    pub async fn account_information(
+        &self,
+        params: AccountInformationParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::AccountInformationResponseResult>>> {
+        self.account_api_client.account_information(params).await
+    }
+
+    /// Account Information `V2(USER_DATA)`
+    ///
+    /// Get current account information. User in single-asset/ multi-assets mode will see different value, see comments in response section for detail.
+    ///
+    /// Weight: 5
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`AccountInformationV2Params`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::AccountInformationV2ResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/account/websocket-api/Account-Information-V2).
+    ///
+    pub async fn account_information_v2(
+        &self,
+        params: AccountInformationV2Params,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::AccountInformationV2ResponseResult>>> {
+        self.account_api_client.account_information_v2(params).await
+    }
+
+    /// Futures Account `Balance(USER_DATA)`
+    ///
+    /// Query account balance info
+    ///
+    /// Weight: 5
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`FuturesAccountBalanceParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Vec<models::FuturesAccountBalanceV2ResponseResultInner>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/account/websocket-api/Futures-Account-Balance).
+    ///
+    pub async fn futures_account_balance(
+        &self,
+        params: FuturesAccountBalanceParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Vec<models::FuturesAccountBalanceV2ResponseResultInner>>> {
+        self.account_api_client.futures_account_balance(params).await
+    }
+
+    /// Futures Account Balance `V2(USER_DATA)`
+    ///
+    /// Query account balance info
+    ///
+    /// Weight: 5
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`FuturesAccountBalanceV2Params`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Vec<models::FuturesAccountBalanceV2ResponseResultInner>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/account/websocket-api/Futures-Account-Balance-V2).
+    ///
+    pub async fn futures_account_balance_v2(
+        &self,
+        params: FuturesAccountBalanceV2Params,
+    ) -> anyhow::Result<WebsocketApiResponse<Vec<models::FuturesAccountBalanceV2ResponseResultInner>>> {
+        self.account_api_client.futures_account_balance_v2(params).await
+    }
+
+    /// Order Book
+    ///
+    /// Get current order book. Note that this request returns limited market depth.
+    /// If you need to continuously monitor order book updates, please consider using Websocket Market Streams:
+    /// * `<symbol>@depth<levels>`
+    /// * `<symbol>@depth`
+    ///
+    /// You can use `depth` request together with `<symbol>@depth` streams to maintain a local order book.
+    ///
+    /// Weight: Adjusted based on the limit:
+    /// | Limit         | Weight |
+    /// | ------------- | ------ |
+    /// | 5, 10, 20, 50 | 2      |
+    /// | 100           | 5      |
+    /// | 500           | 10     |
+    /// | 1000          | 20     |
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`OrderBookParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::OrderBookResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/websocket-api/Order-Book).
+    ///
+    pub async fn order_book(
+        &self,
+        params: OrderBookParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::OrderBookResponseResult>>> {
+        self.market_data_api_client.order_book(params).await
+    }
+
+    /// Symbol Order Book Ticker
+    ///
+    /// Best price/qty on the order book for a symbol or symbols.
+    ///
+    /// * If the symbol is not sent, bookTickers for all symbols will be returned in an array.
+    /// * The field `X-MBX-USED-WEIGHT-1M` in response header is not accurate from this endpoint, please ignore.
+    ///
+    /// Weight: 2 for a single symbol;
+    /// 5 when the symbol parameter is omitted
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`SymbolOrderBookTickerParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<models::SymbolOrderBookTickerResponse>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/websocket-api/Symbol-Order-Book-Ticker).
+    ///
+    pub async fn symbol_order_book_ticker(
+        &self,
+        params: SymbolOrderBookTickerParams,
+    ) -> anyhow::Result<WebsocketApiResponse<models::SymbolOrderBookTickerResponse>> {
+        self.market_data_api_client.symbol_order_book_ticker(params).await
+    }
+
+    /// Symbol Price Ticker
+    ///
+    /// Latest price for a symbol or symbols.
+    ///
+    /// * If the symbol is not sent, prices for all symbols will be returned in an array.
+    ///
+    /// Weight: 1 for a single symbol;
+    /// 2 when the symbol parameter is omitted
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`SymbolPriceTickerParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<models::SymbolPriceTickerResponse>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/websocket-api/Symbol-Price-Ticker).
+    ///
+    pub async fn symbol_price_ticker(
+        &self,
+        params: SymbolPriceTickerParams,
+    ) -> anyhow::Result<WebsocketApiResponse<models::SymbolPriceTickerResponse>> {
+        self.market_data_api_client.symbol_price_ticker(params).await
+    }
+
+    /// Cancel Order (TRADE)
+    ///
+    /// Cancel an active order.
+    ///
+    /// * Either `orderId` or `origClientOrderId` must be sent.
+    ///
+    /// Weight: 1
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`CancelOrderParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::CancelOrderResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/trade/websocket-api/Cancel-Order).
+    ///
+    pub async fn cancel_order(
+        &self,
+        params: CancelOrderParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::CancelOrderResponseResult>>> {
+        self.trade_api_client.cancel_order(params).await
+    }
+
+    /// Modify Order (TRADE)
+    ///
+    /// Order modify function, currently only LIMIT order modification is supported, modified orders will be reordered in the match queue
+    ///
+    /// * Either `orderId` or `origClientOrderId` must be sent, and the `orderId` will prevail if both are sent.
+    /// * Both `quantity` and `price` must be sent, which is different from dapi modify order endpoint.
+    /// * When the new `quantity` or `price` doesn't satisfy `PRICE_FILTER` / `PERCENT_FILTER` / `LOT_SIZE`, amendment will be rejected and the order will stay as it is.
+    /// * However the order will be cancelled by the amendment in the following situations:
+    /// * when the order is in partially filled status and the new `quantity` <= `executedQty`
+    /// * When the order is `GTX` and the new price will cause it to be executed immediately
+    /// * One order can only be modfied for less than 10000 times
+    ///
+    /// Weight: 1 on 10s order rate limit(X-MBX-ORDER-COUNT-10S);
+    /// 1 on 1min order rate limit(X-MBX-ORDER-COUNT-1M);
+    /// 1 on IP rate limit(x-mbx-used-weight-1m)
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`ModifyOrderParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::ModifyOrderResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/trade/websocket-api/Modify-Order).
+    ///
+    pub async fn modify_order(
+        &self,
+        params: ModifyOrderParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::ModifyOrderResponseResult>>> {
+        self.trade_api_client.modify_order(params).await
+    }
+
+    /// New Order(TRADE)
+    ///
+    /// Send in a new order.
+    ///
+    /// * Order with type `STOP`,  parameter `timeInForce` can be sent ( default `GTC`).
+    /// * Order with type `TAKE_PROFIT`,  parameter `timeInForce` can be sent ( default `GTC`).
+    /// * Condition orders will be triggered when:
+    ///
+    /// * If parameter`priceProtect`is sent as true:
+    /// * when price reaches the `stopPrice` ，the difference rate between "`MARK_PRICE`" and "`CONTRACT_PRICE`" cannot be larger than the "triggerProtect" of the symbol
+    /// * "triggerProtect" of a symbol can be got from `GET /fapi/v1/exchangeInfo`
+    ///
+    /// * `STOP`, `STOP_MARKET`:
+    /// * BUY: latest price ("`MARK_PRICE`" or "`CONTRACT_PRICE`") >= `stopPrice`
+    /// * SELL: latest price ("`MARK_PRICE`" or "`CONTRACT_PRICE`") <= `stopPrice`
+    /// * `TAKE_PROFIT`, `TAKE_PROFIT_MARKET`:
+    /// * BUY: latest price ("`MARK_PRICE`" or "`CONTRACT_PRICE`") <= `stopPrice`
+    /// * SELL: latest price ("`MARK_PRICE`" or "`CONTRACT_PRICE`") >= `stopPrice`
+    /// * `TRAILING_STOP_MARKET`:
+    /// * BUY: the lowest price after order placed `<= `activationPrice`, and the latest price >`= the lowest price * (1 + `callbackRate`)
+    /// * SELL: the highest price after order placed >= `activationPrice`, and the latest price <= the highest price * (1 - `callbackRate`)
+    ///
+    /// * For `TRAILING_STOP_MARKET`, if you got such error code.
+    /// ``{"code": -2021, "msg": "Order would immediately trigger."}``
+    /// means that the parameters you send do not meet the following requirements:
+    /// * BUY: `activationPrice` should be smaller than latest price.
+    /// * SELL: `activationPrice` should be larger than latest price.
+    ///
+    /// * If `newOrderRespType ` is sent as `RESULT` :
+    /// * `MARKET` order: the final FILLED result of the order will be return directly.
+    /// * `LIMIT` order with special `timeInForce`: the final status result of the order(FILLED or EXPIRED) will be returned directly.
+    ///
+    /// * `STOP_MARKET`, `TAKE_PROFIT_MARKET` with `closePosition`=`true`:
+    /// * Follow the same rules for condition orders.
+    /// * If triggered，**close all** current long position( if `SELL`) or current short position( if `BUY`).
+    /// * Cannot be used with `quantity` paremeter
+    /// * Cannot be used with `reduceOnly` parameter
+    /// * In Hedge Mode,cannot be used with `BUY` orders in `LONG` position side. and cannot be used with `SELL` orders in `SHORT` position side
+    ///
+    /// Weight: 0
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`NewOrderParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::NewOrderResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/trade/websocket-api/New-Order).
+    ///
+    pub async fn new_order(
+        &self,
+        params: NewOrderParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::NewOrderResponseResult>>> {
+        self.trade_api_client.new_order(params).await
+    }
+
+    /// Position Information (`USER_DATA`)
+    ///
+    /// Get current position information.
+    ///
+    /// * Please use with user data stream `ACCOUNT_UPDATE` to meet your timeliness and accuracy needs.
+    ///
+    /// Weight: 5
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`PositionInformationParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Vec<models::PositionInformationResponseResultInner>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/trade/websocket-api/Position-Information).
+    ///
+    pub async fn position_information(
+        &self,
+        params: PositionInformationParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Vec<models::PositionInformationResponseResultInner>>> {
+        self.trade_api_client.position_information(params).await
+    }
+
+    /// Position Information V2 (`USER_DATA`)
+    ///
+    /// Get current position information(only symbol that has position or open orders will be returned).
+    ///
+    /// * Please use with user data stream `ACCOUNT_UPDATE` to meet your timeliness and accuracy needs.
+    ///
+    /// Weight: 5
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`PositionInformationV2Params`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Vec<models::PositionInformationV2ResponseResultInner>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/trade/websocket-api/Position-Info-V2).
+    ///
+    pub async fn position_information_v2(
+        &self,
+        params: PositionInformationV2Params,
+    ) -> anyhow::Result<WebsocketApiResponse<Vec<models::PositionInformationV2ResponseResultInner>>> {
+        self.trade_api_client.position_information_v2(params).await
+    }
+
+    /// Query Order (`USER_DATA`)
+    ///
+    /// Check an order's status.
+    ///
+    /// * These orders will not be found:
+    /// * order status is `CANCELED` or `EXPIRED` **AND** order has NO filled trade **AND** created time + 3 days < current time
+    /// * order create time + 90 days < current time
+    ///
+    /// * Either `orderId` or `origClientOrderId` must be sent.
+    /// * `orderId` is self-increment for each specific `symbol`
+    ///
+    /// Weight: 1
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`QueryOrderParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::QueryOrderResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/trade/websocket-api/Query-Order).
+    ///
+    pub async fn query_order(
+        &self,
+        params: QueryOrderParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::QueryOrderResponseResult>>> {
+        self.trade_api_client.query_order(params).await
+    }
+
+    /// Close User Data Stream (`USER_STREAM`)
+    ///
+    /// Close out a user data stream.
+    ///
+    /// Weight: 1
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`CloseUserDataStreamParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<serde_json::Value>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/user-data-streams/Close-User-Data-Stream-Wsp).
+    ///
+    pub async fn close_user_data_stream(
+        &self,
+        params: CloseUserDataStreamParams,
+    ) -> anyhow::Result<WebsocketApiResponse<serde_json::Value>> {
+        self.user_data_streams_api_client.close_user_data_stream(params).await
+    }
+
+    /// Keepalive User Data Stream (`USER_STREAM`)
+    ///
+    /// Keepalive a user data stream to prevent a time out. User data streams will close after 60 minutes. It's recommended to send a ping about every 60 minutes.
+    ///
+    /// Weight: 1
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`KeepaliveUserDataStreamParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::KeepaliveUserDataStreamResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/user-data-streams/Keepalive-User-Data-Stream-Wsp).
+    ///
+    pub async fn keepalive_user_data_stream(
+        &self,
+        params: KeepaliveUserDataStreamParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::KeepaliveUserDataStreamResponseResult>>> {
+        self.user_data_streams_api_client.keepalive_user_data_stream(params).await
+    }
+
+    /// Start User Data Stream (`USER_STREAM`)
+    ///
+    /// Start a new user data stream. The stream will close after 60 minutes unless a keepalive is sent. If the account has an active `listenKey`, that `listenKey` will be returned and its validity will be extended for 60 minutes.
+    ///
+    /// Weight: 1
+    ///
+    /// # Arguments
+    ///
+    /// - `params`: [`StartUserDataStreamParams`]
+    ///   The parameters for this operation.
+    ///
+    /// # Returns
+    ///
+    /// [`WebsocketApiResponse<Box<models::StartUserDataStreamResponseResult>>`] on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`anyhow::Error`] if the WebSocket request fails, if parameters are invalid, or if parsing the response fails.
+    ///
+    ///
+    /// For full API details, see the [Binance API Documentation](https://developers.binance.com/docs/derivatives/usds-margined-futures/user-data-streams/Start-User-Data-Stream-Wsp).
+    ///
+    pub async fn start_user_data_stream(
+        &self,
+        params: StartUserDataStreamParams,
+    ) -> anyhow::Result<WebsocketApiResponse<Box<models::StartUserDataStreamResponseResult>>> {
+        self.user_data_streams_api_client.start_user_data_stream(params).await
+    }
+}

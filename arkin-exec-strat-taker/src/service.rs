@@ -235,7 +235,7 @@ impl Runnable for ExecutionStrategy {
 mod tests {
     use super::*;
     use arkin_core::test_utils::{MockPublisher, MockTime};
-    use rust_decimal_macros::dec;
+    use rust_decimal::prelude::*;
     use uuid::Uuid;
 
     #[tokio::test]

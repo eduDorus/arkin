@@ -4,7 +4,6 @@ use std::sync::Arc;
 use arkin_core::prelude::*;
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 use tracing::{error, info, instrument, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -379,7 +378,6 @@ mod tests {
 
     use super::*;
     use arkin_core::test_utils::{MockPublisher, MockTime};
-    use rust_decimal_macros::dec;
     use uuid::Uuid;
 
     #[tokio::test]

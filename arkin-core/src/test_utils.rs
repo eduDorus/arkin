@@ -1,8 +1,7 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
+use rust_decimal::prelude::*;
 use time::{macros::datetime, OffsetDateTime, UtcDateTime};
 use tokio::sync::{Mutex, RwLock};
 use tracing::{info, instrument};

@@ -33,4 +33,3 @@ uuid = { workspace = true }
 statrs = { workspace = true }
 test-log = { workspace = true }
 rust_decimal = { workspace = true }
-rust_decimal_macros = { workspace = true }

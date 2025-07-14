@@ -13,7 +13,6 @@ arkin-binance = { path = "../arkin-binance" }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 rust_decimal = { workspace = true }
-rust_decimal_macros = { workspace = true }
 async-tungstenite = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

@@ -1,5 +1,9 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
+use rust_decimal::prelude::*;
+use tracing::info;
+use uuid::Uuid;
+
 use arkin_accounting::Accounting;
 use arkin_audit::Audit;
 use arkin_core::prelude::*;
@@ -9,9 +13,6 @@ use arkin_ingestor_binance::SimBinanceIngestor;
 use arkin_insights::{prelude::InsightsConfig, Insights};
 use arkin_persistence::{Persistence, PersistenceConfig};
 use arkin_strat_crossover::CrossoverStrategy;
-use rust_decimal_macros::dec;
-use tracing::info;
-use uuid::Uuid;
 
 #[tokio::test]
 #[test_log::test]

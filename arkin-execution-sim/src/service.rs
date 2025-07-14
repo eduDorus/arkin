@@ -3,7 +3,6 @@ use std::{cmp::min, sync::Arc};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 use tracing::{debug, info, instrument, warn};
 
 use arkin_core::prelude::*;
@@ -362,7 +361,6 @@ impl Runnable for Executor {
 mod tests {
     use super::*;
     use arkin_core::test_utils::{MockPublisher, MockTime};
-    use rust_decimal_macros::dec;
     use uuid::Uuid;
 
     #[tokio::test]

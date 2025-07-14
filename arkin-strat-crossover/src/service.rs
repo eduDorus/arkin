@@ -3,7 +3,6 @@ use std::{collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 use tracing::{debug, info, instrument, warn};
 use typed_builder::TypedBuilder;
 

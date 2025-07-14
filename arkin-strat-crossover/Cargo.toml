@@ -12,7 +12,6 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 time = { workspace = true }
 rust_decimal = { workspace = true }
-rust_decimal_macros = { workspace = true }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }

@@ -1,7 +1,6 @@
 use std::{cmp::Ordering, fmt, sync::Arc};
 
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
