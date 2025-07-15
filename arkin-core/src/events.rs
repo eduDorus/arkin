@@ -46,9 +46,13 @@ pub enum Event {
     CancelExecutionOrder(Arc<ExecutionOrder>),
     CancelAllExecutionOrders(UtcDateTime),
 
-    NewMakerExecutionOrder(Arc<ExecutionOrder>),
-    CancelMakerExecutionOrder(Arc<ExecutionOrder>),
-    CancelAllMakerExecutionOrders(UtcDateTime),
+    NewTakerExecutionOrder(Arc<ExecutionOrder>),
+    CancelTakerExecutionOrder(Arc<ExecutionOrder>),
+    CancelAllTakerExecutionOrders(UtcDateTime),
+
+    NewWideQuoterExecutionOrder(Arc<ExecutionOrder>),
+    CancelWideQuoterExecutionOrder(Arc<ExecutionOrder>),
+    CancelAllWideQuoterExecutionOrders(UtcDateTime),
 
     // Order Manager
 
@@ -109,9 +113,13 @@ impl Event {
             Event::CancelExecutionOrder(event) => event.updated_at,
             Event::CancelAllExecutionOrders(ts) => *ts,
 
-            Event::NewMakerExecutionOrder(event) => event.updated_at,
-            Event::CancelMakerExecutionOrder(event) => event.updated_at,
-            Event::CancelAllMakerExecutionOrders(ts) => *ts,
+            Event::NewTakerExecutionOrder(event) => event.updated_at,
+            Event::CancelTakerExecutionOrder(event) => event.updated_at,
+            Event::CancelAllTakerExecutionOrders(ts) => *ts,
+
+            Event::NewWideQuoterExecutionOrder(event) => event.updated_at,
+            Event::CancelWideQuoterExecutionOrder(event) => event.updated_at,
+            Event::CancelAllWideQuoterExecutionOrders(ts) => *ts,
 
             // Order Manger
 

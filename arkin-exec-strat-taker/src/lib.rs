@@ -1,3 +1,3 @@
 mod service;
 
-pub use service::ExecutionStrategy;
+pub use service::TakerExecutionStrategy;

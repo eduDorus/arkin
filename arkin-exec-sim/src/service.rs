@@ -65,14 +65,14 @@ impl Executor {
         info!(target: "executor-simulation", "change order to inflight and add order {} to orderbook", order.id);
         let mut order = order.clone();
         let time = self.time.now().await;
-        order.update_status(VenueOrderStatus::Inflight, time);
+        order.set_inflight(time);
         self.orderbook.insert(order.clone());
         self.publisher.publish(Event::VenueOrderInflight(order.clone().into())).await;
 
         // TODO: Check if we have enough funds
         info!(target: "executor-simulation", "change order to placed and sending placed event for order {}", order.id);
         let time = self.time.now().await;
-        order.update_status(VenueOrderStatus::Placed, time);
+        order.place(time);
         self.orderbook.update(order.clone());
         self.publisher.publish(Event::VenueOrderPlaced(order.into())).await;
     }

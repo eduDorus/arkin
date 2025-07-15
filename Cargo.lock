@@ -283,7 +283,22 @@ dependencies = [
  "arkin-core",
  "async-trait",
  "dashmap",
- "rand 0.9.1",
+ "rust_decimal",
+ "test-log",
+ "time",
+ "tokio",
+ "tracing",
+ "typed-builder",
+ "uuid",
+]
+
+[[package]]
+name = "arkin-exec-strat-wide"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "async-trait",
+ "dashmap",
  "rust_decimal",
  "test-log",
  "time",
@@ -369,25 +384,6 @@ dependencies = [
  "typed-builder",
  "uuid",
  "yata",
-]
-
-[[package]]
-name = "arkin-ordermanager"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arkin-core",
- "async-trait",
- "dashmap",
- "rust_decimal",
- "test-log",
- "thiserror 2.0.12",
- "time",
- "tokio",
- "tokio-util",
- "tracing",
- "typed-builder",
- "uuid",
 ]
 
 [[package]]

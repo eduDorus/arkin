@@ -105,7 +105,7 @@ impl CrossoverStrategy {
 
         for order in execution_orders.iter() {
             self.publisher
-                .publish(Event::NewMakerExecutionOrder(order.to_owned().into()))
+                .publish(Event::NewTakerExecutionOrder(order.to_owned().into()))
                 .await;
             info!(target: "strat-crossover", "send {} execution order for {} to execution strategy {} for a quantity of {}", order.side, order.instrument, order.exec_strategy_type, order.quantity);
         }

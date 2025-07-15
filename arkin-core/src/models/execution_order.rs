@@ -18,6 +18,7 @@ pub type ExecutionOrderId = Uuid;
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "execution_order_type", rename_all = "snake_case")]
 pub enum ExecutionStrategyType {
+    WideQuoter,
     Maker,
     Taker,
     VWAP,
@@ -30,11 +31,15 @@ pub enum ExecutionStrategyType {
 #[sqlx(type_name = "execution_order_status", rename_all = "snake_case")]
 pub enum ExecutionOrderStatus {
     New,
-    Active,
-    Completed,
+    Placed,
     Cancelling,
+    Expiring,
+    Filled,
     Cancelled,
+    PartiallyFilledCancelled,
     Expired,
+    PartiallyFilledExpired,
+    Rejected,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder, Hash)]
@@ -62,7 +67,24 @@ pub struct ExecutionOrder {
 }
 
 impl ExecutionOrder {
+    pub fn place(&mut self, event_time: UtcDateTime) {
+        let new_status = ExecutionOrderStatus::Placed;
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+        }
+    }
+
     pub fn add_fill(&mut self, event_time: UtcDateTime, price: Price, quantity: Quantity, commission: Commission) {
+        if !matches!(
+            self.status,
+            ExecutionOrderStatus::Placed | ExecutionOrderStatus::Cancelling | ExecutionOrderStatus::Expiring
+        ) {
+            warn!("Cannot add fill in state {}", self.status);
+            return;
+        }
         self.fill_price =
             (self.fill_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
         self.filled_quantity += quantity;
@@ -70,49 +92,117 @@ impl ExecutionOrder {
         self.updated_at = event_time;
 
         if self.remaining_quantity().is_zero() {
-            self.status = ExecutionOrderStatus::Completed;
+            let new_status = ExecutionOrderStatus::Filled;
+            if self.is_valid_transition(&new_status) {
+                self.status = new_status;
+            } else {
+                warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            }
         }
     }
 
-    pub fn update_status(&mut self, new_status: ExecutionOrderStatus, event_time: UtcDateTime) {
+    pub fn cancel(&mut self, event_time: UtcDateTime) {
+        let new_status = ExecutionOrderStatus::Cancelling;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
             self.updated_at = event_time;
         } else {
-            warn!(
-                "Invalid state transition from {} to {} for order {}",
-                self.status, new_status, self.id
-            );
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
-    pub fn cancel(&mut self) {
-        match self.status {
-            ExecutionOrderStatus::New => self.status = ExecutionOrderStatus::Cancelled,
-            ExecutionOrderStatus::Active => self.status = ExecutionOrderStatus::Cancelled,
-            _ => warn!("Cannot cancel order in state {}", self.status),
+    pub fn expire(&mut self, event_time: UtcDateTime) {
+        let new_status = ExecutionOrderStatus::Expiring;
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+        }
+    }
+
+    pub fn reject(&mut self, event_time: UtcDateTime) {
+        let new_status = ExecutionOrderStatus::Rejected;
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+        }
+    }
+
+    pub fn finalize_terminate(&mut self, event_time: UtcDateTime) {
+        let new_status = match self.status {
+            ExecutionOrderStatus::Cancelling => {
+                if self.remaining_quantity().is_zero() {
+                    ExecutionOrderStatus::Filled
+                } else if self.has_fill() {
+                    ExecutionOrderStatus::PartiallyFilledCancelled
+                } else {
+                    ExecutionOrderStatus::Cancelled
+                }
+            }
+            ExecutionOrderStatus::Expiring => {
+                if self.remaining_quantity().is_zero() {
+                    ExecutionOrderStatus::Filled
+                } else if self.has_fill() {
+                    ExecutionOrderStatus::PartiallyFilledExpired
+                } else {
+                    ExecutionOrderStatus::Expired
+                }
+            }
+            _ => {
+                return;
+            }
+        };
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {}", new_status, self.status);
         }
     }
 
     fn is_valid_transition(&self, new_status: &ExecutionOrderStatus) -> bool {
         matches!(
             (&self.status, new_status),
-            (ExecutionOrderStatus::New, ExecutionOrderStatus::Active)
-                | (ExecutionOrderStatus::New, ExecutionOrderStatus::Cancelled)
-                | (ExecutionOrderStatus::Active, ExecutionOrderStatus::Completed)
-                | (ExecutionOrderStatus::Active, ExecutionOrderStatus::Cancelled)
-                | (ExecutionOrderStatus::Active, ExecutionOrderStatus::Expired)
+            (ExecutionOrderStatus::New, ExecutionOrderStatus::Placed)
+                | (ExecutionOrderStatus::New, ExecutionOrderStatus::Cancelling)
+                | (ExecutionOrderStatus::New, ExecutionOrderStatus::Rejected)
+                | (ExecutionOrderStatus::Placed, ExecutionOrderStatus::Filled)
+                | (ExecutionOrderStatus::Placed, ExecutionOrderStatus::Cancelling)
+                | (ExecutionOrderStatus::Placed, ExecutionOrderStatus::Expiring)
+                | (ExecutionOrderStatus::Placed, ExecutionOrderStatus::Rejected)
+                | (ExecutionOrderStatus::Cancelling, ExecutionOrderStatus::Filled)
+                | (ExecutionOrderStatus::Cancelling, ExecutionOrderStatus::Cancelled)
+                | (ExecutionOrderStatus::Cancelling, ExecutionOrderStatus::PartiallyFilledCancelled)
+                | (ExecutionOrderStatus::Expiring, ExecutionOrderStatus::Filled)
+                | (ExecutionOrderStatus::Expiring, ExecutionOrderStatus::Expired)
+                | (ExecutionOrderStatus::Expiring, ExecutionOrderStatus::PartiallyFilledExpired)
         )
     }
 
-    pub fn is_active(&self) -> bool {
-        matches!(self.status, ExecutionOrderStatus::Active)
+    pub fn is_new(&self) -> bool {
+        matches!(self.status, ExecutionOrderStatus::New)
     }
 
-    pub fn is_finalized(&self) -> bool {
+    pub fn is_active(&self) -> bool {
+        matches!(self.status, ExecutionOrderStatus::Placed)
+    }
+
+    pub fn is_terminating(&self) -> bool {
+        matches!(self.status, ExecutionOrderStatus::Cancelling | ExecutionOrderStatus::Expiring)
+    }
+
+    pub fn is_terminal(&self) -> bool {
         matches!(
             self.status,
-            ExecutionOrderStatus::Completed | ExecutionOrderStatus::Cancelled | ExecutionOrderStatus::Expired
+            ExecutionOrderStatus::Filled
+                | ExecutionOrderStatus::Cancelled
+                | ExecutionOrderStatus::PartiallyFilledCancelled
+                | ExecutionOrderStatus::Expired
+                | ExecutionOrderStatus::PartiallyFilledExpired
+                | ExecutionOrderStatus::Rejected
         )
     }
 

@@ -1,11 +1,15 @@
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use tracing::{error, info, warn};
+use time::UtcDateTime;
+use tracing::{info, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{ExecutionOrder, ExecutionOrderId, ExecutionOrderStatus, ExecutionStrategyType};
+use crate::{
+    types::Commission, ExecutionOrder, ExecutionOrderId, ExecutionOrderStatus, ExecutionStrategyType, Instrument,
+    Price, Quantity,
+};
 
 #[derive(Default, TypedBuilder)]
 pub struct ExecutionOrderBook {
@@ -23,6 +27,20 @@ impl ExecutionOrderBook {
         .into()
     }
 
+    fn autoclean_order(&self, id: ExecutionOrderId) {
+        if self.autoclean {
+            let is_terminal = if let Some(order) = self.queue.get(&id) {
+                order.is_terminal() // Evaluate and drop ref after this block.
+            } else {
+                false
+            };
+            if is_terminal {
+                self.queue.remove(&id);
+                info!(target: "venue_order_book", "auto cleanup removed finalized order {}", id);
+            }
+        }
+    }
+
     pub fn insert(&self, order: ExecutionOrder) {
         if !matches!(order.status, ExecutionOrderStatus::New) {
             warn!(target: "exec_order_book", "Adding order to order book that is not new");
@@ -35,31 +53,75 @@ impl ExecutionOrderBook {
         self.queue.get(&id).map(|entry| entry.value().to_owned())
     }
 
-    pub fn update(&self, order: ExecutionOrder) {
-        let remove = if let Some(mut o) = self.queue.get_mut(&order.id) {
-            *o = order.to_owned();
-            info!(target: "exec_order_book", "updated order {} in order book to {}", order.id, order.status);
-
-            // autoclean
-            if self.autoclean && o.is_finalized() {
-                true
-            } else {
-                false
-            }
+    pub fn place_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.place(event_time);
         } else {
-            error!(target: "exec_order_book", "Updating order that does not exist in the order book");
-            false
-        };
-
-        if remove {
-            self.queue.remove(&order.id);
-            info!(target: "exec_order_book", "auto cleanup removed finalized order {} with state {}", order.id, order.status);
+            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
+        self.autoclean_order(id);
+    }
+
+    pub fn add_fill_to_order(
+        &self,
+        id: ExecutionOrderId,
+        event_time: UtcDateTime,
+        price: Price,
+        quantity: Quantity,
+        commission: Commission,
+    ) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.add_fill(event_time, price, quantity, commission);
+            info!(target: "exec_order_book", "add fill to order {} from exec order book", id);
+        } else {
+            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn cancel_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.cancel(event_time);
+            info!(target: "exec_order_book", "cancelled order {} from exec order book", id);
+        } else {
+            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn expire_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.expire(event_time);
+            info!(target: "exec_order_book", "expired order {} from exec order book", id);
+        } else {
+            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn reject_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.reject(event_time);
+            info!(target: "exec_order_book", "rejected order {} from exec order book", id);
+        } else {
+            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn finalize_terminate_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+        info!(target: "exec_order_book", "check for terminating order {} from exec order book", id);
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.finalize_terminate(event_time);
+        } else {
+            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+        }
+        self.autoclean_order(id);
     }
 
     pub fn remove(&self, id: Uuid) -> Option<(Uuid, ExecutionOrder)> {
         let entry = self.queue.remove(&id);
-        info!(target: "exec_order_book", "removed order {} from order book", id);
+        info!(target: "exec_order_book", "removed order {} from exec order book", id);
         entry
     }
 
@@ -89,6 +151,33 @@ impl ExecutionOrderBook {
         self.queue
             .iter()
             .filter(|entry| entry.value().exec_strategy_type == exec_type)
+            .map(|entry| entry.value().to_owned())
+            .collect()
+    }
+
+    pub fn list_active_orders(&self) -> Vec<ExecutionOrder> {
+        let mut orders: Vec<ExecutionOrder> = self
+            .queue
+            .iter()
+            .filter(|entry| entry.value().is_active())
+            .map(|entry| entry.value().to_owned())
+            .collect();
+        orders.sort_by_key(|order| order.status);
+        orders
+    }
+
+    pub fn list_active_orders_by_instrument_and_strategy(
+        &self,
+        instrument: &Arc<Instrument>,
+        exec_type: ExecutionStrategyType,
+    ) -> Vec<ExecutionOrder> {
+        self.queue
+            .iter()
+            .filter(|entry| {
+                entry.value().is_active()
+                    && entry.value().exec_strategy_type == exec_type
+                    && &entry.value().instrument == instrument
+            })
             .map(|entry| entry.value().to_owned())
             .collect()
     }

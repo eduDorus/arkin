@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use tracing::{error, info, warn};
+use time::UtcDateTime;
+use tracing::{info, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{ExecutionOrderId, VenueOrder, VenueOrderId, VenueOrderStatus};
+use crate::{types::Commission, Asset, ExecutionOrderId, Price, Quantity, VenueOrder, VenueOrderId, VenueOrderStatus};
 
 #[derive(Default, TypedBuilder)]
 pub struct VenueOrderBook {
@@ -23,6 +24,20 @@ impl VenueOrderBook {
         .into()
     }
 
+    fn autoclean_order(&self, id: VenueOrderId) {
+        if self.autoclean {
+            let is_terminal = if let Some(order) = self.queue.get(&id) {
+                order.is_terminal() // Evaluate and drop ref after this block.
+            } else {
+                false
+            };
+            if is_terminal {
+                self.queue.remove(&id);
+                info!(target: "venue_order_book", "auto cleanup removed finalized order {}", id);
+            }
+        }
+    }
+
     pub fn insert(&self, order: VenueOrder) {
         if !matches!(order.status, VenueOrderStatus::New) {
             warn!(target: "venue_order_book", "Adding order to order book that is not new");
@@ -35,26 +50,90 @@ impl VenueOrderBook {
         self.queue.get(&id).map(|entry| entry.value().to_owned())
     }
 
-    pub fn update(&self, order: VenueOrder) {
-        let remove = if let Some(mut o) = self.queue.get_mut(&order.id) {
-            *o = order.to_owned();
-            info!(target: "venue_order_book", "updated order {} in venue orderbook to {}", order.id, order.status);
-
-            // autoclean
-            if self.autoclean && o.is_finalized() {
-                true
-            } else {
-                false
-            }
+    pub fn set_inflight(&self, id: VenueOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.set_inflight(event_time);
         } else {
-            error!(target: "venue_order_book", "Updating order that does not exist in the order book");
-            false
-        };
-
-        if remove {
-            self.queue.remove(&order.id);
-            info!(target: "venue_order_book", "auto cleanup removed finalized order {} with state {}", order.id, order.status);
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
+        self.autoclean_order(id);
+    }
+
+    pub fn place_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.place(event_time);
+            info!(target: "venue_order_book", "placed order {} in venue order book", id);
+        } else {
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn add_fill_to_order(
+        &self,
+        id: VenueOrderId,
+        event_time: UtcDateTime,
+        price: Price,
+        quantity: Quantity,
+        commission: Commission,
+    ) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.add_fill(event_time, price, quantity, commission);
+            info!(target: "venue_order_book", "add fill to order {} in venue order book", id);
+        } else {
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn cancel_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.cancel(event_time);
+            info!(target: "venue_order_book", "cancelled order {} in venue order book", id);
+        } else {
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn expire_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.expire(event_time);
+            info!(target: "venue_order_book", "expired order {} in venue order book", id);
+        } else {
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn reject_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.reject(event_time);
+            info!(target: "venue_order_book", "rejected order {} in venue order book", id);
+        } else {
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn finalize_terminate_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.finalize_terminate(event_time);
+            info!(target: "venue_order_book", "terminated order {} in venue order book", id);
+        } else {
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub fn update_commission_asset(&self, id: VenueOrderId, asset: Arc<Asset>) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.update_commission_asset(asset);
+            info!(target: "venue_order_book", "updated commission asset for order {} in venue order book", id);
+        } else {
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+        }
+        self.autoclean_order(id);
     }
 
     pub fn remove(&self, id: Uuid) -> Option<(Uuid, VenueOrder)> {

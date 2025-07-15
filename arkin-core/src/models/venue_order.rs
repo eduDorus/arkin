@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use sqlx::Type;
 use strum::Display;
 use time::UtcDateTime;
-use tracing::error;
+use tracing::warn;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -44,13 +44,14 @@ pub enum VenueOrderStatus {
     New,
     Inflight,
     Placed,
+    Cancelling,
     Rejected,
     PartiallyFilled,
-    PartiallyFilledCancelled,
-    PartiallyFilledExpired,
     Filled,
     Cancelled,
+    PartiallyFilledCancelled,
     Expired,
+    PartiallyFilledExpired,
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
@@ -92,7 +93,38 @@ pub struct VenueOrder {
 }
 
 impl VenueOrder {
+    pub fn set_inflight(&mut self, event_time: UtcDateTime) {
+        let new_status = VenueOrderStatus::Inflight;
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+        }
+    }
+
+    pub fn place(&mut self, event_time: UtcDateTime) {
+        let new_status = VenueOrderStatus::Placed;
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+        }
+    }
+
     pub fn add_fill(&mut self, event_time: UtcDateTime, price: Price, quantity: Quantity, commission: Commission) {
+        if !matches!(
+            self.status,
+            VenueOrderStatus::New
+                | VenueOrderStatus::Inflight
+                | VenueOrderStatus::Placed
+                | VenueOrderStatus::PartiallyFilled
+                | VenueOrderStatus::Cancelling
+        ) {
+            warn!("Cannot add fill in state {}", self.status);
+            return;
+        }
         self.last_fill_price = price;
         self.last_fill_quantity = quantity;
         self.last_fill_commission = commission;
@@ -103,42 +135,77 @@ impl VenueOrder {
         self.commission += commission;
         self.updated_at = event_time;
 
-        self.status = match self.remaining_quantity().is_zero() {
-            false => VenueOrderStatus::PartiallyFilled,
-            true => VenueOrderStatus::Filled,
-        };
+        if self.remaining_quantity().is_zero() {
+            let new_status = VenueOrderStatus::Filled;
+            if self.is_valid_transition(&new_status) {
+                self.status = new_status;
+            } else {
+                warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            }
+        } else {
+            let new_status = VenueOrderStatus::PartiallyFilled;
+            if self.is_valid_transition(&new_status) {
+                self.status = new_status;
+            } else {
+                warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            }
+        }
     }
 
-    pub fn update_status(&mut self, new_status: VenueOrderStatus, time: UtcDateTime) {
+    pub fn cancel(&mut self, event_time: UtcDateTime) {
+        let new_status = VenueOrderStatus::Cancelling;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
-            self.updated_at = time
+            self.updated_at = event_time;
         } else {
-            error!(
-                "Invalid state transition from {} to {} for order {}",
-                self.status, new_status, self.id
-            );
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
-    pub fn cancelled(&mut self) {
-        match self.status {
-            VenueOrderStatus::New => self.status = VenueOrderStatus::Cancelled,
-            VenueOrderStatus::Placed => self.status = VenueOrderStatus::Cancelled,
-            VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledCancelled,
-            _ => error!("Cannot cancel order in state {}", self.status),
+    pub fn expire(&mut self, event_time: UtcDateTime) {
+        let new_status = VenueOrderStatus::Expired;
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
-    pub fn expired(&mut self) {
-        match self.status {
-            VenueOrderStatus::Placed => self.status = VenueOrderStatus::Expired,
-            VenueOrderStatus::PartiallyFilled => self.status = VenueOrderStatus::PartiallyFilledExpired,
-            _ => error!("Cannot expire order in state {}", self.status),
+    pub fn reject(&mut self, event_time: UtcDateTime) {
+        let new_status = VenueOrderStatus::Rejected;
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
-    pub fn update_commision_asset(&mut self, asset: Arc<Asset>) {
+    pub fn finalize_terminate(&mut self, event_time: UtcDateTime) {
+        let new_status = match self.status {
+            VenueOrderStatus::Cancelling => {
+                if self.remaining_quantity().is_zero() {
+                    VenueOrderStatus::Filled
+                } else if self.has_fill() {
+                    VenueOrderStatus::PartiallyFilledCancelled
+                } else {
+                    VenueOrderStatus::Cancelled
+                }
+            }
+            _ => {
+                return;
+            }
+        };
+        if self.is_valid_transition(&new_status) {
+            self.status = new_status;
+            self.updated_at = event_time;
+        } else {
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+        }
+    }
+
+    pub fn update_commission_asset(&mut self, asset: Arc<Asset>) {
         self.commission_asset = Some(asset);
     }
 
@@ -157,35 +224,40 @@ impl VenueOrder {
     fn is_valid_transition(&self, new_status: &VenueOrderStatus) -> bool {
         matches!(
             (&self.status, new_status),
-            (VenueOrderStatus::New, VenueOrderStatus::Placed)
-                | (VenueOrderStatus::New, VenueOrderStatus::Inflight)
+            (VenueOrderStatus::New, VenueOrderStatus::Inflight)
+                | (VenueOrderStatus::New, VenueOrderStatus::Placed)
                 | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
-                | (VenueOrderStatus::New, VenueOrderStatus::Rejected)
+                | (VenueOrderStatus::New, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::Inflight, VenueOrderStatus::Placed)
                 | (VenueOrderStatus::Inflight, VenueOrderStatus::Rejected)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelled)
-                | (VenueOrderStatus::Placed, VenueOrderStatus::Expired)
+                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelling)
+                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Cancelling)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledCancelled)
-                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledExpired)
+                | (VenueOrderStatus::Cancelling, VenueOrderStatus::Cancelled)
+                | (VenueOrderStatus::Cancelling, VenueOrderStatus::PartiallyFilledCancelled)
+                | (VenueOrderStatus::Cancelling, VenueOrderStatus::Filled)
         )
     }
 
     pub fn is_active(&self) -> bool {
-        matches!(self.status, VenueOrderStatus::Placed | VenueOrderStatus::PartiallyFilled)
+        matches!(self.status, VenueOrderStatus::Placed)
     }
 
-    pub fn is_finalized(&self) -> bool {
+    pub fn is_terminating(&self) -> bool {
+        matches!(self.status, VenueOrderStatus::Cancelling)
+    }
+
+    pub fn is_terminal(&self) -> bool {
         matches!(
             self.status,
-            VenueOrderStatus::Rejected
+            VenueOrderStatus::Filled
                 | VenueOrderStatus::Cancelled
-                | VenueOrderStatus::Expired
-                | VenueOrderStatus::Filled
                 | VenueOrderStatus::PartiallyFilledCancelled
+                | VenueOrderStatus::Expired
                 | VenueOrderStatus::PartiallyFilledExpired
+                | VenueOrderStatus::Rejected
         )
     }
 }

@@ -8,7 +8,7 @@ use arkin_accounting::Accounting;
 use arkin_audit::Audit;
 use arkin_core::prelude::*;
 use arkin_exec_sim::Executor;
-use arkin_exec_strat_taker::ExecutionStrategy;
+use arkin_exec_strat_taker::TakerExecutionStrategy;
 use arkin_ingestor_binance::SimBinanceIngestor;
 use arkin_insights::{prelude::InsightsConfig, Insights};
 use arkin_persistence::{Persistence, PersistenceConfig};
@@ -23,7 +23,7 @@ async fn test_simulation() {
 
     // Start and end time
     let start_time = time.now().await;
-    let end_time = start_time + Duration::from_secs(43200);
+    let end_time = start_time + Duration::from_secs(10800);
 
     // Init pubsub
     let pubsub = PubSub::new(time.clone(), true);
@@ -121,7 +121,7 @@ async fn test_simulation() {
     let execution_order_book = ExecutionOrderBook::new(true);
     let venue_order_book = VenueOrderBook::new(true);
     let exec_strategy = Arc::new(
-        ExecutionStrategy::builder()
+        TakerExecutionStrategy::builder()
             .identifier("exec-strat-taker".to_string())
             .time(time.to_owned())
             .publisher(pubsub.publisher())
@@ -132,9 +132,9 @@ async fn test_simulation() {
     let exec_strategy_service = Service::new(
         exec_strategy,
         Some(pubsub.subscribe(EventFilter::Events(vec![
-            EventType::NewMakerExecutionOrder,
-            EventType::CancelMakerExecutionOrder,
-            EventType::CancelAllMakerExecutionOrders,
+            EventType::NewTakerExecutionOrder,
+            EventType::CancelTakerExecutionOrder,
+            EventType::CancelAllTakerExecutionOrders,
             EventType::VenueOrderInflight,
             EventType::VenueOrderPlaced,
             EventType::VenueOrderRejected,
