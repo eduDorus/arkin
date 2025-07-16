@@ -28,7 +28,7 @@ impl InternalAccount {
     }
 }
 
-pub struct Executor {
+pub struct SimulationExecutor {
     identifier: String,
     time: Arc<dyn SystemTime>,
     publisher: Arc<dyn Publisher>,
@@ -40,7 +40,7 @@ pub struct Executor {
     leverage: Decimal,
 }
 
-impl Executor {
+impl SimulationExecutor {
     pub fn new(identifier: &str, time: Arc<dyn SystemTime>, publisher: Arc<dyn Publisher>) -> Arc<Self> {
         let account = InternalAccount::default();
         account.update_balance(&test_usdt_asset(), dec!(100000));
@@ -278,7 +278,7 @@ impl Executor {
 }
 
 #[async_trait]
-impl Runnable for Executor {
+impl Runnable for SimulationExecutor {
     fn identifier(&self) -> &str {
         &self.identifier
     }
@@ -374,15 +374,15 @@ mod tests {
         // Setup
         let publisher = MockPublisher::new();
         let time = MockTime::new();
-        let execution = Executor::new("test", time.clone(), publisher.clone());
+        let execution = SimulationExecutor::new("test", time.clone(), publisher.clone());
         let mut order = VenueOrder::builder()
             .id(Uuid::new_v4())
             .strategy(Some(test_strategy_1()))
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Sell)
-            .price(dec!(0))
-            .quantity(dec!(1))
+            .set_price(dec!(0))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -422,15 +422,15 @@ mod tests {
         // Setup
         let publisher = MockPublisher::new();
         let time = MockTime::new();
-        let execution = Executor::new("test", time.clone(), publisher.clone());
+        let execution = SimulationExecutor::new("test", time.clone(), publisher.clone());
         let mut order = VenueOrder::builder()
             .id(Uuid::new_v4())
             .strategy(Some(test_strategy_1()))
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Limit)
             .side(MarketSide::Buy)
-            .price(dec!(100000))
-            .quantity(dec!(1))
+            .set_price(dec!(100000))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -470,15 +470,15 @@ mod tests {
         // Setup
         let publisher = MockPublisher::new();
         let time = MockTime::new();
-        let execution = Executor::new("test", time.clone(), publisher.clone());
+        let execution = SimulationExecutor::new("test", time.clone(), publisher.clone());
         let mut order = VenueOrder::builder()
             .id(Uuid::new_v4())
             .strategy(Some(test_strategy_1()))
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Limit)
             .side(MarketSide::Buy)
-            .price(dec!(100000))
-            .quantity(dec!(1))
+            .set_price(dec!(100000))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -519,7 +519,7 @@ mod tests {
         // Setup
         let publisher = MockPublisher::new();
         let time = MockTime::new();
-        let execution = Executor::new("test", time.clone(), publisher.clone());
+        let execution = SimulationExecutor::new("test", time.clone(), publisher.clone());
 
         // Create and place three orders
         let order1 = VenueOrder::builder()
@@ -528,8 +528,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Limit)
             .side(MarketSide::Buy)
-            .price(dec!(101000))
-            .quantity(dec!(1))
+            .set_price(dec!(101000))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -540,8 +540,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Limit)
             .side(MarketSide::Buy)
-            .price(dec!(100000))
-            .quantity(dec!(1))
+            .set_price(dec!(100000))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -552,8 +552,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Limit)
             .side(MarketSide::Buy)
-            .price(dec!(99000))
-            .quantity(dec!(1))
+            .set_price(dec!(99000))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -603,7 +603,7 @@ mod tests {
         // Setup
         let publisher = MockPublisher::new();
         let time = MockTime::new();
-        let execution = Executor::new("test", time.clone(), publisher.clone());
+        let execution = SimulationExecutor::new("test", time.clone(), publisher.clone());
 
         // Execute cancel_all on empty orderbook
         execution.handle_event(Event::CancelAllVenueOrders(time.now().await)).await;
@@ -626,7 +626,7 @@ mod tests {
         // Setup
         let publisher = MockPublisher::new();
         let time = MockTime::new();
-        let execution = Executor::new("test", time.clone(), publisher.clone());
+        let execution = SimulationExecutor::new("test", time.clone(), publisher.clone());
 
         // Create buy and sell market orders
         let mut buy_order = VenueOrder::builder()
@@ -635,8 +635,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Buy)
-            .price(dec!(0))
-            .quantity(dec!(1))
+            .set_price(dec!(0))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -647,8 +647,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Market)
             .side(MarketSide::Sell)
-            .price(dec!(0))
-            .quantity(dec!(1))
+            .set_price(dec!(0))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -797,7 +797,7 @@ mod tests {
         // Setup
         let publisher = MockPublisher::new();
         let time = MockTime::new();
-        let execution = Executor::new("test", time.clone(), publisher.clone());
+        let execution = SimulationExecutor::new("test", time.clone(), publisher.clone());
         // Create buy and sell limit orders (Will fill at ask 49500)
         let mut buy_order = VenueOrder::builder()
             .id(Uuid::new_v4())
@@ -805,8 +805,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Limit)
             .side(MarketSide::Buy)
-            .price(dec!(49000.0))
-            .quantity(dec!(1))
+            .set_price(dec!(49000.0))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -817,8 +817,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .order_type(VenueOrderType::Limit)
             .side(MarketSide::Sell)
-            .price(dec!(49000.0))
-            .quantity(dec!(1))
+            .set_price(dec!(49000.0))
+            .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)

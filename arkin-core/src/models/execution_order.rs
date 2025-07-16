@@ -4,7 +4,7 @@ use rust_decimal::Decimal;
 use sqlx::Type;
 use strum::Display;
 use time::UtcDateTime;
-use tracing::warn;
+use tracing::error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -43,6 +43,35 @@ pub enum ExecutionOrderStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder, Hash)]
+#[builder(mutators(
+    #[mutator(requires = [instrument])]
+    pub fn set_price(&mut self, value: Price) {
+        if value.is_zero() {
+            self.price = Price::ZERO;  // Or handle as needed.
+            return;
+        }
+        // Scale logic (adapted from your code).
+        let scaling_factor = Decimal::ONE / self.instrument.tick_size;
+        let scaled_price = value * scaling_factor;
+        let rounded_scaled_price = scaled_price.round();
+        let rounded_price = rounded_scaled_price * self.instrument.tick_size;
+        self.price = rounded_price.round_dp(self.instrument.price_precision);
+    }
+
+    #[mutator(requires = [instrument])]
+    pub fn set_quantity(&mut self, value: Quantity) {
+        if value.is_zero() {
+            self.quantity = Quantity::ZERO;
+            return;
+        }
+        // Scale logic.
+        let scaling_factor = Decimal::ONE / self.instrument.lot_size;
+        let scaled_quantity = value * scaling_factor;
+        let rounded_scaled_quantity = scaled_quantity.round();
+        let round_quantity = rounded_scaled_quantity * self.instrument.lot_size;
+        self.quantity = round_quantity.round_dp(self.instrument.quantity_precision);
+    }
+))]
 pub struct ExecutionOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: ExecutionOrderId,
@@ -52,7 +81,9 @@ pub struct ExecutionOrder {
     pub venue_order_ids: Vec<VenueOrderId>,
     pub exec_strategy_type: ExecutionStrategyType,
     pub side: MarketSide,
+    #[builder(via_mutators(init = Price::ZERO))]
     pub price: Price,
+    #[builder(via_mutators(init = Quantity::ZERO))]
     pub quantity: Quantity,
     #[builder(default = Price::ZERO)]
     pub fill_price: Price,
@@ -73,7 +104,7 @@ impl ExecutionOrder {
             self.status = new_status;
             self.updated_at = event_time;
         } else {
-            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
@@ -82,7 +113,7 @@ impl ExecutionOrder {
             self.status,
             ExecutionOrderStatus::Placed | ExecutionOrderStatus::Cancelling | ExecutionOrderStatus::Expiring
         ) {
-            warn!("Cannot add fill in state {}", self.status);
+            error!("Cannot add fill in state {}", self.status);
             return;
         }
         self.fill_price =
@@ -96,7 +127,7 @@ impl ExecutionOrder {
             if self.is_valid_transition(&new_status) {
                 self.status = new_status;
             } else {
-                warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+                error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
             }
         }
     }
@@ -107,7 +138,7 @@ impl ExecutionOrder {
             self.status = new_status;
             self.updated_at = event_time;
         } else {
-            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
@@ -117,7 +148,7 @@ impl ExecutionOrder {
             self.status = new_status;
             self.updated_at = event_time;
         } else {
-            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
@@ -127,7 +158,7 @@ impl ExecutionOrder {
             self.status = new_status;
             self.updated_at = event_time;
         } else {
-            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
@@ -159,7 +190,7 @@ impl ExecutionOrder {
             self.status = new_status;
             self.updated_at = event_time;
         } else {
-            warn!("Invalid transition to {} from {}", new_status, self.status);
+            error!("Invalid transition to {} from {}", new_status, self.status);
         }
     }
 

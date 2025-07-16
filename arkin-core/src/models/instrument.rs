@@ -57,6 +57,16 @@ pub struct Instrument {
     pub status: InstrumentStatus,
 }
 
+impl Instrument {
+    pub fn symbol(&self) -> String {
+        format!(
+            "{}{}",
+            self.base_asset.symbol.to_lowercase(),
+            self.quote_asset.symbol.to_lowercase()
+        )
+    }
+}
+
 impl fmt::Display for Instrument {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.symbol)

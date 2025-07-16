@@ -94,8 +94,8 @@ impl CrossoverStrategy {
                 } else {
                     MarketSide::Sell
                 })
-                .price(dec!(0))
-                .quantity(weight.abs())
+                .set_price(dec!(0))
+                .set_quantity(weight.abs())
                 .status(ExecutionOrderStatus::New)
                 .created_at(self.time.now().await)
                 .updated_at(self.time.now().await)

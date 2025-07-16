@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use time::UtcDateTime;
-use tracing::{info, warn};
+use tracing::{error, info};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -43,7 +43,7 @@ impl ExecutionOrderBook {
 
     pub fn insert(&self, order: ExecutionOrder) {
         if !matches!(order.status, ExecutionOrderStatus::New) {
-            warn!(target: "exec_order_book", "Adding order to order book that is not new");
+            error!(target: "exec_order_book", "Adding order to order book that is not new");
         }
         self.queue.insert(order.id, order.to_owned());
         info!(target: "exec_order_book", "inserted order {} in order book", order.id);
@@ -57,7 +57,7 @@ impl ExecutionOrderBook {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.place(event_time);
         } else {
-            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+            error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
@@ -74,7 +74,7 @@ impl ExecutionOrderBook {
             order.add_fill(event_time, price, quantity, commission);
             info!(target: "exec_order_book", "add fill to order {} from exec order book", id);
         } else {
-            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+            error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
@@ -84,7 +84,7 @@ impl ExecutionOrderBook {
             order.cancel(event_time);
             info!(target: "exec_order_book", "cancelled order {} from exec order book", id);
         } else {
-            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+            error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
@@ -94,7 +94,7 @@ impl ExecutionOrderBook {
             order.expire(event_time);
             info!(target: "exec_order_book", "expired order {} from exec order book", id);
         } else {
-            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+            error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
@@ -104,7 +104,7 @@ impl ExecutionOrderBook {
             order.reject(event_time);
             info!(target: "exec_order_book", "rejected order {} from exec order book", id);
         } else {
-            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+            error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
@@ -114,7 +114,7 @@ impl ExecutionOrderBook {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.finalize_terminate(event_time);
         } else {
-            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
+            error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }

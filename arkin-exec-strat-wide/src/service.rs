@@ -1,11 +1,11 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use time::UtcDateTime;
 use tokio::sync::Mutex;
-use tracing::{info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -96,6 +96,7 @@ impl WideQuoterExecutionStrategy {
             self.exec_order_book.cancel_order(exec_order.id, now);
             let venue_orders = self.venue_order_book.list_orders_by_exec_id(exec_order.id);
             for venue_order in venue_orders {
+                self.venue_order_book.cancel_order(venue_order.id, now);
                 self.publisher
                     .publish(Event::CancelVenueOrder(venue_order.clone().into()))
                     .await;
@@ -139,8 +140,8 @@ impl WideQuoterExecutionStrategy {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
                 self.venue_order_book.reject_order(order.id, order.updated_at);
-                self.check_finalize_exec(id).await;
             }
+            self.check_finalize_exec(id).await;
         }
     }
 
@@ -166,10 +167,8 @@ impl WideQuoterExecutionStrategy {
                     order.last_fill_quantity,
                     order.last_fill_commission,
                 );
-                if order.is_terminal() {
-                    self.check_finalize_exec(id).await;
-                }
             }
+            self.check_finalize_exec(id).await;
         }
     }
 
@@ -180,11 +179,9 @@ impl WideQuoterExecutionStrategy {
         if let Some(id) = order.execution_order_id {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.cancel_order(order.id, order.updated_at);
-                if order.is_terminal() {
-                    self.check_finalize_exec(id).await;
-                }
+                self.venue_order_book.finalize_terminate_order(order.id, order.updated_at);
             }
+            self.check_finalize_exec(id).await;
         }
     }
 
@@ -196,21 +193,20 @@ impl WideQuoterExecutionStrategy {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
                 self.venue_order_book.expire_order(order.id, order.updated_at);
-                if order.is_terminal() {
-                    self.check_finalize_exec(id).await;
-                }
             }
+            self.check_finalize_exec(id).await;
         }
     }
 
     async fn tick_update(&self, tick: &Tick) {
-        info!(target: "exec_strat::wide", "received tick update for {}", tick.instrument);
+        debug!(target: "exec_strat::wide", "received tick update for {}", tick.instrument);
 
         let mid = (tick.bid_price + tick.ask_price) / dec!(2);
         let exec_orders = self
             .exec_order_book
             .list_active_orders_by_instrument_and_strategy(&tick.instrument, self.strategy_type);
 
+        debug!(target: "exec_strat::wide", "found {} execution orders", exec_orders.len());
         for exec_order in exec_orders {
             let venue_orders = self.venue_order_book.list_orders_by_exec_id(exec_order.id);
             let has_active_venue = !venue_orders.is_empty() && venue_orders.iter().any(|v| v.is_active());
@@ -229,11 +225,13 @@ impl WideQuoterExecutionStrategy {
             } else {
                 Decimal::ONE // Force initial placement
             };
+            debug!(target: "exec_strat::wide", "Checking for exec order {}, with {} venue_orders", exec_order, venue_orders.len());
 
             if !has_active_venue || pct_change > self.requote_pct_change {
                 // Cancel existing if any
                 for venue_order in venue_orders {
                     if venue_order.is_active() {
+                        self.venue_order_book.cancel_order(venue_order.id, self.time.now().await);
                         self.publisher
                             .publish(Event::CancelVenueOrder(venue_order.clone().into()))
                             .await;
@@ -248,8 +246,8 @@ impl WideQuoterExecutionStrategy {
                     .strategy(exec_order.strategy.clone())
                     .instrument(exec_order.instrument.clone())
                     .side(exec_order.side)
-                    .quantity(exec_order.remaining_quantity()) // Handle partial fills
-                    .price(desired_price)
+                    .set_price(desired_price)
+                    .set_quantity(exec_order.remaining_quantity()) // Handle partial fills
                     .order_type(VenueOrderType::Limit)
                     .created_at(self.time.now().await)
                     .updated_at(self.time.now().await)
@@ -286,6 +284,28 @@ impl Runnable for WideQuoterExecutionStrategy {
             e => warn!(target: "exec_strat::wide", "received unused event {}", e),
         }
     }
+
+    #[instrument(skip_all, fields(service = %self.identifier))]
+    async fn teardown(&self, _ctx: Arc<ServiceCtx>) {
+        self.cancel_all_execution_orders(&self.time.now().await).await;
+
+        while !self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type).is_empty() {
+            info!(target: "exec_strat::wide", "waiting for orders to cancel");
+            let exec_orders = self.exec_order_book.list_orders_by_exec_strategy(self.strategy_type);
+
+            info!(target: "exec_strat::wide", "--- EXEC ORDERS ---");
+            for order in exec_orders {
+                info!(target: "exec_strat::wide", " - {}", order);
+            }
+
+            info!(target: "exec_strat::wide", "--- VENUE ORDERS ---");
+            let venue_orders = self.venue_order_book.list_orders();
+            for order in venue_orders {
+                info!(target: "exec_strat::wide", " - {}", order);
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -320,8 +340,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .exec_strategy_type(ExecutionStrategyType::WideQuoter)
             .side(MarketSide::Buy)
-            .price(dec!(0))
-            .quantity(dec!(1))
+            .set_price(dec!(0))
+            .set_quantity(dec!(1))
             .status(ExecutionOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -455,8 +475,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .exec_strategy_type(ExecutionStrategyType::WideQuoter)
             .side(MarketSide::Sell)
-            .price(dec!(0))
-            .quantity(dec!(1))
+            .set_price(dec!(0))
+            .set_quantity(dec!(1))
             .status(ExecutionOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -590,8 +610,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .exec_strategy_type(ExecutionStrategyType::WideQuoter)
             .side(MarketSide::Buy)
-            .price(dec!(0))
-            .quantity(dec!(1))
+            .set_price(dec!(0))
+            .set_quantity(dec!(1))
             .status(ExecutionOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)
@@ -613,8 +633,8 @@ mod tests {
             .instrument(test_inst_binance_btc_usdt_perp())
             .exec_strategy_type(ExecutionStrategyType::WideQuoter)
             .side(MarketSide::Sell)
-            .price(dec!(0))
-            .quantity(dec!(1))
+            .set_price(dec!(0))
+            .set_quantity(dec!(1))
             .status(ExecutionOrderStatus::New)
             .created_at(time.now().await)
             .updated_at(time.now().await)

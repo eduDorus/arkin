@@ -13,47 +13,32 @@
 
 #![allow(unused_imports)]
 use crate::derivatives_trading_usds_futures::websocket_streams::models;
+use arkin_core::prelude::*;
+use rust_decimal::Decimal;
 use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
+use time::UtcDateTime;
 
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AggregateTradeStreamsResponse {
-    #[serde(rename = "e", skip_serializing_if = "Option::is_none")]
-    pub e: Option<String>,
-    #[serde(rename = "E", skip_serializing_if = "Option::is_none")]
-    pub e_uppercase: Option<i64>,
-    #[serde(rename = "s", skip_serializing_if = "Option::is_none")]
-    pub s: Option<String>,
-    #[serde(rename = "a", skip_serializing_if = "Option::is_none")]
-    pub a: Option<i64>,
-    #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
-    pub p: Option<String>,
-    #[serde(rename = "q", skip_serializing_if = "Option::is_none")]
-    pub q: Option<String>,
-    #[serde(rename = "f", skip_serializing_if = "Option::is_none")]
-    pub f: Option<i64>,
-    #[serde(rename = "l", skip_serializing_if = "Option::is_none")]
-    pub l: Option<i64>,
-    #[serde(rename = "T", skip_serializing_if = "Option::is_none")]
-    pub t_uppercase: Option<i64>,
-    #[serde(rename = "m", skip_serializing_if = "Option::is_none")]
-    pub m: Option<bool>,
-}
-
-impl AggregateTradeStreamsResponse {
-    #[must_use]
-    pub fn new() -> AggregateTradeStreamsResponse {
-        AggregateTradeStreamsResponse {
-            e: None,
-            e_uppercase: None,
-            s: None,
-            a: None,
-            p: None,
-            q: None,
-            f: None,
-            l: None,
-            t_uppercase: None,
-            m: None,
-        }
-    }
+    #[serde(rename = "E", with = "custom_serde::timestamp")]
+    pub event_time: UtcDateTime,
+    #[serde(rename = "T", with = "custom_serde::timestamp")]
+    pub transaction_time: UtcDateTime,
+    #[serde(rename = "e")]
+    pub event_type: String,
+    #[serde(rename = "s")]
+    pub instrument: String,
+    #[serde(rename = "a")]
+    pub agg_trade_id: u64,
+    #[serde(rename = "f")]
+    pub first_trade_id: u64,
+    #[serde(rename = "l")]
+    pub last_trade_id: u64,
+    #[serde(rename = "p")]
+    pub price: Decimal,
+    #[serde(rename = "q")]
+    pub quantity: Decimal,
+    #[serde(rename = "m")]
+    pub maker: bool, // The true = sell, false = buy
 }

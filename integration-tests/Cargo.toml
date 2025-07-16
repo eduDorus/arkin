@@ -14,7 +14,9 @@ arkin-ingestor-binance = { path = "../arkin-ingestor-binance" }
 arkin-insights = { path = "../arkin-insights" }
 arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
+arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
 arkin-exec-sim = { path = "../arkin-exec-sim" }
+arkin-binance = { path = "../arkin-binance" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }

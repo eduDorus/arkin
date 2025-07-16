@@ -211,7 +211,7 @@ impl PubSub {
             for mut receiver in self.publishers.iter_mut() {
                 // Peek if there is a element and if it is within 24h
                 if let Some(peeked) = receiver.value_mut().peek() {
-                    info!(target: "pubsub", "found event");
+                    debug!(target: "pubsub", "found event");
                     // TODO: This is not optimal
                     if peeked.timestamp() > self.time.now().await + Duration::from_secs(86400) {
                         continue;

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use time::UtcDateTime;
-use tracing::{info, warn};
+use tracing::{error, info};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -40,7 +40,7 @@ impl VenueOrderBook {
 
     pub fn insert(&self, order: VenueOrder) {
         if !matches!(order.status, VenueOrderStatus::New) {
-            warn!(target: "venue_order_book", "Adding order to order book that is not new");
+            error!(target: "venue_order_book", "Adding order to order book that is not new");
         }
         self.queue.insert(order.id, order.to_owned());
         info!(target: "venue_order_book", "inserted order {} in venue orderbook", order.id);
@@ -54,7 +54,7 @@ impl VenueOrderBook {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.set_inflight(event_time);
         } else {
-            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
@@ -64,7 +64,7 @@ impl VenueOrderBook {
             order.place(event_time);
             info!(target: "venue_order_book", "placed order {} in venue order book", id);
         } else {
-            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
@@ -81,7 +81,7 @@ impl VenueOrderBook {
             order.add_fill(event_time, price, quantity, commission);
             info!(target: "venue_order_book", "add fill to order {} in venue order book", id);
         } else {
-            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
@@ -91,7 +91,7 @@ impl VenueOrderBook {
             order.cancel(event_time);
             info!(target: "venue_order_book", "cancelled order {} in venue order book", id);
         } else {
-            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
@@ -101,7 +101,7 @@ impl VenueOrderBook {
             order.expire(event_time);
             info!(target: "venue_order_book", "expired order {} in venue order book", id);
         } else {
-            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
@@ -111,7 +111,7 @@ impl VenueOrderBook {
             order.reject(event_time);
             info!(target: "venue_order_book", "rejected order {} in venue order book", id);
         } else {
-            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
@@ -121,7 +121,7 @@ impl VenueOrderBook {
             order.finalize_terminate(event_time);
             info!(target: "venue_order_book", "terminated order {} in venue order book", id);
         } else {
-            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
@@ -131,7 +131,7 @@ impl VenueOrderBook {
             order.update_commission_asset(asset);
             info!(target: "venue_order_book", "updated commission asset for order {} in venue order book", id);
         } else {
-            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }

@@ -7,7 +7,7 @@ use uuid::Uuid;
 use arkin_accounting::Accounting;
 use arkin_audit::Audit;
 use arkin_core::prelude::*;
-use arkin_exec_sim::Executor;
+use arkin_exec_sim::SimulationExecutor;
 use arkin_exec_strat_taker::TakerExecutionStrategy;
 use arkin_ingestor_binance::SimBinanceIngestor;
 use arkin_insights::{prelude::InsightsConfig, Insights};
@@ -145,7 +145,7 @@ async fn test_simulation() {
     );
 
     // Executor
-    let execution = Executor::new("exec-sim", time.clone(), pubsub.publisher());
+    let execution = SimulationExecutor::new("exec-sim", time.clone(), pubsub.publisher());
     let execution_service = Service::new(
         execution,
         Some(pubsub.subscribe(EventFilter::Events(vec![

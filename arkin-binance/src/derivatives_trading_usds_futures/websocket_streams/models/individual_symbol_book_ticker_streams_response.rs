@@ -13,44 +13,30 @@
 
 #![allow(unused_imports)]
 use crate::derivatives_trading_usds_futures::websocket_streams::models;
+use arkin_core::prelude::*;
+use rust_decimal::Decimal;
 use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use serde_json::Value;
+use time::UtcDateTime;
 
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct IndividualSymbolBookTickerStreamsResponse {
-    #[serde(rename = "e", skip_serializing_if = "Option::is_none")]
-    pub e: Option<String>,
-    #[serde(rename = "u", skip_serializing_if = "Option::is_none")]
-    pub u: Option<i64>,
-    #[serde(rename = "E", skip_serializing_if = "Option::is_none")]
-    pub e_uppercase: Option<i64>,
-    #[serde(rename = "T", skip_serializing_if = "Option::is_none")]
-    pub t_uppercase: Option<i64>,
-    #[serde(rename = "s", skip_serializing_if = "Option::is_none")]
-    pub s: Option<String>,
-    #[serde(rename = "b", skip_serializing_if = "Option::is_none")]
-    pub b: Option<String>,
-    #[serde(rename = "B", skip_serializing_if = "Option::is_none")]
-    pub b_uppercase: Option<String>,
-    #[serde(rename = "a", skip_serializing_if = "Option::is_none")]
-    pub a: Option<String>,
-    #[serde(rename = "A", skip_serializing_if = "Option::is_none")]
-    pub a_uppercase: Option<String>,
-}
-
-impl IndividualSymbolBookTickerStreamsResponse {
-    #[must_use]
-    pub fn new() -> IndividualSymbolBookTickerStreamsResponse {
-        IndividualSymbolBookTickerStreamsResponse {
-            e: None,
-            u: None,
-            e_uppercase: None,
-            t_uppercase: None,
-            s: None,
-            b: None,
-            b_uppercase: None,
-            a: None,
-            a_uppercase: None,
-        }
-    }
+    #[serde(rename = "e")]
+    pub event_type: String,
+    #[serde(rename = "E", with = "custom_serde::timestamp")]
+    pub event_time: UtcDateTime,
+    #[serde(rename = "T", with = "custom_serde::timestamp")]
+    pub transaction_time: UtcDateTime,
+    #[serde(rename = "u")]
+    pub update_id: u64,
+    #[serde(rename = "s")]
+    pub instrument: String,
+    #[serde(rename = "b")]
+    pub bid_price: Decimal,
+    #[serde(rename = "B")]
+    pub bid_quantity: Decimal,
+    #[serde(rename = "a")]
+    pub ask_price: Decimal,
+    #[serde(rename = "A")]
+    pub ask_quantity: Decimal,
 }

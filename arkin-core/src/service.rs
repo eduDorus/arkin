@@ -152,9 +152,9 @@ impl Service {
         info!(target: "service", "stopping");
         self.ctx.stopping().await;
         self.service.clone().stop_tasks(self.ctx.clone()).await;
+        self.service.teardown(self.ctx.to_owned()).await;
         self.ctx.signal_shutdown();
         self.ctx.wait().await;
-        self.service.teardown(self.ctx.to_owned()).await;
         self.ctx.stopped().await;
         info!(target: "service", "stopped");
     }
