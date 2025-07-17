@@ -37,7 +37,7 @@ async fn test_binance_wide_quoting() {
         execution_order_book,
         venue_order_book,
         dec!(0.001),
-        dec!(0.0001),
+        dec!(0.0003),
     );
     let exec_strat_service = Service::new(
         exec_strat,
@@ -116,7 +116,7 @@ async fn test_binance_wide_quoting() {
     engine.register(execution_service, 1, 2).await;
 
     engine.start().await;
-    tokio::time::sleep(Duration::from_secs(180)).await;
+    tokio::time::sleep(Duration::from_secs(600)).await;
     engine.stop().await;
 
     info!(target: "integration-test", " --- LOG REVIEW ---");

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use async_tungstenite::tungstenite::Message;
 use serde::Serialize;
+use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tracing::{debug, error, info, warn};

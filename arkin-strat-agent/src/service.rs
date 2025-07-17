@@ -20,7 +20,7 @@ impl AgentStrategy {
     async fn insight_tick(&self, _tick: &InsightsUpdate) {
         // Define constants
         const BATCH_SIZE: usize = 1;
-        const SEQUENCE_LENGTH: usize = 36;
+        const SEQUENCE_LENGTH: usize = 192;
         const NUM_FEATURES_OBS: usize = 40; // Assuming len(FEATURE_COLUMNS) = 5
         const NUM_FEATURES_STATE: usize = 2;
         const NUM_MASK: usize = 3;
@@ -66,7 +66,7 @@ impl AgentStrategy {
         });
 
         // Step 3: Send the request and handle the response
-        let url = "http://localhost:8000/v2/models/agent/infer";
+        let url = "http://192.168.100.100:8000/v2/models/agent/infer";
         let start = Instant::now();
 
         let response = match self.client.post(url).json(&infer_request).send().await {

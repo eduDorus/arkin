@@ -152,7 +152,7 @@ mod tests {
     async fn test_query() {
         let channel = "trades".to_string();
         let symbols = vec!["BTCUSDT".to_string(), "ETHUSDT".to_string()];
-        let date = datetime!(2021 - 01 - 01 01:00:00).assume_utc();
+        let date = datetime!(2021 - 01 - 01 01:00:00 UTC).to_utc();
         let offset = 1;
 
         let params = QueryParams::new(channel, symbols, date, offset);

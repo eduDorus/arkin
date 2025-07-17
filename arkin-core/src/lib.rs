@@ -23,6 +23,11 @@ pub use types::{FeatureId, Maturity, Notional, Price, Quantity, Weight};
 
 pub mod test_utils;
 
+pub mod triton {
+    include!("triton/inference.rs");
+    include!("triton/grpc.health.v1.rs");
+}
+
 pub mod prelude {
     pub use crate::constants::*;
     pub use crate::engine::*;

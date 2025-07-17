@@ -30,4 +30,4 @@ reqwest = { workspace = true }
 clickhouse = { workspace = true }
 uuid = { workspace = true }
 statrs = { workspace = true }
-
+tonic = { workspace = true }

@@ -14,11 +14,9 @@ use time::macros::format_description;
 use time::UtcDateTime;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::pin;
-use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, instrument};
 use typed_builder::TypedBuilder;
 
-use super::binance_swap::BinanceSwapsEvent;
 use super::http::TardisHttpClient;
 
 #[derive(Debug, Clone)]
@@ -199,8 +197,10 @@ impl TardisRequest {
 
 #[derive(TypedBuilder)]
 pub struct TardisIngestor {
+    #[builder(default =  "ingestor::tardis".to_owned())]
+    identifier: String,
     pub pubsub: PubSubPublisher,
-    pub persistence: Arc<PersistenceService>,
+    pub persistence: Arc<Persistence>,
     pub client: TardisHttpClient,
     pub max_concurrent_requests: usize,
     pub venue: TardisExchange,
@@ -309,16 +309,21 @@ fn parse_line(line: &str) -> Result<(UtcDateTime, String)> {
     let Ok(ts) = time::PrimitiveDateTime::parse(timestamp, format) else {
         bail!("Invalid timestamp: {} in line: {}", &timestamp, line);
     };
-    let ts = ts.assume_utc();
+    let ts = ts.assume_utc().to_utc();
 
     Ok((ts, json.to_string()))
 }
 
 #[async_trait]
-impl RunnableService for TardisIngestor {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
+impl Runnable for TardisIngestor {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn start_tasks(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {
         info!("Starting tardis ingestor...");
-        let persistence_service = Arc::clone(&self.persistence);
+        let _persistence_service = Arc::clone(&self.persistence);
 
         let req = TardisRequest::new(
             self.venue.clone(),
@@ -328,88 +333,87 @@ impl RunnableService for TardisIngestor {
             self.end,
         );
 
-        let stream = self.stream(req);
-        pin!(stream);
+        let _stream = self.stream(req);
+        pin!(_stream);
 
         // No need to clone persistence_service for each iteration
-        loop {
-            tokio::select! {
-                    event = stream.next() => {
-                    let (_ts, json) = match event {
-                      Some(e) => e,
-                      None => {
-                          info!("Stream ended");
-                          break;
-                      }
-                    };
-                    debug!("Received data: {}", json);
-                    let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
-                        Ok(e) => Some(e),
-                        Err(e) => {
-                            error!("Failed to parse Binance event: {}", e);
-                            error!("Data: {}", json);
-                            None
-                        }
-                    };
+        // loop {
+        //     tokio::select! {
+        //             event = stream.next() => {
+        //             let (_ts, json) = match event {
+        //               Some(e) => e,
+        //               None => {
+        //                   info!("Stream ended");
+        //                   break;
+        //               }
+        //             };
+        //             debug!("Received data: {}", json);
+        //             let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
+        //                 Ok(e) => Some(e),
+        //                 Err(e) => {
+        //                     error!("Failed to parse Binance event: {}", e);
+        //                     error!("Data: {}", json);
+        //                     None
+        //                 }
+        //             };
 
-                    let event = match event {
-                        Some(e) => {
-                            debug!("{}", e);
-                            e
-                        }
-                        None => {
-                            error!("Failed to parse event, skipping...");
-                            continue
-                        },
-                    };
+        //             let event = match event {
+        //                 Some(e) => {
+        //                     debug!("{}", e);
+        //                     e
+        //                 }
+        //                 None => {
+        //                     error!("Failed to parse event, skipping...");
+        //                     continue
+        //                 },
+        //             };
 
-                    let instrument = persistence_service
-                        .instrument_store
-                        .read_by_venue_symbol(&event.venue_symbol())
-                        .await?;
+        //             let instrument = persistence_service
+        //                 .instrument_store
+        //                 .read_by_venue_symbol(&event.venue_symbol())
+        //                 .await?;
 
-                    match event {
-                        BinanceSwapsEvent::AggTradeStream(stream) => {
-                            let trade = stream.data;
-                            let side = if trade.maker {
-                                MarketSide::Sell
-                            } else {
-                                MarketSide::Buy
-                            };
-                            let trade = Trade::new(
-                                trade.event_time,
-                                instrument,
-                                trade.agg_trade_id,
-                                side,
-                                trade.price,
-                                trade.quantity,
-                            );
-                            self.pubsub.publish(trade).await;
-                        }
-                        BinanceSwapsEvent::TickStream(stream) => {
-                            let tick = stream.data;
-                            let tick = Tick::new(
-                                tick.event_time,
-                                instrument,
-                                tick.update_id,
-                                tick.bid_price,
-                                tick.bid_quantity,
-                                tick.ask_price,
-                                tick.ask_quantity,
-                            );
-                            self.pubsub.publish(tick).await;
-                        }
-                    }
-                },
-                _ = shutdown.cancelled() => {
-                    info!("Shutting down");
-                    break;
-                }
-            }
-        }
+        //             match event {
+        //                 BinanceSwapsEvent::AggTradeStream(stream) => {
+        //                     let trade = stream.data;
+        //                     let side = if trade.maker {
+        //                         MarketSide::Sell
+        //                     } else {
+        //                         MarketSide::Buy
+        //                     };
+        //                     let trade = Trade::new(
+        //                         trade.event_time,
+        //                         instrument,
+        //                         trade.agg_trade_id,
+        //                         side,
+        //                         trade.price,
+        //                         trade.quantity,
+        //                     );
+        //                     self.pubsub.publish(trade).await;
+        //                 }
+        //                 BinanceSwapsEvent::TickStream(stream) => {
+        //                     let tick = stream.data;
+        //                     let tick = Tick::new(
+        //                         tick.event_time,
+        //                         instrument,
+        //                         tick.update_id,
+        //                         tick.bid_price,
+        //                         tick.bid_quantity,
+        //                         tick.ask_price,
+        //                         tick.ask_quantity,
+        //                     );
+        //                     self.pubsub.publish(tick).await;
+        //                 }
+        //             }
+        //         },
+        //         _ = shutdown.cancelled() => {
+        //             info!("Shutting down");
+        //             break;
+        //         }
+        //     }
+        // }
 
-        self.pubsub.publish(Event::Finished).await;
+        // self.publisher.publish(Event::Finished).await;
         info!("Tardis ingestor service stopped.");
-        Ok(())
     }
 }
