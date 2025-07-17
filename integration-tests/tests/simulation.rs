@@ -23,7 +23,7 @@ async fn test_simulation() {
 
     // Start and end time
     let start_time = time.now().await;
-    let end_time = start_time + Duration::from_secs(10800);
+    let end_time = start_time + Duration::from_secs(86400);
 
     // Init pubsub
     let pubsub = PubSub::new(time.clone(), true);
@@ -37,7 +37,8 @@ async fn test_simulation() {
         .instance_type(InstanceType::Test)
         .build();
     let persistence = Persistence::new(&config, instance, false, false, true).await;
-    let persistence_service = Service::new(persistence.to_owned(), Some(pubsub.subscribe(EventFilter::All)));
+    let persistence_service = Service::new(persistence.to_owned(), None);
+    // let persistence_service = Service::new(persistence.to_owned(), Some(pubsub.subscribe(EventFilter::All)));
 
     // Init accounting
     let accounting = Arc::new(
@@ -56,7 +57,7 @@ async fn test_simulation() {
 
     // Init audit
     let audit = Audit::new("audit");
-    let audit_service = Service::new(audit.to_owned(), Some(pubsub.subscribe(EventFilter::All)));
+    let audit_service = Service::new(audit.to_owned(), Some(pubsub.subscribe(EventFilter::AllWithoutMarket)));
 
     // Init sim ingestor
     let binance_ingestor = Arc::new(

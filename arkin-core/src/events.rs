@@ -143,16 +143,11 @@ impl Event {
             Event::Finished(ts) => *ts,
         }
     }
+}
 
+impl EventType {
     pub fn is_market_data(&self) -> bool {
-        matches!(
-            self,
-            Event::TickUpdate(_)
-                | Event::TradeUpdate(_)
-                | Event::BookUpdate(_)
-                | Event::InsightsTick(_)
-                | Event::InsightsUpdate(_)
-        )
+        matches!(self, EventType::TickUpdate | EventType::TradeUpdate | EventType::BookUpdate)
     }
 }
 

@@ -43,14 +43,12 @@ impl Runnable for SimBinanceIngestor {
 
         let tick_stream = self
             .persistence
-            .tick_store
-            .stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, frequency)
+            .tick_stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, frequency)
             .await;
 
         let trade_stream = self
             .persistence
-            .trade_store
-            .stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, frequency)
+            .trade_stream_range_buffered(&self.instruments, self.start, self.end, self.buffer_size, frequency)
             .await;
 
         ctx.spawn(async move {

@@ -43,7 +43,7 @@ tokio-util = { version = "0.7", features = [ "rt", "time" ] }
 tokio-rustls = { version = "0.26", features = [ "ring" ], default-features = false }
 # async-tungstenite = { version = "0.29", features = [ "tokio-runtime", "tokio-rustls-webpki-roots" ], default-features = false }
 tokio-tungstenite = { version = "0.27", features = [ "rustls-tls-webpki-roots" ] }
-reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "http2", "gzip", "brotli", "zstd", "deflate", "socks", "hickory-dns", "multipart" ], default-features = false }
+reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "http2", "gzip", "socks", "hickory-dns", "multipart" ], default-features = false }
 
 # Data Types
 rust_decimal = { version = "1.37", features = [ "maths", "serde", "std", "macros" ], default-features = false }

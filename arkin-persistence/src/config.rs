@@ -27,5 +27,5 @@ pub struct ClickhouseConfig {
     pub user: String,
     pub password: String,
     pub database: String,
-    pub buffer_size: usize,
+    pub flush_interval: u64,
 }

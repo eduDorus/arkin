@@ -65,9 +65,9 @@ pub fn get_client() -> Result<Client> {
         .timeout(Duration::from_secs(180))
         .connect_timeout(Duration::from_secs(10))
         .gzip(true)
-        .zstd(true)
-        .brotli(true)
-        .deflate(true)
+        // .zstd(true)
+        // .brotli(true)
+        // .deflate(true)
         .build()?;
     Ok(client)
 }

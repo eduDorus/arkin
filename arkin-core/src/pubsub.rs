@@ -18,6 +18,7 @@ use crate::{Event, EventType, InsightsTick, Publisher, Runnable, ServiceCtx, Sub
 
 pub enum EventFilter {
     All,
+    AllWithoutMarket,
     Events(Vec<EventType>),
 }
 
@@ -112,6 +113,13 @@ impl PubSub {
                     self.event_subscriptions.entry(event_type).or_default().push(id);
                 }
             }
+            EventFilter::AllWithoutMarket => {
+                for event_type in EventType::iter() {
+                    if !event_type.is_market_data() {
+                        self.event_subscriptions.entry(event_type).or_default().push(id);
+                    }
+                }
+            }
             EventFilter::Events(events) => {
                 for event_type in events {
                     self.event_subscriptions.entry(event_type).or_default().push(id);
@@ -184,15 +192,11 @@ impl PubSub {
             let mut ack_received = 0;
             if timeout(Duration::from_secs(1), async {
                 while ack_received < ack_counter {
-                    info!(target: "pubsub", "{} waiting for ack ({}/{})", event_type, ack_received, ack_counter);
+                    debug!(target: "pubsub", "{} waiting for ack ({}/{})", event_type, ack_received, ack_counter);
                     if self.subscribers_acknowledge_channel.1.recv().await.is_ok() {
                         ack_received += 1;
-                        info!(target: "pubsub", "{} received ack ({}/{})", event_type, ack_received, ack_counter);
+                        debug!(target: "pubsub", "{} received ack ({}/{})", event_type, ack_received, ack_counter);
                     }
-                    // Err(e) => {
-                    //     // Timeout reached
-                    //     break;
-                    // }
                 }
             })
             .await
@@ -224,7 +228,7 @@ impl PubSub {
                     lock.push(Reverse(event));
                     if lock.len() > 10000000 {
                         drop(lock);
-                        info!(target: "pubsub", "event queue is full, waiting 5s");
+                        warn!(target: "pubsub", "event queue is full, waiting 1s");
                         tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
