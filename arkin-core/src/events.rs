@@ -4,8 +4,8 @@ use strum::{Display, EnumDiscriminants, EnumIter};
 use time::UtcDateTime;
 
 use crate::{
-    Account, AccountUpdate, BalanceUpdate, Book, ExecutionOrder, InsightsTick, InsightsUpdate, PositionUpdate, Signal,
-    Tick, Trade, TransferGroup, VenueOrder,
+    Account, AccountUpdate, BalanceUpdate, Book, ExecutionOrder, InsightsTick, InsightsUpdate, PositionUpdate, Tick,
+    Trade, TransferGroup, VenueOrder,
 };
 
 #[derive(Debug, Display, Clone, EnumDiscriminants)]
@@ -31,30 +31,22 @@ pub enum Event {
     ReconcilePositionUpdate(Arc<PositionUpdate>),
     PositionUpdate(Arc<PositionUpdate>),
 
-    AccountNew(Arc<Account>),
-    TransferNew(Arc<TransferGroup>),
-
     // Insights
     InsightsTick(Arc<InsightsTick>),
     InsightsUpdate(Arc<InsightsUpdate>),
 
-    // Strategy
-    SignalUpdate(Arc<Signal>),
-
     // Allocation Execution Orders
     NewExecutionOrder(Arc<ExecutionOrder>),
-    CancelExecutionOrder(Arc<ExecutionOrder>),
-    CancelAllExecutionOrders(UtcDateTime),
-
     NewTakerExecutionOrder(Arc<ExecutionOrder>),
-    CancelTakerExecutionOrder(Arc<ExecutionOrder>),
-    CancelAllTakerExecutionOrders(UtcDateTime),
-
     NewWideQuoterExecutionOrder(Arc<ExecutionOrder>),
-    CancelWideQuoterExecutionOrder(Arc<ExecutionOrder>),
-    CancelAllWideQuoterExecutionOrders(UtcDateTime),
 
-    // Order Manager
+    CancelExecutionOrder(Arc<ExecutionOrder>),
+    CancelTakerExecutionOrder(Arc<ExecutionOrder>),
+    CancelWideQuoterExecutionOrder(Arc<ExecutionOrder>),
+
+    CancelAllExecutionOrders(UtcDateTime),
+    CancelAllTakerExecutionOrders(UtcDateTime),
+    CancelAllWideQuoterExecutionOrders(UtcDateTime),
 
     // Execution Strategy
     NewVenueOrder(Arc<VenueOrder>),
@@ -72,6 +64,16 @@ pub enum Event {
     VenueOrderFill(Arc<VenueOrder>),
     VenueOrderCancelled(Arc<VenueOrder>),
     VenueOrderExpired(Arc<VenueOrder>),
+
+    // Ledger
+    AccountNew(Arc<Account>),
+    TransferNew(Arc<TransferGroup>),
+
+    // Order Book
+    ExecutionOrderBookNew(Arc<ExecutionOrder>),
+    ExecutionOrderBookUpdate(Arc<ExecutionOrder>),
+    VenueOrderBookNew(Arc<VenueOrder>),
+    VenueOrderBookUpdate(Arc<VenueOrder>),
 
     // Other
     Finished(UtcDateTime),
@@ -98,47 +100,49 @@ impl Event {
             Event::ReconcilePositionUpdate(event) => event.event_time,
             Event::PositionUpdate(event) => event.event_time,
 
-            Event::AccountNew(event) => event.updated_at,
-            Event::TransferNew(event) => event.event_time,
+            Event::AccountNew(event) => event.updated,
+            Event::TransferNew(event) => event.created,
 
             // Insights
             Event::InsightsTick(event) => event.event_time,
             Event::InsightsUpdate(event) => event.event_time,
 
-            // Strategy Signals
-            Event::SignalUpdate(event) => event.event_time,
-
             // Allocation Execution Orders
-            Event::NewExecutionOrder(event) => event.updated_at,
-            Event::CancelExecutionOrder(event) => event.updated_at,
+            Event::NewExecutionOrder(event) => event.updated,
+            Event::NewTakerExecutionOrder(event) => event.updated,
+            Event::NewWideQuoterExecutionOrder(event) => event.updated,
+
+            Event::CancelExecutionOrder(event) => event.updated,
+            Event::CancelTakerExecutionOrder(event) => event.updated,
+            Event::CancelWideQuoterExecutionOrder(event) => event.updated,
+
             Event::CancelAllExecutionOrders(ts) => *ts,
-
-            Event::NewTakerExecutionOrder(event) => event.updated_at,
-            Event::CancelTakerExecutionOrder(event) => event.updated_at,
             Event::CancelAllTakerExecutionOrders(ts) => *ts,
-
-            Event::NewWideQuoterExecutionOrder(event) => event.updated_at,
-            Event::CancelWideQuoterExecutionOrder(event) => event.updated_at,
             Event::CancelAllWideQuoterExecutionOrders(ts) => *ts,
 
-            // Order Manger
-
             // Execution Strategy
-            Event::NewVenueOrder(event) => event.updated_at,
-            Event::CancelVenueOrder(event) => event.updated_at,
+            Event::NewVenueOrder(event) => event.updated,
+            Event::CancelVenueOrder(event) => event.updated,
             Event::CancelAllVenueOrders(ts) => *ts,
-            Event::ExecutionOrderActive(event) => event.updated_at,
-            Event::ExecutionOrderCompleted(event) => event.updated_at,
-            Event::ExecutionOrderCancelled(event) => event.updated_at,
-            Event::ExecutionOrderExpired(event) => event.updated_at,
+            Event::ExecutionOrderActive(event) => event.updated,
+            Event::ExecutionOrderCompleted(event) => event.updated,
+            Event::ExecutionOrderCancelled(event) => event.updated,
+            Event::ExecutionOrderExpired(event) => event.updated,
 
             // Execution
-            Event::VenueOrderInflight(event) => event.updated_at,
-            Event::VenueOrderPlaced(event) => event.updated_at,
-            Event::VenueOrderRejected(event) => event.updated_at,
-            Event::VenueOrderFill(event) => event.updated_at,
-            Event::VenueOrderCancelled(event) => event.updated_at,
-            Event::VenueOrderExpired(event) => event.updated_at,
+            Event::VenueOrderInflight(event) => event.updated,
+            Event::VenueOrderPlaced(event) => event.updated,
+            Event::VenueOrderRejected(event) => event.updated,
+            Event::VenueOrderFill(event) => event.updated,
+            Event::VenueOrderCancelled(event) => event.updated,
+            Event::VenueOrderExpired(event) => event.updated,
+
+            // Order Books Updates
+            Event::ExecutionOrderBookNew(event) => event.updated,
+            Event::ExecutionOrderBookUpdate(event) => event.updated,
+            Event::VenueOrderBookNew(event) => event.updated,
+            Event::VenueOrderBookUpdate(event) => event.updated,
+
             // Other
             Event::Finished(ts) => *ts,
         }
@@ -148,6 +152,21 @@ impl Event {
 impl EventType {
     pub fn is_market_data(&self) -> bool {
         matches!(self, EventType::TickUpdate | EventType::TradeUpdate | EventType::BookUpdate)
+    }
+
+    pub fn is_persistable(&self) -> bool {
+        matches!(
+            self,
+            EventType::TickUpdate
+                | EventType::TradeUpdate
+                | EventType::InsightsUpdate
+                | EventType::AccountNew
+                | EventType::TransferNew
+                | EventType::ExecutionOrderBookNew
+                | EventType::ExecutionOrderBookUpdate
+                | EventType::VenueOrderBookNew
+                | EventType::VenueOrderBookUpdate
+        )
     }
 }
 

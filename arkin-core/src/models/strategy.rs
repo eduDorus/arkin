@@ -1,5 +1,6 @@
 use std::fmt;
 
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -9,6 +10,8 @@ pub struct Strategy {
     pub id: Uuid,
     pub name: String,
     pub description: Option<String>,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
 }
 
 impl fmt::Display for Strategy {

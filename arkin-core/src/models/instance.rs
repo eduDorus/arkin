@@ -2,10 +2,11 @@ use std::fmt;
 
 use sqlx::Type;
 use strum::Display;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-#[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type)]
+#[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type, Hash)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "instance_type", rename_all = "snake_case")]
 pub enum InstanceType {
@@ -16,12 +17,13 @@ pub enum InstanceType {
     Test,
 }
 
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq, Hash)]
 pub struct Instance {
-    #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
     pub name: String,
     pub instance_type: InstanceType,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
 }
 
 impl fmt::Display for Instance {

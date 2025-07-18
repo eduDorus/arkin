@@ -31,6 +31,8 @@ pub struct InstrumentDTO {
     pub lot_size: Decimal,
     pub tick_size: Price,
     pub status: InstrumentStatus,
+    pub created: OffsetDateTime,
+    pub updated: OffsetDateTime,
 }
 
 impl From<Arc<Instrument>> for InstrumentDTO {
@@ -55,6 +57,8 @@ impl From<Arc<Instrument>> for InstrumentDTO {
             lot_size: instrument.lot_size,
             tick_size: instrument.tick_size,
             status: instrument.status.clone(),
+            created: instrument.created.into(),
+            updated: instrument.updated.into(),
         }
     }
 }
@@ -118,7 +122,9 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Instrumen
                 quote_precision,
                 lot_size,
                 tick_size,
-                status AS "status:InstrumentStatus"
+                status AS "status:InstrumentStatus",
+                created,
+                updated
             FROM instruments
             WHERE id = $1
             "#,
@@ -157,7 +163,9 @@ pub async fn read_by_venue_symbol(ctx: &PersistenceContext, symbol: &str) -> Res
                 quote_precision,
                 lot_size,
                 tick_size,
-                status AS "status:InstrumentStatus"
+                status AS "status:InstrumentStatus",
+                created,
+                updated
             FROM instruments
             WHERE venue_symbol = $1
             "#,

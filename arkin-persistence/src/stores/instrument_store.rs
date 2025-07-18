@@ -66,6 +66,8 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Instr
                 tick_size: instrument_dto.tick_size,
                 lot_size: instrument_dto.lot_size,
                 status: instrument_dto.status.into(),
+                created: instrument_dto.created.to_utc(),
+                updated: instrument_dto.updated.to_utc(),
             };
 
             // Update cache
@@ -112,6 +114,8 @@ pub async fn read_by_venue_symbol(
                 tick_size: instrument_dto.tick_size,
                 lot_size: instrument_dto.lot_size,
                 status: instrument_dto.status.into(),
+                created: instrument_dto.created.to_utc(),
+                updated: instrument_dto.updated.to_utc(),
             };
 
             // Update cache

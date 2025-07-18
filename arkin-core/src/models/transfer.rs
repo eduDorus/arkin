@@ -32,7 +32,7 @@ pub enum TransferGroupType {
 pub enum TransferType {
     Transfer,
     Pnl,
-    UnrealizedPNL,
+    UnrealizedPnl,
     Margin,
     Commission,
     Rebate,
@@ -45,12 +45,12 @@ pub enum TransferType {
 pub struct Transfer {
     #[builder(default = Uuid::new_v4())]
     pub id: Uuid,
-    /// The event time of this transfer.
-    pub event_time: UtcDateTime,
     /// The ID of the transfer group this transfer belongs to.
     pub transfer_group_id: Uuid,
     /// Type of transfer group
     pub transfer_group_type: TransferGroupType,
+    /// Transfer type (e.g. deposit, withdrawal, trade, etc.)
+    pub transfer_type: TransferType,
     /// The account that is debited (balance goes down).
     pub debit_account: Arc<Account>,
     /// The account that is credited (balance goes up).
@@ -59,14 +59,14 @@ pub struct Transfer {
     pub amount: Decimal,
     /// The Unit Price of the asset being transferred.
     pub unit_price: Decimal,
-    /// Transfer type (e.g. deposit, withdrawal, trade, etc.)
-    pub transfer_type: TransferType,
     /// strategy that initiated this transfer.
     pub strategy: Option<Arc<Strategy>>,
     /// Instrument that this transfer is related to.
     pub instrument: Option<Arc<Instrument>>,
     /// The asset being transferred.
     pub asset: Option<Arc<Asset>>,
+    /// The time of this transfer.
+    pub created: UtcDateTime,
 }
 
 impl Transfer {
@@ -92,7 +92,7 @@ impl fmt::Display for Transfer {
         write!(
             f,
             "{} {}: {} -> {} {}{} {} @ {}",
-            self.event_time,
+            self.created,
             self.transfer_type,
             self.debit_account,
             self.credit_account,
@@ -112,6 +112,6 @@ impl fmt::Display for Transfer {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct TransferGroup {
-    pub event_time: UtcDateTime,
     pub transfers: Vec<Arc<Transfer>>,
+    pub created: UtcDateTime,
 }

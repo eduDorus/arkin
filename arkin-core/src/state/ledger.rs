@@ -9,8 +9,8 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{
-    Account, AccountOwner, AccountType, Asset, Instrument, InstrumentType, Strategy, Transfer, TransferGroup,
-    TransferGroupType, TransferType, Venue,
+    Account, AccountOwner, AccountType, Asset, Event, Instrument, InstrumentType, Publisher, Strategy, Transfer,
+    TransferGroup, TransferGroupType, TransferType, Venue,
 };
 
 #[derive(Error, Debug)]
@@ -61,8 +61,9 @@ pub enum AccountingError {
 }
 
 /// The in-memory ledger tracks accounts and can apply sets of transfers atomically.
-#[derive(Debug, TypedBuilder)]
+#[derive(TypedBuilder)]
 pub struct Ledger {
+    publisher: Arc<dyn Publisher>,
     // For simplicity, we'll hold accounts in a HashMap
     #[builder(default)]
     accounts: DashMap<Uuid, Arc<Account>>,
@@ -77,8 +78,9 @@ pub struct Ledger {
 }
 
 impl Ledger {
-    pub fn new() -> Arc<Self> {
+    pub fn new(publisher: Arc<dyn Publisher>) -> Arc<Self> {
         Self {
+            publisher,
             accounts: DashMap::new(),
             transfers: RwLock::new(Vec::new()),
             balances: DashMap::new(),
@@ -88,7 +90,7 @@ impl Ledger {
     }
 
     /// Adds an account to the ledger and returns it.
-    pub fn add_account(
+    pub async fn add_account(
         &self,
         venue: Arc<Venue>,
         owner: AccountOwner,
@@ -103,12 +105,14 @@ impl Ledger {
                     .venue(venue)
                     .owner(owner)
                     .account_type(account_type)
-                    .created_at(timestamp)
-                    .updated_at(timestamp)
+                    .created(timestamp)
+                    .updated(timestamp)
                     .build()
                     .into();
                 self.accounts.insert(account.id, account.clone());
                 info!("Added account: {} {}", account.id, account);
+
+                self.publisher.publish(Event::AccountNew(account.clone().into())).await;
                 account
             }
         }
@@ -128,7 +132,7 @@ impl Ledger {
     }
 
     /// Finds an account by venue, asset, and account type, or creates it if it doesn't exist.
-    pub fn find_or_create_account(
+    pub async fn find_or_create_account(
         &self,
         venue: &Arc<Venue>,
         owner: AccountOwner,
@@ -137,7 +141,7 @@ impl Ledger {
     ) -> Arc<Account> {
         match self.find_account(venue, owner, account_type) {
             Some(account) => account,
-            None => self.add_account(venue.clone(), owner, account_type, timestamp),
+            None => self.add_account(venue.clone(), owner, account_type, timestamp).await,
         }
     }
 
@@ -248,7 +252,7 @@ impl Ledger {
         };
         let transfer = Arc::new(
             Transfer::builder()
-                .event_time(event_time)
+                .created(event_time)
                 .transfer_group_id(Uuid::new_v4())
                 .transfer_group_type(transfer_group_type)
                 .debit_account(debit_account.clone())
@@ -360,12 +364,13 @@ impl Ledger {
             }
         }
 
-        let transfer_group = TransferGroup::builder()
-            .event_time(transfers[0].event_time)
+        let transfer_group: Arc<TransferGroup> = TransferGroup::builder()
+            .created(transfers[0].created)
             .transfers(transfers.to_vec())
             .build()
             .into();
 
+        self.publisher.publish(Event::TransferNew(transfer_group.clone())).await;
         Ok(transfer_group)
     }
 
@@ -457,7 +462,7 @@ impl Ledger {
         info!(target: "ledger", "=== Recent Transfers (Oldest First) ===");
         let tx_lock = self.transfers.read().await;
         let mut all_tx: Vec<_> = tx_lock.iter().cloned().collect();
-        all_tx.sort_by_key(|t| t.event_time);
+        all_tx.sort_by_key(|t| t.created);
         let recent: Vec<_> = all_tx.iter().take(max_transfers).cloned().collect();
         for tx in recent {
             info!(target: "ledger", "{}", tx);

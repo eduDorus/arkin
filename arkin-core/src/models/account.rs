@@ -31,8 +31,8 @@ pub struct Account {
     pub venue: Arc<Venue>,
     pub owner: AccountOwner,
     pub account_type: AccountType,
-    pub created_at: UtcDateTime,
-    pub updated_at: UtcDateTime,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
 }
 
 impl Account {

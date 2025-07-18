@@ -2,6 +2,7 @@ use std::fmt;
 
 use sqlx::prelude::Type;
 use strum::Display;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -21,6 +22,8 @@ pub struct Venue {
     pub id: Uuid,
     pub name: String,
     pub venue_type: VenueType,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
 }
 
 impl fmt::Display for Venue {

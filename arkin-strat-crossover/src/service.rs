@@ -97,8 +97,8 @@ impl CrossoverStrategy {
                 .set_price(dec!(0))
                 .set_quantity(weight.abs())
                 .status(ExecutionOrderStatus::New)
-                .created_at(self.time.now().await)
-                .updated_at(self.time.now().await)
+                .created(self.time.now().await)
+                .updated(self.time.now().await)
                 .build();
             execution_orders.push(order);
         }
@@ -137,10 +137,13 @@ mod tests {
     async fn test_crossover_strategy() {
         let publisher = MockPublisher::new();
         let time = MockTime::new();
+        let now = time.now().await;
         let strategy = Strategy::builder()
             .id(Uuid::from_str("1fce35ce-1583-4334-a410-bc0f71c7469b").expect("Invalid UUID"))
             .name("crossover_strategy".into())
             .description(Some("This strategy is only for testing".into()))
+            .created(now)
+            .updated(now)
             .build();
         let strategy_name = Arc::new(strategy);
         let service = CrossoverStrategy::builder()

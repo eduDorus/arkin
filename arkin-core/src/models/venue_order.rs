@@ -20,8 +20,8 @@ pub type VenueOrderId = Uuid;
 pub enum VenueOrderType {
     Market,
     Limit,
-    StopLimit,
     StopMarket,
+    StopLimit,
     TakeProfit,
     TakeProfitMarket,
     TrailingStopMarket,
@@ -45,10 +45,10 @@ pub enum VenueOrderStatus {
     New,
     Inflight,
     Placed,
-    Cancelling,
     Rejected,
     PartiallyFilled,
     Filled,
+    Cancelling,
     Cancelled,
     PartiallyFilledCancelled,
     Expired,
@@ -120,8 +120,8 @@ pub struct VenueOrder {
     pub commission: Commission,
     #[builder(default = VenueOrderStatus::New)]
     pub status: VenueOrderStatus,
-    pub created_at: UtcDateTime,
-    pub updated_at: UtcDateTime,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
 }
 
 impl VenueOrder {
@@ -129,7 +129,7 @@ impl VenueOrder {
         let new_status = VenueOrderStatus::Inflight;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
-            self.updated_at = event_time;
+            self.updated = event_time;
         } else {
             error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
@@ -139,7 +139,7 @@ impl VenueOrder {
         let new_status = VenueOrderStatus::Placed;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
-            self.updated_at = event_time;
+            self.updated = event_time;
         } else {
             error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
@@ -165,7 +165,7 @@ impl VenueOrder {
             (self.filled_price * self.filled_quantity + price * quantity) / (self.filled_quantity + quantity);
         self.filled_quantity += quantity;
         self.commission += commission;
-        self.updated_at = event_time;
+        self.updated = event_time;
 
         if self.remaining_quantity().is_zero() {
             let new_status = VenueOrderStatus::Filled;
@@ -188,7 +188,7 @@ impl VenueOrder {
         let new_status = VenueOrderStatus::Cancelling;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
-            self.updated_at = event_time;
+            self.updated = event_time;
         } else {
             error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
@@ -198,7 +198,7 @@ impl VenueOrder {
         let new_status = VenueOrderStatus::Expired;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
-            self.updated_at = event_time;
+            self.updated = event_time;
         } else {
             error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
@@ -208,13 +208,13 @@ impl VenueOrder {
         let new_status = VenueOrderStatus::Rejected;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
-            self.updated_at = event_time;
+            self.updated = event_time;
         } else {
             error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
-    pub fn finalize_terminate(&mut self, event_time: UtcDateTime) {
+    pub fn finalize_terminate(&mut self, event_time: UtcDateTime) -> bool {
         let new_status = match self.status {
             VenueOrderStatus::Cancelling => {
                 if self.remaining_quantity().is_zero() {
@@ -226,14 +226,16 @@ impl VenueOrder {
                 }
             }
             _ => {
-                return;
+                return false;
             }
         };
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
-            self.updated_at = event_time;
+            self.updated = event_time;
+            return true;
         } else {
             error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            return false;
         }
     }
 

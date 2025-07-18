@@ -16,7 +16,7 @@ pub struct AllocationOptimizer {
 }
 
 impl AllocationOptimizer {
-    async fn strategy_signal_update(&self, _signal: &Signal) {
+    async fn _strategy_signal_update(&self, _signal: &Signal) {
         info!(target: "allocation", "received strategy signal");
     }
 }
@@ -30,7 +30,7 @@ impl Runnable for AllocationOptimizer {
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn handle_event(&self, event: Event) {
         match &event {
-            Event::SignalUpdate(s) => self.strategy_signal_update(s).await,
+            // Event::SignalUpdate(s) => self.strategy_signal_update(s).await,
             e => warn!(target: "allocation", "received unused event {}", e),
         }
     }

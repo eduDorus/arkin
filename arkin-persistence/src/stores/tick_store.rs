@@ -14,8 +14,8 @@ pub async fn insert(ctx: &PersistenceContext, tick: Arc<Tick>) -> Result<(), Per
     tick_repo::insert(ctx, tick.into()).await
 }
 
-pub async fn insert_vec(ctx: &PersistenceContext, ticks: Vec<Arc<Tick>>) -> Result<(), PersistenceError> {
-    let ticks = ticks.into_iter().map(|t| t.into()).collect::<Vec<_>>();
+pub async fn insert_vec(ctx: &PersistenceContext, ticks: &[Arc<Tick>]) -> Result<(), PersistenceError> {
+    let ticks = ticks.into_iter().cloned().map(|t| t.into()).collect::<Vec<_>>();
     tick_repo::insert_batch(ctx, &ticks).await
 }
 

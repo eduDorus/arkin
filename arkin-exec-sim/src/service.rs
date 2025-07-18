@@ -384,8 +384,8 @@ mod tests {
             .set_price(dec!(0))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         // Execute
@@ -432,8 +432,8 @@ mod tests {
             .set_price(dec!(100000))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         // Execute
@@ -480,8 +480,8 @@ mod tests {
             .set_price(dec!(100000))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         // Place the order first
@@ -531,8 +531,8 @@ mod tests {
             .set_price(dec!(101000))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
         let order2 = VenueOrder::builder()
             .id(Uuid::new_v4())
@@ -543,8 +543,8 @@ mod tests {
             .set_price(dec!(100000))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
         let order3 = VenueOrder::builder()
             .id(Uuid::new_v4())
@@ -555,8 +555,8 @@ mod tests {
             .set_price(dec!(99000))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         execution.handle_event(Event::NewVenueOrder(order1.clone().into())).await;
@@ -638,8 +638,8 @@ mod tests {
             .set_price(dec!(0))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
         let mut sell_order = VenueOrder::builder()
             .id(Uuid::new_v4())
@@ -650,8 +650,8 @@ mod tests {
             .set_price(dec!(0))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         // Place the buy order
@@ -808,8 +808,8 @@ mod tests {
             .set_price(dec!(49000.0))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
         let mut sell_order = VenueOrder::builder()
             .id(Uuid::new_v4())
@@ -820,8 +820,8 @@ mod tests {
             .set_price(dec!(49000.0))
             .set_quantity(dec!(1))
             .status(VenueOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         // Place the buy order

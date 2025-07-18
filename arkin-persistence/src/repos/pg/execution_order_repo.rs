@@ -11,7 +11,6 @@ use crate::{context::PersistenceContext, PersistenceError};
 #[derive(Debug, Clone)]
 pub struct ExecutionOrderDTO {
     pub id: Uuid,
-    pub event_time: OffsetDateTime,
     pub strategy_id: Option<Uuid>,
     pub instrument_id: Uuid,
     pub exec_strategy_type: ExecutionStrategyType,
@@ -22,14 +21,14 @@ pub struct ExecutionOrderDTO {
     pub filled_quantity: Decimal,
     pub total_commission: Decimal,
     pub status: ExecutionOrderStatus,
-    pub updated_at: OffsetDateTime,
+    pub created: OffsetDateTime,
+    pub updated: OffsetDateTime,
 }
 
 impl From<ExecutionOrder> for ExecutionOrderDTO {
     fn from(order: ExecutionOrder) -> Self {
         Self {
             id: order.id,
-            event_time: order.created_at.into(),
             strategy_id: order.strategy.as_ref().map(|s| s.id),
             instrument_id: order.instrument.id,
             exec_strategy_type: order.exec_strategy_type,
@@ -40,7 +39,8 @@ impl From<ExecutionOrder> for ExecutionOrderDTO {
             filled_quantity: order.filled_quantity,
             total_commission: order.total_commission,
             status: order.status,
-            updated_at: order.updated_at.into(),
+            created: order.created.into(),
+            updated: order.updated.into(),
         }
     }
 }
@@ -49,7 +49,6 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
     fn from(order: Arc<ExecutionOrder>) -> Self {
         Self {
             id: order.id,
-            event_time: order.created_at.into(),
             strategy_id: order.strategy.as_ref().map(|s| s.id),
             instrument_id: order.instrument.id,
             exec_strategy_type: order.exec_strategy_type,
@@ -60,7 +59,8 @@ impl From<Arc<ExecutionOrder>> for ExecutionOrderDTO {
             filled_quantity: order.filled_quantity,
             total_commission: order.total_commission,
             status: order.status,
-            updated_at: order.updated_at.into(),
+            created: order.created.into(),
+            updated: order.updated.into(),
         }
     }
 }
@@ -71,7 +71,6 @@ pub async fn insert(ctx: &PersistenceContext, order: ExecutionOrderDTO) -> Resul
             INSERT INTO execution_orders
             (
                 id, 
-                event_time, 
                 instance_id, 
                 strategy_id,
                 instrument_id, 
@@ -83,11 +82,11 @@ pub async fn insert(ctx: &PersistenceContext, order: ExecutionOrderDTO) -> Resul
                 filled_quantity, 
                 total_commission, 
                 status, 
-                updated_at
+                created, 
+                updated
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
         order.id,
-        order.event_time,
         ctx.instance.id,
         order.strategy_id,
         order.instrument_id,
@@ -99,7 +98,8 @@ pub async fn insert(ctx: &PersistenceContext, order: ExecutionOrderDTO) -> Resul
         order.filled_quantity,
         order.total_commission,
         order.status as ExecutionOrderStatus,
-        order.updated_at,
+        order.created,
+        order.updated,
     )
     .execute(&ctx.pg_pool)
     .await?;
@@ -115,7 +115,7 @@ pub async fn update(ctx: &PersistenceContext, order: ExecutionOrderDTO) -> Resul
                 filled_quantity = $3,
                 total_commission = $4,
                 status = $5,
-                updated_at = $6
+                updated = $6
             WHERE id = $1
             "#,
         order.id,
@@ -123,7 +123,7 @@ pub async fn update(ctx: &PersistenceContext, order: ExecutionOrderDTO) -> Resul
         order.filled_quantity,
         order.total_commission,
         order.status as ExecutionOrderStatus,
-        order.updated_at,
+        order.updated,
     )
     .execute(&ctx.pg_pool)
     .await?;

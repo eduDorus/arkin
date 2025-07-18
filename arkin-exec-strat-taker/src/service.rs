@@ -40,7 +40,7 @@ impl TakerExecutionStrategy {
     #[instrument(skip_all)]
     async fn check_finalize_exec(&self, exec_id: Uuid) {
         let now = self.time.now().await;
-        self.exec_order_book.finalize_terminate_order(exec_id, now);
+        self.exec_order_book.finalize_terminate_order(exec_id, now).await;
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
@@ -54,8 +54,8 @@ impl TakerExecutionStrategy {
         }
 
         // add to execution order book
-        self.exec_order_book.insert(exec_order.clone());
-        self.exec_order_book.place_order(exec_order.id, self.time.now().await);
+        self.exec_order_book.insert(exec_order.clone()).await;
+        self.exec_order_book.place_order(exec_order.id, self.time.now().await).await;
 
         // Create market order
         let venue_order = VenueOrder::builder()
@@ -67,13 +67,13 @@ impl TakerExecutionStrategy {
             .set_quantity(exec_order.quantity)
             .set_price(exec_order.price)
             .order_type(VenueOrderType::Market)
-            .created_at(self.time.now().await)
-            .updated_at(self.time.now().await)
+            .created(self.time.now().await)
+            .updated(self.time.now().await)
             .build();
         info!(target: "exec_strat::taker", "created new venue order {}", venue_order.id);
 
         // Add to the order book
-        self.venue_order_book.insert(venue_order.clone());
+        self.venue_order_book.insert(venue_order.clone()).await;
 
         // Publish the new venue order
         self.publisher.publish(Event::NewVenueOrder(venue_order.clone().into())).await;
@@ -85,7 +85,7 @@ impl TakerExecutionStrategy {
         info!(target: "exec_strat::taker", "received cancel for execution order {}", order_id);
 
         // Update the exec order book
-        self.exec_order_book.cancel_order(order_id, self.time.now().await);
+        self.exec_order_book.cancel_order(order_id, self.time.now().await).await;
 
         // Cancel all venue orders linked to the exec order
         let venue_orders = self.venue_order_book.list_orders_by_exec_id(order_id);
@@ -104,7 +104,7 @@ impl TakerExecutionStrategy {
         // Change all exec orders to cancelling
         let now = self.time.now().await;
         for exec_order in self.exec_order_book.list_orders_by_exec_strategy(self.strategy_type) {
-            self.exec_order_book.cancel_order(exec_order.id, now);
+            self.exec_order_book.cancel_order(exec_order.id, now).await;
             let venue_orders = self.venue_order_book.list_orders_by_exec_id(exec_order.id);
             for venue_order in venue_orders {
                 self.publisher
@@ -123,7 +123,7 @@ impl TakerExecutionStrategy {
         if let Some(id) = order.execution_order_id {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.set_inflight(order.id, order.updated_at);
+                self.venue_order_book.set_inflight(order.id, order.updated).await;
             }
         }
     }
@@ -136,7 +136,7 @@ impl TakerExecutionStrategy {
         if let Some(id) = order.execution_order_id {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.place_order(order.id, order.updated_at);
+                self.venue_order_book.place_order(order.id, order.updated).await;
             }
         }
     }
@@ -149,7 +149,7 @@ impl TakerExecutionStrategy {
         if let Some(id) = order.execution_order_id {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.reject_order(order.id, order.updated_at);
+                self.venue_order_book.reject_order(order.id, order.updated).await;
                 self.check_finalize_exec(id).await;
             }
         }
@@ -163,20 +163,24 @@ impl TakerExecutionStrategy {
         if let Some(id) = order.execution_order_id {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.add_fill_to_order(
-                    order.id,
-                    order.updated_at,
-                    order.last_fill_price,
-                    order.last_fill_quantity,
-                    order.last_fill_commission,
-                );
-                self.exec_order_book.add_fill_to_order(
-                    id,
-                    order.updated_at,
-                    order.last_fill_price,
-                    order.last_fill_quantity,
-                    order.last_fill_commission,
-                );
+                self.venue_order_book
+                    .add_fill_to_order(
+                        order.id,
+                        order.updated,
+                        order.last_fill_price,
+                        order.last_fill_quantity,
+                        order.last_fill_commission,
+                    )
+                    .await;
+                self.exec_order_book
+                    .add_fill_to_order(
+                        id,
+                        order.updated,
+                        order.last_fill_price,
+                        order.last_fill_quantity,
+                        order.last_fill_commission,
+                    )
+                    .await;
                 if order.is_terminal() {
                     self.check_finalize_exec(id).await;
                 }
@@ -191,7 +195,7 @@ impl TakerExecutionStrategy {
         if let Some(id) = order.execution_order_id {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.cancel_order(order.id, order.updated_at);
+                self.venue_order_book.cancel_order(order.id, order.updated).await;
                 if order.is_terminal() {
                     self.check_finalize_exec(id).await;
                 }
@@ -206,7 +210,7 @@ impl TakerExecutionStrategy {
         if let Some(id) = order.execution_order_id {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.expire_order(order.id, order.updated_at);
+                self.venue_order_book.expire_order(order.id, order.updated).await;
                 if order.is_terminal() {
                     self.check_finalize_exec(id).await;
                 }
@@ -251,8 +255,8 @@ mod tests {
         // Setup: Initialize OrderManager with mock dependencies
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let execution_order_book = ExecutionOrderBook::new(true);
-        let venue_order_book = VenueOrderBook::new(true);
+        let execution_order_book = ExecutionOrderBook::new(publisher.clone(), true);
+        let venue_order_book = VenueOrderBook::new(publisher.clone(), true);
         let exec_strategy = TakerExecutionStrategy::builder()
             .identifier("test".to_string())
             .time(time.to_owned())
@@ -271,8 +275,8 @@ mod tests {
             .set_price(dec!(0))
             .set_quantity(dec!(1))
             .status(ExecutionOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         // Execute: Handle the NewExecutionOrder event
@@ -302,8 +306,8 @@ mod tests {
             .set_price(dec!(0))
             .set_quantity(dec!(1))
             .status(ExecutionOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         // Execute: Handle the NewExecutionOrder event
@@ -344,8 +348,8 @@ mod tests {
         // Setup: Initialize with mock dependencies
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let execution_order_book = ExecutionOrderBook::new(false);
-        let venue_order_book = VenueOrderBook::new(false);
+        let execution_order_book = ExecutionOrderBook::new(publisher.clone(), true);
+        let venue_order_book = VenueOrderBook::new(publisher.clone(), true);
         let exec_strategy = TakerExecutionStrategy::builder()
             .identifier("test".to_string())
             .time(time.clone())
@@ -365,8 +369,8 @@ mod tests {
             .set_price(dec!(0))
             .set_quantity(dec!(1))
             .status(ExecutionOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         // Handle new exec order -> set Active, place market venue immediately
@@ -418,8 +422,8 @@ mod tests {
         // Setup: Same as above
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let execution_order_book = ExecutionOrderBook::new(false);
-        let venue_order_book = VenueOrderBook::new(false);
+        let execution_order_book = ExecutionOrderBook::new(publisher.clone(), true);
+        let venue_order_book = VenueOrderBook::new(publisher.clone(), true);
         let exec_strategy = TakerExecutionStrategy::builder()
             .identifier("test".to_string())
             .time(time.clone())
@@ -439,8 +443,8 @@ mod tests {
             .set_price(dec!(0))
             .set_quantity(dec!(2))
             .status(ExecutionOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         exec_strategy
@@ -490,8 +494,8 @@ mod tests {
         // Setup: Same
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let execution_order_book = ExecutionOrderBook::new(false);
-        let venue_order_book = VenueOrderBook::new(false);
+        let execution_order_book = ExecutionOrderBook::new(publisher.clone(), true);
+        let venue_order_book = VenueOrderBook::new(publisher.clone(), true);
         let exec_strategy = TakerExecutionStrategy::builder()
             .identifier("test".to_string())
             .time(time.clone())
@@ -511,8 +515,8 @@ mod tests {
             .set_price(dec!(0))
             .set_quantity(dec!(2))
             .status(ExecutionOrderStatus::New)
-            .created_at(time.now().await)
-            .updated_at(time.now().await)
+            .created(time.now().await)
+            .updated(time.now().await)
             .build();
 
         exec_strategy

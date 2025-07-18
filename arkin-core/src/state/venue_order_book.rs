@@ -6,18 +6,22 @@ use tracing::{error, info};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Asset, ExecutionOrderId, Price, Quantity, VenueOrder, VenueOrderId, VenueOrderStatus};
+use crate::{
+    types::Commission, Event, ExecutionOrderId, Price, Publisher, Quantity, VenueOrder, VenueOrderId, VenueOrderStatus,
+};
 
-#[derive(Default, TypedBuilder)]
+#[derive(TypedBuilder)]
 pub struct VenueOrderBook {
+    publisher: Arc<dyn Publisher>,
     queue: DashMap<VenueOrderId, VenueOrder>,
     #[builder(default = true)]
     autoclean: bool,
 }
 
 impl VenueOrderBook {
-    pub fn new(autoclean: bool) -> Arc<Self> {
+    pub fn new(publisher: Arc<dyn Publisher>, autoclean: bool) -> Arc<Self> {
         Self {
+            publisher,
             queue: DashMap::new(),
             autoclean,
         }
@@ -38,38 +42,63 @@ impl VenueOrderBook {
         }
     }
 
-    pub fn insert(&self, order: VenueOrder) {
+    pub async fn insert(&self, order: VenueOrder) {
         if !matches!(order.status, VenueOrderStatus::New) {
             error!(target: "venue_order_book", "Adding order to order book that is not new");
         }
         self.queue.insert(order.id, order.to_owned());
+
         info!(target: "venue_order_book", "inserted order {} in venue orderbook", order.id);
+        self.publisher.publish(Event::VenueOrderBookNew(order.into())).await;
     }
 
     pub fn get(&self, id: Uuid) -> Option<VenueOrder> {
         self.queue.get(&id).map(|entry| entry.value().to_owned())
     }
 
-    pub fn set_inflight(&self, id: VenueOrderId, event_time: UtcDateTime) {
+    pub async fn set_inflight(&self, id: VenueOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.set_inflight(event_time);
+            info!(target: "venue_order_book", "inflight order {} in venue orderbook", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::VenueOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn place_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+    pub async fn place_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.place(event_time);
             info!(target: "venue_order_book", "placed order {} in venue order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::VenueOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn add_fill_to_order(
+    pub async fn reject_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+        if let Some(mut order) = self.queue.get_mut(&id) {
+            order.reject(event_time);
+            info!(target: "venue_order_book", "rejected order {} in venue order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::VenueOrderBookUpdate(update.into())).await;
+        } else {
+            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
+        }
+        self.autoclean_order(id);
+    }
+
+    pub async fn add_fill_to_order(
         &self,
         id: VenueOrderId,
         event_time: UtcDateTime,
@@ -80,66 +109,58 @@ impl VenueOrderBook {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.add_fill(event_time, price, quantity, commission);
             info!(target: "venue_order_book", "add fill to order {} in venue order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::VenueOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn cancel_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+    pub async fn cancel_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.cancel(event_time);
             info!(target: "venue_order_book", "cancelled order {} in venue order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::VenueOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn expire_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+    pub async fn expire_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.expire(event_time);
             info!(target: "venue_order_book", "expired order {} in venue order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::VenueOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn reject_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+    pub async fn finalize_terminate_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
-            order.reject(event_time);
-            info!(target: "venue_order_book", "rejected order {} in venue order book", id);
+            let finalized = order.finalize_terminate(event_time);
+            if finalized {
+                info!(target: "venue_order_book", "finalized order {} in venue order book", id);
+
+                let update = order.clone();
+                drop(order);
+                self.publisher.publish(Event::VenueOrderBookUpdate(update.into())).await;
+            }
         } else {
             error!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
-    }
-
-    pub fn finalize_terminate_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
-        if let Some(mut order) = self.queue.get_mut(&id) {
-            order.finalize_terminate(event_time);
-            info!(target: "venue_order_book", "terminated order {} in venue order book", id);
-        } else {
-            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
-        }
-        self.autoclean_order(id);
-    }
-
-    pub fn update_commission_asset(&self, id: VenueOrderId, asset: Arc<Asset>) {
-        if let Some(mut order) = self.queue.get_mut(&id) {
-            order.update_commission_asset(asset);
-            info!(target: "venue_order_book", "updated commission asset for order {} in venue order book", id);
-        } else {
-            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
-        }
-        self.autoclean_order(id);
-    }
-
-    pub fn remove(&self, id: Uuid) -> Option<(Uuid, VenueOrder)> {
-        let entry = self.queue.remove(&id);
-        info!(target: "venue_order_book", "removed order {} in venue orderbook", id);
-        entry
     }
 
     pub fn len(&self) -> usize {

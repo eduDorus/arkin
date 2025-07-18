@@ -7,20 +7,22 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 use crate::{
-    types::Commission, ExecutionOrder, ExecutionOrderId, ExecutionOrderStatus, ExecutionStrategyType, Instrument,
-    Price, Quantity,
+    types::Commission, Event, ExecutionOrder, ExecutionOrderId, ExecutionOrderStatus, ExecutionStrategyType,
+    Instrument, Price, Publisher, Quantity,
 };
 
-#[derive(Default, TypedBuilder)]
+#[derive(TypedBuilder)]
 pub struct ExecutionOrderBook {
+    publisher: Arc<dyn Publisher>,
     queue: DashMap<ExecutionOrderId, ExecutionOrder>,
     #[builder(default = true)]
     autoclean: bool,
 }
 
 impl ExecutionOrderBook {
-    pub fn new(autoclean: bool) -> Arc<Self> {
+    pub fn new(publisher: Arc<dyn Publisher>, autoclean: bool) -> Arc<Self> {
         Self {
+            publisher,
             queue: DashMap::new(),
             autoclean,
         }
@@ -36,33 +38,40 @@ impl ExecutionOrderBook {
             };
             if is_terminal {
                 self.queue.remove(&id);
-                info!(target: "venue_order_book", "auto cleanup removed finalized order {}", id);
+                info!(target: "exec_order_book", "auto cleanup removed finalized order {}", id);
             }
         }
     }
 
-    pub fn insert(&self, order: ExecutionOrder) {
+    pub async fn insert(&self, order: ExecutionOrder) {
         if !matches!(order.status, ExecutionOrderStatus::New) {
             error!(target: "exec_order_book", "Adding order to order book that is not new");
         }
         self.queue.insert(order.id, order.to_owned());
+
         info!(target: "exec_order_book", "inserted order {} in order book", order.id);
+        self.publisher.publish(Event::ExecutionOrderBookNew(order.into())).await;
     }
 
     pub fn get(&self, id: Uuid) -> Option<ExecutionOrder> {
         self.queue.get(&id).map(|entry| entry.value().to_owned())
     }
 
-    pub fn place_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+    pub async fn place_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.place(event_time);
+            info!(target: "exec_order_book", "placed order {} in exec order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn add_fill_to_order(
+    pub async fn add_fill_to_order(
         &self,
         id: ExecutionOrderId,
         event_time: UtcDateTime,
@@ -73,56 +82,73 @@ impl ExecutionOrderBook {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.add_fill(event_time, price, quantity, commission);
             info!(target: "exec_order_book", "add fill to order {} from exec order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn cancel_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+    pub async fn cancel_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.cancel(event_time);
             info!(target: "exec_order_book", "cancelled order {} from exec order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn expire_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+    pub async fn expire_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.expire(event_time);
             info!(target: "exec_order_book", "expired order {} from exec order book", id);
+
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn reject_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+    pub async fn reject_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.reject(event_time);
+
             info!(target: "exec_order_book", "rejected order {} from exec order book", id);
+            let update = order.clone();
+            drop(order);
+            self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
         } else {
             error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }
 
-    pub fn finalize_terminate_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+    pub async fn finalize_terminate_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
         info!(target: "exec_order_book", "check for terminating order {} from exec order book", id);
         if let Some(mut order) = self.queue.get_mut(&id) {
-            order.finalize_terminate(event_time);
+            let finalized = order.finalize_terminate(event_time);
+            if finalized {
+                info!(target: "exec_order_book", "finalized order {} in exec order book", id);
+
+                let update = order.clone();
+                drop(order);
+                self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
+            }
         } else {
             error!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
-    }
-
-    pub fn remove(&self, id: Uuid) -> Option<(Uuid, ExecutionOrder)> {
-        let entry = self.queue.remove(&id);
-        info!(target: "exec_order_book", "removed order {} from exec order book", id);
-        entry
     }
 
     pub fn len(&self) -> usize {

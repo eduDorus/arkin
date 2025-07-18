@@ -13,8 +13,8 @@ pub async fn insert(ctx: &PersistenceContext, trade: Arc<Trade>) -> Result<(), P
     trade_repo::insert(ctx, trade.into()).await
 }
 
-pub async fn insert_vec(ctx: &PersistenceContext, trades: Vec<Arc<Trade>>) -> Result<(), PersistenceError> {
-    let ticks = trades.into_iter().map(|t| t.into()).collect::<Vec<_>>();
+pub async fn insert_vec(ctx: &PersistenceContext, trades: &[Arc<Trade>]) -> Result<(), PersistenceError> {
+    let ticks = trades.into_iter().cloned().map(|t| t.into()).collect::<Vec<_>>();
     trade_repo::insert_batch(ctx, &ticks).await
 }
 

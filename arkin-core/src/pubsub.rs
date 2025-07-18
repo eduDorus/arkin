@@ -19,6 +19,7 @@ use crate::{Event, EventType, InsightsTick, Publisher, Runnable, ServiceCtx, Sub
 pub enum EventFilter {
     All,
     AllWithoutMarket,
+    Persistable,
     Events(Vec<EventType>),
 }
 
@@ -116,6 +117,13 @@ impl PubSub {
             EventFilter::AllWithoutMarket => {
                 for event_type in EventType::iter() {
                     if !event_type.is_market_data() {
+                        self.event_subscriptions.entry(event_type).or_default().push(id);
+                    }
+                }
+            }
+            EventFilter::Persistable => {
+                for event_type in EventType::iter() {
+                    if event_type.is_persistable() {
                         self.event_subscriptions.entry(event_type).or_default().push(id);
                     }
                 }

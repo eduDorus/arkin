@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 use sqlx::prelude::*;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{context::PersistenceContext, PersistenceError};
@@ -11,6 +12,8 @@ pub struct PipelineDTO {
     pub id: Uuid,
     pub name: String,
     pub description: Option<String>,
+    pub created: OffsetDateTime,
+    pub updated: OffsetDateTime,
 }
 
 impl From<Arc<Pipeline>> for PipelineDTO {
@@ -19,6 +22,8 @@ impl From<Arc<Pipeline>> for PipelineDTO {
             id: pipeline.id,
             name: pipeline.name.clone(),
             description: pipeline.description.clone().into(),
+            created: pipeline.created.into(),
+            updated: pipeline.updated.into(),
         }
     }
 }
@@ -29,24 +34,30 @@ impl From<PipelineDTO> for Arc<Pipeline> {
             id: pipeline.id,
             name: pipeline.name,
             description: pipeline.description.unwrap_or_default(),
+            created: pipeline.created.into(),
+            updated: pipeline.updated.into(),
         };
         Arc::new(asset)
     }
 }
 
-pub async fn insert(ctx: &PersistenceContext, asset: PipelineDTO) -> Result<(), PersistenceError> {
+pub async fn insert(ctx: &PersistenceContext, pipeline: PipelineDTO) -> Result<(), PersistenceError> {
     sqlx::query!(
         r#"
             INSERT INTO pipelines 
             (
                 id, 
                 name, 
-                description
-            ) VALUES ($1, $2, $3)
+                description,
+                created,
+                updated
+            ) VALUES ($1, $2, $3, $4, $5)
             "#,
-        asset.id,
-        asset.name,
-        asset.description
+        pipeline.id,
+        pipeline.name,
+        pipeline.description,
+        pipeline.created,
+        pipeline.updated
     )
     .execute(&ctx.pg_pool)
     .await?;
@@ -60,7 +71,9 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<PipelineD
             SELECT
                 id, 
                 name, 
-                description
+                description,
+                created,
+                updated
             FROM pipelines
             WHERE id = $1
             "#,
@@ -82,7 +95,9 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Pipeli
             SELECT
                 id, 
                 name, 
-                description
+                description,
+                created,
+                updated
             FROM pipelines
             WHERE name = $1
             "#,

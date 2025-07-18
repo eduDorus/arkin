@@ -28,8 +28,8 @@ async fn test_binance_wide_quoting() {
     let audit_service = Service::new(audit.to_owned(), Some(pubsub.subscribe(EventFilter::All)));
 
     // Init wide quoter strategy
-    let execution_order_book = ExecutionOrderBook::new(true);
-    let venue_order_book = VenueOrderBook::new(true);
+    let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
+    let venue_order_book = VenueOrderBook::new(pubsub.publisher(), true);
     let exec_strat = WideQuoterExecutionStrategy::new(
         "wide-quoter",
         time.clone(),
@@ -81,8 +81,8 @@ async fn test_binance_wide_quoting() {
         .set_price(dec!(0))
         .set_quantity(dec!(0.001))
         .status(ExecutionOrderStatus::New)
-        .created_at(time.now().await)
-        .updated_at(time.now().await)
+        .created(time.now().await)
+        .updated(time.now().await)
         .build();
 
     publisher
@@ -100,8 +100,8 @@ async fn test_binance_wide_quoting() {
         .set_price(dec!(0))
         .set_quantity(dec!(0.001))
         .status(ExecutionOrderStatus::New)
-        .created_at(time.now().await)
-        .updated_at(time.now().await)
+        .created(time.now().await)
+        .updated(time.now().await)
         .build();
 
     publisher
@@ -145,8 +145,10 @@ async fn test_sim_wide_quoting() {
         .id(Uuid::from_str("04432ac5-483d-46a3-811b-6be79d6ef7c1").unwrap())
         .name("integration-test".to_owned())
         .instance_type(InstanceType::Test)
+        .created(time.now().await)
+        .updated(time.now().await)
         .build();
-    let persistence = Persistence::new(&config, instance, false, false, true).await;
+    let persistence = Persistence::new(&config, instance, false, false, true);
     let persistence_service = Service::new(persistence.to_owned(), Some(pubsub.subscribe(EventFilter::All)));
 
     // Init audit
@@ -184,8 +186,8 @@ async fn test_sim_wide_quoting() {
     let binance_ingestor_service = Service::new(binance_ingestor, None);
 
     // Init wide quoter strategy
-    let execution_order_book = ExecutionOrderBook::new(true);
-    let venue_order_book = VenueOrderBook::new(true);
+    let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
+    let venue_order_book = VenueOrderBook::new(pubsub.publisher(), true);
     let exec_strat = WideQuoterExecutionStrategy::new(
         "wide-quoter",
         time.clone(),
@@ -237,8 +239,8 @@ async fn test_sim_wide_quoting() {
         .set_price(dec!(0))
         .set_quantity(dec!(0.001))
         .status(ExecutionOrderStatus::New)
-        .created_at(time.now().await)
-        .updated_at(time.now().await)
+        .created(time.now().await)
+        .updated(time.now().await)
         .build();
 
     publisher
@@ -256,8 +258,8 @@ async fn test_sim_wide_quoting() {
         .set_price(dec!(0))
         .set_quantity(dec!(0.001))
         .status(ExecutionOrderStatus::New)
-        .created_at(time.now().await)
-        .updated_at(time.now().await)
+        .created(time.now().await)
+        .updated(time.now().await)
         .build();
 
     publisher

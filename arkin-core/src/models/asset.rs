@@ -2,6 +2,7 @@ use std::fmt;
 
 use sqlx::Type;
 use strum::Display;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -11,7 +12,7 @@ use uuid::Uuid;
 pub enum AssetType {
     Crypto,
     Stock,
-    Forex,
+    Fiat,
     Commodity,
 }
 
@@ -22,6 +23,8 @@ pub struct Asset {
     pub symbol: String,
     pub name: String,
     pub asset_type: AssetType,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
 }
 
 impl fmt::Display for Asset {

@@ -22,17 +22,6 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Arc<St
     Ok(strategy)
 }
 
-pub async fn read_by_name_or_create(ctx: &PersistenceContext, name: &str) -> Result<Arc<Strategy>, PersistenceError> {
-    if let Ok(strategy_dto) = strategy_repo::read_by_name(ctx, name).await {
-        let strategy: Arc<Strategy> = Arc::new(Strategy::from(strategy_dto));
-        return Ok(strategy);
-    } else {
-        let strategy = Arc::new(Strategy::builder().name(name.to_string()).description(None).build());
-        strategy_repo::insert(ctx, strategy.clone().into()).await?;
-        return Ok(strategy);
-    }
-}
-
 pub async fn update(ctx: &PersistenceContext, strategy: Arc<Strategy>) -> Result<(), PersistenceError> {
     strategy_repo::update(ctx, strategy.into()).await
 }

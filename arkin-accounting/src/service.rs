@@ -39,9 +39,8 @@ pub struct Accounting {
     identifier: String,
     time: Arc<dyn SystemTime>,
     publisher: Arc<dyn Publisher>,
-    #[builder(default = Ledger::new())]
+    #[builder(default_code = "Ledger::new(publisher.clone())")]
     ledger: Arc<Ledger>,
-    // user_account: Arc<Account>,
 }
 
 impl Accounting {
@@ -55,12 +54,14 @@ impl Accounting {
         let mut transfers = Vec::new();
         let mut diffs = Vec::new(); // (item: String, diff, current) for warns
 
-        let user_account =
-            self.ledger
-                .find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, event_time);
-        let venue_account =
-            self.ledger
-                .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Margin, event_time);
+        let user_account = self
+            .ledger
+            .find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, event_time)
+            .await;
+        let venue_account = self
+            .ledger
+            .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Margin, event_time)
+            .await;
 
         // Balances
         for bal in &update.balances {
@@ -82,7 +83,7 @@ impl Accounting {
             };
             transfers.push(
                 Transfer::builder()
-                    .event_time(event_time)
+                    .created(event_time)
                     .transfer_group_id(transfer_group_id)
                     .transfer_group_type(mode.transfer_group_type())
                     .debit_account(debit)
@@ -117,7 +118,7 @@ impl Accounting {
                 };
                 transfers.push(
                     Transfer::builder()
-                        .event_time(event_time)
+                        .created(event_time)
                         .transfer_group_id(transfer_group_id)
                         .transfer_group_type(mode.transfer_group_type())
                         .debit_account(debit)
@@ -144,7 +145,7 @@ impl Accounting {
                 };
                 transfers.push(
                     Transfer::builder()
-                        .event_time(event_time)
+                        .created(event_time)
                         .transfer_group_id(transfer_group_id)
                         .transfer_group_type(mode.transfer_group_type())
                         .debit_account(debit)
@@ -171,14 +172,14 @@ impl Accounting {
                 };
                 transfers.push(
                     Transfer::builder()
-                        .event_time(event_time)
+                        .created(event_time)
                         .transfer_group_id(transfer_group_id)
                         .transfer_group_type(mode.transfer_group_type())
                         .debit_account(debit)
                         .credit_account(credit)
                         .amount(amount.abs())
                         .unit_price(Decimal::ONE)
-                        .transfer_type(TransferType::UnrealizedPNL)
+                        .transfer_type(TransferType::UnrealizedPnl)
                         .strategy(None)
                         .instrument(None)
                         .asset(Some(quote_asset))
@@ -385,7 +386,7 @@ mod tests {
     async fn test_account_sync() {
         let time = MockTime::new();
         let publisher = MockPublisher::new();
-        let ledger = Ledger::new();
+        let ledger = Ledger::new(publisher.clone());
         let accounting = Accounting::builder()
             .identifier("test".to_string())
             .time(time.clone())
@@ -398,8 +399,9 @@ mod tests {
         let btc_perp = test_inst_binance_btc_usdt_perp(); // Assume leverage=20
         let eth_perp = test_inst_binance_eth_usdt_perp(); // Assume leverage=20
 
-        let user_account =
-            ledger.find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, time.now().await);
+        let user_account = ledger
+            .find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, time.now().await)
+            .await;
 
         // Step 1: Initial (100k USDT margin, no positions)
         let initial = AccountUpdate::builder()

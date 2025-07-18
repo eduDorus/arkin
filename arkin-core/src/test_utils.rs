@@ -8,9 +8,8 @@ use tracing::{info, instrument};
 use uuid::Uuid;
 
 use crate::{
-    Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus, InstrumentType, MarketSide,
-    Pipeline, Price, PubSub, Publisher, Quantity, SimulationSystemTime, Strategy, SystemTime, Tick, Venue, VenueOrder,
-    VenueOrderStatus, VenueOrderType, VenueType,
+    Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus, InstrumentType, Pipeline, Price,
+    PubSub, Publisher, Quantity, SimulationSystemTime, Strategy, SystemTime, Tick, Venue, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -122,6 +121,8 @@ pub fn test_btc_asset() -> Arc<Asset> {
         .symbol("BTC".into())
         .name("Bitcoin".into())
         .asset_type(AssetType::Crypto)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(asset)
 }
@@ -132,6 +133,8 @@ pub fn test_eth_asset() -> Arc<Asset> {
         .symbol("ETH".into())
         .name("Ethereum".into())
         .asset_type(AssetType::Crypto)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(asset)
 }
@@ -142,6 +145,8 @@ pub fn test_usdt_asset() -> Arc<Asset> {
         .symbol("USDT".into())
         .name("Tether".into())
         .asset_type(AssetType::Crypto)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(asset)
 }
@@ -152,6 +157,8 @@ pub fn test_bnb_asset() -> Arc<Asset> {
         .symbol("BNB".into())
         .name("Binance Coin".into())
         .asset_type(AssetType::Crypto)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(asset)
 }
@@ -161,6 +168,8 @@ pub fn test_binance_venue() -> Arc<Venue> {
         .id(Uuid::parse_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID"))
         .name("Binance".into())
         .venue_type(VenueType::Cex)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(venue)
 }
@@ -170,6 +179,8 @@ pub fn test_personal_venue() -> Arc<Venue> {
         .id(Uuid::parse_str("b8b9dcf2-77ea-4d24-964e-8243bb7298ea").expect("Invalid UUID"))
         .name("Personal".into())
         .venue_type(VenueType::Otc)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(venue)
 }
@@ -195,6 +206,8 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
         .tick_size(dec!(0.10))
         .lot_size(dec!(0.001))
         .status(InstrumentStatus::Trading)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(instrument)
 }
@@ -220,6 +233,8 @@ pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
         .tick_size(dec!(0.01))
         .lot_size(dec!(0.001))
         .status(InstrumentStatus::Trading)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(instrument)
 }
@@ -229,6 +244,8 @@ pub fn test_pipeline() -> Arc<Pipeline> {
         .id(Uuid::from_str("df5305b0-3e9b-4b7c-8a13-1406e93f5cc9").expect("Invalid UUID"))
         .name("Test Pipeline".into())
         .description("This Pipeline is for testing purposes".into())
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(pipeline)
 }
@@ -257,6 +274,8 @@ pub fn test_instance() -> Arc<Instance> {
         .id(Uuid::from_str("31c79d6c-8dce-44a5-a5c8-c02578671afb").expect("Invalid UUID"))
         .name("Test Instance".into())
         .instance_type(InstanceType::Live)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(instance)
 }
@@ -266,6 +285,8 @@ pub fn test_strategy_1() -> Arc<Strategy> {
         .id(Uuid::from_str("1fce35ce-1583-4334-a410-bc0f71c7469b").expect("Invalid UUID"))
         .name("test_strategy_2".into())
         .description(Some("This strategy is only for testing".into()))
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(strategy)
 }
@@ -275,75 +296,8 @@ pub fn test_strategy_2() -> Arc<Strategy> {
         .id(Uuid::from_str("a2d0951e-9bc6-47a4-b803-e4e0bb4e98a3").expect("Invalid UUID"))
         .name("test_strategy_2".into())
         .description(Some("This strategy is only for testing".into()))
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(strategy)
-}
-
-// pub fn test_execution_order_new() -> Arc<ExecutionOrder> {
-//     let order = ExecutionOrder::builder()
-//         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-//         .event_time(UtcDateTime::now())
-//         .strategy(Some(test_strategy_1()))
-//         .instrument(test_inst_binance_btc_usdt_perp())
-//         .order_type(ExecutionOrderType::Maker)
-//         .side(MarketSide::Buy)
-//         .price(dec!(0))
-//         .quantity(dec!(1))
-//         .status(ExecutionOrderStatus::New)
-//         .updated_at(UtcDateTime::now())
-//         .build();
-//     Arc::new(order)
-// }
-
-// pub fn test_execution_order_filled() -> Arc<ExecutionOrder> {
-//     let order = ExecutionOrder::builder()
-//         .id(Uuid::from_str("452883de-70fa-4620-8c56-5e00e54dbb0a").expect("Invalid UUID"))
-//         .event_time(UtcDateTime::now())
-//         .strategy(Some(test_strategy_1()))
-//         .instrument(test_inst_binance_btc_usdt_perp())
-//         .order_type(ExecutionOrderType::Maker)
-//         .side(MarketSide::Buy)
-//         .price(dec!(0).into())
-//         .quantity(dec!(1))
-//         .fill_price(dec!(110))
-//         .filled_quantity(dec!(1))
-//         .total_commission(dec!(0.2))
-//         .status(ExecutionOrderStatus::Filled)
-//         .updated_at(UtcDateTime::now())
-//         .build();
-//     Arc::new(order)
-// }
-// pub fn test_venue_market_order_new(time: UtcDateTime, instrument: Arc<Instrument>, side: MarketSide) -> VenueOrder {
-//     VenueOrder::builder()
-//         .id(Uuid::new_v4())
-//         .strategy(Some(test_strategy_1()))
-//         .instrument(instrument)
-//         .order_type(VenueOrderType::Market)
-//         .side(side)
-//         .price(dec!(0))
-//         .quantity(dec!(1))
-//         .status(VenueOrderStatus::New)
-//         .created_at(time)
-//         .updated_at(time)
-//         .build()
-// }
-
-pub fn test_venue_limit_order_new(
-    time: UtcDateTime,
-    instrument: Arc<Instrument>,
-    price: Decimal,
-    side: MarketSide,
-) -> VenueOrder {
-    VenueOrder::builder()
-        .id(Uuid::new_v4())
-        .strategy(Some(test_strategy_1()))
-        .instrument(instrument)
-        .order_type(VenueOrderType::Limit)
-        .side(side)
-        .set_price(price)
-        .set_quantity(dec!(1))
-        .status(VenueOrderStatus::New)
-        .created_at(time)
-        .updated_at(time)
-        .build()
 }

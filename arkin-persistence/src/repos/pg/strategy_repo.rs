@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use time::OffsetDateTime;
 use tracing::warn;
 use uuid::Uuid;
 
@@ -12,6 +13,8 @@ pub struct StrategyDTO {
     pub id: Uuid,
     pub name: String,
     pub description: Option<String>,
+    pub created: OffsetDateTime,
+    pub updated: OffsetDateTime,
 }
 
 impl From<Strategy> for StrategyDTO {
@@ -20,6 +23,8 @@ impl From<Strategy> for StrategyDTO {
             id: strategy.id,
             name: strategy.name,
             description: strategy.description,
+            created: strategy.created.into(),
+            updated: strategy.updated.into(),
         }
     }
 }
@@ -30,6 +35,8 @@ impl From<Arc<Strategy>> for StrategyDTO {
             id: strategy.id,
             name: strategy.name.to_owned(),
             description: strategy.description.to_owned(),
+            created: strategy.created.into(),
+            updated: strategy.updated.into(),
         }
     }
 }
@@ -40,6 +47,8 @@ impl From<StrategyDTO> for Strategy {
             id: strategy.id,
             name: strategy.name,
             description: strategy.description,
+            created: strategy.created.into(),
+            updated: strategy.updated.into(),
         }
     }
 }
@@ -51,12 +60,16 @@ pub async fn insert(ctx: &PersistenceContext, strategy: StrategyDTO) -> Result<(
             (
                 id, 
                 name, 
-                description
-            ) VALUES ($1, $2, $3)
+                description,
+                created,
+                updated
+            ) VALUES ($1, $2, $3, $4, $5)
             "#,
         strategy.id,
         strategy.name,
         strategy.description,
+        strategy.created,
+        strategy.updated
     )
     .execute(&ctx.pg_pool)
     .await?;
@@ -70,7 +83,9 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<StrategyD
             SELECT 
                 id,
                 name,
-                description
+                description,
+                created,
+                updated
             FROM strategies 
             WHERE id = $1
             "#,
@@ -91,7 +106,9 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Strate
             SELECT 
                 id,
                 name,
-                description
+                description,
+                created,
+                updated
             FROM strategies 
             WHERE name = $1
             "#,
@@ -114,12 +131,14 @@ pub async fn update(ctx: &PersistenceContext, strategy: StrategyDTO) -> Result<(
             UPDATE strategies
             SET
                 name = $2,
-                description = $3
+                description = $3,
+                updated = $4
             WHERE id = $1
             "#,
         strategy.id,
         strategy.name,
-        strategy.description
+        strategy.description,
+        strategy.updated
     )
     .execute(&ctx.pg_pool)
     .await?;

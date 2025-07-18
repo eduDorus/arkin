@@ -3,6 +3,7 @@ use std::{fmt, sync::Arc};
 use rust_decimal::prelude::Decimal;
 use sqlx::Type;
 use strum::Display;
+use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -55,6 +56,8 @@ pub struct Instrument {
     pub tick_size: Decimal,
     pub lot_size: Decimal,
     pub status: InstrumentStatus,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
 }
 
 impl Instrument {

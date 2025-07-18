@@ -35,10 +35,12 @@ async fn test_simulation() {
         .id(Uuid::from_str("04432ac5-483d-46a3-811b-6be79d6ef7c1").unwrap())
         .name("integration-test".to_owned())
         .instance_type(InstanceType::Test)
+        .created(time.now().await)
+        .updated(time.now().await)
         .build();
-    let persistence = Persistence::new(&config, instance, false, false, true).await;
-    let persistence_service = Service::new(persistence.to_owned(), None);
-    // let persistence_service = Service::new(persistence.to_owned(), Some(pubsub.subscribe(EventFilter::All)));
+    let persistence = Persistence::new(&config, instance, false, false, false);
+    // let persistence_service = Service::new(persistence.to_owned(), None);
+    let persistence_service = Service::new(persistence.to_owned(), Some(pubsub.subscribe(EventFilter::Persistable)));
 
     // Init accounting
     let accounting = Arc::new(
@@ -79,6 +81,8 @@ async fn test_simulation() {
         .id(Uuid::new_v4())
         .name("pipeline-test".to_owned())
         .description("Pipeline used for test purpuse".to_owned())
+        .created(time.now().await)
+        .updated(time.now().await)
         .build();
     let insights = Insights::new(
         pubsub.publisher(),
@@ -100,6 +104,8 @@ async fn test_simulation() {
         .id(Uuid::from_str("1fce35ce-1583-4334-a410-bc0f71c7469b").expect("Invalid UUID"))
         .name("crossover_strategy".into())
         .description(Some("This strategy is only for testing".into()))
+        .created(time.now().await)
+        .updated(time.now().await)
         .build();
     let strategy_name = Arc::new(strategy);
     let crossover_strategy = Arc::new(
@@ -119,8 +125,8 @@ async fn test_simulation() {
     );
 
     // Exec Strategy
-    let execution_order_book = ExecutionOrderBook::new(true);
-    let venue_order_book = VenueOrderBook::new(true);
+    let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
+    let venue_order_book = VenueOrderBook::new(pubsub.publisher(), true);
     let exec_strategy = Arc::new(
         TakerExecutionStrategy::builder()
             .identifier("exec-strat-taker".to_string())

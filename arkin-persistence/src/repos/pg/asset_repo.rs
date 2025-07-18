@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 use sqlx::prelude::*;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{context::PersistenceContext, PersistenceError};
@@ -12,6 +13,8 @@ pub struct AssetDTO {
     pub symbol: String,
     pub name: String,
     pub asset_type: AssetType,
+    pub created: OffsetDateTime,
+    pub updated: OffsetDateTime,
 }
 
 impl From<Arc<Asset>> for AssetDTO {
@@ -21,6 +24,8 @@ impl From<Arc<Asset>> for AssetDTO {
             symbol: asset.symbol.clone(),
             name: asset.name.clone(),
             asset_type: asset.asset_type.clone(),
+            created: asset.created.into(),
+            updated: asset.updated.into(),
         }
     }
 }
@@ -32,6 +37,8 @@ impl From<AssetDTO> for Arc<Asset> {
             symbol: asset.symbol,
             name: asset.name,
             asset_type: asset.asset_type,
+            created: asset.created.into(),
+            updated: asset.updated.into(),
         };
         Arc::new(asset)
     }
@@ -45,13 +52,17 @@ pub async fn insert(ctx: &PersistenceContext, asset: AssetDTO) -> Result<(), Per
                 id, 
                 symbol, 
                 name,
-                asset_type
-            ) VALUES ($1, $2, $3, $4)
+                asset_type,
+                created,
+                updated
+            ) VALUES ($1, $2, $3, $4, $5, $6)
             "#,
         asset.id,
         asset.symbol,
         asset.name,
         asset.asset_type as AssetType,
+        asset.created,
+        asset.updated,
     )
     .execute(&ctx.pg_pool)
     .await?;
@@ -66,7 +77,9 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<AssetDTO,
                 id,
                 symbol,
                 name,
-                asset_type AS "asset_type:AssetType"
+                asset_type AS "asset_type:AssetType",
+                created,
+                updated
             FROM assets
             WHERE id = $1
             "#,
@@ -89,7 +102,9 @@ pub async fn read_by_symbol(ctx: &PersistenceContext, symbol: &str) -> Result<As
                 id,
                 symbol,
                 name,
-                asset_type AS "asset_type:AssetType"
+                asset_type AS "asset_type:AssetType",
+                created,
+                updated
             FROM assets
             WHERE symbol = $1
             "#,
