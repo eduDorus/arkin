@@ -32,7 +32,7 @@ impl Insights {
         let service = Self {
             identifier: "insights".to_owned(),
             publisher,
-            warmup_steps: AtomicU16::new(180),
+            warmup_steps: AtomicU16::new(1440),
             graph,
             state,
         };

@@ -225,95 +225,86 @@ impl Persistence {
         let insights = {
             let mut lock = self.ctx.buffer.insights.lock().await;
             let insights = std::mem::take(&mut *lock);
-            info!(target: "persistence", "buffer length {}", lock.len());
+            debug!(target: "persistence", "insights buffer length {}", lock.len());
             insights
         };
 
-        if insights.is_empty() {
-            debug!(target: "persistence", "No insights to flush.");
-            return;
-        }
+        if !insights.is_empty() {
+            let persistence_ctx = self.ctx.clone();
+            ctx.spawn(async move {
+                debug!(target: "persistence", "flushing {} insights", insights.len());
 
-        let persistence_ctx = self.ctx.clone();
-        ctx.spawn(async move {
-            debug!(target: "persistence", "Flushing {} insights", insights.len());
-
-            // Insert the insights into the database
-            loop {
-                match insight_store::insert_vec(&persistence_ctx, &insights).await {
-                    Ok(_) => {
-                        info!(target: "persistence", "Successfully flushed {} insights", insights.len());
-                        break;
-                    }
-                    Err(e) => {
-                        error!(target: "persistence", "Failed to flush insights: {}", e);
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                // Insert the insights into the database
+                loop {
+                    match insight_store::insert_vec(&persistence_ctx, &insights).await {
+                        Ok(_) => {
+                            info!(target: "persistence", "successfully flushed {} insights", insights.len());
+                            break;
+                        }
+                        Err(e) => {
+                            error!(target: "persistence", "failed to flush insights: {}", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
 
         let trades = {
             let mut lock = self.ctx.buffer.trades.lock().await;
             let trades = std::mem::take(&mut *lock);
-            info!(target: "persistence", "buffer length {}", lock.len());
+            debug!(target: "persistence", "trade buffer length {}", lock.len());
             trades
         };
 
-        if trades.is_empty() {
-            debug!(target: "persistence", "No insights to flush.");
-            return;
-        }
+        if !trades.is_empty() {
+            let persistence_ctx = self.ctx.clone();
+            ctx.spawn(async move {
+                debug!(target: "persistence", "flushing {} trades", trades.len());
 
-        let persistence_ctx = self.ctx.clone();
-        ctx.spawn(async move {
-            debug!(target: "persistence", "Flushing {} insights", trades.len());
-
-            // Insert the insights into the database
-            loop {
-                match trade_store::insert_vec(&persistence_ctx, &trades).await {
-                    Ok(_) => {
-                        info!(target: "persistence", "Successfully flushed {} insights", trades.len());
-                        break;
-                    }
-                    Err(e) => {
-                        error!(target: "persistence", "Failed to flush insights: {}", e);
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                // Insert the insights into the database
+                loop {
+                    match trade_store::insert_vec(&persistence_ctx, &trades).await {
+                        Ok(_) => {
+                            info!(target: "persistence", "successfully flushed {} trades", trades.len());
+                            break;
+                        }
+                        Err(e) => {
+                            error!(target: "persistence", "failed to flush insights: {}", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
 
         let ticks = {
             let mut lock = self.ctx.buffer.ticks.lock().await;
             let ticks = std::mem::take(&mut *lock);
-            info!(target: "persistence", "buffer length {}", lock.len());
+            debug!(target: "persistence", "tick buffer length {}", lock.len());
             ticks
         };
 
-        if ticks.is_empty() {
-            debug!(target: "persistence", "No ticks to flush.");
-            return;
-        }
+        if !ticks.is_empty() {
+            let persistence_ctx = self.ctx.clone();
+            ctx.spawn(async move {
+                debug!(target: "persistence", "flushing {} ticks", ticks.len());
 
-        let persistence_ctx = self.ctx.clone();
-        ctx.spawn(async move {
-            debug!(target: "persistence", "Flushing {} ticks", ticks.len());
-
-            // Insert the ticks into the database
-            loop {
-                match tick_store::insert_vec(&persistence_ctx, &ticks).await {
-                    Ok(_) => {
-                        info!(target: "persistence", "Successfully flushed {} ticks", ticks.len());
-                        break;
-                    }
-                    Err(e) => {
-                        error!(target: "persistence", "Failed to flush ticks: {}", e);
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                // Insert the ticks into the database
+                loop {
+                    match tick_store::insert_vec(&persistence_ctx, &ticks).await {
+                        Ok(_) => {
+                            info!(target: "persistence", "successfully flushed {} ticks", ticks.len());
+                            break;
+                        }
+                        Err(e) => {
+                            error!(target: "persistence", "failed to flush ticks: {}", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 }
 

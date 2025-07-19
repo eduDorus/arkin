@@ -51,8 +51,8 @@ impl SimulationExecutor {
             venue: test_binance_venue(), // TODO: This will not work in prod
             orderbook: ExchangeBook::default(),
             account,
-            taker_commission: dec!(0.0005),
-            maker_commission: dec!(0.0002),
+            taker_commission: dec!(0.0002),
+            maker_commission: dec!(0.0000),
             leverage: dec!(10),
         }
         .into()

@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use rust_decimal::prelude::*;
+use arkin_strat_agent::AgentStrategy;
 use tracing::info;
 use uuid::Uuid;
 
@@ -12,7 +12,6 @@ use arkin_exec_strat_taker::TakerExecutionStrategy;
 use arkin_ingestor_binance::SimBinanceIngestor;
 use arkin_insights::{prelude::InsightsConfig, Insights};
 use arkin_persistence::{Persistence, PersistenceConfig};
-use arkin_strat_crossover::CrossoverStrategy;
 
 #[tokio::test]
 #[test_log::test]
@@ -23,7 +22,7 @@ async fn test_simulation() {
 
     // Start and end time
     let start_time = time.now().await;
-    let end_time = start_time + Duration::from_secs(86400);
+    let end_time = start_time + Duration::from_secs(14 * 86400);
 
     // Init pubsub
     let pubsub = PubSub::new(time.clone(), true);
@@ -102,27 +101,41 @@ async fn test_simulation() {
     );
 
     // Crossover strategy
-    let strategy = Strategy::builder()
-        .id(Uuid::from_str("1fce35ce-1583-4334-a410-bc0f71c7469b").expect("Invalid UUID"))
-        .name("crossover_strategy".into())
+    // let strategy = Strategy::builder()
+    //     .id(Uuid::from_str("9433328f-8f55-4357-a639-85350dec93d2").expect("Invalid UUID"))
+    //     .name("crossover".into())
+    //     .description(Some("This strategy is only for testing".into()))
+    //     .created(time.now().await)
+    //     .updated(time.now().await)
+    //     .build();
+    // let strategy_name = Arc::new(strategy);
+    // let crossover_strategy = Arc::new(
+    //     CrossoverStrategy::builder()
+    //         .identifier("crossover_strategy".into())
+    //         .publisher(pubsub.publisher())
+    //         .time(time.to_owned())
+    //         .strategy(strategy_name)
+    //         .allocation_limit_per_instrument(dec!(10000))
+    //         .fast_ma(FeatureId::new("vwap_price_ema_10".into()))
+    //         .slow_ma(FeatureId::new("vwap_price_ema_60".into()))
+    //         .build(),
+    // );
+    // let strategy_service = Service::new(
+    //     crossover_strategy,
+    //     Some(pubsub.subscribe(EventFilter::Events(vec![EventType::InsightsUpdate]))),
+    // );
+
+    let strategy_name = Strategy::builder()
+        .id(Uuid::from_str("bf59f914-3304-4f57-89ea-c098b9af3f59").expect("Invalid UUID"))
+        .name("agent".into())
         .description(Some("This strategy is only for testing".into()))
         .created(time.now().await)
         .updated(time.now().await)
-        .build();
-    let strategy_name = Arc::new(strategy);
-    let crossover_strategy = Arc::new(
-        CrossoverStrategy::builder()
-            .identifier("crossover_strategy".into())
-            .publisher(pubsub.publisher())
-            .time(time.to_owned())
-            .strategy(strategy_name)
-            .allocation_limit_per_instrument(dec!(10000))
-            .fast_ma(FeatureId::new("vwap_price_ema_10".into()))
-            .slow_ma(FeatureId::new("vwap_price_ema_60".into()))
-            .build(),
-    );
+        .build()
+        .into();
+    let strategy = AgentStrategy::new(time.clone(), pubsub.publisher(), strategy_name);
     let strategy_service = Service::new(
-        crossover_strategy,
+        strategy,
         Some(pubsub.subscribe(EventFilter::Events(vec![EventType::InsightsUpdate]))),
     );
 

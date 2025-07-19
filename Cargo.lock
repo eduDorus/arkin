@@ -437,6 +437,7 @@ version = "0.1.0"
 dependencies = [
  "arkin-core",
  "async-trait",
+ "dashmap",
  "futures",
  "kanal",
  "reqwest",
@@ -449,6 +450,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
+ "tonic",
  "tracing",
  "typed-builder",
  "uuid",
@@ -1838,6 +1840,7 @@ dependencies = [
  "arkin-ingestor-binance",
  "arkin-insights",
  "arkin-persistence",
+ "arkin-strat-agent",
  "arkin-strat-crossover",
  "clickhouse",
  "futures",

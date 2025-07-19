@@ -10,7 +10,7 @@ use arkin_core::{
 };
 use rand::{rng, Rng};
 use tonic::{codec::CompressionEncoding, transport::Channel};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() {
@@ -103,13 +103,14 @@ async fn main() {
     };
 
     let url = "http://192.168.100.100:8001";
-    let channel = match Channel::from_static(url).connect().await {
-        Ok(c) => c,
-        Err(e) => {
-            error!("Connection error: {}", e);
-            return;
-        }
-    };
+    // let channel = match Channel::from_static(url).connect().await {
+    //     Ok(c) => c,
+    //     Err(e) => {
+    //         error!("Connection error: {}", e);
+    //         return;
+    //     }
+    // };
+    let channel = Channel::from_static(url).connect_lazy();
     let mut client = GrpcInferenceServiceClient::new(channel).send_compressed(CompressionEncoding::Gzip); // Marginally slower with compression (but we will save some bandwith)
                                                                                                           // let mut client = GrpcInferenceServiceClient::new(channel); // Marginally faster without compression
 

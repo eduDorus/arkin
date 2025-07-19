@@ -27,7 +27,7 @@ pub struct CrossoverStrategy {
 impl CrossoverStrategy {
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn insight_tick(&self, tick: &InsightsUpdate) {
-        debug!(target: "strat-crossover", "received insight tick");
+        debug!(target: "strat::crossover", "received insight tick");
 
         // Calculate the crossover signals for each instrument in the tick
         let mut new_weights = HashMap::new();
@@ -64,13 +64,13 @@ impl CrossoverStrategy {
         for (instrument, new_weight) in new_weights {
             if let Some(current_weight) = self.current_weights.get(instrument) {
                 if *current_weight != new_weight {
-                    info!(target: "strat-crossover", "weight change detected for {} from {} to {}", instrument, *current_weight, new_weight);
+                    info!(target: "strat::crossover", "weight change detected for {} from {} to {}", instrument, *current_weight, new_weight);
                     // Calculate the allocation change
                     let allocation_change = new_weight - *current_weight;
                     allocations.insert(instrument.clone(), allocation_change);
                 }
             } else {
-                info!(target: "strat-crossover", "new weight for {} is {}", instrument, new_weight);
+                info!(target: "strat::crossover", "new weight for {} is {}", instrument, new_weight);
                 if !new_weight.is_zero() {
                     allocations.insert(instrument.clone(), new_weight);
                 }
@@ -107,7 +107,7 @@ impl CrossoverStrategy {
             self.publisher
                 .publish(Event::NewTakerExecutionOrder(order.to_owned().into()))
                 .await;
-            info!(target: "strat-crossover", "send {} execution order for {} to execution strategy {} for a quantity of {}", order.side, order.instrument, order.exec_strategy_type, order.quantity);
+            info!(target: "strat::crossover", "send {} execution order for {} to execution strategy {} for a quantity of {}", order.side, order.instrument, order.exec_strategy_type, order.quantity);
         }
     }
 }
@@ -122,7 +122,7 @@ impl Runnable for CrossoverStrategy {
     async fn handle_event(&self, event: Event) {
         match &event {
             Event::InsightsUpdate(vo) => self.insight_tick(vo).await,
-            e => warn!(target: "strat-crossover", "received unused event {}", e),
+            e => warn!(target: "strat::crossover", "received unused event {}", e),
         }
     }
 }

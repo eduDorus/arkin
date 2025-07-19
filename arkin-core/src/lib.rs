@@ -40,6 +40,10 @@ pub mod prelude {
     pub use crate::system_time::*;
     pub use crate::test_utils::*;
     pub use crate::traits::*;
+    pub use crate::triton::grpc_inference_service_client::*;
+    pub use crate::triton::model_infer_request::*;
+    pub use crate::triton::model_infer_response::*;
+    pub use crate::triton::*;
     pub use crate::types::*;
     pub use crate::utils::*;
 }
