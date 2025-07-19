@@ -195,6 +195,7 @@ impl ExecutionOrder {
                 | (ExecutionOrderStatus::Placed, ExecutionOrderStatus::Filled)
                 | (ExecutionOrderStatus::Placed, ExecutionOrderStatus::Cancelling)
                 | (ExecutionOrderStatus::Placed, ExecutionOrderStatus::Expired)
+                | (ExecutionOrderStatus::PartiallyFilled, ExecutionOrderStatus::PartiallyFilled)
                 | (ExecutionOrderStatus::PartiallyFilled, ExecutionOrderStatus::Filled)
                 | (ExecutionOrderStatus::Cancelling, ExecutionOrderStatus::PartiallyFilledCancelled)
                 | (ExecutionOrderStatus::Cancelling, ExecutionOrderStatus::Filled)

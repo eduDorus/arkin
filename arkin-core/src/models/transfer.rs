@@ -91,11 +91,17 @@ impl fmt::Display for Transfer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {}: {} -> {} {}{} {} @ {}",
+            "{} {}: {}{} {}{} @ {}",
             self.created,
             self.transfer_type,
-            self.debit_account,
-            self.credit_account,
+            // self.debit_account,
+            // self.credit_account,
+            if self.debit_account.is_user_account() {
+                "-"
+            } else {
+                "+"
+            },
+            self.amount,
             match &self.asset {
                 Some(asset) => format!("{}", asset),
                 None => "".to_string(),
@@ -104,14 +110,13 @@ impl fmt::Display for Transfer {
                 Some(inst) => format!("{}", inst),
                 None => "".to_string(),
             },
-            self.amount,
             self.unit_price
         )
     }
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct TransferGroup {
+pub struct TransferBatch {
+    pub event_time: UtcDateTime,
     pub transfers: Vec<Arc<Transfer>>,
-    pub created: UtcDateTime,
 }

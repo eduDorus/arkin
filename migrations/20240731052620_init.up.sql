@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 
 -- TRANSFERS
 CREATE TYPE transfer_group_type AS ENUM (
-  'initial'
+  'initial',
   'deposit',
   'withdrawal',
   'trade',

@@ -8,11 +8,7 @@ pub async fn insert(ctx: &PersistenceContext, transfer: Arc<Transfer>) -> Result
     transfer_repo::insert(ctx, transfer.into()).await
 }
 
-pub async fn insert_batch(
-    ctx: &PersistenceContext,
-    transfer_group: Arc<TransferGroup>,
-) -> Result<(), PersistenceError> {
-    let transfers = transfer_group.transfers.clone();
+pub async fn insert_batch(ctx: &PersistenceContext, transfers: Vec<Arc<Transfer>>) -> Result<(), PersistenceError> {
     let transfers_dto = transfers.into_iter().map(|t| t.into()).collect();
     transfer_repo::insert_batch(ctx, transfers_dto).await
 }

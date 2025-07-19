@@ -4,8 +4,8 @@ use strum::{Display, EnumDiscriminants, EnumIter};
 use time::UtcDateTime;
 
 use crate::{
-    Account, AccountUpdate, BalanceUpdate, Book, ExecutionOrder, InsightsTick, InsightsUpdate, PositionUpdate, Tick,
-    Trade, TransferGroup, VenueOrder,
+    Account, Book, ExecutionOrder, InsightsTick, InsightsUpdate, Tick, Trade, Transfer, TransferBatch,
+    VenueAccountUpdate, VenueOrder, VenueTradeUpdate,
 };
 
 #[derive(Debug, Display, Clone, EnumDiscriminants)]
@@ -19,17 +19,10 @@ pub enum Event {
     BookUpdate(Arc<Book>),
 
     // Accounting
-    InitialAccountUpdate(Arc<AccountUpdate>),
-    ReconcileAccountUpdate(Arc<AccountUpdate>),
-    AccountUpdate(Arc<AccountUpdate>),
-
-    InitialBalanceUpdate(Arc<BalanceUpdate>),
-    ReconcileBalanceUpdate(Arc<BalanceUpdate>),
-    BalanceUpdate(Arc<BalanceUpdate>),
-
-    InitialPositionUpdate(Arc<PositionUpdate>),
-    ReconcilePositionUpdate(Arc<PositionUpdate>),
-    PositionUpdate(Arc<PositionUpdate>),
+    InitialAccountUpdate(Arc<VenueAccountUpdate>),
+    ReconcileAccountUpdate(Arc<VenueAccountUpdate>),
+    VenueAccountUpdate(Arc<VenueAccountUpdate>),
+    VenueTradeUpdate(Arc<VenueTradeUpdate>),
 
     // Insights
     InsightsTick(Arc<InsightsTick>),
@@ -66,8 +59,9 @@ pub enum Event {
     VenueOrderExpired(Arc<VenueOrder>),
 
     // Ledger
-    AccountNew(Arc<Account>),
-    TransferNew(Arc<TransferGroup>),
+    NewAccount(Arc<Account>),
+    NewTransfer(Arc<Transfer>),
+    NewTransferBatch(Arc<TransferBatch>),
 
     // Order Book
     ExecutionOrderBookNew(Arc<ExecutionOrder>),
@@ -90,18 +84,12 @@ impl Event {
             // Accounting
             Event::InitialAccountUpdate(event) => event.event_time,
             Event::ReconcileAccountUpdate(event) => event.event_time,
-            Event::AccountUpdate(event) => event.event_time,
+            Event::VenueAccountUpdate(event) => event.event_time,
+            Event::VenueTradeUpdate(event) => event.event_time,
 
-            Event::InitialBalanceUpdate(event) => event.event_time,
-            Event::ReconcileBalanceUpdate(event) => event.event_time,
-            Event::BalanceUpdate(event) => event.event_time,
-
-            Event::InitialPositionUpdate(event) => event.event_time,
-            Event::ReconcilePositionUpdate(event) => event.event_time,
-            Event::PositionUpdate(event) => event.event_time,
-
-            Event::AccountNew(event) => event.updated,
-            Event::TransferNew(event) => event.created,
+            Event::NewAccount(event) => event.updated,
+            Event::NewTransfer(event) => event.created,
+            Event::NewTransferBatch(event) => event.event_time, // TODO: This is probably not optimal
 
             // Insights
             Event::InsightsTick(event) => event.event_time,
@@ -160,8 +148,9 @@ impl EventType {
             EventType::TickUpdate
                 | EventType::TradeUpdate
                 | EventType::InsightsUpdate
-                | EventType::AccountNew
-                | EventType::TransferNew
+                | EventType::NewAccount
+                | EventType::NewTransfer
+                | EventType::NewTransferBatch
                 | EventType::ExecutionOrderBookNew
                 | EventType::ExecutionOrderBookUpdate
                 | EventType::VenueOrderBookNew

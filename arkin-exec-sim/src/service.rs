@@ -153,7 +153,7 @@ impl SimulationExecutor {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn account_update(&self, order: &VenueOrder, price: Decimal, quantity: Decimal, commission: Decimal) {
+    async fn trade_update(&self, order: &VenueOrder, price: Price, quantity: Quantity, commission: Commission) {
         let instrument = order.instrument.clone();
         let margin_asset = order.instrument.margin_asset.clone();
         let side_sign: Decimal = order.side.into();
@@ -167,7 +167,7 @@ impl SimulationExecutor {
             .map_or((dec!(0), dec!(0)), |p| *p.value());
 
         // Calc closed amt/PNL if reducing
-        let amt_closed = if current_qty.signum() != qty_delta.signum() || current_qty.abs() < quantity {
+        let amt_closed = if current_qty.signum() != qty_delta.signum() {
             current_qty.abs().min(quantity)
         } else {
             dec!(0)
@@ -188,11 +188,15 @@ impl SimulationExecutor {
         let new_entry = if new_qty == dec!(0) {
             dec!(0)
         } else if amt_closed == current_qty.abs() {
-            // Flip: new entry = price
-            price
+            price // Flip
+        } else if amt_closed > dec!(0) {
+            entry // Reduce, keep entry
         } else {
-            // Avg
-            (entry * current_qty.abs() + price * (quantity - amt_closed)) / new_qty.abs()
+            if current_qty.is_zero() {
+                price // New open
+            } else {
+                (entry * current_qty.abs() + price * quantity) / new_qty.abs() // Increase, average
+            }
         };
 
         // Margin delta (change to wallet: negative for post, positive for release)
@@ -213,41 +217,64 @@ impl SimulationExecutor {
         self.account.update_position(&instrument, new_entry, new_qty);
 
         // Publish AccountUpdate
-        let bal_change = pnl + margin_delta - commission;
-        let new_bal = self.account.balances.get(&margin_asset).map_or(dec!(0), |b| *b.value());
-        let bal_update = BalanceUpdate::builder()
-            .event_time(self.time.now().await)
-            .venue(instrument.venue.clone())
-            .asset(margin_asset)
-            .account_type(AccountType::Margin)
-            .quantity_change(bal_change)
-            .quantity(new_bal)
-            .build();
+        // let bal_change = margin_delta;
+        // let new_bal = self.account.balances.get(&margin_asset).map_or(dec!(0), |b| *b.value());
+        // let bal_update = BalanceUpdate::builder()
+        //     .event_time(self.time.now().await)
+        //     .venue(instrument.venue.clone())
+        //     .asset(margin_asset)
+        //     .account_type(AccountType::Margin)
+        //     .quantity_change(bal_change)
+        //     .quantity(new_bal)
+        //     .build();
 
-        let pos_update = PositionUpdate::builder()
-            .event_time(self.time.now().await)
-            .instrument(instrument)
-            .account_type(AccountType::Margin)
-            .entry_price(new_entry)
-            .quantity(new_qty)
-            .realized_pnl(pnl) // Incremental
-            .unrealized_pnl(dec!(0)) // Sim no mark
-            .position_side(if new_qty > dec!(0) {
-                PositionSide::Long
-            } else {
-                PositionSide::Short
-            })
-            .build();
+        // // Publish AccountUpdate (no realized_pnl here)
+        // let pos_update = PositionUpdate::builder()
+        //     .event_time(self.time.now().await)
+        //     .instrument(instrument.clone())
+        //     .account_type(AccountType::Margin)
+        //     .entry_price(new_entry)
+        //     .quantity(new_qty)
+        //     .realized_pnl(dec!(0)) // Remove; per-fill elsewhere
+        //     .unrealized_pnl(if new_qty > dec!(0) {
+        //         (mark_price - new_entry) * new_qty
+        //     } else {
+        //         (new_entry - mark_price) * new_qty.abs()
+        //     })
+        //     .position_side(if new_qty > dec!(0) {
+        //         PositionSide::Long
+        //     } else {
+        //         PositionSide::Short
+        //     })
+        //     .build();
 
-        let au = AccountUpdate::builder()
+        // let au = VenueAccountUpdate::builder()
+        //     .event_time(self.time.now().await)
+        //     .venue(self.venue.to_owned())
+        //     .balances(vec![bal_update])
+        //     .positions(vec![pos_update])
+        //     .reason("ORDER".to_string())
+        //     .build();
+        // self.publisher.publish(Event::VenueAccountUpdate(au.to_owned().into())).await;
+        // info!(target: "executor-simulation", "published account update {}", au);
+
+        // Publish VenueOrderTradeUpdate (mimic ORDER_TRADE_UPDATE)
+        let trade_update = VenueTradeUpdate::builder() // Assume new struct
             .event_time(self.time.now().await)
-            .venue(self.venue.to_owned())
-            .balances(vec![bal_update])
-            .positions(vec![pos_update])
-            .reason("ORDER".to_string())
+            .order(order.clone().into())
+            .fill_price(price)
+            .fill_quantity(quantity)
+            .commission_asset(
+                order
+                    .commission_asset
+                    .clone()
+                    .unwrap_or_else(|| order.instrument.quote_asset.clone()),
+            )
+            .commission(commission)
+            .realized_pnl(pnl) // Per-fill incremental
             .build();
-        self.publisher.publish(Event::AccountUpdate(au.to_owned().into())).await;
-        info!(target: "executor-simulation", "published account update {}", au);
+        self.publisher.publish(Event::VenueTradeUpdate(trade_update.into())).await;
+        info!(target: "executor-simulation", "published order trade update for order {}", order.id);
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
@@ -270,7 +297,7 @@ impl SimulationExecutor {
                 info!(target: "executor-simulation", "order {} matched {}", order.id, matched);
                 if matched {
                     self.fill_update(&order, price, quantity, commission).await;
-                    self.account_update(&order, price, quantity, commission).await;
+                    self.trade_update(&order, price, quantity, commission).await;
                 }
             }
         }
@@ -335,7 +362,7 @@ impl Runnable for SimulationExecutor {
                     .build(),
             );
         }
-        let au = AccountUpdate::builder()
+        let au = VenueAccountUpdate::builder()
             .event_time(self.time.now().await)
             .venue(self.venue.to_owned())
             .balances(balances)

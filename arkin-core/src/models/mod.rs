@@ -1,5 +1,4 @@
 mod account;
-mod account_update;
 mod asset;
 mod balance_update;
 mod book;
@@ -15,10 +14,11 @@ mod tick;
 mod trade;
 mod transfer;
 mod venue;
+mod venue_account_update;
 mod venue_order;
+mod venue_trade_update;
 
 pub use account::*;
-pub use account_update::*;
 pub use asset::*;
 pub use balance_update::*;
 pub use book::*;
@@ -34,4 +34,6 @@ pub use tick::*;
 pub use trade::*;
 pub use transfer::*;
 pub use venue::*;
+pub use venue_account_update::*;
 pub use venue_order::*;
+pub use venue_trade_update::*;

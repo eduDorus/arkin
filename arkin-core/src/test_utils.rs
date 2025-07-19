@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use time::{macros::datetime, OffsetDateTime, UtcDateTime};
 use tokio::sync::{Mutex, RwLock};
-use tracing::{info, instrument};
+use tracing::{debug, instrument};
 use uuid::Uuid;
 
 use crate::{
@@ -49,14 +49,14 @@ impl SystemTime for MockTime {
     async fn advance_time_to(&self, time: UtcDateTime) {
         let mut guard = self.state.write().await;
         guard.current = time;
-        info!(target: "mock-time", "advanced time to {}", time);
+        debug!(target: "mock-time", "advanced time to {}", time);
     }
 
     #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
     async fn advance_time_by(&self, duration: Duration) {
         let mut guard = self.state.write().await;
         guard.current += duration;
-        info!(target: "mock-time", "advanced time by {:?}", duration);
+        debug!(target: "mock-time", "advanced time by {:?}", duration);
     }
 
     async fn is_final_hour(&self) -> bool {

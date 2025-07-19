@@ -181,9 +181,6 @@ impl TakerExecutionStrategy {
                         order.last_fill_commission,
                     )
                     .await;
-                if order.is_terminal() {
-                    self.check_finalize_exec(id).await;
-                }
             }
         }
     }

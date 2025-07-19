@@ -53,7 +53,9 @@ async fn test_simulation() {
         accounting.to_owned(),
         Some(pubsub.subscribe(EventFilter::Events(vec![
             EventType::InitialAccountUpdate,
-            EventType::AccountUpdate,
+            EventType::ReconcileAccountUpdate,
+            EventType::VenueAccountUpdate,
+            EventType::VenueTradeUpdate,
         ]))),
     );
 

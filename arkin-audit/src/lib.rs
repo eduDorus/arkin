@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use time::UtcDateTime;
-use tracing::{info, instrument};
+use tracing::{debug, instrument};
 
 use arkin_core::prelude::*;
 
@@ -30,7 +30,7 @@ impl Audit {
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn add_event_to_log(&self, event: Event) {
         self.event_log.insert(event.timestamp(), event.to_owned());
-        info!(target: "audit", "add new event {} to log ({} logs)", event.event_type(), self.event_log.len());
+        debug!(target: "audit", "add new event {} to log ({} logs)", event.event_type(), self.event_log.len());
     }
 }
 

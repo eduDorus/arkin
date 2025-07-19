@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::{BalanceUpdate, PositionUpdate, Venue};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct AccountUpdate {
+pub struct VenueAccountUpdate {
     #[builder(default)]
     pub id: Uuid,
     pub event_time: UtcDateTime,
@@ -17,15 +17,15 @@ pub struct AccountUpdate {
     pub reason: String, // "m" from stream, e.g., "ORDER"
 }
 
-impl PartialEq for AccountUpdate {
+impl PartialEq for VenueAccountUpdate {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl Eq for AccountUpdate {}
+impl Eq for VenueAccountUpdate {}
 
-impl fmt::Display for AccountUpdate {
+impl fmt::Display for VenueAccountUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,

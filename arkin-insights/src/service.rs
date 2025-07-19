@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 
 use async_trait::async_trait;
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument};
 
 use arkin_core::prelude::*;
 
@@ -52,7 +52,7 @@ impl Insights {
     pub async fn process_tick(&self, tick: &InsightsTick) {
         // TODO: We might want to span this calculation with spawn blocking
         let insights = self.graph.calculate(tick);
-        info!(target: "insights", "calculated {} insights", insights.len());
+        debug!(target: "insights", "calculated {} insights", insights.len());
         let insights_tick = InsightsUpdate::builder()
             .event_time(tick.event_time)
             .instruments(tick.instruments.to_owned())
@@ -64,7 +64,7 @@ impl Insights {
             info!(target: "insights", "warmup tick {} not published",number);
         } else {
             self.publisher.publish(Event::InsightsUpdate(insights_tick.into())).await;
-            info!(target: "insights", "published inside tick");
+            debug!(target: "insights", "published inside update");
         }
     }
 }

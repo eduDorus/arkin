@@ -137,8 +137,15 @@ impl Persistence {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn insert_transfer_group(&self, transfer: Arc<TransferGroup>) {
-        if let Err(e) = transfer_store::insert_batch(&self.ctx, transfer).await {
+    pub async fn insert_transfer(&self, transfer: Arc<Transfer>) {
+        if let Err(e) = transfer_store::insert(&self.ctx, transfer).await {
+            error!(target: "persistence", "error in inserting transfer group: {}",e);
+        }
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    pub async fn insert_transfer_batch(&self, batch: Arc<TransferBatch>) {
+        if let Err(e) = transfer_store::insert_batch(&self.ctx, batch.transfers.clone()).await {
             error!(target: "persistence", "error in inserting transfer group: {}",e);
         }
     }
@@ -328,8 +335,9 @@ impl Runnable for Persistence {
             Event::InsightsUpdate(i) => self.insert_insights_update(i).await,
 
             // Ledger
-            Event::AccountNew(a) => self.insert_account(a).await,
-            Event::TransferNew(t) => self.insert_transfer_group(t).await,
+            Event::NewAccount(a) => self.insert_account(a).await,
+            Event::NewTransfer(t) => self.insert_transfer(t).await,
+            Event::NewTransferBatch(tb) => self.insert_transfer_batch(tb).await,
 
             // Execution Orders
             Event::ExecutionOrderBookNew(o) => self.insert_execution_order(o).await,

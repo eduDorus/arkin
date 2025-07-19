@@ -267,6 +267,7 @@ impl VenueOrder {
                 | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
                 | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelling)
+                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Cancelling)
                 | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
                 | (VenueOrderStatus::Cancelling, VenueOrderStatus::Cancelled)

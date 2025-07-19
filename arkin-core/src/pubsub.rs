@@ -163,7 +163,7 @@ impl PubSub {
             .get(&event_type)
             .map(|v| v.value().clone())
             .unwrap_or_default();
-        info!(target: "pubsub", "sending event {} to {} subscribers", event_type,  subscriber_ids.len());
+        debug!(target: "pubsub", "sending event {} to {} subscribers", event_type,  subscriber_ids.len());
 
         // Send to subscribers and check for closed connections (DashMap version)
         let mut to_remove = Vec::new();
@@ -259,7 +259,7 @@ impl PubSub {
 
                 // Advance time in simulation
                 if !self.time.is_live().await {
-                    info!(target: "pubsub", "advancing time to {}", event.timestamp());
+                    debug!(target: "pubsub", "advancing time to {}", event.timestamp());
                     self.time.advance_time_to(event.timestamp()).await;
                 }
 
