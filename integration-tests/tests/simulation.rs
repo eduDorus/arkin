@@ -1,6 +1,7 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 use arkin_strat_agent::AgentStrategy;
+use time::macros::utc_datetime;
 use tracing::info;
 use uuid::Uuid;
 
@@ -18,7 +19,7 @@ use arkin_persistence::{Persistence, PersistenceConfig};
 async fn test_simulation() {
     info!("Starting simulation test...");
     // Init mock time
-    let time = MockTime::new();
+    let time = MockTime::new_from(utc_datetime!(2025-03-01 00:00:00));
 
     // Start and end time
     let start_time = time.now().await;

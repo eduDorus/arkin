@@ -1,9 +1,12 @@
 use std::{
     collections::{HashMap, VecDeque},
+    fs::OpenOptions,
+    io::{BufWriter, Seek, SeekFrom},
     sync::Arc,
 };
 
 use async_trait::async_trait;
+use csv::Writer;
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
 use tokio::sync::Mutex;
@@ -17,12 +20,12 @@ use uuid::Uuid;
 const BATCH_SIZE: usize = 1;
 const SEQUENCE_LENGTH: usize = 192;
 const NUM_FEATURES_OBS: usize = 40; // Assuming len(FEATURE_COLUMNS) = 5
-const NUM_FEATURES_STATE: usize = 3;
-const NUM_MASK: usize = 3;
-const POSSIBLE_WEIGHTS: [f32; 3] = [0., -1., 1.];
+const NUM_STATE_OBS: usize = 1;
+const NUM_MASK: usize = 4;
+const POSSIBLE_WEIGHTS: [f32; 4] = [0.0, 1.0, 2.0, 3.0];
 
 const SHAPE_0: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_FEATURES_OBS as i64];
-const SHAPE_1: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_FEATURES_STATE as i64];
+const SHAPE_1: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_STATE_OBS as i64];
 const SHAPE_2: [i64; 2] = [BATCH_SIZE as i64, NUM_MASK as i64];
 
 #[derive(TypedBuilder)]
@@ -32,13 +35,10 @@ pub struct AgentStrategy {
     publisher: Arc<dyn Publisher>,
     strategy: Arc<Strategy>,
     client: Mutex<GrpcInferenceServiceClient<Channel>>,
-    returns_feature_id: FeatureId,
     input_features_ids: Vec<FeatureId>,
     input_features: DashMap<FeatureId, VecDeque<f32>>,
-    weight: Mutex<VecDeque<f32>>,
-    trade_cum_pnl: Mutex<VecDeque<f32>>,
-    trade_max_cum: Mutex<f32>,
-    trade_dd: Mutex<VecDeque<f32>>,
+    input_state_ids: Vec<FeatureId>,
+    input_state: DashMap<FeatureId, VecDeque<f32>>,
 }
 
 impl AgentStrategy {
@@ -47,7 +47,7 @@ impl AgentStrategy {
         let channel = Channel::from_static(url).connect_lazy();
         let client = GrpcInferenceServiceClient::new(channel).send_compressed(CompressionEncoding::Gzip); // Marginally slower with compression (but we will save some bandwith)
 
-        let returns_feature_id = "price_percent_change_01min".to_owned().into();
+        // Input features
         let input_features_ids: Vec<FeatureId> = vec![
             "price_percent_change_10min".to_owned().into(),
             "price_percent_change_15min".to_owned().into(),
@@ -90,11 +90,16 @@ impl AgentStrategy {
             "volume_relative_range_30min".to_owned().into(),
             "volume_relative_range_60min".to_owned().into(),
         ];
-
-        // In AgentStrategy::new
         let input_features = DashMap::new();
         for feature_id in &input_features_ids {
             input_features.insert(feature_id.clone(), VecDeque::<f32>::with_capacity(SEQUENCE_LENGTH));
+        }
+
+        // State features
+        let input_state_ids: Vec<FeatureId> = vec!["weight".to_owned().into()];
+        let input_state = DashMap::new();
+        for id in &input_state_ids {
+            input_state.insert(id.clone(), VecDeque::<f32>::with_capacity(SEQUENCE_LENGTH));
         }
         Self {
             identifier: "strat_agent".to_owned(),
@@ -102,13 +107,10 @@ impl AgentStrategy {
             publisher,
             strategy,
             client: Mutex::new(client),
-            returns_feature_id,
             input_features_ids: input_features_ids,
             input_features,
-            weight: Mutex::new(VecDeque::with_capacity(SEQUENCE_LENGTH)),
-            trade_cum_pnl: Mutex::new(VecDeque::with_capacity(SEQUENCE_LENGTH)),
-            trade_max_cum: Mutex::new(0.0),
-            trade_dd: Mutex::new(VecDeque::with_capacity(SEQUENCE_LENGTH)),
+            input_state_ids,
+            input_state,
         }
         .into()
     }
@@ -123,51 +125,16 @@ impl AgentStrategy {
         }
     }
 
-    async fn calculate_trade_cum_pnl(&self, current_return: f32) {
-        let weight_guard = self.weight.lock().await;
-        let mut pnl_guard = self.trade_cum_pnl.lock().await;
-        let mut max_cum_guard = self.trade_max_cum.lock().await;
-
-        let prev_weight = weight_guard.back().copied().unwrap_or(0.0);
-        let net_pnl = prev_weight * current_return;
-
-        if prev_weight == 0.0 {
-            // Enter/exit trade: reset
-            pnl_guard.push_back(net_pnl);
-            *max_cum_guard = net_pnl.max(0.0); // Init max to current if positive
-        } else {
-            let last_cum_pnl = pnl_guard.back().copied().unwrap_or(0.0);
-            let cum_pnl = last_cum_pnl + net_pnl;
-            pnl_guard.push_back(cum_pnl);
-            *max_cum_guard = (*max_cum_guard).max(cum_pnl);
-        }
-        if pnl_guard.len() > SEQUENCE_LENGTH {
-            pnl_guard.pop_front();
-        }
-    }
-
-    async fn calculate_trade_dd(&self) {
-        let pnl_guard = self.trade_cum_pnl.lock().await;
-        let max_cum = *self.trade_max_cum.lock().await;
-        let mut dd_guard = self.trade_dd.lock().await;
-
-        let cum_pnl = pnl_guard.back().copied().unwrap_or(0.0);
-        let dd = ((max_cum - cum_pnl) / (max_cum + 1e-6)).max(0.0).min(1.0);
-        dd_guard.push_back(dd);
-        if dd_guard.len() > SEQUENCE_LENGTH {
-            dd_guard.pop_front();
-        }
-    }
-
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn insight_tick(&self, update: &InsightsUpdate) {
-        // first fill the data from the update
+        let mut new_features = HashMap::new();
         for insight in update
             .insights
             .iter()
-            .filter(|i| self.input_features_ids.contains(&i.feature_id))
+            .filter(|i| self.input_features_ids.contains(&i.feature_id) && i.insight_type == InsightType::Normalized)
         {
             if let Some(mut deque) = self.input_features.get_mut(&insight.feature_id) {
+                new_features.insert(insight.feature_id.clone(), insight.value as f32);
                 deque.push_back(insight.value as f32); // Convert Decimal to f32, default 0 on error
                 if deque.len() > SEQUENCE_LENGTH {
                     deque.pop_front();
@@ -175,20 +142,42 @@ impl AgentStrategy {
             }
         }
 
-        // For returns (assume single value; error if multiple/none)
-        let current_return = update
-            .insights
-            .iter()
-            .find(|i| i.feature_id == self.returns_feature_id)
-            .map(|v| v.value as f32)
-            .unwrap_or(0.0);
-        self.calculate_trade_cum_pnl(current_return).await;
-        self.calculate_trade_dd().await;
+        // Check if history full; skip if not (avoids zero-padding obs)
+        if self.input_features.iter().any(|kv| kv.value().len() < SEQUENCE_LENGTH) {
+            info!(target: "strat::agent", "Skipping inference: insufficient history");
+            return;
+        }
+
+        // Write to csv
+        let mut row = Vec::with_capacity(NUM_FEATURES_OBS + 1);
+        row.push(update.event_time.unix_timestamp().to_string());
+        for feat_idx in 0..NUM_FEATURES_OBS {
+            let feature_id = &self.input_features_ids[feat_idx];
+            if let Some(deque) = self.input_features.get(feature_id) {
+                row.push(deque.back().unwrap_or(&0.0).clone().to_string());
+            }
+        }
+        let file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open("dump.csv")
+            .unwrap();
+        let mut buf_file = BufWriter::new(file);
+        let is_new = buf_file.seek(SeekFrom::End(0)).unwrap() == 0; // Check if empty (new file)
+        let mut wtr = Writer::from_writer(buf_file);
+
+        if is_new {
+            let mut header = vec!["event_time".to_string()];
+            header.extend(self.input_features_ids.iter().map(|id| id.to_string()));
+            wtr.serialize(&header).unwrap();
+        }
+        wtr.serialize(&row).unwrap();
+        wtr.flush().unwrap();
 
         // Create Feature Input
         let mut input_data_flat_0: Vec<f32> = Vec::with_capacity(BATCH_SIZE * SEQUENCE_LENGTH * NUM_FEATURES_OBS);
         for _batch in 0..BATCH_SIZE {
-            // For now, single batch
             for seq in 0..SEQUENCE_LENGTH {
                 for feat_idx in 0..NUM_FEATURES_OBS {
                     let feature_id = &self.input_features_ids[feat_idx];
@@ -197,7 +186,7 @@ impl AgentStrategy {
                         let val = if seq >= SEQUENCE_LENGTH - len {
                             deque.get(seq - (SEQUENCE_LENGTH - len)).copied().unwrap_or(0.0)
                         } else {
-                            0.0 // Pad front
+                            0.0
                         };
                         input_data_flat_0.push(val);
                     } else {
@@ -208,36 +197,43 @@ impl AgentStrategy {
         }
 
         // Create State Input
-        let mut input_data_flat_1: Vec<f32> = Vec::with_capacity(BATCH_SIZE * SEQUENCE_LENGTH * NUM_FEATURES_STATE);
-        let state_deques = [
-            self.weight.lock().await.clone(), // Clone for read; optimize if perf issue
-            self.trade_cum_pnl.lock().await.clone(),
-            self.trade_dd.lock().await.clone(),
-        ];
+        let mut input_data_flat_1: Vec<f32> = Vec::with_capacity(BATCH_SIZE * SEQUENCE_LENGTH * NUM_STATE_OBS);
+        let max_weight = POSSIBLE_WEIGHTS.iter().fold(f32::NEG_INFINITY, |acc, &x| acc.max(x));
+        let scale_factor = 1.0 / (max_weight * 1.3489795003921636);
         for _batch in 0..BATCH_SIZE {
             for seq in 0..SEQUENCE_LENGTH {
-                for state_idx in 0..NUM_FEATURES_STATE {
-                    let deque = &state_deques[state_idx];
-                    let len = deque.len();
-                    let val = if seq >= SEQUENCE_LENGTH - len {
-                        deque.get(seq - (SEQUENCE_LENGTH - len)).copied().unwrap_or(0.0)
+                for state_idx in 0..NUM_STATE_OBS {
+                    let state_id = &self.input_state_ids[state_idx];
+                    if let Some(deque) = self.input_state.get(state_id) {
+                        let len = deque.len();
+                        let val = if seq >= SEQUENCE_LENGTH - len {
+                            let weight = deque.get(seq - (SEQUENCE_LENGTH - len)).copied().unwrap_or(0.0);
+                            weight * scale_factor
+                        } else {
+                            0.0
+                        };
+                        input_data_flat_1.push(val);
                     } else {
-                        0.0 // Pad front
-                    };
-                    input_data_flat_1.push(val);
+                        input_data_flat_1.push(0.0);
+                    }
                 }
             }
         }
 
         // Create Mask
-        let current_weight = self.weight.lock().await.back().copied().unwrap_or(0.0);
-        let mask = self.create_mask(current_weight, &POSSIBLE_WEIGHTS);
-        let input_data_flat_2: Vec<bool> = (0..BATCH_SIZE).flat_map(|_| mask.clone()).collect();
+        // Create Mask
+        // let mask = if let Some(deque) = self.input_state.get(&self.input_state_ids[0]) {
+        //     let current_weight = deque.back().copied().unwrap_or(0.0);
+        //     self.create_mask(current_weight, &POSSIBLE_WEIGHTS)
+        // } else {
+        //     vec![true; POSSIBLE_WEIGHTS.len()] // Default: all actions allowed
+        // };
+        // let input_data_flat_2: Vec<bool> = (0..BATCH_SIZE).flat_map(|_| mask.clone()).collect();
 
         // Construct the inference request
         let inputs = vec![
             InferInputTensor {
-                name: "OBSERVATION".to_string(),
+                name: "INPUT__0".to_string(),
                 shape: SHAPE_0.to_vec(),
                 datatype: "FP32".to_string(),
                 contents: Some(InferTensorContents {
@@ -247,7 +243,7 @@ impl AgentStrategy {
                 parameters: std::collections::HashMap::new(),
             },
             InferInputTensor {
-                name: "STATE".to_string(),
+                name: "INPUT__1".to_string(),
                 shape: SHAPE_1.to_vec(),
                 datatype: "FP32".to_string(),
                 contents: Some(InferTensorContents {
@@ -256,33 +252,33 @@ impl AgentStrategy {
                 }),
                 parameters: std::collections::HashMap::new(),
             },
-            InferInputTensor {
-                name: "MASK".to_string(),
-                shape: SHAPE_2.to_vec(),
-                datatype: "BOOL".to_string(),
-                contents: Some(InferTensorContents {
-                    bool_contents: input_data_flat_2,
-                    ..Default::default()
-                }),
-                parameters: std::collections::HashMap::new(),
-            },
+            // InferInputTensor {
+            //     name: "INPUT__2".to_string(),
+            //     shape: SHAPE_2.to_vec(),
+            //     datatype: "BOOL".to_string(),
+            //     contents: Some(InferTensorContents {
+            //         bool_contents: input_data_flat_2,
+            //         ..Default::default()
+            //     }),
+            //     parameters: std::collections::HashMap::new(),
+            // },
         ];
 
         let outputs = vec![
             InferRequestedOutputTensor {
-                name: "ACTION".to_string(),
+                name: "OUTPUT__0".to_string(),
                 parameters: std::collections::HashMap::new(),
             },
             InferRequestedOutputTensor {
-                name: "ACTION_SPACE".to_string(),
+                name: "OUTPUT__1".to_string(),
                 parameters: std::collections::HashMap::new(),
             },
             InferRequestedOutputTensor {
-                name: "WEIGHT".to_string(),
+                name: "OUTPUT__2".to_string(),
                 parameters: std::collections::HashMap::new(),
             },
             InferRequestedOutputTensor {
-                name: "PROBABILITY".to_string(),
+                name: "OUTPUT__3".to_string(),
                 parameters: std::collections::HashMap::new(),
             },
         ];
@@ -306,7 +302,7 @@ impl AgentStrategy {
             match client.model_infer(infer_request.clone()).await {
                 Ok(resp) => resp.into_inner(),
                 Err(e) => {
-                    warn!("Inference failed: {}", e);
+                    warn!(target: "strat::agent", "inference failed: {}", e);
                     return;
                 }
             }
@@ -317,15 +313,14 @@ impl AgentStrategy {
             warn!(target: "strat::agent", "No outputs in response");
             return;
         }
-
-        // After getting response and checking !outputs.is_empty()
+        // info!(target: "strat::agent", "{:?}", outputs);
 
         let mut outputs_map: HashMap<String, InferOutputTensor> = HashMap::new();
         for output in &outputs {
             outputs_map.insert(output.name.clone(), output.clone());
         }
 
-        if let Some(weight_out) = outputs_map.get("WEIGHT") {
+        if let Some(weight_out) = outputs_map.get("OUTPUT__2") {
             // Validate datatype and shape (assume FP32, shape [1] for single f32 weight)
             if weight_out.datatype != "FP32" {
                 warn!(target: "strat::agent","Unexpected datatype for WEIGHT: {}", weight_out.datatype);
@@ -339,7 +334,7 @@ impl AgentStrategy {
             let new_weight: f32;
             if !response.raw_output_contents.is_empty() {
                 // Raw mode: Assume outputs ordered, find index
-                let index = outputs.iter().position(|o| o.name == "WEIGHT").unwrap();
+                let index = outputs.iter().position(|o| o.name == "OUTPUT__2").unwrap();
                 let raw_bytes = &response.raw_output_contents[index];
                 if raw_bytes.len() != 4 {
                     warn!(target: "strat::agent","Invalid raw bytes length for f32: {}", raw_bytes.len());
@@ -357,46 +352,46 @@ impl AgentStrategy {
                 return;
             }
 
-            // Now use new_weight: Push to deque
-            let mut weight_guard = self.weight.lock().await;
-            weight_guard.push_back(new_weight);
-            if weight_guard.len() > SEQUENCE_LENGTH {
-                weight_guard.pop_front();
-            }
-            let prev_weight = if weight_guard.len() >= 2 {
-                *weight_guard.get(weight_guard.len() - 2).unwrap_or(&0.0)
-            } else {
-                0.0
-            };
-            drop(weight_guard); // Unlock early
+            info!(target: "strat::agent", "New weigth is {}", new_weight);
 
-            let allocation_change = new_weight - prev_weight;
-            if allocation_change != 0.0 {
-                let instrument = update.instruments[0].clone(); // Assume InsightsUpdate exposes instrument
-                let quantity = Decimal::from_f32_retain(allocation_change.abs()).unwrap_or(Decimal::ZERO);
-                if quantity.is_zero() {
-                    return; // Skip trivial
+            // Now use new_weight: Push to deque
+            if let Some(mut deque) = self.input_state.get_mut(&FeatureId::from("weight".to_owned())) {
+                let prev_weight = deque.back().copied().unwrap_or(0.0);
+                deque.push_back(new_weight);
+                if deque.len() > SEQUENCE_LENGTH {
+                    deque.pop_front();
                 }
-                let order = ExecutionOrder::builder()
-                    .id(Uuid::new_v4())
-                    .strategy(Some(self.strategy.clone()))
-                    .instrument(instrument)
-                    .exec_strategy_type(ExecutionStrategyType::Taker)
-                    .side(if allocation_change > 0.0 {
-                        MarketSide::Buy
-                    } else {
-                        MarketSide::Sell
-                    })
-                    .set_price(Decimal::ZERO)
-                    .set_quantity(quantity)
-                    .status(ExecutionOrderStatus::New)
-                    .created(self.time.now().await)
-                    .updated(self.time.now().await)
-                    .build();
-                self.publisher
-                    .publish(Event::NewTakerExecutionOrder(order.clone().into()))
-                    .await;
-                info!(target: "strat::agent", "send {} execution order for {} quantity {}", order.side, order.instrument, order.quantity);
+                let allocation_change = new_weight - prev_weight;
+                if allocation_change != 0.0 {
+                    let instrument = update.instruments[0].clone();
+                    let quantity = Decimal::from_f32_retain(allocation_change.abs()).unwrap_or(Decimal::ZERO);
+                    if quantity.is_zero() {
+                        return;
+                    }
+                    let order = ExecutionOrder::builder()
+                        .id(Uuid::new_v4())
+                        .strategy(Some(self.strategy.clone()))
+                        .instrument(instrument)
+                        .exec_strategy_type(ExecutionStrategyType::Taker)
+                        .side(if allocation_change > 0.0 {
+                            MarketSide::Buy
+                        } else {
+                            MarketSide::Sell
+                        })
+                        .set_price(Decimal::ZERO)
+                        .set_quantity(quantity)
+                        .status(ExecutionOrderStatus::New)
+                        .created(self.time.now().await)
+                        .updated(self.time.now().await)
+                        .build();
+                    self.publisher
+                        .publish(Event::NewTakerExecutionOrder(order.clone().into()))
+                        .await;
+                    info!(target: "strat::agent", "send {} execution order for {} quantity {}", order.side, order.instrument, order.quantity);
+                }
+            } else {
+                warn!(target: "strat::agent", "Missing weight deque");
+                return;
             }
         } else {
             warn!(target: "strat::agent","Missing WEIGHT output");
