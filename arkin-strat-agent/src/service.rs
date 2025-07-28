@@ -21,12 +21,12 @@ const BATCH_SIZE: usize = 1;
 const SEQUENCE_LENGTH: usize = 192;
 const NUM_FEATURES_OBS: usize = 40; // Assuming len(FEATURE_COLUMNS) = 5
 const NUM_STATE_OBS: usize = 1;
-const NUM_MASK: usize = 4;
+// const NUM_MASK: usize = 4;
 const POSSIBLE_WEIGHTS: [f32; 4] = [0.0, 1.0, 2.0, 3.0];
 
 const SHAPE_0: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_FEATURES_OBS as i64];
 const SHAPE_1: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_STATE_OBS as i64];
-const SHAPE_2: [i64; 2] = [BATCH_SIZE as i64, NUM_MASK as i64];
+// const SHAPE_2: [i64; 2] = [BATCH_SIZE as i64, NUM_MASK as i64];
 
 #[derive(TypedBuilder)]
 pub struct AgentStrategy {
@@ -115,15 +115,15 @@ impl AgentStrategy {
         .into()
     }
 
-    fn create_mask(&self, new_weight: f32, possible_weights: &[f32]) -> Vec<bool> {
-        if new_weight < 0.0 {
-            possible_weights.iter().map(|&w| w >= new_weight && w <= 0.0).collect()
-        } else if new_weight > 0.0 {
-            possible_weights.iter().map(|&w| w <= new_weight && w >= 0.0).collect()
-        } else {
-            vec![true; possible_weights.len()]
-        }
-    }
+    // fn create_mask(&self, new_weight: f32, possible_weights: &[f32]) -> Vec<bool> {
+    //     if new_weight < 0.0 {
+    //         possible_weights.iter().map(|&w| w >= new_weight && w <= 0.0).collect()
+    //     } else if new_weight > 0.0 {
+    //         possible_weights.iter().map(|&w| w <= new_weight && w >= 0.0).collect()
+    //     } else {
+    //         vec![true; possible_weights.len()]
+    //     }
+    // }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn insight_tick(&self, update: &InsightsUpdate) {
