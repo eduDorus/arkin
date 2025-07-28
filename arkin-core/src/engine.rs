@@ -1,6 +1,7 @@
 use futures::future::join_all;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
 use tracing::{info, instrument};
 
@@ -61,6 +62,23 @@ impl Engine {
             }
         }
         info!(target: "engine", "started services");
+    }
+
+    pub async fn wait_for_shutdown(&self) {
+        let mut sigterm = signal(SignalKind::terminate()).unwrap();
+        let mut sigint = signal(SignalKind::interrupt()).unwrap();
+
+        tokio::select! {
+          _ = sigterm.recv() => {
+            info!("Received terminate signal, shutting down...");
+            self.stop().await;
+          },
+          _ = sigint.recv() => {
+            info!("Received interrupt signal, shutting down...");
+            self.stop().await;
+          },
+        }
+        info!("Successfully shutdown!");
     }
 
     #[instrument(parent = None, skip_all)]

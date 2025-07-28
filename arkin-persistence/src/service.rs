@@ -96,6 +96,11 @@ impl Persistence {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    pub async fn get_instrument_by_venue_symbol(&self, symbol: &str) -> Result<Arc<Instrument>, PersistenceError> {
+        instrument_store::read_by_venue_symbol(&self.ctx, &symbol).await
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn get_venue(&self, id: Uuid) -> Result<Arc<Venue>, PersistenceError> {
         venue_store::read_by_id(&self.ctx, &id).await
     }
@@ -125,7 +130,7 @@ impl Persistence {
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> impl Stream<Item = Arc<Trade>> + 'static {
+    ) -> impl Stream<Item = Arc<AggTrade>> + 'static {
         trade_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
     }
 
@@ -187,7 +192,7 @@ impl Persistence {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn insert_trade(&self, trade: Arc<Trade>) {
+    pub async fn insert_trade(&self, trade: Arc<AggTrade>) {
         if self.mode == InstanceType::Live || self.mode == InstanceType::Utility {
             let mut lock = self.ctx.buffer.trades.lock().await;
             lock.push(trade);
@@ -253,7 +258,7 @@ impl Persistence {
         let trades = {
             let mut lock = self.ctx.buffer.trades.lock().await;
             let trades = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "trade buffer length {}", lock.len());
+            info!(target: "persistence", "trade buffer length {}", lock.len());
             trades
         };
 
@@ -281,7 +286,7 @@ impl Persistence {
         let ticks = {
             let mut lock = self.ctx.buffer.ticks.lock().await;
             let ticks = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "tick buffer length {}", lock.len());
+            info!(target: "persistence", "tick buffer length {}", lock.len());
             ticks
         };
 
@@ -322,7 +327,7 @@ impl Runnable for Persistence {
 
         match event {
             Event::TickUpdate(t) => self.insert_tick(t).await,
-            Event::TradeUpdate(t) => self.insert_trade(t).await,
+            Event::AggTradeUpdate(t) => self.insert_trade(t).await,
             Event::InsightsUpdate(i) => self.insert_insights_update(i).await,
 
             // Ledger
@@ -344,8 +349,10 @@ impl Runnable for Persistence {
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn setup(&self, _ctx: Arc<ServiceCtx>) {
         // TODO: NOT FOR PRODUCTION
-        if let Err(e) = instance_store::delete(&self.ctx, self.ctx.instance.id).await {
-            error!(target: "persistence", "could not delete instance: {}", e)
+        if self.ctx.instance.instance_type == InstanceType::Test {
+            if let Err(e) = instance_store::delete(&self.ctx, self.ctx.instance.id).await {
+                error!(target: "persistence", "could not delete instance: {}", e)
+            }
         }
         // Create the instance
         if let Err(e) = instance_store::insert(&self.ctx, self.ctx.instance.clone()).await {

@@ -95,7 +95,7 @@ async fn test_simulation() {
     let insights_service = Service::new(
         insights,
         Some(pubsub.subscribe(EventFilter::Events(vec![
-            EventType::TradeUpdate,
+            EventType::AggTradeUpdate,
             EventType::TickUpdate,
             EventType::InsightsTick,
         ]))),

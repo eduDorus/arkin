@@ -53,5 +53,5 @@ impl Caches {
 pub struct Buffers {
     pub insights: Arc<Mutex<Vec<Arc<Insight>>>>,
     pub ticks: Arc<Mutex<Vec<Arc<Tick>>>>,
-    pub trades: Arc<Mutex<Vec<Arc<Trade>>>>,
+    pub trades: Arc<Mutex<Vec<Arc<AggTrade>>>>,
 }

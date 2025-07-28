@@ -26,7 +26,7 @@ typed-builder = { workspace = true }
 kanal = { workspace = true }
 dashmap = { workspace = true }
 moka2 = { workspace = true }
-
+clap = { workspace = true }
 tonic = { workspace = true }
 prost = { workspace = true }
 

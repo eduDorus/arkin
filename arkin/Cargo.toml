@@ -13,7 +13,9 @@ path = "src/bin/main.rs"
 [dependencies]
 arkin-core = { path = "../arkin-core" }
 arkin-audit = { path = "../arkin-audit" }
-# arkin-engine = { path = "../arkin-engine" }
+arkin-cli = { path = "../arkin-cli" }
+arkin-persistence = { path = "../arkin-persistence" }
+arkin-ingestor-tardis = { path = "../arkin-ingestor-tardis" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
@@ -31,3 +33,4 @@ clickhouse = { workspace = true }
 uuid = { workspace = true }
 statrs = { workspace = true }
 tonic = { workspace = true }
+clap = { workspace = true }

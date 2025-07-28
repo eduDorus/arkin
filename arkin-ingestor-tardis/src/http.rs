@@ -17,11 +17,29 @@ use typed_builder::TypedBuilder;
 pub struct TardisHttpClient {
     pub base_url: String,
     pub api_secret: Option<String>,
-    #[builder(default = get_client().expect("Failed to create http client"))]
     pub client: Client,
 }
 
 impl TardisHttpClient {
+    pub fn new(base_url: String, api_secret: Option<String>) -> Self {
+        let client = Client::builder()
+            .read_timeout(Duration::from_secs(120))
+            .timeout(Duration::from_secs(180))
+            .connect_timeout(Duration::from_secs(10))
+            .gzip(true)
+            // .zstd(true)
+            // .brotli(true)
+            // .deflate(true)
+            .build()
+            .expect("Could not initialize tardis http client");
+
+        Self {
+            base_url: base_url.to_owned(),
+            api_secret,
+            client,
+        }
+    }
+
     pub async fn request(
         &self,
         exchange: String,
@@ -56,20 +74,6 @@ impl TardisHttpClient {
         .await?;
         Ok(res)
     }
-}
-
-pub fn get_client() -> Result<Client> {
-    // Set api bearer token if provided
-    let client = Client::builder()
-        .read_timeout(Duration::from_secs(120))
-        .timeout(Duration::from_secs(180))
-        .connect_timeout(Duration::from_secs(10))
-        .gzip(true)
-        // .zstd(true)
-        // .brotli(true)
-        // .deflate(true)
-        .build()?;
-    Ok(client)
 }
 
 fn create_headers(api_secret: &Option<String>) -> anyhow::Result<HeaderMap> {

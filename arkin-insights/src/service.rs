@@ -81,7 +81,7 @@ impl Runnable for Insights {
             Event::InsightsTick(tick) => {
                 self.process_tick(tick).await;
             }
-            Event::TradeUpdate(trade) => {
+            Event::AggTradeUpdate(trade) => {
                 let insights = trade.as_ref().clone().to_insights();
                 self.insert_batch(&insights).await;
             }

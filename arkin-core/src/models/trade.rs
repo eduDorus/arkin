@@ -14,7 +14,7 @@ use crate::{
 use super::{InsightType, Instrument, MarketSide};
 
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct Trade {
+pub struct AggTrade {
     pub event_time: UtcDateTime,
     pub instrument: Arc<Instrument>,
     pub trade_id: u64,
@@ -23,7 +23,7 @@ pub struct Trade {
     pub quantity: Quantity,
 }
 
-impl Trade {
+impl AggTrade {
     pub fn new(
         event_time: UtcDateTime,
         instrument: Arc<Instrument>,
@@ -63,7 +63,7 @@ impl Trade {
     }
 }
 
-impl PartialEq for Trade {
+impl PartialEq for AggTrade {
     fn eq(&self, other: &Self) -> bool {
         self.event_time == other.event_time
             && self.trade_id == other.trade_id
@@ -71,21 +71,21 @@ impl PartialEq for Trade {
     }
 }
 
-impl Eq for Trade {}
+impl Eq for AggTrade {}
 
-impl PartialOrd for Trade {
+impl PartialOrd for AggTrade {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Trade {
+impl Ord for AggTrade {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.event_time, self.trade_id).cmp(&(other.event_time, other.trade_id))
     }
 }
 
-impl fmt::Display for Trade {
+impl fmt::Display for AggTrade {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let event_time = self.event_time.format(TIMESTAMP_FORMAT).expect("Failed to format timestamp");
         write!(

@@ -9,11 +9,11 @@ use arkin_core::prelude::*;
 
 use crate::{context::PersistenceContext, repos::ch::trade_repo, stores::instrument_store, PersistenceError};
 
-pub async fn insert(ctx: &PersistenceContext, trade: Arc<Trade>) -> Result<(), PersistenceError> {
+pub async fn insert(ctx: &PersistenceContext, trade: Arc<AggTrade>) -> Result<(), PersistenceError> {
     trade_repo::insert(ctx, trade.into()).await
 }
 
-pub async fn insert_vec(ctx: &PersistenceContext, trades: &[Arc<Trade>]) -> Result<(), PersistenceError> {
+pub async fn insert_vec(ctx: &PersistenceContext, trades: &[Arc<AggTrade>]) -> Result<(), PersistenceError> {
     let ticks = trades.into_iter().cloned().map(|t| t.into()).collect::<Vec<_>>();
     trade_repo::insert_batch(ctx, &ticks).await
 }
@@ -23,14 +23,14 @@ pub async fn read_range(
     instruments: &[Arc<Instrument>],
     from: UtcDateTime,
     to: UtcDateTime,
-) -> Result<Vec<Arc<Trade>>, PersistenceError> {
+) -> Result<Vec<Arc<AggTrade>>, PersistenceError> {
     let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
     let dto = trade_repo::read_range(ctx, &ids, from, to).await?;
 
     let mut trades = Vec::with_capacity(dto.len());
     for trade in &dto {
         let instrument = instrument_store::read_by_id(ctx, &trade.instrument_id).await?;
-        let trade = Trade::builder()
+        let trade = AggTrade::builder()
             .event_time(trade.event_time.to_utc())
             .instrument(instrument)
             .trade_id(trade.trade_id as u64)
@@ -48,7 +48,7 @@ pub async fn stream_range(
     instruments: &[Arc<Instrument>],
     from: UtcDateTime,
     to: UtcDateTime,
-) -> Result<impl Stream<Item = Result<Arc<Trade>, PersistenceError>> + 'static, PersistenceError> {
+) -> Result<impl Stream<Item = Result<Arc<AggTrade>, PersistenceError>> + 'static, PersistenceError> {
     // We do not `async` here, because returning `impl Stream` + `'a` from an `async fn`
     // is not yet stable. Instead, we return a non-async function that constructs the stream.
 
@@ -65,7 +65,7 @@ pub async fn stream_range(
         while let Some(row) = cursor.next().await? {
             // For each row, do your transformations.
             let instrument = instrument_store::read_by_id(&ctx_clone, &row.instrument_id).await?;
-            let trade = Trade::builder()
+            let trade = AggTrade::builder()
                 .event_time(row.event_time.to_utc())
                 .instrument(instrument)
                 .trade_id(row.trade_id as u64)
@@ -88,7 +88,7 @@ pub async fn stream_range_buffered(
     end: UtcDateTime,
     buffer_size: usize,
     frequency: Frequency,
-) -> impl Stream<Item = Arc<Trade>> + 'static {
+) -> impl Stream<Item = Arc<AggTrade>> + 'static {
     // Split the range into daily chunks
     let time_chunks = datetime_chunks(start, end, frequency).unwrap();
     let instrument_ids = Arc::new(instruments.iter().map(|i| i.id).collect::<Vec<_>>());
@@ -116,7 +116,7 @@ pub async fn stream_range_buffered(
             let mut trades = Vec::with_capacity(batch.len());
             for dto in batch {
                 let instrument = local_instrument_lookup.get(&dto.instrument_id).cloned().unwrap();
-                let trade = Trade::builder()
+                let trade = AggTrade::builder()
                     .event_time(dto.event_time.to_utc())
                     .instrument(instrument)
                     .trade_id(dto.trade_id as u64)

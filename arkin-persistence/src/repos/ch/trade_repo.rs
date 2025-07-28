@@ -26,8 +26,8 @@ pub struct TradeClickhouseDTO {
     pub quantity: Decimal, // Negative for sell, positive for buy
 }
 
-impl From<Arc<Trade>> for TradeClickhouseDTO {
-    fn from(trade: Arc<Trade>) -> Self {
+impl From<Arc<AggTrade>> for TradeClickhouseDTO {
+    fn from(trade: Arc<AggTrade>) -> Self {
         Self {
             event_time: trade.event_time.into(),
             instrument_id: trade.instrument.id,

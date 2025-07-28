@@ -80,7 +80,7 @@ impl Runnable for SimBinanceIngestor {
                             tick_ts
                         } else {
                             let trade = next_trade.take().unwrap();
-                            publisher.publish(Event::TradeUpdate(trade.into())).await;
+                            publisher.publish(Event::AggTradeUpdate(trade.into())).await;
                             next_trade = trade_stream.next().await;
                             trade_ts
                         }
@@ -95,7 +95,7 @@ impl Runnable for SimBinanceIngestor {
                     (None, Some(ts)) => {
                         // only trades left
                         let trade = next_trade.take().unwrap();
-                        publisher.publish(Event::TradeUpdate(trade.into())).await;
+                        publisher.publish(Event::AggTradeUpdate(trade.into())).await;
                         next_trade = trade_stream.next().await;
                         ts
                     }

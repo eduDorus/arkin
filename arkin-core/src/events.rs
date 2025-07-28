@@ -4,7 +4,7 @@ use strum::{Display, EnumDiscriminants, EnumIter};
 use time::UtcDateTime;
 
 use crate::{
-    Account, Book, ExecutionOrder, InsightsTick, InsightsUpdate, Tick, Trade, Transfer, TransferBatch,
+    Account, AggTrade, Book, ExecutionOrder, InsightsTick, InsightsUpdate, Tick, Transfer, TransferBatch,
     VenueAccountUpdate, VenueOrder, VenueTradeUpdate,
 };
 
@@ -15,7 +15,7 @@ use crate::{
 pub enum Event {
     // Market Data
     TickUpdate(Arc<Tick>),
-    TradeUpdate(Arc<Trade>),
+    AggTradeUpdate(Arc<AggTrade>),
     BookUpdate(Arc<Book>),
 
     // Accounting
@@ -78,7 +78,7 @@ impl Event {
         match self {
             // Market Data
             Event::TickUpdate(event) => event.event_time,
-            Event::TradeUpdate(event) => event.event_time,
+            Event::AggTradeUpdate(event) => event.event_time,
             Event::BookUpdate(event) => event.event_time,
 
             // Accounting
@@ -139,14 +139,14 @@ impl Event {
 
 impl EventType {
     pub fn is_market_data(&self) -> bool {
-        matches!(self, EventType::TickUpdate | EventType::TradeUpdate | EventType::BookUpdate)
+        matches!(self, EventType::TickUpdate | EventType::AggTradeUpdate | EventType::BookUpdate)
     }
 
     pub fn is_persistable(&self) -> bool {
         matches!(
             self,
             EventType::TickUpdate
-                | EventType::TradeUpdate
+                | EventType::AggTradeUpdate
                 | EventType::InsightsUpdate
                 | EventType::NewAccount
                 | EventType::NewTransfer

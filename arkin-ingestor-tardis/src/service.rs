@@ -1,9 +1,7 @@
-use std::fmt;
 use std::future::Future;
-use std::str::FromStr;
 use std::sync::Arc;
 
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Result};
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 use async_trait::async_trait;
@@ -17,161 +15,14 @@ use tokio::pin;
 use tracing::{debug, error, info, instrument};
 use typed_builder::TypedBuilder;
 
+use crate::binance_swap::BinanceSwapsEvent;
+use crate::mapping;
+
 use super::http::TardisHttpClient;
 
-#[derive(Debug, Clone)]
-pub enum TardisExchange {
-    BinanceSpot,
-    BinanceUSDM,
-    BinanceCOINM,
-    BinanceOptions,
-    OkxFutures,
-    OkxSwap,
-    OkxSpot,
-    OkxOptions,
-}
-
-impl fmt::Display for TardisExchange {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                TardisExchange::BinanceSpot => "binance",
-                TardisExchange::BinanceUSDM => "binance-futures",
-                TardisExchange::BinanceCOINM => "binance-delivery",
-                TardisExchange::BinanceOptions => "binance-european-options",
-                TardisExchange::OkxSpot => "okex-spot",
-                TardisExchange::OkxSwap => "okex-swap",
-                TardisExchange::OkxFutures => "okex-futures",
-                TardisExchange::OkxOptions => "okex-options",
-            }
-        )
-    }
-}
-
-impl FromStr for TardisExchange {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "binance-spot" => Ok(TardisExchange::BinanceSpot),
-            "binance-usdm" => Ok(TardisExchange::BinanceUSDM),
-            "binance-coinm" => Ok(TardisExchange::BinanceCOINM),
-            "binance-options" => Ok(TardisExchange::BinanceOptions),
-            "okex-spot" => Ok(TardisExchange::OkxSpot),
-            "okex-swaps" => Ok(TardisExchange::OkxSwap),
-            "okex-futures" => Ok(TardisExchange::OkxFutures),
-            "okex-options" => Ok(TardisExchange::OkxOptions),
-            _ => Err(Error::msg("invalid exchange")),
-        }
-    }
-}
-
-impl TardisExchange {
-    pub fn channel_str(&self, channel: &TardisChannel) -> Result<String> {
-        match self {
-            TardisExchange::BinanceUSDM => match channel {
-                TardisChannel::Book => Ok("depth".to_string()),
-                TardisChannel::Trade => Ok("trade".to_string()),
-                TardisChannel::AggTrade => Ok("aggTrade".to_string()),
-                TardisChannel::Tick => Ok("bookTicker".to_string()),
-                _ => bail!("Channel not supported for Binance exchange"),
-            },
-            TardisExchange::BinanceOptions => match channel {
-                TardisChannel::Book => Ok("depth100".to_string()),
-                TardisChannel::Trade => Ok("trade".to_string()),
-                TardisChannel::Tick => Ok("ticker".to_string()),
-                TardisChannel::OpenInterest => Ok("openInterest".to_string()),
-                _ => bail!("Channel not supported for Binance exchange".to_string()),
-            },
-            TardisExchange::OkxSwap => match channel {
-                TardisChannel::Book => Ok("books".to_string()),
-                TardisChannel::Trade => Ok("trades-all".to_string()),
-                TardisChannel::Tick => Ok("tickers".to_string()),
-                TardisChannel::OpenInterest => Ok("open-interest".to_string()),
-                TardisChannel::FundingRate => Ok("funding-rate".to_string()),
-                _ => bail!("Channel not supported for Okex exchange"),
-            },
-            TardisExchange::OkxOptions => match channel {
-                TardisChannel::Book => Ok("books".to_string()),
-                TardisChannel::Trade => Ok("trades-all".to_string()),
-                TardisChannel::Tick => Ok("opt-summary".to_string()),
-                TardisChannel::OpenInterest => Ok("open-interest".to_string()),
-                _ => bail!("Channel not supported for Okex exchange"),
-            },
-            _ => bail!("Exchange not supported yet"),
-        }
-    }
-}
-
-impl Default for TardisExchange {
-    fn default() -> Self {
-        TardisExchange::BinanceUSDM // Set default to VariantA
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum TardisChannel {
-    Book,
-    Trade,
-    AggTrade,
-    Perpetual,
-    Quote,
-    Tick,
-    Snapshot,
-    OpenInterest,
-    FundingRate,
-}
-
-impl Default for TardisChannel {
-    fn default() -> Self {
-        TardisChannel::AggTrade // Set default to VariantA
-    }
-}
-
-impl fmt::Display for TardisChannel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                TardisChannel::Book => "book",
-                TardisChannel::Trade => "trades",
-                TardisChannel::AggTrade => "agg-trades",
-                TardisChannel::Perpetual => "perpetual",
-                TardisChannel::Quote => "quotes",
-                TardisChannel::Tick => "ticks",
-                TardisChannel::Snapshot => "snapshots",
-                TardisChannel::OpenInterest => "open-interest",
-                TardisChannel::FundingRate => "funding",
-            }
-        )
-    }
-}
-
-impl FromStr for TardisChannel {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "book" => Ok(TardisChannel::Book),
-            "trades" => Ok(TardisChannel::Trade),
-            "agg-trades" => Ok(TardisChannel::AggTrade),
-            "perpetual" => Ok(TardisChannel::Perpetual),
-            "quotes" => Ok(TardisChannel::Quote),
-            "ticks" => Ok(TardisChannel::Tick),
-            "snapshots" => Ok(TardisChannel::Snapshot),
-            "open-interest" => Ok(TardisChannel::OpenInterest),
-            "funding" => Ok(TardisChannel::FundingRate),
-            _ => Err(Error::msg("invalid channel")),
-        }
-    }
-}
-
 pub struct TardisRequest {
-    pub exchange: TardisExchange,
-    pub channel: TardisChannel,
+    pub exchange: Exchange,
+    pub channel: Channel,
     pub instruments: Vec<String>,
     pub start: UtcDateTime,
     pub end: UtcDateTime,
@@ -179,8 +30,8 @@ pub struct TardisRequest {
 
 impl TardisRequest {
     pub fn new(
-        exchange: TardisExchange,
-        channel: TardisChannel,
+        exchange: Exchange,
+        channel: Channel,
         instruments: Vec<String>,
         start: UtcDateTime,
         end: UtcDateTime,
@@ -198,16 +49,17 @@ impl TardisRequest {
 #[derive(TypedBuilder)]
 pub struct TardisIngestor {
     #[builder(default =  "ingestor::tardis".to_owned())]
-    identifier: String,
-    pub pubsub: PubSubPublisher,
+    pub identifier: String,
+    pub publisher: Arc<dyn Publisher>,
     pub persistence: Arc<Persistence>,
-    pub client: TardisHttpClient,
     pub max_concurrent_requests: usize,
-    pub venue: TardisExchange,
-    pub channel: TardisChannel,
+    pub venue: Exchange,
+    pub channel: Channel,
     pub instruments: Vec<String>,
     pub start: UtcDateTime,
     pub end: UtcDateTime,
+    pub base_url: String,
+    pub api_secret: Option<String>,
 }
 
 impl TardisIngestor {
@@ -216,16 +68,20 @@ impl TardisIngestor {
         req: TardisRequest,
     ) -> impl Stream<Item = impl Future<Output = Result<Vec<(UtcDateTime, String)>>> + '_> + '_ {
         let dates = datetime_range_minute(req.start, req.end).expect("Invalid date range");
+        let client = TardisHttpClient::new(self.base_url.clone(), self.api_secret.clone());
         stream::iter(dates.into_iter().map(move |datetime| {
-            let client = self.client.clone();
-            let exchange_str = req.exchange.to_string();
-            let channel_str = req.exchange.channel_str(&req.channel).unwrap();
+            let client = client.clone();
+            let exchange_str = mapping::get_tardis_exchange_id(req.exchange).expect("No entry in lookup map");
+            let channel_str =
+                mapping::get_tardis_channel_str(req.exchange, req.channel).expect("No entry in lookup map");
             let instruments = req.instruments.clone();
             let offset = datetime.time().hour() as i64 * 60 + datetime.time().minute() as i64;
 
             async move {
-                info!("Tardis downloading {} from {}", channel_str, datetime);
-                let buffer: Bytes = client.request(exchange_str, channel_str, instruments, datetime, offset).await?;
+                info!(target: "ingestor::tardis", "Tardis downloading {} from {}", channel_str, datetime);
+                let buffer: Bytes = client
+                    .request(exchange_str.to_owned(), channel_str.to_owned(), instruments, datetime, offset)
+                    .await?;
 
                 // Write response to buffer
                 let mut reader = BufReader::new(buffer.as_ref());
@@ -253,7 +109,7 @@ impl TardisIngestor {
                 match result {
                     Ok(values) => Some(stream::iter(values)),
                     Err(e) => {
-                        error!("Error: {}", e);
+                        error!(target: "ingestor::tardis", "Error: {}", e);
                         None
                     }
                 }
@@ -271,7 +127,7 @@ impl TardisIngestor {
                 match result {
                     Ok(values) => Some(stream::iter(values)),
                     Err(e) => {
-                        error!("Error: {}", e);
+                        error!(target: "ingestor::tardis", "Error: {}", e);
                         None
                     }
                 }
@@ -282,12 +138,104 @@ impl TardisIngestor {
                 match res {
                     Ok(value) => Some((ts, value)),
                     Err(e) => {
-                        error!("{:?}", e);
-                        error!("Data: {}", data);
+                        error!(target: "ingestor::tardis", "{:?}", e);
+                        error!(target: "ingestor::tardis", "Data: {}", data);
                         None
                     }
                 }
             })
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn download_task(&self, ctx: Arc<ServiceCtx>) {
+        info!(target: "ingestor::tardis", "Starting tardis ingestor...");
+        let persistence_service = Arc::clone(&self.persistence);
+
+        let req = TardisRequest::new(
+            self.venue.clone(),
+            self.channel.clone(),
+            self.instruments.clone(),
+            self.start,
+            self.end,
+        );
+
+        let stream = self.stream(req);
+        pin!(stream);
+
+        // No need to clone persistence_service for each iteration
+        while ctx.is_running().await {
+            tokio::select! {
+                    event = stream.next() => {
+                    let (_ts, json) = match event {
+                      Some(e) => e,
+                      None => {
+                          info!(target: "ingestor::tardis", "Stream ended");
+                          break;
+                      }
+                    };
+                    debug!(target: "ingestor::tardis", "Received data: {}", json);
+                    let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
+                        Ok(e) => Some(e),
+                        Err(e) => {
+                            error!(target: "ingestor::tardis", "Failed to parse Binance event: {}", e);
+                            error!(target: "ingestor::tardis", "Data: {}", json);
+                            None
+                        }
+                    };
+
+                    let event = match event {
+                        Some(e) => {
+                            debug!(target: "ingestor::tardis", "{}", e);
+                            e
+                        }
+                        None => {
+                            error!(target: "ingestor::tardis", "Failed to parse event, skipping...");
+                            continue
+                        },
+                    };
+
+                    let instrument = persistence_service
+                        .get_instrument_by_venue_symbol(&event.venue_symbol())
+                        .await.expect("Failed to look up venue symbol");
+
+                    match event {
+                        BinanceSwapsEvent::AggTradeStream(stream) => {
+                            let trade = stream.data;
+                            let side = if trade.maker {
+                                MarketSide::Sell
+                            } else {
+                                MarketSide::Buy
+                            };
+                            let trade = AggTrade::new(
+                                trade.event_time,
+                                instrument,
+                                trade.agg_trade_id,
+                                side,
+                                trade.price,
+                                trade.quantity,
+                            );
+                            debug!(target: "ingestor::tardis", "Send agg trade update");
+                            self.publisher.publish(Event::AggTradeUpdate(trade.into())).await;
+                        }
+                        BinanceSwapsEvent::TickStream(stream) => {
+                            let tick = stream.data;
+                            let tick = Tick::new(
+                                tick.event_time,
+                                instrument,
+                                tick.update_id,
+                                tick.bid_price,
+                                tick.bid_quantity,
+                                tick.ask_price,
+                                tick.ask_quantity,
+                            );
+                            self.publisher.publish(Event::TickUpdate(tick.into())).await;
+                            debug!(target: "ingestor::tardis", "Send tick update");
+                        }
+                    }
+                },
+            }
+        }
+        info!(target: "ingestor::tardis", "Tardis ingestor service stopped.");
     }
 }
 
@@ -298,12 +246,12 @@ fn parse_line(line: &str) -> Result<(UtcDateTime, String)> {
     let timestamp = parts.next().unwrap_or_default();
     let timestamp = timestamp.trim();
     let timestamp = timestamp.trim_end_matches(':');
-    debug!("Timestamp: {}", &timestamp);
+    debug!(target: "ingestor::tardis", "Timestamp: {}", &timestamp);
 
     // Json part
     let json = parts.next().unwrap_or_default();
     let json = json.trim();
-    debug!("Json: {}", &json);
+    debug!(target: "ingestor::tardis", "Json: {}", &json);
 
     let format = format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond]Z");
     let Ok(ts) = time::PrimitiveDateTime::parse(timestamp, format) else {
@@ -321,99 +269,9 @@ impl Runnable for TardisIngestor {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn start_tasks(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {
-        info!("Starting tardis ingestor...");
-        let _persistence_service = Arc::clone(&self.persistence);
-
-        let req = TardisRequest::new(
-            self.venue.clone(),
-            self.channel.clone(),
-            self.instruments.clone(),
-            self.start,
-            self.end,
-        );
-
-        let _stream = self.stream(req);
-        pin!(_stream);
-
-        // No need to clone persistence_service for each iteration
-        // loop {
-        //     tokio::select! {
-        //             event = stream.next() => {
-        //             let (_ts, json) = match event {
-        //               Some(e) => e,
-        //               None => {
-        //                   info!("Stream ended");
-        //                   break;
-        //               }
-        //             };
-        //             debug!("Received data: {}", json);
-        //             let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
-        //                 Ok(e) => Some(e),
-        //                 Err(e) => {
-        //                     error!("Failed to parse Binance event: {}", e);
-        //                     error!("Data: {}", json);
-        //                     None
-        //                 }
-        //             };
-
-        //             let event = match event {
-        //                 Some(e) => {
-        //                     debug!("{}", e);
-        //                     e
-        //                 }
-        //                 None => {
-        //                     error!("Failed to parse event, skipping...");
-        //                     continue
-        //                 },
-        //             };
-
-        //             let instrument = persistence_service
-        //                 .instrument_store
-        //                 .read_by_venue_symbol(&event.venue_symbol())
-        //                 .await?;
-
-        //             match event {
-        //                 BinanceSwapsEvent::AggTradeStream(stream) => {
-        //                     let trade = stream.data;
-        //                     let side = if trade.maker {
-        //                         MarketSide::Sell
-        //                     } else {
-        //                         MarketSide::Buy
-        //                     };
-        //                     let trade = Trade::new(
-        //                         trade.event_time,
-        //                         instrument,
-        //                         trade.agg_trade_id,
-        //                         side,
-        //                         trade.price,
-        //                         trade.quantity,
-        //                     );
-        //                     self.pubsub.publish(trade).await;
-        //                 }
-        //                 BinanceSwapsEvent::TickStream(stream) => {
-        //                     let tick = stream.data;
-        //                     let tick = Tick::new(
-        //                         tick.event_time,
-        //                         instrument,
-        //                         tick.update_id,
-        //                         tick.bid_price,
-        //                         tick.bid_quantity,
-        //                         tick.ask_price,
-        //                         tick.ask_quantity,
-        //                     );
-        //                     self.pubsub.publish(tick).await;
-        //                 }
-        //             }
-        //         },
-        //         _ = shutdown.cancelled() => {
-        //             info!("Shutting down");
-        //             break;
-        //         }
-        //     }
-        // }
-
-        // self.publisher.publish(Event::Finished).await;
-        info!("Tardis ingestor service stopped.");
+    async fn start_tasks(self: Arc<Self>, ctx: Arc<ServiceCtx>) {
+        let exec = self.clone();
+        let ctx_clone = ctx.clone();
+        ctx.spawn(async move { exec.download_task(ctx_clone).await });
     }
 }

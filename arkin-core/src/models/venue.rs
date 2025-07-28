@@ -31,3 +31,32 @@ impl fmt::Display for Venue {
         write!(f, "{}", self.name.to_lowercase())
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, clap::ValueEnum)] // For Clap auto-parsing
+#[strum(serialize_all = "snake_case")]
+pub enum Exchange {
+    BinanceSpot,
+    BinanceUsdmFutures,
+    BinanceCoinmFutures,
+    BinanceOptions,
+    OkxSpot,
+    OkxSwap,
+    OkxFutures,
+    OkxOptions,
+    BybitSpot,
+    BybitDerivatives,
+    BybitOptions,
+    Deribit,
+}
+
+// Similarly for Channel
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, clap::ValueEnum)]
+#[strum(serialize_all = "snake_case")]
+pub enum Channel {
+    OrderBook,
+    Trades,
+    AggTrades,
+    Ticker,
+    OpenInterest,
+    FundingRate,
+}
