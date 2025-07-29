@@ -52,7 +52,7 @@ const MAPPINGS: &[MappingEntry] = &[
         exchange: Exchange::BinanceSpot,
         channel: Channel::Ticker,
         tardis_id: "binance",
-        tardis_channel_str: "ticker",
+        tardis_channel_str: "bookTicker",
     },
     // BinanceUsdmFutures (verified: FundingRate via "markPrice")
     MappingEntry {
@@ -77,7 +77,7 @@ const MAPPINGS: &[MappingEntry] = &[
         exchange: Exchange::BinanceUsdmFutures,
         channel: Channel::Ticker,
         tardis_id: "binance-futures",
-        tardis_channel_str: "ticker",
+        tardis_channel_str: "bookTicker",
     },
     MappingEntry {
         exchange: Exchange::BinanceUsdmFutures,

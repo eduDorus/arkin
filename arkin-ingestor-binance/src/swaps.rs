@@ -20,8 +20,8 @@ impl BinanceSwapEvent {
         match self {
             BinanceSwapEvent::AggTrade(data) => data.instrument.clone(),
             BinanceSwapEvent::Tick(data) => data.instrument.clone(),
-            BinanceSwapsEvent::Trade(data) => data.instrument.clone(),
-            BinanceSwapsEvent::Book(data) => data.instrument.clone(),
+            BinanceSwapEvent::Trade(data) => data.instrument.clone(),
+            BinanceSwapEvent::Book(data) => data.instrument.clone(),
         }
     }
 }
@@ -31,8 +31,8 @@ impl fmt::Display for BinanceSwapEvent {
         match self {
             BinanceSwapEvent::AggTrade(data) => write!(f, "{}", data),
             BinanceSwapEvent::Tick(data) => write!(f, "{}", data),
-            BinanceSwapsEvent::Trade(data) => write!(f, "{:?}", data),
-            BinanceSwapsEvent::Book(data) => write!(f, "{:?}", data),
+            BinanceSwapEvent::Trade(data) => write!(f, "{:?}", data),
+            BinanceSwapEvent::Book(data) => write!(f, "{:?}", data),
         }
     }
 }

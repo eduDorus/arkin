@@ -13,7 +13,7 @@ use url::Url;
 use arkin_core::prelude::*;
 use arkin_persistence::prelude::*;
 
-use crate::binance::swaps::BinanceSwapEvent;
+use crate::swaps::BinanceSwapEvent;
 use crate::ws::WebSocketManager;
 
 #[derive(Serialize, Clone)]
@@ -45,8 +45,9 @@ impl From<Subscription> for Message {
 
 #[derive(TypedBuilder, Clone)]
 pub struct BinanceIngestor {
-    pubsub: PubSubPublisher,
-    persistence: Arc<PersistenceService>,
+    identifier: String,
+    publisher: Arc<dyn Publisher>,
+    persistence: Arc<Persistence>,
     url: Url,
     channels: Vec<String>,
     #[builder(default)]
@@ -80,7 +81,7 @@ impl BinanceIngestor {
                             } else {
                                 MarketSide::Buy
                             };
-                            let trade = Trade::new(
+                            let trade = AggTrade::new(
                                 trade.event_time,
                                 instrument,
                                 trade.agg_trade_id,
@@ -89,7 +90,7 @@ impl BinanceIngestor {
                                 trade.quantity,
                             );
                             let trade = Arc::new(trade);
-                            self.pubsub.publish(trade).await;
+                            self.publisher.publish(trade).await;
                         }
                         BinanceSwapEvent::Tick(tick) => {
                             let tick = Tick::new(
@@ -102,8 +103,9 @@ impl BinanceIngestor {
                                 tick.ask_quantity,
                             );
                             let tick = Arc::new(tick);
-                            self.pubsub.publish(tick).await;
+                            self.publisher.publish(tick).await;
                         }
+                        _ => error!("type not impolemented"),
                     }
                 } else {
                     warn!("Instrument not found for symbol: {}", e.venue_symbol());
@@ -118,8 +120,11 @@ impl BinanceIngestor {
 }
 
 #[async_trait]
-impl RunnableService for BinanceIngestor {
-    async fn start(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
+impl Runnable for BinanceIngestor {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+    async fn start_tasks(&self, shutdown: CancellationToken) -> Result<(), anyhow::Error> {
         info!("Starting binance ingestor...");
 
         // Check for API key and secret

@@ -1,23 +1,15 @@
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
-use async_tungstenite::{
-    stream::Stream,
-    tokio::{connect_async, TokioAdapter},
-    tungstenite::Message,
-    WebSocketStream,
-};
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use kanal::AsyncSender;
 use tokio::{net::TcpStream, select, sync::Semaphore};
-use tokio_rustls::client::TlsStream;
+use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error, info};
 use url::Url;
 
-use crate::IngestorError;
-
-use super::binance::Subscription;
+use crate::{error::IngestorError, Subscription};
 
 /// A WebSocket manager handles multiple WebSocket connections.
 pub struct WebSocketManager {
@@ -68,7 +60,7 @@ impl WebSocketManager {
                     };
                     // let bin_data = msg.into_data();
                     let data = msg.to_string();
-                    if self.deduplicator.check(&data) {
+                    if self.deduplicator.has(&data).await {
                         manager_tx.send(data).await.unwrap();
                     }
                 }
@@ -77,7 +69,7 @@ impl WebSocketManager {
                     if shutdown.is_cancelled() {
                         continue;
                     }
-                    let permit = permit?;
+                    let permit = permit.expect("Aquire went wrong");
                     debug!("Acquired permit: {:?}", permit);
                     let mut handle = Handler::new(&self.url, sender.clone(), subscription.clone(), shutdown.clone()).await?;
                     websocket_tracker.spawn(async move {
@@ -111,7 +103,7 @@ pub struct Handler {
     /// passed to `Connection::new`, which initializes the associated buffers.
     /// `Connection` allows the handler to operate at the "frame" level and keep
     /// the byte level protocol parsing details encapsulated in `Connection`.
-    stream: WebSocketStream<Stream<TokioAdapter<TcpStream>, TokioAdapter<TlsStream<TcpStream>>>>,
+    stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
 
     /// Send messages to the WebSocket Manager
     sender: AsyncSender<Message>,
@@ -127,10 +119,10 @@ impl Handler {
         subscription: Subscription,
         shutdown: CancellationToken,
     ) -> Result<Self, IngestorError> {
-        let (mut stream, _) = connect_async(url.to_string()).await?;
+        let (mut stream, _) = connect_async(url.to_string()).await.unwrap();
         // Send ping
         let ping = Message::Ping(bytes::Bytes::new());
-        stream.send(ping).await?;
+        stream.send(ping).await;
 
         Ok(Self {
             id: 0,
@@ -156,17 +148,17 @@ impl Handler {
     async fn run(&mut self) -> Result<(), IngestorError> {
         let mut sub = self.subscription.clone();
         sub.update_id(self.id);
-        self.stream.send(sub.into()).await?;
+        self.stream.send(sub.into()).await;
 
         loop {
             select! {
                     Some(msg) = self.stream.next() => {
-                        let msg = msg?;
+                        let msg = msg.unwrap();
                         self.handle_message(msg).await?;
                     }
                     _ = self.shutdown.cancelled() => {
                         info!("Shutting down handler...");
-                        self.stream.send(Message::Close(None)).await?;
+                        self.stream.send(Message::Close(None)).await;
                         break;
                     }
             }
@@ -178,11 +170,11 @@ impl Handler {
         match msg {
             Message::Text(text) => {
                 debug!("Hanlder received text: {:?}", text);
-                self.sender.send(Message::Text(text)).await?;
+                self.sender.send(Message::Text(text)).await;
             }
             Message::Ping(ping) => {
                 debug!("Handler received ping: {:?}", ping);
-                self.stream.send(Message::Pong(ping)).await?;
+                self.stream.send(Message::Pong(ping)).await;
             }
             _ => {
                 debug!("Handler received other message: {:?}", msg);

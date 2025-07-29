@@ -67,6 +67,32 @@ async fn main() {
             engine.start().await;
             engine.wait_for_shutdown().await;
         }
+        Commands::Ingestor(_a) => {
+            let time = LiveSystemTime::new();
+
+            let pubsub = PubSub::new(time.clone(), true);
+            let pubsub_service = Service::new(pubsub.clone(), None);
+
+            let config = load::<PersistenceConfig>();
+            let instance = Instance::builder()
+                .id(Uuid::from_str("fcdad148-4ecf-4989-89d9-89c21d50f9b1").unwrap())
+                .name("downloader".to_owned())
+                .instance_type(InstanceType::Utility)
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+            let persistence = Persistence::new(&config, instance, false, false, false);
+            // let persistence_service = Service::new(persistence.to_owned(), None);
+            let persistence_service =
+                Service::new(persistence.to_owned(), Some(pubsub.subscribe(EventFilter::Persistable)));
+
+            let engine = Engine::new();
+            engine.register(pubsub_service, 0, 10).await;
+            engine.register(persistence_service, 0, 10).await;
+            // engine.register(download_service, 0, 10).await;
+            engine.start().await;
+            engine.wait_for_shutdown().await;
+        }
         _ => todo!(),
     }
 }
