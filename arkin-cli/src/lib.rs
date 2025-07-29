@@ -123,6 +123,10 @@ pub struct InsightsArgs {
     #[arg(long, short, value_parser = parse_datetime)]
     pub end: UtcDateTime,
 
+    /// Pipeline warmup ticks
+    #[arg(short, long, default_value_t = 1440)]
+    pub warmup: u16,
+
     /// Save only normalized insights (e.g., scaled features).
     #[arg(long)]
     pub only_normalized: bool,

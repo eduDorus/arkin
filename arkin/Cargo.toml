@@ -15,7 +15,9 @@ arkin-core = { path = "../arkin-core" }
 arkin-audit = { path = "../arkin-audit" }
 arkin-cli = { path = "../arkin-cli" }
 arkin-persistence = { path = "../arkin-persistence" }
+arkin-insights = { path = "../arkin-insights" }
 arkin-ingestor-tardis = { path = "../arkin-ingestor-tardis" }
+arkin-ingestor-binance = { path = "../arkin-ingestor-binance" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }

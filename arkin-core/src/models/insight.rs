@@ -11,7 +11,6 @@ use super::{Instrument, Pipeline};
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct InsightsTick {
     pub event_time: UtcDateTime,
-    pub instruments: Vec<Arc<Instrument>>,
     pub frequency: Duration,
 }
 

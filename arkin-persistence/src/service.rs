@@ -82,12 +82,17 @@ impl Persistence {
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn get_pipeline(&self, id: Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
-        pipeline_store::read_by_id(&self.ctx, &id).await // Assume impl added
+        pipeline_store::read_by_id(&self.ctx, &id).await
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    pub async fn insert_pipeline(&self, pipeline: Arc<Pipeline>) -> Result<(), PersistenceError> {
+        pipeline_store::insert(&self.ctx, pipeline).await
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn get_strategy(&self, id: Uuid) -> Result<Arc<Strategy>, PersistenceError> {
-        strategy_store::read_by_id(&self.ctx, &id).await // Assume impl added
+        strategy_store::read_by_id(&self.ctx, &id).await
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
@@ -202,7 +207,7 @@ impl Persistence {
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn insert_insights_update(&self, tick: Arc<InsightsUpdate>) {
-        if self.mode == InstanceType::Live || self.mode == InstanceType::Utility {
+        if self.mode != InstanceType::Test {
             let insights = if self.only_normalized {
                 tick.insights
                     .iter()
@@ -230,7 +235,7 @@ impl Persistence {
         let insights = {
             let mut lock = self.ctx.buffer.insights.lock().await;
             let insights = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "insights buffer length {}", lock.len());
+            info!(target: "persistence", "insights buffer length {}", lock.len());
             insights
         };
 

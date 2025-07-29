@@ -142,6 +142,10 @@ impl EventType {
         matches!(self, EventType::TickUpdate | EventType::AggTradeUpdate | EventType::BookUpdate)
     }
 
+    pub fn is_insight(&self) -> bool {
+        matches!(self, EventType::InsightsUpdate)
+    }
+
     pub fn is_persistable(&self) -> bool {
         matches!(
             self,

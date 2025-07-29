@@ -12,6 +12,7 @@ use petgraph::{
 };
 use rayon::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
+use time::UtcDateTime;
 use tracing::debug;
 
 use crate::config::PipelineConfig;
@@ -94,10 +95,7 @@ impl PipelineGraph {
     }
 
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
-    pub fn calculate(&self, tick: &InsightsTick) -> Vec<Arc<Insight>> {
-        let instruments = tick.instruments.clone();
-        let timestamp = tick.event_time.clone();
-
+    pub fn calculate(&self, timestamp: UtcDateTime, instruments: &[Arc<Instrument>]) -> Vec<Arc<Insight>> {
         // Step 1: Calculate in-degrees
         let in_degrees = Arc::new(RwLock::new(self.indegrees.clone()));
 
@@ -114,7 +112,6 @@ impl PipelineGraph {
         let pipeline_result = Arc::new(Mutex::new(Vec::new()));
         self.pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
-                let instruments = instruments.clone();
                 let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);
                 let queue_tx = queue_tx.clone();

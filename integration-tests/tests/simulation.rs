@@ -19,11 +19,12 @@ use arkin_persistence::{Persistence, PersistenceConfig};
 async fn test_simulation() {
     info!("Starting simulation test...");
     // Init mock time
-    let time = MockTime::new_from(utc_datetime!(2025-03-01 00:00:00));
+    let time = MockTime::new_from(utc_datetime!(2025-03-01 00:00:00), 60);
 
     // Start and end time
     let start_time = time.now().await;
     let end_time = start_time + Duration::from_secs(14 * 86400);
+    let instruments = vec![test_inst_binance_btc_usdt_perp()];
 
     // Init pubsub
     let pubsub = PubSub::new(time.clone(), true);
@@ -70,7 +71,7 @@ async fn test_simulation() {
             ._time(time.to_owned())
             .start(start_time)
             .end(end_time + Duration::from_secs(3600))
-            .instruments(vec![test_inst_binance_btc_usdt_perp()])
+            .instruments(instruments.clone())
             .persistence(persistence.to_owned())
             .publisher(pubsub.publisher())
             .build(),
@@ -90,6 +91,8 @@ async fn test_simulation() {
         pubsub.publisher(),
         pipeline_info.into(),
         &pipeline_config.insights_service.pipeline,
+        instruments,
+        1440,
     )
     .await;
     let insights_service = Service::new(

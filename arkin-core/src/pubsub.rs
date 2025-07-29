@@ -12,7 +12,6 @@ use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tracing::{debug, error, info, instrument, warn};
 
-use crate::prelude::test_inst_binance_btc_usdt_perp;
 use crate::utils::PeekableReceiver;
 use crate::{Event, EventType, InsightsTick, Publisher, Runnable, ServiceCtx, Subscriber, SystemTime};
 
@@ -20,6 +19,7 @@ pub enum EventFilter {
     All,
     AllWithoutMarket,
     Persistable,
+    Insights,
     Events(Vec<EventType>),
 }
 
@@ -124,6 +124,13 @@ impl PubSub {
             EventFilter::Persistable => {
                 for event_type in EventType::iter() {
                     if event_type.is_persistable() {
+                        self.event_subscriptions.entry(event_type).or_default().push(id);
+                    }
+                }
+            }
+            EventFilter::Insights => {
+                for event_type in EventType::iter() {
+                    if event_type.is_insight() {
                         self.event_subscriptions.entry(event_type).or_default().push(id);
                     }
                 }
@@ -269,7 +276,6 @@ impl PubSub {
                     for ts in intervals {
                         let tick = InsightsTick::builder()
                             .event_time(ts)
-                            .instruments(vec![test_inst_binance_btc_usdt_perp()])
                             .frequency(Duration::from_secs(60))
                             .build();
                         let tick_event = Event::InsightsTick(tick.into());

@@ -38,8 +38,8 @@ impl MockTime {
         })
     }
 
-    pub fn new_from(start_time: UtcDateTime) -> Arc<Self> {
-        let tick_frequency = Duration::from_secs(60);
+    pub fn new_from(start_time: UtcDateTime, tick_freq: u64) -> Arc<Self> {
+        let tick_frequency = Duration::from_secs(tick_freq);
         let next_tick = start_time + tick_frequency;
         Arc::new(Self {
             state: RwLock::new(MockTimeState {
