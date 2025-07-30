@@ -1,4 +1,4 @@
-use std::{env, sync::Arc};
+use std::{collections::HashMap, env, sync::Arc};
 
 use async_trait::async_trait;
 use tokio::sync::RwLock;
@@ -27,6 +27,7 @@ use crate::{
 pub struct BinanceExecution {
     identifier: String,
     time: Arc<dyn SystemTime>,
+    instruments: Vec<Arc<Instrument>>,
     publisher: Arc<dyn Publisher>,
     handle: WebsocketApiHandle,
     api: Arc<RwLock<Option<WebsocketApi>>>,
@@ -35,7 +36,11 @@ pub struct BinanceExecution {
 }
 
 impl BinanceExecution {
-    pub fn new(time: Arc<dyn SystemTime>, publisher: Arc<dyn Publisher>) -> Arc<Self> {
+    pub fn new(
+        time: Arc<dyn SystemTime>,
+        publisher: Arc<dyn Publisher>,
+        instruments: Vec<Arc<Instrument>>,
+    ) -> Arc<Self> {
         // Build Websocket trade api
         let api_key = env::var("API_KEY").expect("API_KEY must be set");
         let api_secret = env::var("API_SECRET").expect("API_SECRET must be set");
@@ -56,6 +61,7 @@ impl BinanceExecution {
         Arc::new(Self {
             identifier: "execution::binance".to_owned(),
             time,
+            instruments,
             publisher,
             handle,
             api: Arc::new(RwLock::new(None)),
@@ -189,32 +195,44 @@ impl Runnable for BinanceExecution {
         let mut streams_guard = self.stream_api.write().await;
         match self.stream_handle.connect().await {
             Ok(api) => {
-                // Setup the stream parameters
-                let params = IndividualSymbolBookTickerStreamsParams::builder()
-                    .symbol("btcusdt".to_string())
-                    .build();
-
-                // Subscribe to the stream
-                let stream = api
-                    .individual_symbol_book_ticker_streams(params)
-                    .await
-                    .expect("Failed to subscribe to the stream");
-
-                // Register callback for incoming messages
-                let publisher = self.publisher.clone();
-                stream.on_message(move |data| {
-                    let tick = Tick::builder()
-                        .instrument(test_inst_binance_btc_usdt_perp())
-                        .tick_id(data.update_id)
-                        .event_time(data.event_time)
-                        .ask_price(data.ask_price)
-                        .ask_quantity(data.ask_quantity)
-                        .bid_price(data.bid_price)
-                        .bid_quantity(data.bid_quantity)
+                let inst_lookup = self
+                    .instruments
+                    .iter()
+                    .map(|i| (i.venue_symbol.clone(), i.clone()))
+                    .collect::<HashMap<_, _>>();
+                for inst in &self.instruments {
+                    // Setup the stream parameters
+                    let params = IndividualSymbolBookTickerStreamsParams::builder()
+                        .symbol(inst.venue_symbol.to_owned())
                         .build();
-                    let publisher = publisher.clone();
-                    tokio::spawn(async move { publisher.publish(Event::TickUpdate(tick.into())).await });
-                });
+
+                    // Subscribe to the stream
+                    let stream = api
+                        .individual_symbol_book_ticker_streams(params)
+                        .await
+                        .expect("Failed to subscribe to the stream");
+
+                    // Register callback for incoming messages
+                    let publisher = self.publisher.clone();
+                    let inst_lookup = inst_lookup.clone();
+                    stream.on_message(move |data| {
+                        if let Some(inst) = inst_lookup.get(&data.instrument) {
+                            let tick = Tick::builder()
+                                .instrument(inst.clone())
+                                .tick_id(data.update_id)
+                                .event_time(data.event_time)
+                                .ask_price(data.ask_price)
+                                .ask_quantity(data.ask_quantity)
+                                .bid_price(data.bid_price)
+                                .bid_quantity(data.bid_quantity)
+                                .build();
+                            let publisher = publisher.clone();
+                            tokio::spawn(async move { publisher.publish(Event::TickUpdate(tick.into())).await });
+                        } else {
+                            error!(target: "execution::binance", "could not find instrument: {}", data.instrument)
+                        }
+                    });
+                }
 
                 // // Setup the stream parameters
                 // let params = AggregateTradeStreamsParams::builder().symbol("btcusdt".to_string()).build();

@@ -36,6 +36,11 @@ pub enum Commands {
     /// Runs pipelines to compute normalized or predictive insights over a time range.
     Insights(InsightsArgs),
 
+    /// Generate and manage scalers from processed data.
+    ///
+    /// Runs scaler initialization to compute normalization of insights.
+    Scaler(ScalerArgs),
+
     /// Configure and run simulation ingestors for backtesting.
     ///
     /// Simulates trading scenarios with configurable accounting and tick frequencies.
@@ -140,6 +145,34 @@ pub struct InsightsArgs {
     pub dry_run: bool,
 }
 
+/// Arguments for the `scaler` subcommand.
+#[derive(Args, Debug)]
+pub struct ScalerArgs {
+    /// Name of the insights pipeline to run (e.g., "volatility_analysis").
+    #[arg(long, short)]
+    pub pipeline: String,
+
+    /// Instruments to generate insights for (comma-separated, e.g., "BTCUSDT,ETHUSDT").
+    #[arg(long, short, value_delimiter = ',')]
+    pub instruments: Vec<String>,
+
+    /// Start datetime in "YYYY-MM-DD HH:MM" UTC format.
+    #[arg(long, short, value_parser = parse_datetime)]
+    pub start: UtcDateTime,
+
+    /// End datetime in "YYYY-MM-DD HH:MM" UTC format (exclusive).
+    #[arg(long, short, value_parser = parse_datetime)]
+    pub end: UtcDateTime,
+
+    /// Number of quantiles
+    #[arg(short, long, default_value_t = 1000)]
+    pub n_quantiles: u16,
+
+    /// Perform a dry run: simulate insights generation without saving.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
 /// Arguments for the `simulation` subcommand.
 #[derive(Args, Debug)]
 pub struct SimulationArgs {
@@ -167,6 +200,10 @@ pub struct SimulationArgs {
     #[arg(long, short, value_parser = parse_datetime)]
     pub end: UtcDateTime,
 
+    /// Pipeline warmup ticks
+    #[arg(short, long, default_value_t = 1440)]
+    pub warmup: u16,
+
     /// Perform a dry run: simulate without executing trades or saving results.
     #[arg(long)]
     pub dry_run: bool,
@@ -180,10 +217,6 @@ pub struct LiveArgs {
     pub instance_name: String,
 
     /// Instruments to process live (comma-separated, e.g., "BTCUSDT,ETHUSDT").
-    #[arg(long, value_delimiter = ',', value_parser)]
+    #[arg(long, short = 'i', value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,
-
-    /// Ingestors to use for live data (comma-separated).
-    #[arg(long, value_delimiter = ',')]
-    pub ingestors: Vec<IngestorType>,
 }

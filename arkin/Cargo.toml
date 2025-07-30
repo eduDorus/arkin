@@ -12,12 +12,21 @@ path = "src/bin/main.rs"
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
+arkin-accounting = { path = "../arkin-accounting" }
 arkin-audit = { path = "../arkin-audit" }
 arkin-cli = { path = "../arkin-cli" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-insights = { path = "../arkin-insights" }
 arkin-ingestor-tardis = { path = "../arkin-ingestor-tardis" }
 arkin-ingestor-binance = { path = "../arkin-ingestor-binance" }
+arkin-strat-crossover = { path = "../arkin-strat-crossover" }
+arkin-strat-agent = { path = "../arkin-strat-agent" }
+arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
+arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
+
+arkin-exec-sim = { path = "../arkin-exec-sim" }
+
+arkin-binance = { path = "../arkin-binance" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
@@ -36,3 +45,4 @@ uuid = { workspace = true }
 statrs = { workspace = true }
 tonic = { workspace = true }
 clap = { workspace = true }
+rust_decimal = { workspace = true }

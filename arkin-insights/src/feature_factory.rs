@@ -164,8 +164,8 @@ impl FeatureFactory {
                             .build(),
                     ),
                     FeatureConfig::Normalize(c) => {
-                        let transformer = QuantileTransformer::load(&c.data_location, DistributionType::Normal);
-                        let scaler = RobustScaler::load(&c.data_location);
+                        let transformer = QuantileTransformer::new(&pipeline, DistributionType::Normal);
+                        let scaler = RobustScaler::new(&pipeline);
 
                         Arc::new(
                             NormalizeFeature::builder()

@@ -204,11 +204,17 @@ impl WideQuoterExecutionStrategy {
 
     async fn tick_update(&self, tick: &Tick) {
         debug!(target: "exec_strat::wide", "received tick update for {}", tick.instrument);
+        // info!(target: "exec_strat::wide", "received tick update for {:?}", tick.instrument);
 
         let mid = (tick.bid_price + tick.ask_price) / dec!(2);
         let exec_orders = self
             .exec_order_book
             .list_active_orders_by_instrument_and_strategy(&tick.instrument, self.strategy_type);
+
+        // let all_orders = self.exec_order_book.list_orders();
+        // for order in all_orders {
+        //     info!(target: "exec_strat::wide", " - {:?}", order.instrument);
+        // }
 
         debug!(target: "exec_strat::wide", "found {} execution orders", exec_orders.len());
         for exec_order in exec_orders {

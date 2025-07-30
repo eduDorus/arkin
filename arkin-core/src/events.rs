@@ -146,6 +146,19 @@ impl EventType {
         matches!(self, EventType::InsightsUpdate)
     }
 
+    pub fn is_persistable_no_market(&self) -> bool {
+        matches!(
+            self,
+            EventType::NewAccount
+                | EventType::NewTransfer
+                | EventType::NewTransferBatch
+                | EventType::ExecutionOrderBookNew
+                | EventType::ExecutionOrderBookUpdate
+                | EventType::VenueOrderBookNew
+                | EventType::VenueOrderBookUpdate
+        )
+    }
+
     pub fn is_persistable(&self) -> bool {
         matches!(
             self,

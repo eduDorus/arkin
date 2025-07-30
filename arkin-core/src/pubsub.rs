@@ -19,6 +19,7 @@ pub enum EventFilter {
     All,
     AllWithoutMarket,
     Persistable,
+    PersistableNoMarket,
     Insights,
     Events(Vec<EventType>),
 }
@@ -128,6 +129,13 @@ impl PubSub {
                     }
                 }
             }
+            EventFilter::PersistableNoMarket => {
+                for event_type in EventType::iter() {
+                    if event_type.is_persistable_no_market() {
+                        self.event_subscriptions.entry(event_type).or_default().push(id);
+                    }
+                }
+            }
             EventFilter::Insights => {
                 for event_type in EventType::iter() {
                     if event_type.is_insight() {
@@ -176,8 +184,8 @@ impl PubSub {
         let mut to_remove = Vec::new();
         for id in subscriber_ids {
             if let Some(sender) = self.subscribers.get(&id) {
-                match sender.send(event.clone()).await {
-                    Ok(()) => ack_counter += 1,
+                match sender.try_send(event.clone()) {
+                    Ok(_) => ack_counter += 1,
                     Err(_) => {
                         info!(target: "pubsub", "subscriber closed connection, will be removed");
                         to_remove.push(id);
@@ -208,9 +216,12 @@ impl PubSub {
             if timeout(Duration::from_secs(1), async {
                 while ack_received < ack_counter {
                     debug!(target: "pubsub", "{} waiting for ack ({}/{})", event_type, ack_received, ack_counter);
-                    if self.subscribers_acknowledge_channel.1.recv().await.is_ok() {
+                    if let Ok(_) = self.subscribers_acknowledge_channel.1.recv().await {
                         ack_received += 1;
                         debug!(target: "pubsub", "{} received ack ({}/{})", event_type, ack_received, ack_counter);
+                    } else {
+                        warn!(target: "pubsub", "ack channel closed early, missing {}/{} acks for {}, moving on", ack_counter - ack_received, ack_counter, event);
+                        break;
                     }
                 }
             })
@@ -226,19 +237,23 @@ impl PubSub {
     async fn event_collector_task(&self, ctx: Arc<ServiceCtx>) {
         info!(target: "pubsub", "starting event collector task");
         while ctx.is_running().await {
-            // let mut receivers = self.publishers.write().await;
+            let mut collected_any = false;
             for mut receiver in self.publishers.iter_mut() {
                 // Peek if there is a element and if it is within 24h
                 if let Some(peeked) = receiver.value_mut().peek() {
                     debug!(target: "pubsub", "found event");
                     // TODO: This is not optimal
                     if peeked.timestamp() > self.time.now().await + Duration::from_secs(86400) {
+                        debug!(target: "pubsub", "timestamp to big, we continue");
                         continue;
                     }
                 } else {
+                    debug!(target: "pubsub", "No events we continue");
                     continue;
                 }
                 if let Some(event) = receiver.take() {
+                    collected_any = true;
+
                     let mut lock = self.event_queue.lock().await;
                     lock.push(Reverse(event));
                     if lock.len() > 10000000 {
@@ -247,6 +262,10 @@ impl PubSub {
                         tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
+            }
+            if !collected_any {
+                debug!(target: "pubsub", "No events collected, waiting...");
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
         }
         info!(target: "pubsub", "event collector task has stopped");
@@ -260,9 +279,9 @@ impl PubSub {
             // info!(target: "pubsub", "event queue length: {}", length);
             if let Some(Reverse(event)) = self.event_queue.lock().await.pop() {
                 //  I think we don't need this anymore
-                // if !event.is_market_data() {
-                //     info!(target: "pubsub", "processing event: {}", event);
-                // }
+                if !event.event_type().is_market_data() {
+                    info!(target: "pubsub", "processing event: {}", event);
+                }
 
                 // Advance time in simulation
                 if !self.time.is_live().await {
@@ -284,6 +303,7 @@ impl PubSub {
                 }
                 self.broadcast_event(event).await;
             } else {
+                debug!(target: "pubsub", "No events processed, waiting...");
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }
         }

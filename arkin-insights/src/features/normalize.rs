@@ -1,7 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use statrs::distribution::{ContinuousCDF, Normal};
 use strum::Display;
 use time::UtcDateTime;
@@ -13,49 +16,32 @@ use arkin_core::prelude::*;
 
 use crate::{math::interp, state::InsightsState, Feature};
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct QuantileData {
-    levels: Vec<f64>,
-    data: Vec<QuantileEntryData>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuantileEntryData {
-    instrument_id: Uuid,
-    feature_id: String,
-    quantiles: Vec<f64>,
-    median: f64,
-    iqr: f64,
-}
-
 #[derive(Debug, Clone)]
 pub struct RobustScaler {
     feature_data: HashMap<(Uuid, FeatureId), (f64, f64)>,
 }
 
 impl RobustScaler {
-    pub fn load(file_path: &str) -> Self {
-        let file = std::fs::File::open(file_path).expect("Failed to open file");
-        let scaler_data: QuantileData = serde_json::from_reader(file).expect("Failed to parse JSON");
-        RobustScaler::new(scaler_data)
+    pub fn new(pipeline: &Arc<Pipeline>) -> Self {
+        let mut feature_data = HashMap::new();
+
+        let quantiles = Self::load(pipeline);
+        for q in quantiles.data.into_iter() {
+            feature_data.insert((q.instrument_id, q.feature_id.into()), (q.median, q.iqr));
+        }
+        RobustScaler { feature_data }
+    }
+
+    fn load(pipeline: &Arc<Pipeline>) -> Quantiles {
+        let pipeline_name = pipeline.name.clone();
+        let file = std::fs::File::open(format!("./scalers/{pipeline_name}.json")).expect("Failed to open file");
+        let quantiles: Quantiles = serde_json::from_reader(file).expect("Failed to parse JSON");
+        quantiles
     }
 
     #[allow(dead_code)]
-    pub fn features(&self) -> Vec<FeatureId> {
+    pub fn features(&self) -> HashSet<FeatureId> {
         self.feature_data.keys().map(|(_, f)| f.clone()).collect()
-    }
-
-    pub fn new(scaler_data: QuantileData) -> Self {
-        let feature_data = scaler_data
-            .data
-            .into_iter()
-            .map(|q| {
-                let key = (q.instrument_id, q.feature_id.into());
-                let value = (q.median, q.iqr);
-                (key, value)
-            })
-            .collect();
-        RobustScaler { feature_data }
     }
 
     pub fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
@@ -96,22 +82,11 @@ pub struct QuantileTransformer {
 }
 
 impl QuantileTransformer {
-    /// Load a transformer from a JSON file
-    pub fn load(file_path: &str, output_distribution: DistributionType) -> Self {
-        let file = std::fs::File::open(file_path).expect("Failed to open file");
-        let scaler_data: QuantileData = serde_json::from_reader(file).expect("Failed to parse JSON");
-        QuantileTransformer::new(scaler_data, output_distribution)
-    }
-
-    #[allow(dead_code)]
-    pub fn features(&self) -> Vec<FeatureId> {
-        self.feature_quantiles.keys().map(|(_, f)| f.clone()).collect()
-    }
-
     /// Create a new transformer with a specified number of quantiles and output distribution
-    fn new(scaler_data: QuantileData, output_distribution: DistributionType) -> Self {
-        let references = scaler_data.levels;
-        let feature_quantiles = scaler_data
+    pub fn new(pipeline: &Arc<Pipeline>, output_distribution: DistributionType) -> Self {
+        let quantiles = Self::load(&pipeline);
+        let references = quantiles.levels;
+        let feature_quantiles = quantiles
             .data
             .into_iter()
             .map(|q| ((q.instrument_id, q.feature_id.into()), q.quantiles))
@@ -121,6 +96,18 @@ impl QuantileTransformer {
             references,
             output_distribution: output_distribution,
         }
+    }
+
+    fn load(pipeline: &Arc<Pipeline>) -> Quantiles {
+        let pipeline_name = pipeline.name.clone();
+        let file = std::fs::File::open(format!("./scalers/{pipeline_name}.json")).expect("Failed to open file");
+        let quantile_data: Quantiles = serde_json::from_reader(file).expect("Failed to parse JSON");
+        quantile_data
+    }
+
+    #[allow(dead_code)]
+    pub fn features(&self) -> HashSet<FeatureId> {
+        self.feature_quantiles.keys().map(|(_, f)| f.clone()).collect()
     }
 
     /// Transform a value x for a given feature_id

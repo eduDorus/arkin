@@ -68,17 +68,26 @@ impl Engine {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
         let mut sigint = signal(SignalKind::interrupt()).unwrap();
 
+        // Wait for first shutdown signal
         tokio::select! {
-          _ = sigterm.recv() => {
-            info!("Received terminate signal, shutting down...");
-            self.stop().await;
-          },
-          _ = sigint.recv() => {
-            info!("Received interrupt signal, shutting down...");
-            self.stop().await;
-          },
+            _ = sigterm.recv() => {
+                info!("Received terminate signal, starting graceful shutdown...");
+            },
+            _ = sigint.recv() => {
+                info!("Received interrupt signal, starting graceful shutdown...");
+            },
         }
-        info!("Successfully shutdown!");
+
+        // Now perform shutdown, but allow interrupt for force
+        tokio::select! {
+            _ = self.stop() => {
+                info!("Graceful shutdown completed successfully!");
+            },
+            _ = sigint.recv() => {
+                info!("Received second interrupt signal, forcing exit...");
+                std::process::exit(130);
+            },
+        }
     }
 
     #[instrument(parent = None, skip_all)]

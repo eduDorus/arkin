@@ -58,7 +58,7 @@ async fn test_binance_wide_quoting() {
     // Init binance ingestor
 
     // Executor
-    let execution = BinanceExecution::new(time.clone(), pubsub.publisher());
+    let execution = BinanceExecution::new(time.clone(), pubsub.publisher(), vec![test_inst_binance_btc_usdt_perp()]);
     let execution_service = Service::new(
         execution,
         Some(pubsub.subscribe(EventFilter::Events(vec![

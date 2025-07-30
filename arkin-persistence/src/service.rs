@@ -7,9 +7,9 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
 use sqlx::ConnectOptions;
 use time::UtcDateTime;
 use tracing::{debug, error, info, instrument, warn};
+use uuid::Uuid;
 
 use arkin_core::prelude::*;
-use uuid::Uuid;
 
 use crate::context::PersistenceContext;
 use crate::stores::*;
@@ -86,6 +86,11 @@ impl Persistence {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    pub async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
+        pipeline_store::read_by_name(&self.ctx, name).await
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn insert_pipeline(&self, pipeline: Arc<Pipeline>) -> Result<(), PersistenceError> {
         pipeline_store::insert(&self.ctx, pipeline).await
     }
@@ -106,6 +111,19 @@ impl Persistence {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    pub async fn list_instruments_by_venue_symbol(
+        &self,
+        symbols: &[String],
+    ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        let mut instruments = Vec::with_capacity(symbols.len());
+        for symbol in symbols {
+            let inst = instrument_store::read_by_venue_symbol(&self.ctx, symbol).await?;
+            instruments.push(inst);
+        }
+        Ok(instruments)
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn get_venue(&self, id: Uuid) -> Result<Arc<Venue>, PersistenceError> {
         venue_store::read_by_id(&self.ctx, &id).await
     }
@@ -113,6 +131,18 @@ impl Persistence {
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn get_asset(&self, id: Uuid) -> Result<Arc<Asset>, PersistenceError> {
         asset_store::read_by_id(&self.ctx, &id).await
+    }
+
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    pub async fn get_scaler_data(
+        &self,
+        pipeline: &Arc<Pipeline>,
+        instrument: &Arc<Instrument>,
+        from: UtcDateTime,
+        till: UtcDateTime,
+        levels: &[f64],
+    ) -> Result<Vec<QuantileData>, PersistenceError> {
+        scaler_store::get_iqr(&self.ctx, &pipeline, &instrument, from, till, levels).await
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
@@ -231,11 +261,11 @@ impl Persistence {
     // TODO: WE NEED TO FLUSH ALSO TRADES AND TICKS
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn flush_all(&self, ctx: Arc<ServiceCtx>) {
-        info!(target: "persistence", "flushing...");
+        debug!(target: "persistence", "flushing...");
         let insights = {
             let mut lock = self.ctx.buffer.insights.lock().await;
             let insights = std::mem::take(&mut *lock);
-            info!(target: "persistence", "insights buffer length {}", lock.len());
+            debug!(target: "persistence", "insights buffer length {}", lock.len());
             insights
         };
 
@@ -263,7 +293,7 @@ impl Persistence {
         let trades = {
             let mut lock = self.ctx.buffer.trades.lock().await;
             let trades = std::mem::take(&mut *lock);
-            info!(target: "persistence", "trade buffer length {}", lock.len());
+            debug!(target: "persistence", "trade buffer length {}", lock.len());
             trades
         };
 
@@ -291,7 +321,7 @@ impl Persistence {
         let ticks = {
             let mut lock = self.ctx.buffer.ticks.lock().await;
             let ticks = std::mem::take(&mut *lock);
-            info!(target: "persistence", "tick buffer length {}", lock.len());
+            debug!(target: "persistence", "tick buffer length {}", lock.len());
             ticks
         };
 
