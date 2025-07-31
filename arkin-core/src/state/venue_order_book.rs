@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use time::UtcDateTime;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -147,7 +147,7 @@ impl VenueOrderBook {
         self.autoclean_order(id);
     }
 
-    pub async fn finalize_terminate_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
+    pub async fn check_finalize_order(&self, id: VenueOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             let finalized = order.finalize_terminate(event_time);
             if finalized {
@@ -158,7 +158,7 @@ impl VenueOrderBook {
                 self.publisher.publish(Event::VenueOrderBookUpdate(update.into())).await;
             }
         } else {
-            error!(target: "venue_order_book", "could not find order {} in venue order book", id);
+            warn!(target: "venue_order_book", "could not find order {} in venue order book", id);
         }
         self.autoclean_order(id);
     }

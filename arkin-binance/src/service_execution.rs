@@ -15,10 +15,13 @@ use crate::{
     },
     derivatives_trading_usds_futures::{
         websocket_api::{
-            CancelOrderParams, NewOrderParams, NewOrderSideEnum, NewOrderTimeInForceEnum, StartUserDataStreamParams,
-            SymbolOrderBookTickerParams, WebsocketApi, WebsocketApiHandle,
+            CancelOrderParams, NewOrderParams, NewOrderPriceMatchEnum, NewOrderSideEnum, NewOrderTimeInForceEnum,
+            StartUserDataStreamParams, SymbolOrderBookTickerParams, WebsocketApi, WebsocketApiHandle,
         },
-        websocket_streams::{IndividualSymbolBookTickerStreamsParams, WebsocketStreams, WebsocketStreamsHandle},
+        websocket_streams::{
+            AggregateTradeStreamsParams, IndividualSymbolBookTickerStreamsParams, WebsocketStreams,
+            WebsocketStreamsHandle,
+        },
         DerivativesTradingUsdsFuturesWsApi, DerivativesTradingUsdsFuturesWsStreams,
     },
 };
@@ -86,9 +89,43 @@ impl BinanceExecution {
             MarketSide::Buy => NewOrderSideEnum::Buy,
             MarketSide::Sell => NewOrderSideEnum::Sell,
         };
-        let order_type = match order.order_type {
-            VenueOrderType::Limit => "LIMIT",
-            VenueOrderType::Market => "MARKET",
+        let params = match order.order_type {
+            VenueOrderType::Limit => match order.time_in_force {
+                VenueOrderTimeInForce::Gtc => NewOrderParams::builder()
+                    .symbol(order.instrument.venue_symbol.clone())
+                    .new_client_order_id(Some(order.id.to_string()))
+                    .side(side)
+                    .price(Some(order.price))
+                    .quantity(Some(order.quantity))
+                    .r#type("LIMIT".to_string())
+                    .time_in_force(Some(NewOrderTimeInForceEnum::Gtc))
+                    .build(),
+                VenueOrderTimeInForce::Gtx => NewOrderParams::builder()
+                    .symbol(order.instrument.venue_symbol.clone())
+                    .new_client_order_id(Some(order.id.to_string()))
+                    .side(side)
+                    .quantity(Some(order.quantity))
+                    .r#type("LIMIT".to_string())
+                    .time_in_force(Some(NewOrderTimeInForceEnum::Gtx))
+                    .price_match(Some(NewOrderPriceMatchEnum::Queue))
+                    .build(),
+                _ => {
+                    error!(target: "execution::binance", "unsupported time in force type {}", order.time_in_force);
+                    let mut order_clone = order.clone();
+                    order_clone.reject(self.time.now().await);
+                    self.publisher.publish(Event::VenueOrderRejected(order_clone.into())).await;
+                    return;
+                }
+            },
+            VenueOrderType::Market => NewOrderParams::builder()
+                .symbol(order.instrument.venue_symbol.clone())
+                .new_client_order_id(Some(order.id.to_string()))
+                .side(side)
+                .price(Some(order.price))
+                .quantity(Some(order.quantity))
+                .r#type("MARKET".to_string())
+                .time_in_force(Some(NewOrderTimeInForceEnum::Gtx))
+                .build(),
             _ => {
                 error!(target: "execution::binance", "unsupported order type {}", order.order_type);
                 let mut order_clone = order.clone();
@@ -97,15 +134,6 @@ impl BinanceExecution {
                 return;
             }
         };
-        let params = NewOrderParams::builder()
-            .symbol(order.instrument.venue_symbol.clone())
-            .new_client_order_id(Some(order.id.to_string()))
-            .side(side)
-            .price(Some(order.price))
-            .quantity(Some(order.quantity))
-            .r#type(order_type.to_string())
-            .time_in_force(Some(NewOrderTimeInForceEnum::Gtc))
-            .build();
 
         match api.new_order(params).await {
             Ok(res) => {
@@ -214,9 +242,9 @@ impl Runnable for BinanceExecution {
 
                     // Register callback for incoming messages
                     let publisher = self.publisher.clone();
-                    let inst_lookup = inst_lookup.clone();
+                    let inst_lookup_ticks = inst_lookup.clone();
                     stream.on_message(move |data| {
-                        if let Some(inst) = inst_lookup.get(&data.instrument) {
+                        if let Some(inst) = inst_lookup_ticks.get(&data.instrument) {
                             let tick = Tick::builder()
                                 .instrument(inst.clone())
                                 .tick_id(data.update_id)
@@ -229,24 +257,46 @@ impl Runnable for BinanceExecution {
                             let publisher = publisher.clone();
                             tokio::spawn(async move { publisher.publish(Event::TickUpdate(tick.into())).await });
                         } else {
+                            warn!(target: "execution::binance", "could not find instrument: {}", data.instrument)
+                        }
+                    });
+
+                    // Setup the stream parameters
+                    let params = AggregateTradeStreamsParams::builder()
+                        .symbol(inst.venue_symbol.to_owned())
+                        .build();
+
+                    // Subscribe to the stream
+                    let stream = api
+                        .aggregate_trade_streams(params)
+                        .await
+                        .expect("Failed to subscribe to the stream");
+
+                    // Register callback for incoming messages
+                    let publisher = self.publisher.clone();
+                    let inst_lookup_agg_trades = inst_lookup.clone();
+                    stream.on_message(move |data| {
+                        if let Some(inst) = inst_lookup_agg_trades.get(&data.instrument) {
+                            let side = if data.maker {
+                                MarketSide::Sell
+                            } else {
+                                MarketSide::Buy
+                            };
+                            let trade = AggTrade::builder()
+                                .instrument(inst.clone())
+                                .trade_id(data.agg_trade_id)
+                                .event_time(data.event_time)
+                                .side(side)
+                                .price(data.price)
+                                .quantity(data.quantity)
+                                .build();
+                            let publisher = publisher.clone();
+                            tokio::spawn(async move { publisher.publish(Event::AggTradeUpdate(trade.into())).await });
+                        } else {
                             error!(target: "execution::binance", "could not find instrument: {}", data.instrument)
                         }
                     });
                 }
-
-                // // Setup the stream parameters
-                // let params = AggregateTradeStreamsParams::builder().symbol("btcusdt".to_string()).build();
-
-                // // Subscribe to the stream
-                // let stream = api
-                //     .aggregate_trade_streams(params)
-                //     .await
-                //     .expect("Failed to subscribe to the stream");
-
-                // // Register callback for incoming messages
-                // stream.on_message(|data| {
-                //     info!("AGG TRADE: {:?}", data);
-                // });
 
                 *streams_guard = Some(api);
             }

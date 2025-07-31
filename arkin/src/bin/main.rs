@@ -460,7 +460,7 @@ async fn main() {
                 pubsub.publisher(),
                 execution_order_book,
                 venue_order_book,
-                dec!(0.002),
+                dec!(0.005),
                 dec!(0.0005),
             );
             let exec_strat_service = Service::new(
@@ -506,7 +506,7 @@ async fn main() {
                 info!("Sending orders for {}", inst);
 
                 let lot_size = if inst.venue_symbol != "BTCUSDT" {
-                    inst.lot_size * dec!(10)
+                    inst.lot_size * dec!(20)
                 } else {
                     inst.lot_size
                 };

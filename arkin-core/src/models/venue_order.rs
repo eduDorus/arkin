@@ -260,6 +260,7 @@ impl VenueOrder {
             (&self.status, new_status),
             (VenueOrderStatus::New, VenueOrderStatus::Inflight)
                 | (VenueOrderStatus::New, VenueOrderStatus::Placed)
+                | (VenueOrderStatus::New, VenueOrderStatus::Rejected)
                 | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
                 | (VenueOrderStatus::New, VenueOrderStatus::PartiallyFilled)
                 | (VenueOrderStatus::Inflight, VenueOrderStatus::Placed)

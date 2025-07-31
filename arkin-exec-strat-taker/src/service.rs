@@ -40,7 +40,7 @@ impl TakerExecutionStrategy {
     #[instrument(skip_all)]
     async fn check_finalize_exec(&self, exec_id: Uuid) {
         let now = self.time.now().await;
-        self.exec_order_book.finalize_terminate_order(exec_id, now).await;
+        self.exec_order_book.check_finalize_order(exec_id, now).await;
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]

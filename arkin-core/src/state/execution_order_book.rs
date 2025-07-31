@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use time::UtcDateTime;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -134,7 +134,7 @@ impl ExecutionOrderBook {
         self.autoclean_order(id);
     }
 
-    pub async fn finalize_terminate_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
+    pub async fn check_finalize_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
         info!(target: "exec_order_book", "check for terminating order {} from exec order book", id);
         if let Some(mut order) = self.queue.get_mut(&id) {
             let finalized = order.finalize_terminate(event_time);
@@ -146,7 +146,7 @@ impl ExecutionOrderBook {
                 self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
             }
         } else {
-            error!(target: "exec_order_book", "could not find order {} in exec order book", id);
+            warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
         self.autoclean_order(id);
     }

@@ -51,7 +51,7 @@ impl WideQuoterExecutionStrategy {
     #[instrument(skip_all)]
     async fn check_finalize_exec(&self, exec_id: Uuid) {
         let now = self.time.now().await;
-        self.exec_order_book.finalize_terminate_order(exec_id, now).await;
+        self.exec_order_book.check_finalize_order(exec_id, now).await;
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
@@ -183,7 +183,7 @@ impl WideQuoterExecutionStrategy {
         if let Some(id) = order.execution_order_id {
             let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
             if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.finalize_terminate_order(order.id, order.updated).await;
+                self.venue_order_book.check_finalize_order(order.id, order.updated).await;
             }
             self.check_finalize_exec(id).await;
         }
@@ -306,12 +306,16 @@ impl Runnable for WideQuoterExecutionStrategy {
             info!(target: "exec_strat::wide", "--- EXEC ORDERS ---");
             for order in exec_orders {
                 info!(target: "exec_strat::wide", " - {}", order);
+                self.exec_order_book.check_finalize_order(order.id, self.time.now().await).await;
             }
 
             info!(target: "exec_strat::wide", "--- VENUE ORDERS ---");
             let venue_orders = self.venue_order_book.list_orders();
             for order in venue_orders {
                 info!(target: "exec_strat::wide", " - {}", order);
+                // self.venue_order_book
+                //     .check_finalize_order(order.id, self.time.now().await)
+                //     .await;
             }
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
