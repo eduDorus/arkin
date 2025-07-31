@@ -4,6 +4,10 @@ mod http;
 mod mapping;
 mod service;
 
-// pub use http::TardisHttpClient;
 pub use config::*;
 pub use service::*;
+
+pub mod prelude {
+    pub use crate::config::*;
+    pub use crate::service::*;
+}

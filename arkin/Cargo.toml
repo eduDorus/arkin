@@ -17,7 +17,7 @@ arkin-audit = { path = "../arkin-audit" }
 arkin-cli = { path = "../arkin-cli" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-insights = { path = "../arkin-insights" }
-arkin-ingestor-tardis = { path = "../arkin-ingestor-tardis" }
+arkin-ingestor-historical = { path = "../arkin-ingestor-historical" }
 arkin-ingestor-binance = { path = "../arkin-ingestor-binance" }
 arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 arkin-strat-agent = { path = "../arkin-strat-agent" }

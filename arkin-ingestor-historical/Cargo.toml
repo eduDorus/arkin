@@ -1,5 +1,5 @@
 [package]
-name = "arkin-ingestor-tardis"
+name = "arkin-ingestor-historical"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true

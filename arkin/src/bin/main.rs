@@ -7,7 +7,7 @@ use arkin_exec_sim::SimulationExecutor;
 use arkin_exec_strat_taker::TakerExecutionStrategy;
 use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
 use arkin_ingestor_binance::SimBinanceIngestor;
-use arkin_ingestor_tardis::{TardisConfig, TardisIngestor};
+use arkin_ingestor_historical::prelude::*;
 use arkin_insights::{prelude::InsightsConfig, Insights};
 use arkin_persistence::{Persistence, PersistenceConfig};
 use arkin_strat_crossover::CrossoverStrategy;
