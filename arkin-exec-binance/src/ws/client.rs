@@ -1,18 +1,22 @@
-use async_tungstenite::{
-    tokio::{connect_async, ConnectStream},
-    tungstenite::{handshake::client::Response, protocol::Message, Error},
-    WebSocketStream,
+use futures::SinkExt;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpStream,
 };
-use futures::{AsyncRead, AsyncWrite};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{handshake::client::Response, Error, Message},
+    MaybeTlsStream, WebSocketStream,
+};
 use tracing::{debug, info};
 
-use super::Stream;
+use crate::Stream;
 
 /// Binance websocket client using Tungstenite.
 pub struct BinanceWebSocketClient;
 
 impl BinanceWebSocketClient {
-    pub async fn connect(url: &str) -> Result<(WebSocketState<ConnectStream>, Response), Error> {
+    pub async fn connect(url: &str) -> Result<(WebSocketState<MaybeTlsStream<TcpStream>>, Response), Error> {
         let (socket, response) = connect_async(url).await?;
 
         info!("Connected to {}", url);
@@ -25,11 +29,13 @@ impl BinanceWebSocketClient {
         Ok((WebSocketState::new(socket), response))
     }
 
-    pub async fn connect_default() -> Result<(WebSocketState<ConnectStream>, Response), Error> {
+    pub async fn connect_default() -> Result<(WebSocketState<MaybeTlsStream<TcpStream>>, Response), Error> {
         BinanceWebSocketClient::connect("wss://fstream.binance.com/ws").await
     }
 
-    pub async fn connect_with_listen_key(listen_key: &str) -> Result<(WebSocketState<ConnectStream>, Response), Error> {
+    pub async fn connect_with_listen_key(
+        listen_key: &str,
+    ) -> Result<(WebSocketState<MaybeTlsStream<TcpStream>>, Response), Error> {
         let url = format!("wss://fstream.binance.com/ws/{}", listen_key);
         BinanceWebSocketClient::connect(&url).await
     }
@@ -45,7 +51,14 @@ impl<T: AsyncRead + AsyncWrite + Unpin> WebSocketState<T> {
         Self { socket, id: 0 }
     }
 
+    fn get_id(&mut self) -> u64 {
+        self.id += 1;
+        self.id
+    }
+
     async fn send(&mut self, method: &str, params: impl IntoIterator<Item = &str>) -> u64 {
+        let id = self.get_id();
+
         let mut params_str: String = params
             .into_iter()
             .map(|param| format!("\"{}\"", param))
@@ -55,10 +68,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin> WebSocketState<T> {
         if !params_str.is_empty() {
             params_str = format!("\"params\": [{params}],", params = params_str)
         };
-
-        let id = self.id.clone();
-        self.id += 1;
-
         let s = format!(
             "{{\"method\":\"{method}\",{params}\"id\":{id}}}",
             method = method,

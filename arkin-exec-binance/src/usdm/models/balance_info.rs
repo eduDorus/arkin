@@ -1,4 +1,4 @@
-use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 use serde::Deserialize;
 use time::UtcDateTime;
 
@@ -22,7 +22,6 @@ pub struct BalanceDetails {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal_macros::dec;
     use serde_json::from_str;
 
     #[test]

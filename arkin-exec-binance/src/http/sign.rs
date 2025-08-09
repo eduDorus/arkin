@@ -24,7 +24,7 @@ fn sign_hmac(payload: &str, key: &str) -> Result<String, Box<dyn Error>> {
 }
 
 fn sign_ed25519(payload: &str, key: &str) -> Result<String, Box<dyn Error>> {
-    let private_key = SigningKey::from_pkcs8_pem(key)?;
+    let private_key = SigningKey::from_pkcs8_der(key.as_bytes())?;
 
     let signature: Ed25519Signature = private_key.sign(payload.as_bytes());
     Ok(general_purpose::STANDARD.encode(signature.to_bytes()))

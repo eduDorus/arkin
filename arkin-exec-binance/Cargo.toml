@@ -1,5 +1,5 @@
 [package]
-name = "arkin-binance"
+name = "arkin-exec-binance"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true
@@ -9,16 +9,11 @@ license.workspace = true
 arkin-core = { path = "../arkin-core" }
 
 tokio = { workspace = true }
-async-tungstenite = { workspace = true }
+tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
 time = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true }
-hmac = { workspace = true }
-sha2 = { workspace = true }
-signature = { workspace = true }
-base64 = { workspace = true }
-ed25519-dalek = { workspace = true }
 thiserror = { workspace = true }
 url = { workspace = true }
 rust_decimal = { workspace = true }
@@ -26,6 +21,16 @@ strum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 typed-builder = { workspace = true }
+
+hmac = "0.12"
+sha2 = { version = "0.10", default-features = false, features = [ "oid" ] }
+signature = "2.2"
+base64 = "0.22"
+ed25519-dalek = { version = "2.2", features = [ "pkcs8" ] }
+http = "1"
+flate2 = "1.1"
+hex = "0.4"
+
 
 [dev-dependencies]
 test-log = { workspace = true }

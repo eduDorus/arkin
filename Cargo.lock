@@ -268,6 +268,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkin-exec-binance"
+version = "0.1.0"
+dependencies = [
+ "arkin-core",
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "flate2",
+ "futures",
+ "hex",
+ "hmac",
+ "http",
+ "reqwest",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sha2",
+ "signature",
+ "strum",
+ "test-log",
+ "thiserror 2.0.12",
+ "time",
+ "tokio",
+ "tokio-tungstenite",
+ "tracing",
+ "typed-builder",
+ "url",
+]
+
+[[package]]
 name = "arkin-exec-sim"
 version = "0.1.0"
 dependencies = [
