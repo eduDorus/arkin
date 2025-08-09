@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 
 use async_trait::async_trait;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, warn};
 
 use arkin_core::prelude::*;
 
@@ -14,8 +14,6 @@ use crate::pipeline::PipelineGraph;
 use crate::state::InsightsState;
 
 pub struct Insights {
-    identifier: String,
-    publisher: Arc<dyn Publisher>,
     instruments: Vec<Arc<Instrument>>,
     warmup_steps: AtomicU16,
     graph: PipelineGraph,
@@ -24,7 +22,6 @@ pub struct Insights {
 
 impl Insights {
     pub async fn new(
-        publisher: Arc<dyn Publisher>,
         pipeline: Arc<Pipeline>,
         pipeline_config: &PipelineConfig,
         instruments: Vec<Arc<Instrument>>,
@@ -33,8 +30,6 @@ impl Insights {
         let state = Arc::new(InsightsState::builder().build());
         let graph = PipelineGraph::from_config(pipeline, state.clone(), pipeline_config);
         let service = Self {
-            identifier: "insights".to_owned(),
-            publisher,
             instruments,
             warmup_steps: AtomicU16::new(warmup),
             graph,
@@ -54,8 +49,7 @@ impl Insights {
         self.state.insert_batch(insights);
     }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn process_tick(&self, tick: &InsightsTick) {
+    pub async fn process_tick(&self, ctx: Arc<CoreCtx>, tick: &InsightsTick) {
         // TODO: We might want to span this calculation with spawn blocking
         let insights = self.graph.calculate(tick.event_time, &self.instruments);
         debug!(target: "insights", "calculated {} insights", insights.len());
@@ -69,7 +63,7 @@ impl Insights {
             let number = self.warmup_steps.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             info!(target: "insights", "warmup tick {} not published",number);
         } else {
-            self.publisher.publish(Event::InsightsUpdate(insights_tick.into())).await;
+            ctx.publish(Event::InsightsUpdate(insights_tick.into())).await;
             debug!(target: "insights", "published inside update");
         }
     }
@@ -77,16 +71,11 @@ impl Insights {
 
 #[async_trait]
 impl Runnable for Insights {
-    fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn handle_event(&self, event: Event) {
+    async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
         match &event {
             Event::InsightsTick(tick) => {
                 debug!(target: "insights", "received insights tick" );
-                self.process_tick(tick).await;
+                self.process_tick(ctx, tick).await;
             }
             Event::AggTradeUpdate(trade) => {
                 debug!(target: "insights", "received trade update" );

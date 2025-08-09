@@ -7,11 +7,16 @@ use arkin_core::Venue;
 use crate::{context::PersistenceContext, repos::pg::venues_repo, PersistenceError};
 
 async fn update_venue_cache(ctx: &PersistenceContext, venue: Arc<Venue>) {
-    ctx.cache.venue_id.insert(venue.id, venue).await;
+    ctx.cache.venue_id.insert(venue.id, venue.clone()).await;
+    ctx.cache.venue_name.insert(venue.name.clone(), venue).await;
 }
 
-async fn read_venue_cache(ctx: &PersistenceContext, id: &Uuid) -> Option<Arc<Venue>> {
+async fn read_venue_id_cache(ctx: &PersistenceContext, id: &Uuid) -> Option<Arc<Venue>> {
     ctx.cache.venue_id.get(id).await
+}
+
+async fn read_venue_name_cache(ctx: &PersistenceContext, name: &str) -> Option<Arc<Venue>> {
+    ctx.cache.venue_name.get(name).await
 }
 
 pub async fn insert(ctx: &PersistenceContext, venue: Arc<Venue>) -> Result<(), PersistenceError> {
@@ -21,10 +26,22 @@ pub async fn insert(ctx: &PersistenceContext, venue: Arc<Venue>) -> Result<(), P
 }
 
 pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {
-    match read_venue_cache(ctx, id).await {
+    match read_venue_id_cache(ctx, id).await {
         Some(venue) => return Ok(venue),
         None => {
             let venue = venues_repo::read_by_id(ctx, id).await?;
+            let venue: Arc<Venue> = Arc::new(venue.into());
+            update_venue_cache(ctx, venue.clone()).await;
+            Ok(venue)
+        }
+    }
+}
+
+pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Arc<Venue>, PersistenceError> {
+    match read_venue_name_cache(ctx, name).await {
+        Some(venue) => return Ok(venue),
+        None => {
+            let venue = venues_repo::read_by_name(ctx, name).await?;
             let venue: Arc<Venue> = Arc::new(venue.into());
             update_venue_cache(ctx, venue.clone()).await;
             Ok(venue)

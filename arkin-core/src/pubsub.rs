@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,12 +9,13 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use kanal::{AsyncReceiver, AsyncSender};
 use strum::{IntoDiscriminant, IntoEnumIterator};
+use tokio::select;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::utils::PeekableReceiver;
-use crate::{Event, EventType, InsightsTick, Publisher, Runnable, ServiceCtx, Subscriber, SystemTime};
+use crate::{CoreCtx, Event, EventType, InsightsTick, Publisher, Runnable, ServiceCtx, Subscriber};
 
 pub enum EventFilter {
     All,
@@ -72,7 +74,6 @@ impl Subscriber for PubSubSubscriber {
 }
 
 pub struct PubSub {
-    time: Arc<dyn SystemTime>,
     event_queue: Mutex<BinaryHeap<Reverse<Event>>>,
     publishers: DashMap<u64, PeekableReceiver<Event>>,
     next_id: AtomicU64,
@@ -83,9 +84,8 @@ pub struct PubSub {
 }
 
 impl PubSub {
-    pub fn new(time: Arc<dyn SystemTime>, ack: bool) -> Arc<Self> {
+    pub fn new(ack: bool) -> Arc<Self> {
         Self {
-            time: time,
             event_queue: Mutex::new(BinaryHeap::<Reverse<Event>>::new()),
             publishers: DashMap::new(),
             next_id: AtomicU64::new(0),
@@ -232,101 +232,103 @@ impl PubSub {
             }
         }
     }
+}
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn event_collector_task(&self, ctx: Arc<ServiceCtx>) {
-        info!(target: "pubsub", "starting event collector task");
-        while ctx.is_running().await {
-            let mut collected_any = false;
-            for mut receiver in self.publishers.iter_mut() {
-                // Peek if there is a element and if it is within 24h
-                if let Some(peeked) = receiver.value_mut().peek() {
-                    debug!(target: "pubsub", "found event");
-                    // TODO: This is not optimal
-                    if peeked.timestamp() > self.time.now().await + Duration::from_secs(86400) {
-                        debug!(target: "pubsub", "timestamp to big, we continue");
-                        continue;
-                    }
-                } else {
-                    debug!(target: "pubsub", "No events we continue");
+async fn event_collector_task(pubsub: Arc<PubSub>, service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
+    info!(target: "pubsub", "starting event collector task");
+
+    let shutdown = service_ctx.get_shutdown_token();
+    loop {
+        let mut collected_any = false;
+        for mut receiver in pubsub.publishers.iter_mut() {
+            // Peek if there is a element and if it is within 24h
+            if let Some(peeked) = receiver.value_mut().peek() {
+                debug!(target: "pubsub", "found event");
+                // TODO: This is not optimal
+                if peeked.timestamp() > core_ctx.time.now().await + Duration::from_secs(86400) {
+                    debug!(target: "pubsub", "timestamp to big, we continue");
                     continue;
                 }
-                if let Some(event) = receiver.take() {
-                    collected_any = true;
-
-                    let mut lock = self.event_queue.lock().await;
-                    lock.push(Reverse(event));
-                    if lock.len() > 10000000 {
-                        drop(lock);
-                        warn!(target: "pubsub", "event queue is full, waiting 1s");
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-                }
-            }
-            if !collected_any {
-                debug!(target: "pubsub", "No events collected, waiting...");
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        }
-        info!(target: "pubsub", "event collector task has stopped");
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn event_processor_task(&self, ctx: Arc<ServiceCtx>) {
-        info!(target: "pubsub", "starting event processor task");
-        while ctx.is_running().await {
-            // let length = self.event_queue.lock().await.len();
-            // info!(target: "pubsub", "event queue length: {}", length);
-            if let Some(Reverse(event)) = self.event_queue.lock().await.pop() {
-                //  I think we don't need this anymore
-                if !event.event_type().is_market_data() {
-                    info!(target: "pubsub", "processing event: {}", event);
-                }
-
-                // Advance time in simulation
-                if !self.time.is_live().await {
-                    debug!(target: "pubsub", "advancing time to {}", event.timestamp());
-                    self.time.advance_time_to(event.timestamp()).await;
-                }
-
-                // Post tick events
-                let intervals = self.time.check_interval().await;
-                if !intervals.is_empty() {
-                    for ts in intervals {
-                        let tick = InsightsTick::builder()
-                            .event_time(ts)
-                            .frequency(Duration::from_secs(60))
-                            .build();
-                        let tick_event = Event::InsightsTick(tick.into());
-                        self.broadcast_event(tick_event).await;
-                    }
-                }
-                self.broadcast_event(event).await;
             } else {
-                debug!(target: "pubsub", "No events processed, waiting...");
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                debug!(target: "pubsub", "No events we continue");
+                continue;
+            }
+            if let Some(event) = receiver.take() {
+                collected_any = true;
+
+                let mut lock = pubsub.event_queue.lock().await;
+                lock.push(Reverse(event));
+                if lock.len() > 10000000 {
+                    drop(lock);
+                    warn!(target: "pubsub", "event queue is full, waiting 1s");
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
             }
         }
-        info!(target: "pubsub", "event processor task has stopped");
+        if !collected_any {
+            debug!(target: "pubsub", "No events collected, waiting...");
+            select! {
+                _ = shutdown.cancelled() => break,
+                _ = tokio::time::sleep(Duration::from_millis(1)) => {},
+            }
+        }
     }
+    info!(target: "pubsub", "event collector task has stopped");
+}
+
+async fn event_processor_task(pubsub: Arc<PubSub>, service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
+    info!(target: "pubsub", "starting event processor task");
+
+    let shutdown = service_ctx.get_shutdown_token();
+    loop {
+        // let length = self.event_queue.lock().await.len();
+        // info!(target: "pubsub", "event queue length: {}", length);
+        if let Some(Reverse(event)) = pubsub.event_queue.lock().await.pop() {
+            //  I think we don't need this anymore
+            if !event.event_type().is_market_data() {
+                debug!(target: "pubsub", "processing event: {}", event);
+            }
+
+            // Advance time in simulation
+            if !core_ctx.time.is_live().await {
+                debug!(target: "pubsub", "advancing time to {}", event.timestamp());
+                core_ctx.time.advance_time_to(event.timestamp()).await;
+            }
+
+            // Post tick events
+            let intervals = core_ctx.time.check_interval().await;
+            if !intervals.is_empty() {
+                for ts in intervals {
+                    let tick = InsightsTick::builder()
+                        .event_time(ts)
+                        .frequency(Duration::from_secs(60))
+                        .build();
+                    let tick_event = Event::InsightsTick(tick.into());
+                    pubsub.broadcast_event(tick_event).await;
+                }
+            }
+            pubsub.broadcast_event(event).await;
+        } else {
+            debug!(target: "pubsub", "No events processed, waiting...");
+            select! {
+                _ = shutdown.cancelled() => break,
+                _ = tokio::time::sleep(Duration::from_millis(1)) => {},
+            }
+        }
+    }
+    info!(target: "pubsub", "event processor task has stopped");
 }
 
 #[async_trait]
 impl Runnable for PubSub {
-    fn identifier(&self) -> &str {
-        "pubsub"
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn start_tasks(self: Arc<Self>, ctx: Arc<ServiceCtx>) {
-        info!(target: "pubsub", "starting tasks");
-        let exec = self.clone();
-        let ctx_clone = ctx.clone();
-        ctx.spawn(async move { exec.event_collector_task(ctx_clone).await });
-
-        let exec = self.clone();
-        let ctx_clone = ctx.clone();
-        ctx.spawn(async move { exec.event_processor_task(ctx_clone).await });
-        info!(target: "pubsub", "tasks started");
+    async fn get_tasks(
+        self: Arc<Self>,
+        service_ctx: Arc<ServiceCtx>,
+        core_ctx: Arc<CoreCtx>,
+    ) -> Vec<Pin<Box<dyn Future<Output = ()> + Send>>> {
+        vec![
+            Box::pin(event_collector_task(self.clone(), service_ctx.clone(), core_ctx.clone())),
+            Box::pin(event_processor_task(self.clone(), service_ctx.clone(), core_ctx.clone())),
+        ]
     }
 }

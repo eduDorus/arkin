@@ -4,27 +4,44 @@ use std::sync::Arc;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
 use tracing::{info, instrument};
+use typed_builder::TypedBuilder;
 
 use crate::service::Service;
+use crate::{EventFilter, PersistenceReader, PubSub, Runnable, SystemTime};
 
-#[derive(Default)]
+#[derive(TypedBuilder)]
 pub struct Engine {
+    time: Arc<dyn SystemTime>,
+    pubsub: Arc<PubSub>,
+    persistence: Arc<dyn PersistenceReader>,
+    #[builder(default)]
     services: RwLock<HashMap<String, Arc<Service>>>,
+    #[builder(default)]
     start_order: RwLock<BTreeMap<u64, Vec<String>>>,
+    #[builder(default)]
     stop_order: RwLock<BTreeMap<u64, Vec<String>>>,
 }
 
 impl Engine {
-    pub fn new() -> Arc<Self> {
-        Self {
-            services: RwLock::new(HashMap::new()),
-            start_order: RwLock::new(BTreeMap::new()),
-            stop_order: RwLock::new(BTreeMap::new()),
-        }
-        .into()
-    }
-
-    pub async fn register(&self, service: Arc<Service>, start_priority: u64, stop_priority: u64) {
+    pub async fn register(
+        &self,
+        identifier: &str,
+        service: Arc<dyn Runnable>,
+        start_priority: u64,
+        stop_priority: u64,
+        event_filter: Option<EventFilter>,
+    ) {
+        let service = Service::new(
+            identifier,
+            service,
+            self.time.clone(),
+            self.pubsub.publisher(),
+            match event_filter {
+                Some(f) => Some(self.pubsub.subscribe(f)),
+                None => None,
+            },
+            self.persistence.clone(),
+        );
         info!(target: "engine", "register services {}", service.identifier());
         let name = service.identifier().to_owned();
         self.services.write().await.insert(name.clone(), service);

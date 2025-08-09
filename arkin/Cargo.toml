@@ -46,3 +46,4 @@ statrs = { workspace = true }
 tonic = { workspace = true }
 clap = { workspace = true }
 rust_decimal = { workspace = true }
+

@@ -106,7 +106,7 @@ pub async fn read_by_symbol(ctx: &PersistenceContext, symbol: &str) -> Result<As
                 created,
                 updated
             FROM assets
-            WHERE symbol = $1
+            WHERE LOWER(symbol) = LOWER($1)
             "#,
         symbol,
     )

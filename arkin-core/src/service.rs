@@ -1,11 +1,15 @@
 use std::{sync::Arc, time::Duration};
 
 use strum::Display;
+use time::UtcDateTime;
 use tokio::{select, sync::RwLock};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument};
 
-use crate::traits::{Runnable, Subscriber};
+use crate::{
+    traits::{Runnable, Subscriber},
+    Event, PersistenceReader, Publisher, SystemTime,
+};
 
 #[derive(PartialEq, Debug, Copy, Clone, Default, Display)]
 #[strum(serialize_all = "snake_case")]
@@ -17,7 +21,6 @@ pub enum ServiceState {
     Stopped,
 }
 
-#[derive(Debug, Default)]
 pub struct ServiceCtx {
     state: RwLock<ServiceState>,
     tracker: TaskTracker,
@@ -83,16 +86,51 @@ impl ServiceCtx {
     }
 }
 
+pub struct CoreCtx {
+    pub time: Arc<dyn SystemTime>,
+    pub publisher: Arc<dyn Publisher>,
+    pub persistence: Arc<dyn PersistenceReader>,
+}
+
+impl CoreCtx {
+    fn new(time: Arc<dyn SystemTime>, publisher: Arc<dyn Publisher>, persistence: Arc<dyn PersistenceReader>) -> Self {
+        Self {
+            time,
+            publisher,
+            persistence,
+        }
+    }
+
+    pub async fn now(&self) -> UtcDateTime {
+        self.time.now().await
+    }
+
+    pub async fn publish(&self, event: Event) {
+        self.publisher.publish(event).await
+    }
+}
+
 pub struct Service {
-    ctx: Arc<ServiceCtx>,
-    service: Arc<dyn Runnable>,
+    service_ctx: Arc<ServiceCtx>,
+    core_ctx: Arc<CoreCtx>,
+    identifier: String,
     subscriber: Option<Arc<dyn Subscriber>>,
+    service: Arc<dyn Runnable>,
 }
 
 impl Service {
-    pub fn new(service: Arc<dyn Runnable>, subscriber: Option<Arc<dyn Subscriber>>) -> Arc<Self> {
+    pub fn new(
+        identifier: &str,
+        service: Arc<dyn Runnable>,
+        time: Arc<dyn SystemTime>,
+        publisher: Arc<dyn Publisher>,
+        subscriber: Option<Arc<dyn Subscriber>>,
+        persistence: Arc<dyn PersistenceReader>,
+    ) -> Arc<Self> {
         Self {
-            ctx: Arc::new(ServiceCtx::new()),
+            service_ctx: Arc::new(ServiceCtx::new()),
+            core_ctx: Arc::new(CoreCtx::new(time, publisher, persistence)),
+            identifier: identifier.to_owned(),
             subscriber,
             service,
         }
@@ -100,28 +138,31 @@ impl Service {
     }
 
     pub fn identifier(&self) -> &str {
-        self.service.identifier()
+        &self.identifier
     }
 
-    pub async fn event_loop(&self) {
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
+    async fn event_loop(&self) {
         info!(target: "service", "starting event loop");
-        let ctx = self.ctx.clone();
+        let service_ctx = self.service_ctx.clone();
+        let core_ctx = self.core_ctx.clone();
         let service = self.service.clone();
-        let token = self.ctx.get_shutdown_token();
+        let token = self.service_ctx.get_shutdown_token();
         let subscriber = self.subscriber.as_ref().expect("Need subscriber for event loop").clone();
-        self.ctx.spawn(async move {
+        self.service_ctx.spawn(async move {
             loop {
                 select! {
                   Some(event) = subscriber.recv() => {
                         if subscriber.needs_ack() {
                             // Simulation mode: Process sequentially
-                            service.handle_event(event).await;
+                            service.handle_event(core_ctx.clone(), event).await;
                             subscriber.send_ack().await;
                         } else {
                             // Live mode: Spawn a task for concurrent processing
                             let service_clone = service.clone();
-                            ctx.spawn(async move {
-                                service_clone.handle_event(event).await;
+                            let ctx_clone = core_ctx.clone();
+                            service_ctx.spawn(async move {
+                                service_clone.handle_event(ctx_clone, event).await;
                             });
                         }
                   },
@@ -134,28 +175,53 @@ impl Service {
         info!(target: "service", "started event loop");
     }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.service.identifier()))]
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn start_service(&self) {
         info!(target: "service", "starting");
-        self.ctx.starting().await;
-        self.service.setup(self.ctx.to_owned()).await;
+
+        // Starting the service
+        self.service_ctx.starting().await;
+
+        // Run service setup functionality
+        self.service.setup(self.service_ctx.to_owned(), self.core_ctx.to_owned()).await;
+
+        // Start the service event_loop
         if self.subscriber.is_some() {
             self.event_loop().await;
         }
-        self.service.clone().start_tasks(self.ctx.clone()).await;
-        self.ctx.started().await;
+
+        // Start the service tasks
+        let tasks = self
+            .service
+            .clone()
+            .get_tasks(self.service_ctx.clone(), self.core_ctx.clone())
+            .await;
+        for task in tasks {
+            self.service_ctx.spawn(task);
+        }
+
+        // Set service to be running
+        self.service_ctx.started().await;
         info!(target: "service", "started");
     }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.service.identifier()))]
+    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     pub async fn stop_service(&self) {
         info!(target: "service", "stopping");
-        self.ctx.stopping().await;
-        self.service.clone().stop_tasks(self.ctx.clone()).await;
-        self.service.teardown(self.ctx.to_owned()).await;
-        self.ctx.signal_shutdown();
-        self.ctx.wait().await;
-        self.ctx.stopped().await;
+        // Stopping the srevice
+        self.service_ctx.stopping().await;
+
+        // Run down the tear down process
+        self.service
+            .teardown(self.service_ctx.to_owned(), self.core_ctx.to_owned())
+            .await;
+
+        // Stop the tasks
+        self.service_ctx.signal_shutdown();
+        self.service_ctx.wait().await;
+
+        // Set to stopped
+        self.service_ctx.stopped().await;
         info!(target: "service", "stopped");
     }
 }

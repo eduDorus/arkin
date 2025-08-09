@@ -4,7 +4,7 @@
 /// @@
 /// @@   Request message for HealthCheck
 /// @@
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct HealthCheckRequest {
     #[prost(string, tag = "1")]
     pub service: ::prost::alloc::string::String,
@@ -14,7 +14,7 @@ pub struct HealthCheckRequest {
 /// @@
 /// @@   Response message for HealthCheck
 /// @@
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct HealthCheckResponse {
     #[prost(enumeration = "health_check_response::ServingStatus", tag = "1")]
     pub status: i32,
@@ -185,7 +185,7 @@ pub mod health_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/grpc.health.v1.Health/Check",
             );
@@ -333,7 +333,7 @@ pub mod health_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = CheckSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,

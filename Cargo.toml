@@ -1,6 +1,6 @@
 [workspace]
 # members = [ "arkin-persistence", "arkin-ingestors", "arkin-strategies", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
-members = [ "arkin", "arkin-core", "arkin-audit", "arkin-risk", "arkin-accounting", "arkin-ingestor-binance", "arkin-ingestor-historical", "arkin-insights", "arkin-forecast", "arkin-strat-crossover", "arkin-strat-agent", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-exec-sim", "arkin-binance", "integration-tests", "arkin-cli" ]
+members = [ "arkin", "arkin-core", "arkin-audit", "arkin-accounting", "arkin-ingestor-binance", "arkin-ingestor-historical", "arkin-insights", "arkin-strat-crossover", "arkin-strat-agent", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-exec-sim", "arkin-binance", "arkin-cli" ]
 
 default-members = [ "arkin" ]
 
@@ -88,8 +88,9 @@ moka2 = { version = "0.13.0", features = [ "future" ] }
 yata = "0.7"
 
 # GRPC
-tonic = { version = "0.13", features = [ "gzip" ] }
-prost = "0.13"
+tonic = { version = "0.14", features = [ "gzip" ] }
+prost = "0.14"
+tonic-prost = "0.14"
 
 # Ort
 # ort = { version = "=2.0.0-rc.10" }

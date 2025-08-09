@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus, InstrumentType, Pipeline, Price,
-    PubSub, Publisher, Quantity, SimulationSystemTime, Strategy, SystemTime, Tick, Venue, VenueType,
+    PubSub, Publisher, Quantity, Strategy, SystemTime, Tick, Venue, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -119,11 +119,7 @@ impl Publisher for MockPublisher {
 }
 
 pub fn test_pubsub() -> Arc<PubSub> {
-    let clock = SimulationSystemTime::new(
-        datetime!(2025-03-01 00:00:00 UTC).to_utc(),
-        datetime!(2025-03-02 00:00:00 UTC).to_utc(),
-    );
-    let pubsub = PubSub::new(clock, true);
+    let pubsub = PubSub::new(true);
     pubsub
 }
 

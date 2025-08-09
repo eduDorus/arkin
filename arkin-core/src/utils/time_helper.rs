@@ -6,7 +6,6 @@ pub enum Frequency {
     Hourly,
     HalfDaily,
     Daily,
-    Weekly,
 }
 
 fn next_boundary(dt: UtcDateTime, frequency: &Frequency) -> UtcDateTime {
@@ -34,10 +33,6 @@ fn next_boundary(dt: UtcDateTime, frequency: &Frequency) -> UtcDateTime {
                 let truncated = dt.replace_time(Time::from_hms(dt.hour(), 0, 0).unwrap());
                 truncated + Duration::hours(1)
             }
-        }
-        Frequency::Weekly => {
-            // Placeholder: next Monday at midnight (to be implemented if needed)
-            unimplemented!("Weekly frequency not yet implemented");
         }
     }
 }

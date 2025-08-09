@@ -1,17 +1,14 @@
 use std::{
     collections::{HashMap, VecDeque},
-    fs::OpenOptions,
-    io::{BufWriter, Seek, SeekFrom},
     sync::Arc,
 };
 
 use async_trait::async_trait;
-use csv::Writer;
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, transport::Channel};
-use tracing::{info, instrument, warn};
+use tracing::{info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -22,7 +19,7 @@ const SEQUENCE_LENGTH: usize = 192;
 const NUM_FEATURES_OBS: usize = 40; // Assuming len(FEATURE_COLUMNS) = 5
 const NUM_STATE_OBS: usize = 1;
 // const NUM_MASK: usize = 4;
-const POSSIBLE_WEIGHTS: [f32; 4] = [0.0, 1.0, 2.0, 3.0];
+const POSSIBLE_WEIGHTS: [f32; 3] = [-1.0, 0.0, 1.0];
 
 const SHAPE_0: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_FEATURES_OBS as i64];
 const SHAPE_1: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_STATE_OBS as i64];
@@ -30,9 +27,6 @@ const SHAPE_1: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_STATE_
 
 #[derive(TypedBuilder)]
 pub struct AgentStrategy {
-    identifier: String,
-    time: Arc<dyn SystemTime>,
-    publisher: Arc<dyn Publisher>,
     strategy: Arc<Strategy>,
     client: Mutex<GrpcInferenceServiceClient<Channel>>,
     input_features_ids: Vec<FeatureId>,
@@ -42,7 +36,7 @@ pub struct AgentStrategy {
 }
 
 impl AgentStrategy {
-    pub fn new(time: Arc<dyn SystemTime>, publisher: Arc<dyn Publisher>, strategy: Arc<Strategy>) -> Arc<Self> {
+    pub fn new(strategy: Arc<Strategy>) -> Arc<Self> {
         let url = "http://192.168.100.100:8001";
         let channel = Channel::from_static(url).connect_lazy();
         let client = GrpcInferenceServiceClient::new(channel).send_compressed(CompressionEncoding::Gzip); // Marginally slower with compression (but we will save some bandwith)
@@ -102,9 +96,6 @@ impl AgentStrategy {
             input_state.insert(id.clone(), VecDeque::<f32>::with_capacity(SEQUENCE_LENGTH));
         }
         Self {
-            identifier: "strat_agent".to_owned(),
-            time,
-            publisher,
             strategy,
             client: Mutex::new(client),
             input_features_ids: input_features_ids,
@@ -125,8 +116,9 @@ impl AgentStrategy {
     //     }
     // }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn insight_tick(&self, update: &InsightsUpdate) {
+    async fn insight_tick(&self, ctx: Arc<CoreCtx>, update: &InsightsUpdate) {
+        let time = ctx.now().await;
+
         let mut new_features = HashMap::new();
         for insight in update
             .insights
@@ -149,31 +141,31 @@ impl AgentStrategy {
         }
 
         // Write to csv
-        let mut row = Vec::with_capacity(NUM_FEATURES_OBS + 1);
-        row.push(update.event_time.unix_timestamp().to_string());
-        for feat_idx in 0..NUM_FEATURES_OBS {
-            let feature_id = &self.input_features_ids[feat_idx];
-            if let Some(deque) = self.input_features.get(feature_id) {
-                row.push(deque.back().unwrap_or(&0.0).clone().to_string());
-            }
-        }
-        let file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .create(true)
-            .open("dump.csv")
-            .unwrap();
-        let mut buf_file = BufWriter::new(file);
-        let is_new = buf_file.seek(SeekFrom::End(0)).unwrap() == 0; // Check if empty (new file)
-        let mut wtr = Writer::from_writer(buf_file);
+        // let mut row = Vec::with_capacity(NUM_FEATURES_OBS + 1);
+        // row.push(update.event_time.unix_timestamp().to_string());
+        // for feat_idx in 0..NUM_FEATURES_OBS {
+        //     let feature_id = &self.input_features_ids[feat_idx];
+        //     if let Some(deque) = self.input_features.get(feature_id) {
+        //         row.push(deque.back().unwrap_or(&0.0).clone().to_string());
+        //     }
+        // }
+        // let file = OpenOptions::new()
+        //     .write(true)
+        //     .append(true)
+        //     .create(true)
+        //     .open("dump.csv")
+        //     .unwrap();
+        // let mut buf_file = BufWriter::new(file);
+        // let is_new = buf_file.seek(SeekFrom::End(0)).unwrap() == 0; // Check if empty (new file)
+        // let mut wtr = Writer::from_writer(buf_file);
 
-        if is_new {
-            let mut header = vec!["event_time".to_string()];
-            header.extend(self.input_features_ids.iter().map(|id| id.to_string()));
-            wtr.serialize(&header).unwrap();
-        }
-        wtr.serialize(&row).unwrap();
-        wtr.flush().unwrap();
+        // if is_new {
+        //     let mut header = vec!["event_time".to_string()];
+        //     header.extend(self.input_features_ids.iter().map(|id| id.to_string()));
+        //     wtr.serialize(&header).unwrap();
+        // }
+        // wtr.serialize(&row).unwrap();
+        // wtr.flush().unwrap();
 
         // Create Feature Input
         let mut input_data_flat_0: Vec<f32> = Vec::with_capacity(BATCH_SIZE * SEQUENCE_LENGTH * NUM_FEATURES_OBS);
@@ -381,12 +373,11 @@ impl AgentStrategy {
                         .set_price(Decimal::ZERO)
                         .set_quantity(quantity)
                         .status(ExecutionOrderStatus::New)
-                        .created(self.time.now().await)
-                        .updated(self.time.now().await)
+                        .created(time)
+                        .updated(time)
                         .build();
-                    self.publisher
-                        .publish(Event::NewTakerExecutionOrder(order.clone().into()))
-                        .await;
+
+                    ctx.publish(Event::NewTakerExecutionOrder(order.clone().into())).await;
                     info!(target: "strat::agent", "send {} execution order for {} quantity {}", order.side, order.instrument, order.quantity);
                 }
             } else {
@@ -401,14 +392,9 @@ impl AgentStrategy {
 
 #[async_trait]
 impl Runnable for AgentStrategy {
-    fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn handle_event(&self, event: Event) {
+    async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
         match &event {
-            Event::InsightsUpdate(vo) => self.insight_tick(vo).await,
+            Event::InsightsUpdate(vo) => self.insight_tick(ctx, vo).await,
             e => warn!(target: "strat::agent", "received unused event {}", e),
         }
     }

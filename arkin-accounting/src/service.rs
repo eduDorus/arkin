@@ -4,8 +4,7 @@ use std::sync::Arc;
 use arkin_core::prelude::*;
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
-use tracing::{error, info, instrument, warn};
-use typed_builder::TypedBuilder;
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy)]
@@ -24,22 +23,19 @@ impl UpdateMode {
     }
 }
 
-#[derive(TypedBuilder)]
 pub struct Accounting {
-    #[builder(default = String::from("accounting"))]
-    identifier: String,
-    time: Arc<dyn SystemTime>,
-    publisher: Arc<dyn Publisher>,
-    #[builder(default_code = "Ledger::new(publisher.clone())")]
     ledger: Arc<Ledger>,
 }
 
 impl Accounting {
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn process_account_update(&self, update: &VenueAccountUpdate, mode: UpdateMode) {
-        info!(target: "accounting", "processing account update: reason {}", update);
+    pub fn new(ledger: Arc<Ledger>) -> Self {
+        Self { ledger }
+    }
 
-        let event_time = self.time.now().await;
+    async fn process_account_update(&self, ctx: Arc<CoreCtx>, update: &VenueAccountUpdate, mode: UpdateMode) {
+        info!(target: "accounting", "processing account update: reason {}", update);
+        let time = ctx.now().await;
+
         let venue = update.venue.clone();
         let transfer_group_id = Uuid::new_v4();
         let transfer_group_type = match mode {
@@ -51,11 +47,11 @@ impl Accounting {
 
         let user_account = self
             .ledger
-            .find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, event_time)
+            .find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, time)
             .await;
         let venue_account = self
             .ledger
-            .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Margin, event_time)
+            .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Margin, time)
             .await;
 
         // Balances (margin deltas only)
@@ -88,7 +84,7 @@ impl Accounting {
                     .strategy(None)
                     .instrument(None)
                     .asset(Some(asset))
-                    .created(event_time)
+                    .created(time)
                     .build()
                     .into(),
             );
@@ -119,7 +115,7 @@ impl Accounting {
                         .strategy(None)
                         .instrument(Some(instr.clone()))
                         .asset(None)
-                        .created(event_time)
+                        .created(time)
                         .build()
                         .into(),
                 );
@@ -132,7 +128,7 @@ impl Accounting {
         }
 
         if !transfers.is_empty() {
-            let batch = TransferBatch::builder().event_time(event_time).transfers(transfers).build();
+            let batch = TransferBatch::builder().event_time(time).transfers(transfers).build();
             let res = self.ledger.apply_transfers(batch.into()).await;
             match res {
                 Ok(_) => {
@@ -154,19 +150,18 @@ impl Accounting {
     }
 
     // Wrappers
-    pub async fn initial_account_update(&self, update: &VenueAccountUpdate) {
-        self.process_account_update(update, UpdateMode::Initial).await;
+    pub async fn handle_initial_account_update(&self, ctx: Arc<CoreCtx>, update: &VenueAccountUpdate) {
+        self.process_account_update(ctx, update, UpdateMode::Initial).await;
     }
 
-    pub async fn reconcile_account_update(&self, update: &VenueAccountUpdate) {
-        self.process_account_update(update, UpdateMode::Recon).await;
+    pub async fn handle_reconcile_account_update(&self, ctx: Arc<CoreCtx>, update: &VenueAccountUpdate) {
+        self.process_account_update(ctx, update, UpdateMode::Recon).await;
     }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn trade_update(&self, update: &VenueTradeUpdate) {
+    async fn handle_trade_update(&self, ctx: Arc<CoreCtx>, update: &VenueTradeUpdate) {
         info!(target: "accounting", "processing trade update for order {}", update.order.id);
+        let time = ctx.now().await;
 
-        let event_time = self.time.now().await;
         let transfer_group_id = Uuid::new_v4();
         let transfer_group_type = TransferGroupType::Trade;
         let venue = update.order.instrument.venue.clone();
@@ -174,11 +169,11 @@ impl Accounting {
 
         let user_account = self
             .ledger
-            .find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, event_time)
+            .find_or_create_account(&venue, AccountOwner::User, AccountType::Margin, time)
             .await;
         let venue_account = self
             .ledger
-            .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Margin, event_time)
+            .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Margin, time)
             .await;
         let instrument = update.order.instrument.clone();
         let margin_asset = instrument.margin_asset.clone();
@@ -246,7 +241,7 @@ impl Accounting {
                     .strategy(update.order.strategy.clone())
                     .instrument(Some(instrument.clone()))
                     .asset(Some(margin_asset.clone()))
-                    .created(event_time)
+                    .created(time)
                     .build()
                     .into(),
             );
@@ -271,7 +266,7 @@ impl Accounting {
                     .strategy(update.order.strategy.clone())
                     .instrument(Some(instrument.clone()))
                     .asset(Some(margin_asset.clone()))
-                    .created(event_time)
+                    .created(time)
                     .build()
                     .into(),
             );
@@ -291,7 +286,7 @@ impl Accounting {
                     .strategy(update.order.strategy.clone())
                     .instrument(Some(instrument.clone()))
                     .asset(Some(margin_asset.clone()))
-                    .created(event_time)
+                    .created(time)
                     .build()
                     .into(),
             );
@@ -316,16 +311,19 @@ impl Accounting {
                     .strategy(update.order.strategy.clone())
                     .instrument(Some(instrument))
                     .asset(Some(margin_asset))
-                    .created(event_time)
+                    .created(time)
                     .build()
                     .into(),
             );
         }
 
         if !transfers.is_empty() {
-            let batch = TransferBatch::builder().event_time(event_time).transfers(transfers).build();
-            if let Err(e) = self.ledger.apply_transfers(batch.into()).await {
+            let batch = TransferBatch::builder().event_time(time).transfers(transfers).build();
+            if let Err(e) = self.ledger.apply_transfers(batch.clone().into()).await {
                 error!(target: "accounting", "Failed trade update: {}", e);
+                for transfer in batch.transfers {
+                    error!(target: "accounting", " - : {}", transfer);
+                }
             } else {
                 info!(target: "accounting", "Trade update applied");
             }
@@ -335,23 +333,17 @@ impl Accounting {
 
 #[async_trait]
 impl Runnable for Accounting {
-    fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn handle_event(&self, event: Event) {
+    async fn handle_event(&self, core_ctx: Arc<CoreCtx>, event: Event) {
         match &event {
             // Account
-            Event::InitialAccountUpdate(au) => self.initial_account_update(au).await,
-            Event::ReconcileAccountUpdate(au) => self.reconcile_account_update(au).await,
-            Event::VenueTradeUpdate(tu) => self.trade_update(tu).await,
+            Event::InitialAccountUpdate(au) => self.handle_initial_account_update(core_ctx, au).await,
+            Event::ReconcileAccountUpdate(au) => self.handle_reconcile_account_update(core_ctx, au).await,
+            Event::VenueTradeUpdate(tu) => self.handle_trade_update(core_ctx, tu).await,
             e => warn!(target: "accounting", "received unused event {}", e),
         }
     }
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn teardown(&self, _ctx: Arc<ServiceCtx>) {
+    async fn teardown(&self, _ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {
         self.ledger.dump_state(1000).await;
     }
 }

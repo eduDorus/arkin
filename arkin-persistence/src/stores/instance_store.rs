@@ -13,6 +13,12 @@ pub async fn insert(ctx: &PersistenceContext, instance: Arc<Instance>) -> Result
     Ok(())
 }
 
+pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Instance>, PersistenceError> {
+    let instance_dto = instance_repo::read_by_id(ctx, id).await?;
+    let instance: Arc<Instance> = instance_dto.into();
+    Ok(instance)
+}
+
 pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Arc<Instance>, PersistenceError> {
     let instance_dto = instance_repo::read_by_name(ctx, name).await?;
     let instance: Arc<Instance> = instance_dto.into();

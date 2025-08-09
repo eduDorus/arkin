@@ -46,10 +46,15 @@ pub enum Commands {
     /// Simulates trading scenarios with configurable accounting and tick frequencies.
     Simulation(SimulationArgs),
 
-    /// Perform live engine operations, such as real-time processing.
+    /// Perform wide quoting operations, such as real-time processing.
     ///
     /// Connects to live ingestors for ongoing data handling.
-    Live(LiveArgs),
+    WideQuoter(WideQuoterArgs),
+
+    /// Perform agent operations, such as real-time processing.
+    ///
+    /// Connects to live ingestors for ongoing data handling.
+    Agent(AgentArgs),
 }
 
 /// Arguments for the `download` subcommand.
@@ -209,9 +214,9 @@ pub struct SimulationArgs {
     pub dry_run: bool,
 }
 
-/// Arguments for the `live` subcommand.
+/// Arguments for the `wide-quoter` subcommand.
 #[derive(Args, Debug)]
-pub struct LiveArgs {
+pub struct WideQuoterArgs {
     /// Unique name for this live instance.
     #[arg(long, short = 'n')]
     pub instance_name: String,
@@ -219,4 +224,28 @@ pub struct LiveArgs {
     /// Instruments to process live (comma-separated, e.g., "BTCUSDT,ETHUSDT").
     #[arg(long, short = 'i', value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,
+}
+
+/// Arguments for the `wide-quoter` subcommand.
+#[derive(Args, Debug)]
+pub struct AgentArgs {
+    /// Unique name for this live instance.
+    #[arg(long, short = 'n')]
+    pub instance_name: String,
+
+    /// Instruments to process live (comma-separated, e.g., "BTCUSDT,ETHUSDT").
+    #[arg(long, short = 'i', value_delimiter = ',', value_parser)]
+    pub instruments: Vec<String>,
+
+    /// Tick frequency for simulation steps, in seconds.
+    #[arg(long, short)]
+    pub tick_frequency: u64,
+
+    /// Name of the simulation pipeline (e.g., "backtest_strategy").
+    #[arg(long, short)]
+    pub pipeline: String,
+
+    /// Pipeline warmup ticks
+    #[arg(short, long, default_value_t = 1440)]
+    pub warmup: u16,
 }

@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, sync::Arc};
 
 use async_trait::async_trait;
 use tokio::sync::RwLock;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -147,7 +147,7 @@ impl BinanceExecution {
                         return;
                     }
                 };
-                info!(target: "execution::binance", "place order response data: {:?}", data);
+                debug!(target: "execution::binance", "place order response data: {:?}", data);
                 let mut order_clone = order.clone();
                 order_clone.place(self.time.now().await);
                 self.publisher.publish(Event::VenueOrderPlaced(order_clone.into())).await;
@@ -184,7 +184,7 @@ impl BinanceExecution {
                         return;
                     }
                 };
-                info!(target: "execution::binance", "cancel order response data: {:?}", data);
+                debug!(target: "execution::binance", "cancel order response data: {:?}", data);
                 let mut order_clone = order.clone();
                 order_clone.cancel(self.time.now().await);
                 self.publisher.publish(Event::VenueOrderCancelled(order_clone.into())).await;
@@ -203,12 +203,7 @@ impl BinanceExecution {
 
 #[async_trait]
 impl Runnable for BinanceExecution {
-    fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn handle_event(&self, event: Event) {
+    async fn handle_event(&self, _core_ctx: Arc<CoreCtx>, event: Event) {
         match &event {
             Event::NewVenueOrder(o) => self.place_order(o).await,
             Event::CancelVenueOrder(o) => self.cancel_order(o).await,
@@ -217,8 +212,7 @@ impl Runnable for BinanceExecution {
         }
     }
 
-    #[instrument(skip_all, fields(service = %self.identifier))]
-    async fn setup(&self, _ctx: Arc<ServiceCtx>) {
+    async fn setup(&self, _ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {
         // Connect market stream
         let mut streams_guard = self.stream_api.write().await;
         match self.stream_handle.connect().await {
@@ -315,9 +309,9 @@ impl Runnable for BinanceExecution {
                     .start_user_data_stream(params)
                     .await
                     .expect("Could not start user data stream");
-                info!(target: "execution::binance", "start_user_data_stream rate limits: {:?}", response.rate_limits);
+                debug!(target: "execution::binance", "start_user_data_stream rate limits: {:?}", response.rate_limits);
                 let data = response.data().expect("Subscription error");
-                info!(target: "execution::binance", "start_user_data_stream data: {:?}", data);
+                debug!(target: "execution::binance", "start_user_data_stream data: {:?}", data);
 
                 // Subscribe to symbol price ticker
                 let params = SymbolOrderBookTickerParams::builder().symbol("btcusdt".to_owned()).build();
@@ -331,7 +325,7 @@ impl Runnable for BinanceExecution {
 
                 // Get a subscription handle
                 let _stream =
-                    api.subscribe_on_ws_events(|e| info!(target: "execution::binance", "USER STREAM EVENT: {:?}", e));
+                    api.subscribe_on_ws_events(|e| debug!(target: "execution::binance", "USER STREAM EVENT: {:?}", e));
 
                 *api_guard = Some(api);
             }
@@ -340,7 +334,7 @@ impl Runnable for BinanceExecution {
     }
 
     #[instrument(skip_all, fields(service = %self.identifier))]
-    async fn teardown(&self, _ctx: Arc<ServiceCtx>) {
+    async fn teardown(&self, _ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {
         // Disconnect trade stream
         let api_guard = self.stream_api.read().await;
         if let Some(api) = api_guard.as_ref() {

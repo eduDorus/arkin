@@ -16,7 +16,6 @@ pub struct Forecast {
 }
 
 impl Forecast {
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn insight_tick(&self, _tick: &InsightsUpdate) {
         // Define constants
         const BATCH_SIZE: usize = 1;
@@ -124,12 +123,7 @@ impl Forecast {
 
 #[async_trait]
 impl Runnable for Forecast {
-    fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn handle_event(&self, event: Event) {
+    async fn handle_event(&self, _ctx: Arc<CoreServices>, event: Event) {
         match &event {
             Event::InsightsUpdate(vo) => self.insight_tick(vo).await,
             e => warn!(target: "forecast", "received unused event {}", e),

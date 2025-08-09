@@ -88,7 +88,7 @@ pub async fn stream_range_buffered(
     end: UtcDateTime,
     buffer_size: usize,
     frequency: Frequency,
-) -> impl Stream<Item = Arc<AggTrade>> + 'static {
+) -> Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin> {
     // Split the range into daily chunks
     let time_chunks = datetime_chunks(start, end, frequency).unwrap();
     let instrument_ids = Arc::new(instruments.iter().map(|i| i.id).collect::<Vec<_>>());
@@ -129,5 +129,5 @@ pub async fn stream_range_buffered(
             trades
         }
     });
-    fetch_stream.buffered(buffer_size).flat_map(|x| stream::iter(x))
+    Box::new(fetch_stream.buffered(buffer_size).flat_map(|x| stream::iter(x)))
 }

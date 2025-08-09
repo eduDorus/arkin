@@ -7,18 +7,10 @@ use typed_builder::TypedBuilder;
 use arkin_core::prelude::*;
 
 #[derive(TypedBuilder)]
-pub struct Risk {
-    identifier: String,
-    _time: Arc<dyn SystemTime>,
-    _publisher: Arc<dyn Publisher>,
-}
+pub struct Risk {}
 
 #[async_trait]
 impl Runnable for Risk {
-    fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn handle_event(&self, event: Event) {
         match &event {

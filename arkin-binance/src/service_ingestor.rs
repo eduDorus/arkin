@@ -22,10 +22,6 @@ pub struct BinanceIngestor {
 
 #[async_trait]
 impl Runnable for BinanceIngestor {
-    fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
     async fn start_tasks(self: Arc<Self>, ctx: Arc<ServiceCtx>) {
         info!(target: "ingestor::binance", "starting simulation tasks");
 

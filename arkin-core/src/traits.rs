@@ -1,9 +1,13 @@
-use std::{sync::Arc, time::Duration};
+use std::{pin::Pin, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use futures::Stream;
 use time::UtcDateTime;
+use uuid::Uuid;
 
-use crate::{Event, ServiceCtx};
+use crate::{
+    utils::Frequency, AggTrade, Asset, CoreCtx, Event, Instance, Instrument, Pipeline, ServiceCtx, Tick, Venue,
+};
 
 #[async_trait]
 pub trait SystemTime: Send + Sync {
@@ -14,6 +18,36 @@ pub trait SystemTime: Send + Sync {
     async fn is_finished(&self) -> bool;
     async fn is_live(&self) -> bool;
     async fn check_interval(&self) -> Vec<UtcDateTime>;
+}
+
+#[async_trait]
+pub trait PersistenceReader: Send + Sync {
+    async fn get_instance_by_id(&self, id: &Uuid) -> Arc<Instance>;
+    async fn get_instance_by_name(&self, name: &str) -> Arc<Instance>;
+    async fn get_pipeline_by_id(&self, id: &Uuid) -> Arc<Pipeline>;
+    async fn get_pipeline_by_name(&self, name: &str) -> Arc<Pipeline>;
+    async fn get_venue_by_id(&self, id: &Uuid) -> Arc<Venue>;
+    async fn get_venue_by_name(&self, name: &str) -> Arc<Venue>;
+    async fn get_instrument_by_id(&self, id: &Uuid) -> Arc<Instrument>;
+    async fn get_instrument_by_venue_symbol(&self, symbol: &str) -> Arc<Instrument>;
+    async fn get_asset_by_id(&self, id: &Uuid) -> Arc<Asset>;
+    async fn get_asset_by_symbol(&self, symbol: &str) -> Arc<Asset>;
+    async fn tick_stream_range_buffered(
+        &self,
+        instruments: &[Arc<Instrument>],
+        start: UtcDateTime,
+        end: UtcDateTime,
+        buffer_size: usize,
+        frequency: Frequency,
+    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>;
+    async fn trade_stream_range_buffered(
+        &self,
+        instruments: &[Arc<Instrument>],
+        start: UtcDateTime,
+        end: UtcDateTime,
+        buffer_size: usize,
+        frequency: Frequency,
+    ) -> Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>;
 }
 
 /// A trait for defining the lifecycle of a service in the system.
@@ -29,13 +63,8 @@ pub trait SystemTime: Send + Sync {
 /// transitions, ensuring they integrate smoothly with the system's service management framework.
 #[async_trait]
 pub trait Runnable: Sync + Send {
-    /// Returns a unique identifier for the service.
-    ///
-    /// This identifier is used for logging, monitoring, and distinguishing between different services.
-    fn identifier(&self) -> &str;
-
     // async fn event_loop(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {}
-    async fn handle_event(&self, _event: Event) {}
+    async fn handle_event(&self, _core_ctx: Arc<CoreCtx>, _event: Event) {}
 
     /// Performs initialization logic before starting the main tasks.
     ///
@@ -47,7 +76,7 @@ pub trait Runnable: Sync + Send {
     /// # Parameters
     /// - `ctx`: The service context, providing access to the service's state and task tracker.
     /// - `pubsub`: The publish-subscribe system for event communication.
-    async fn setup(&self, _ctx: Arc<ServiceCtx>) {}
+    async fn setup(&self, _service_ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {}
 
     /// Starts the main operational tasks of the service.
     ///
@@ -61,21 +90,13 @@ pub trait Runnable: Sync + Send {
     /// - `self`: An `Arc<Self>` to allow the service to be shared across tasks.
     /// - `ctx`: The service context for managing state and tasks.
     /// - `pubsub`: The publish-subscribe system for event communication.
-    async fn start_tasks(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {}
-
-    /// Stops the main operational tasks of the service.
-    ///
-    /// This method should gracefully shut down any running tasks, ensuring that the service
-    /// stops cleanly without leaving resources in an inconsistent state. It is called before
-    /// `teardown` and should coordinate with the `ServiceCtx` to wait for tasks to complete.
-    ///
-    /// The default implementation does nothing, making this method optional for implementors.
-    ///
-    /// # Parameters
-    /// - `self`: An `Arc<Self>` to allow the service to be shared across tasks.
-    /// - `ctx`: The service context for managing state and tasks.
-    /// - `pubsub`: The publish-subscribe system for event communication.
-    async fn stop_tasks(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {}
+    async fn get_tasks(
+        self: Arc<Self>,
+        _service_ctx: Arc<ServiceCtx>,
+        _core_ctx: Arc<CoreCtx>,
+    ) -> Vec<Pin<Box<dyn Future<Output = ()> + Send>>> {
+        vec![]
+    }
 
     /// Performs cleanup logic after stopping the main tasks.
     ///
@@ -86,7 +107,7 @@ pub trait Runnable: Sync + Send {
     /// # Parameters
     /// - `ctx`: The service context, providing access to the service's state and task tracker.
     /// - `pubsub`: The publish-subscribe system for event communication.
-    async fn teardown(&self, _ctx: Arc<ServiceCtx>) {}
+    async fn teardown(&self, _service_ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {}
 }
 
 #[async_trait]

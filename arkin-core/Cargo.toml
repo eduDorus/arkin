@@ -27,13 +27,15 @@ kanal = { workspace = true }
 dashmap = { workspace = true }
 moka2 = { workspace = true }
 clap = { workspace = true }
+
 tonic = { workspace = true }
 prost = { workspace = true }
+tonic-prost = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
 walkdir = "2.5.0"
-tonic-build = { version = "0.13" }
+tonic-prost-build = { version = "0.14" }
 
 [dev-dependencies]
 test-log = { workspace = true }

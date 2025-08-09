@@ -1,9 +1,9 @@
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use arkin_core::prelude::*;
-use arkin_persistence::prelude::*;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream, Stream, StreamExt};
@@ -12,7 +12,7 @@ use time::macros::format_description;
 use time::UtcDateTime;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::pin;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 
 use crate::binance_swap::BinanceSwapsEvent;
@@ -48,10 +48,6 @@ impl TardisRequest {
 
 #[derive(TypedBuilder)]
 pub struct TardisIngestor {
-    #[builder(default =  "ingestor::tardis".to_owned())]
-    pub identifier: String,
-    pub publisher: Arc<dyn Publisher>,
-    pub persistence: Arc<Persistence>,
     pub max_concurrent_requests: usize,
     pub venue: Exchange,
     pub channel: Channel,
@@ -145,98 +141,100 @@ impl TardisIngestor {
                 }
             })
     }
+}
 
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn download_task(&self, ctx: Arc<ServiceCtx>) {
-        info!(target: "ingestor::tardis", "Starting tardis ingestor...");
-        let persistence_service = Arc::clone(&self.persistence);
+async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
+    info!(target: "ingestor::tardis", "Starting tardis ingestor...");
+    let persistence_service = Arc::clone(&core_ctx.persistence);
 
-        let req = TardisRequest::new(
-            self.venue.clone(),
-            self.channel.clone(),
-            self.instruments.clone(),
-            self.start,
-            self.end,
-        );
+    let shutdown = service_ctx.get_shutdown_token();
 
-        let stream = self.stream(req);
-        pin!(stream);
+    let req = TardisRequest::new(
+        ingestor.venue.clone(),
+        ingestor.channel.clone(),
+        ingestor.instruments.clone(),
+        ingestor.start,
+        ingestor.end,
+    );
 
-        // No need to clone persistence_service for each iteration
-        while ctx.is_running().await {
-            tokio::select! {
-                    event = stream.next() => {
-                    let (_ts, json) = match event {
-                      Some(e) => e,
-                      None => {
-                          info!(target: "ingestor::tardis", "Stream ended");
-                          break;
-                      }
-                    };
-                    debug!(target: "ingestor::tardis", "Received data: {}", json);
-                    let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
-                        Ok(e) => Some(e),
-                        Err(e) => {
-                            error!(target: "ingestor::tardis", "Failed to parse Binance event: {}", e);
-                            error!(target: "ingestor::tardis", "Data: {}", json);
-                            None
-                        }
-                    };
+    let stream = ingestor.stream(req);
+    pin!(stream);
 
-                    let event = match event {
-                        Some(e) => {
-                            debug!(target: "ingestor::tardis", "{}", e);
-                            e
-                        }
-                        None => {
-                            error!(target: "ingestor::tardis", "Failed to parse event, skipping...");
-                            continue
-                        },
-                    };
-
-                    let instrument = persistence_service
-                        .get_instrument_by_venue_symbol(&event.venue_symbol())
-                        .await.expect("Failed to look up venue symbol");
-
-                    match event {
-                        BinanceSwapsEvent::AggTradeStream(stream) => {
-                            let trade = stream.data;
-                            let side = if trade.maker {
-                                MarketSide::Sell
-                            } else {
-                                MarketSide::Buy
-                            };
-                            let trade = AggTrade::new(
-                                trade.event_time,
-                                instrument,
-                                trade.agg_trade_id,
-                                side,
-                                trade.price,
-                                trade.quantity,
-                            );
-                            debug!(target: "ingestor::tardis", "Send agg trade update");
-                            self.publisher.publish(Event::AggTradeUpdate(trade.into())).await;
-                        }
-                        BinanceSwapsEvent::TickStream(stream) => {
-                            let tick = stream.data;
-                            let tick = Tick::new(
-                                tick.event_time,
-                                instrument,
-                                tick.update_id,
-                                tick.bid_price,
-                                tick.bid_quantity,
-                                tick.ask_price,
-                                tick.ask_quantity,
-                            );
-                            self.publisher.publish(Event::TickUpdate(tick.into())).await;
-                            debug!(target: "ingestor::tardis", "Send tick update");
-                        }
+    // No need to clone persistence_service for each iteration
+    loop {
+        tokio::select! {
+                event = stream.next() => {
+                let (_ts, json) = match event {
+                  Some(e) => e,
+                  None => {
+                      info!(target: "ingestor::tardis", "Stream ended");
+                      break;
+                  }
+                };
+                debug!(target: "ingestor::tardis", "Received data: {}", json);
+                let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
+                    Ok(e) => Some(e),
+                    Err(e) => {
+                        error!(target: "ingestor::tardis", "Failed to parse Binance event: {}", e);
+                        error!(target: "ingestor::tardis", "Data: {}", json);
+                        None
                     }
-                },
-            }
+                };
+
+                let event = match event {
+                    Some(e) => {
+                        debug!(target: "ingestor::tardis", "{}", e);
+                        e
+                    }
+                    None => {
+                        error!(target: "ingestor::tardis", "Failed to parse event, skipping...");
+                        continue
+                    },
+                };
+
+                let instrument = persistence_service
+                    .get_instrument_by_venue_symbol(&event.venue_symbol())
+                    .await;
+
+                match event {
+                    BinanceSwapsEvent::AggTradeStream(stream) => {
+                        let trade = stream.data;
+                        let side = if trade.maker {
+                            MarketSide::Sell
+                        } else {
+                            MarketSide::Buy
+                        };
+                        let trade = AggTrade::new(
+                            trade.event_time,
+                            instrument,
+                            trade.agg_trade_id,
+                            side,
+                            trade.price,
+                            trade.quantity,
+                        );
+                        debug!(target: "ingestor::tardis", "Send agg trade update");
+                        core_ctx.publish(Event::AggTradeUpdate(trade.into())).await;
+                    }
+                    BinanceSwapsEvent::TickStream(stream) => {
+                        let tick = stream.data;
+                        let tick = Tick::new(
+                            tick.event_time,
+                            instrument,
+                            tick.update_id,
+                            tick.bid_price,
+                            tick.bid_quantity,
+                            tick.ask_price,
+                            tick.ask_quantity,
+                        );
+                        core_ctx.publish(Event::TickUpdate(tick.into())).await;
+                        debug!(target: "ingestor::tardis", "Send tick update");
+                    }
+                }
+            },
+            _ = shutdown.cancelled() => break,
         }
-        info!(target: "ingestor::tardis", "Tardis ingestor service stopped.");
     }
+    info!(target: "ingestor::tardis", "Tardis ingestor service stopped.");
 }
 
 fn parse_line(line: &str) -> Result<(UtcDateTime, String)> {
@@ -264,14 +262,11 @@ fn parse_line(line: &str) -> Result<(UtcDateTime, String)> {
 
 #[async_trait]
 impl Runnable for TardisIngestor {
-    fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    async fn start_tasks(self: Arc<Self>, ctx: Arc<ServiceCtx>) {
-        let exec = self.clone();
-        let ctx_clone = ctx.clone();
-        ctx.spawn(async move { exec.download_task(ctx_clone).await });
+    async fn get_tasks(
+        self: Arc<Self>,
+        service_ctx: Arc<ServiceCtx>,
+        core_ctx: Arc<CoreCtx>,
+    ) -> Vec<Pin<Box<dyn Future<Output = ()> + Send>>> {
+        vec![Box::pin(download_task(self.clone(), service_ctx.clone(), core_ctx.clone()))]
     }
 }

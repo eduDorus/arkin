@@ -87,3 +87,27 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<VenueDTO,
         None => Err(PersistenceError::NotFound),
     }
 }
+
+pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<VenueDTO, PersistenceError> {
+    let id = sqlx::query_as!(
+        VenueDTO,
+        r#"
+            SELECT 
+                id,
+                name,
+                venue_type AS "venue_type:VenueType",
+                created,
+                updated
+            FROM venues
+            WHERE name = $1
+            "#,
+        name,
+    )
+    .fetch_optional(&ctx.pg_pool)
+    .await?;
+
+    match id {
+        Some(id) => Ok(id),
+        None => Err(PersistenceError::NotFound),
+    }
+}
