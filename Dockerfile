@@ -3,10 +3,14 @@ ARG BINARY_NAME=main
 ARG PROFILE=maxperf
 
 # BUILD IMAGE
-FROM rust:1.86.0-bookworm AS build
+FROM rust:1.89.0-bookworm AS build
 # Set arguments
 ARG BINARY_NAME
 ARG PROFILE
+
+RUN apt-get update && \
+    apt-get install -y protobuf-compiler && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app

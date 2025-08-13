@@ -5,7 +5,7 @@ mod common;
 mod derivatives_trading_usds_futures;
 
 mod service_execution;
-// mod service_ingestor;
+mod service_ingestor;
 
 pub use service_execution::*;
-// pub use service_ingestor::*;
+pub use service_ingestor::*;

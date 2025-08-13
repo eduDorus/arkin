@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                id,\n                name,\n                venue_type AS \"venue_type:VenueType\",\n                created,\n                updated\n            FROM venues\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "venue_type:VenueType",
+        "type_info": {
+          "Custom": {
+            "name": "venue_type",
+            "kind": {
+              "Enum": [
+                "cex",
+                "dex",
+                "otc",
+                "user_funds"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "created",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "updated",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f16802a2d0fe3977e17697850c67aa1ed1d1c3c54cb8ca30d8354851f94913a2"
+}

@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                id,\n                name,\n                instance_type AS \"instance_type:InstanceType\",\n                created,\n                updated\n            FROM instances \n            WHERE name = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "instance_type:InstanceType",
+        "type_info": {
+          "Custom": {
+            "name": "instance_type",
+            "kind": {
+              "Enum": [
+                "live",
+                "simulation",
+                "insights",
+                "utility",
+                "test"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "created",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "updated",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c199756f235a27de8a4461534f3f41ab648378ca35250f54657c2287adb25756"
+}

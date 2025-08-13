@@ -15,6 +15,7 @@
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::spawn;
+use tokio::sync::broadcast;
 
 use crate::common::config::ConfigurationWebsocketStreams;
 use crate::common::models::{WebsocketEvent, WebsocketMode};
@@ -33,7 +34,7 @@ pub use models::*;
 const HAS_TIME_UNIT: bool = false;
 
 pub struct WebsocketStreams {
-    websocket_streams_base: Arc<WebsocketStreamsBase>,
+    pub websocket_streams_base: Arc<WebsocketStreamsBase>,
     websocket_market_streams_api_client: WebsocketMarketStreamsApiClient,
 }
 
@@ -78,30 +79,9 @@ impl WebsocketStreams {
     ///     // Handle WebSocket event
     /// });
     ///
-    pub fn subscribe_on_ws_events<F>(&self, callback: F) -> Subscription
-    where
-        F: FnMut(WebsocketEvent) + Send + 'static,
-    {
+    pub fn subscribe_on_ws_message(&self) -> broadcast::Receiver<WebsocketEvent> {
         let base = Arc::clone(&self.websocket_streams_base);
-        base.common.events.subscribe(callback)
-    }
-
-    /// Unsubscribes from WebSocket events for a given `Subscription`.
-    ///
-    /// # Arguments
-    ///
-    /// * `subscription` - The `Subscription` to unsubscribe from WebSocket events.
-    ///
-    /// # Examples
-    ///
-    ///
-    /// let subscription = `websocket_streams.subscribe_on_ws_events(|event`| {
-    ///     // Handle WebSocket event
-    /// });
-    /// `websocket_streams.unsubscribe_from_ws_events(subscription)`;
-    ///
-    pub fn unsubscribe_from_ws_events(&self, subscription: Subscription) {
-        subscription.unsubscribe();
+        base.common.events.subscribe()
     }
 
     /// Disconnects the WebSocket connection.

@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO instances\n            (\n                id, \n                \"name\", \n                instance_type,\n                created,\n                updated\n            ) VALUES ($1, $2, $3, $4, $5)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        {
+          "Custom": {
+            "name": "instance_type",
+            "kind": {
+              "Enum": [
+                "live",
+                "simulation",
+                "insights",
+                "utility",
+                "test"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cda317c9aeb14ae4d315b9cc5ddfdd418dfc4c2dfef17fb1b6bfd3df723ef5af"
+}

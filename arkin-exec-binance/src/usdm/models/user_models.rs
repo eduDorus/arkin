@@ -1,4 +1,5 @@
 use rust_decimal::prelude::*;
+use serde::Serialize;
 
 use arkin_core::prelude::*;
 
@@ -46,9 +47,10 @@ pub enum AccountUpdateReason {
     CoinSwapWithdraw,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Copy, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BinanceOrderSide {
+    #[default]
     Buy,
     Sell,
 }
@@ -62,10 +64,20 @@ impl From<BinanceOrderSide> for MarketSide {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+impl From<MarketSide> for BinanceOrderSide {
+    fn from(side: MarketSide) -> Self {
+        match side {
+            MarketSide::Buy => Self::Buy,
+            MarketSide::Sell => Self::Sell,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Copy, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BinanceOrderType {
     Limit,
+    #[default]
     Market,
     Stop,
     StopMarket,
@@ -88,7 +100,21 @@ impl From<BinanceOrderType> for VenueOrderType {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+impl From<VenueOrderType> for BinanceOrderType {
+    fn from(order_type: VenueOrderType) -> Self {
+        match order_type {
+            VenueOrderType::Limit => Self::Limit,
+            VenueOrderType::Market => Self::Market,
+            VenueOrderType::StopLimit => Self::Stop,
+            VenueOrderType::StopMarket => Self::StopMarket,
+            VenueOrderType::TakeProfit => Self::TakeProfit,
+            VenueOrderType::TakeProfitMarket => Self::TakeProfitMarket,
+            VenueOrderType::TrailingStopMarket => Self::TrailingStopMarket,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BinanceExecutionType {
     New,
@@ -125,7 +151,7 @@ impl From<BinanceOrderStatus> for VenueOrderStatus {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BinanceTimeInForce {
     Gtc,
@@ -141,6 +167,18 @@ impl From<BinanceTimeInForce> for VenueOrderTimeInForce {
             BinanceTimeInForce::Ioc => VenueOrderTimeInForce::Ioc,
             BinanceTimeInForce::Fok => VenueOrderTimeInForce::Fok,
             BinanceTimeInForce::Gtx => VenueOrderTimeInForce::Gtx,
+        }
+    }
+}
+
+impl From<VenueOrderTimeInForce> for BinanceTimeInForce {
+    fn from(time_in_force: VenueOrderTimeInForce) -> Self {
+        match time_in_force {
+            VenueOrderTimeInForce::Gtc => Self::Gtc,
+            VenueOrderTimeInForce::Ioc => Self::Ioc,
+            VenueOrderTimeInForce::Fok => Self::Fok,
+            VenueOrderTimeInForce::Gtx => Self::Gtx,
+            VenueOrderTimeInForce::Gtd => unimplemented!("GTD not supported for Binance"),
         }
     }
 }

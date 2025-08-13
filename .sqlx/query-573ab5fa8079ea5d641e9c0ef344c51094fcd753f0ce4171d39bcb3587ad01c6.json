@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE venue_orders\n            SET\n                last_fill_price = $2,\n                last_fill_quantity = $3,\n                last_fill_commission = $4,\n                filled_price = $5,\n                filled_quantity = $6,\n                commission_asset_id = $7,\n                commission = $8,\n                status = $9,\n                updated = $10\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Uuid",
+        "Numeric",
+        {
+          "Custom": {
+            "name": "venue_order_status",
+            "kind": {
+              "Enum": [
+                "new",
+                "inflight",
+                "placed",
+                "rejected",
+                "partially_filled",
+                "filled",
+                "cancelling",
+                "cancelled",
+                "partially_filled_cancelled",
+                "expired",
+                "partially_filled_expired"
+              ]
+            }
+          }
+        },
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "573ab5fa8079ea5d641e9c0ef344c51094fcd753f0ce4171d39bcb3587ad01c6"
+}

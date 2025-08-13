@@ -11,7 +11,7 @@ use super::{credentials::Credentials, method::Method, request::Request, response
 
 // Client Implementatino
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct BinanceHttpClient {
+pub struct HttpClient {
     #[builder(default)]
     client: Client,
     #[builder(default = Url::parse("https://fapi.binance.com").expect("Default url for binance http client is invalid"))]
@@ -21,39 +21,7 @@ pub struct BinanceHttpClient {
     credentials: Option<Credentials>,
 }
 
-impl BinanceHttpClient {
-    pub fn new(client: Client, base_url: &str) -> Self {
-        let url = Url::parse(base_url).expect("Invalid URL");
-        Self {
-            client,
-            base_url: url,
-            timestamp_delta: 0,
-            credentials: None,
-        }
-    }
-
-    pub fn with_url(base_url: &str) -> Self {
-        let url = Url::parse(base_url).expect("Invalid URL");
-        Self {
-            client: Client::new(),
-            base_url: url,
-            timestamp_delta: 0,
-            credentials: None,
-        }
-    }
-
-    pub fn credentials(mut self, credentials: Credentials) -> Self {
-        self.credentials = Some(credentials);
-        self
-    }
-
-    pub fn timestamp_delta(mut self, timestamp_delta: i64) -> Self {
-        self.timestamp_delta = timestamp_delta;
-        self
-    }
-}
-
-impl BinanceHttpClient {
+impl HttpClient {
     pub async fn send<R: Into<Request>>(&self, request: R) -> Result<Response, BinanceHttpClientError> {
         let Request {
             method,
@@ -129,12 +97,6 @@ impl BinanceHttpClient {
 
         let body = response.text().await?;
         Ok(Response { body })
-    }
-}
-
-impl Default for BinanceHttpClient {
-    fn default() -> Self {
-        Self::new(Client::new(), "https://testnet.binancefuture.com/")
     }
 }
 

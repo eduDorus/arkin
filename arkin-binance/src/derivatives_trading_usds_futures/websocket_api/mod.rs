@@ -2,6 +2,7 @@
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{collections::BTreeMap, sync::Arc};
+use tokio::sync::broadcast;
 
 use crate::common::config::ConfigurationWebsocketApi;
 use crate::common::errors::WebsocketError;
@@ -24,7 +25,7 @@ pub use models::*;
 const HAS_TIME_UNIT: bool = false;
 
 pub struct WebsocketApi {
-    websocket_api_base: Arc<WebsocketApiBase>,
+    pub websocket_api_base: Arc<WebsocketApiBase>,
 
     account_api_client: AccountApiClient,
     market_data_api_client: MarketDataApiClient,
@@ -75,30 +76,9 @@ impl WebsocketApi {
     ///     // Handle WebSocket event
     /// });
     ///
-    pub fn subscribe_on_ws_events<F>(&self, callback: F) -> Subscription
-    where
-        F: FnMut(WebsocketEvent) + Send + 'static,
-    {
+    pub fn subscribe_on_ws_message(&self) -> broadcast::Receiver<WebsocketEvent> {
         let base = Arc::clone(&self.websocket_api_base);
-        base.common.events.subscribe(callback)
-    }
-
-    /// Unsubscribes from WebSocket events using the provided `Subscription`.
-    ///
-    /// # Arguments
-    ///
-    /// * `subscription` - The `Subscription` to unsubscribe from WebSocket events.
-    ///
-    /// # Examples
-    ///
-    ///
-    /// let subscription = `websocket_api.subscribe_on_ws_events(|event`| {
-    ///     // Handle WebSocket event
-    /// });
-    /// `websocket_api.unsubscribe_from_ws_events(subscription)`;
-    ///
-    pub fn unsubscribe_from_ws_events(&self, subscription: Subscription) {
-        subscription.unsubscribe();
+        base.common.events.subscribe()
     }
 
     /// Disconnects the WebSocket connection.
@@ -113,7 +93,6 @@ impl WebsocketApi {
     /// Returns an [`anyhow::Error`] if the connection fails.
     ///
     /// # Examples
-    ///
     ///
     /// let result = `websocket_api.disconnect().await`;
     ///

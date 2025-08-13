@@ -29,9 +29,6 @@ impl InternalAccount {
 }
 
 pub struct SimulationExecutor {
-    // identifier: String,
-    // time: Arc<dyn SystemTime>,
-    // publisher: Arc<dyn Publisher>,
     venue: Arc<Venue>,
     orderbook: ExchangeBook,
     account: InternalAccount,

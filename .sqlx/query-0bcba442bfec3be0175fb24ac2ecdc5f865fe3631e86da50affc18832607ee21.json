@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO accounts \n            (\n                id, \n                instance_id,\n                venue_id,\n                owner,\n                account_type,\n                created,\n                updated\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "account_owner",
+            "kind": {
+              "Enum": [
+                "user",
+                "venue"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "account_type",
+            "kind": {
+              "Enum": [
+                "spot",
+                "margin",
+                "equity"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0bcba442bfec3be0175fb24ac2ecdc5f865fe3631e86da50affc18832607ee21"
+}

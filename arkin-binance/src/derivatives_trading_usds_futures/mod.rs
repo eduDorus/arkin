@@ -1,3 +1,4 @@
+pub mod models;
 pub mod rest_api;
 pub mod websocket_api;
 pub mod websocket_streams;

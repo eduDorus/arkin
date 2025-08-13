@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
 use arkin_accounting::Accounting;
-use arkin_binance::BinanceExecution;
+use arkin_binance::{BinanceExecution, BinanceIngestor};
 use arkin_cli::{Cli, Commands};
 use arkin_exec_sim::SimulationExecutor;
 use arkin_exec_strat_taker::TakerExecutionStrategy;
@@ -75,33 +75,38 @@ async fn main() {
             engine.start().await;
             engine.wait_for_shutdown().await;
         }
-        // Commands::Ingestor(a) => {
-        //     info!("Starting arkin ingestor 🚀");
-        //     let time = LiveSystemTime::new();
+        Commands::Ingestor(a) => {
+            info!("Starting arkin ingestor 🚀");
+            let time = LiveSystemTime::new();
+            let pubsub = PubSub::new(true);
 
-        //     let pubsub = PubSub::new(time.clone(), true);
-        //     let pubsub_service = Service::new(pubsub.clone(), None);
+            let config = load::<PersistenceConfig>();
+            let instance = Instance::builder()
+                .id(Uuid::from_str("0387efa2-2d8b-4d40-9244-a4377697556a").unwrap())
+                .name("binance-ingestor".to_owned())
+                .instance_type(InstanceType::Utility)
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+            let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
 
-        //     let config = load::<PersistenceConfig>();
-        //     let instance = Instance::builder()
-        //         .id(Uuid::from_str("fcdad148-4ecf-4989-89d9-89c21d50f9b1").unwrap())
-        //         .name("downloader".to_owned())
-        //         .instance_type(InstanceType::Utility)
-        //         .created(time.now().await)
-        //         .updated(time.now().await)
-        //         .build();
-        //     let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
-        //     // let persistence_service = Service::new(persistence.to_owned(), None);
-        //     let persistence_service =
-        //         Service::new(persistence.to_owned(), Some(pubsub.subscribe(EventFilter::Persistable)));
+            let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
 
-        //     let engine = Engine::new();
-        //     engine.register(pubsub_service, 0, 10).await;
-        //     engine.register(persistence_service, 0, 10).await;
-        //     // engine.register(download_service, 0, 10).await;
-        //     engine.start().await;
-        //     engine.wait_for_shutdown().await;
-        // }
+            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).build());
+
+            let engine = Engine::builder()
+                .time(time.clone())
+                .pubsub(pubsub.clone())
+                .persistence(persistence.clone())
+                .build();
+            engine.register("pubsub", pubsub, 0, 10, None).await;
+            engine
+                .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
+                .await;
+            engine.register("ingestor", ingestor, 1, 9, None).await;
+            engine.start().await;
+            engine.wait_for_shutdown().await;
+        }
         // Commands::Scaler(a) => {
         //     info!("Starting arkin scaler init 🚀");
 

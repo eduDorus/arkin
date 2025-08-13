@@ -98,11 +98,11 @@ pub enum IngestorType {
 #[derive(Args, Debug)]
 pub struct IngestorsArgs {
     /// Type of ingestor to run.
-    #[arg(long, short)]
-    pub ingestor: IngestorType,
+    // #[arg(long, )]
+    // pub ingestor: IngestorType,
 
     /// Instruments to subscribe to (comma-separated, e.g., "BTCUSDT,ETHUSDT").
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, short, value_delimiter = ',')]
     pub instruments: Vec<String>,
 
     /// Perform a dry run: simulate ingestion without processing data.

@@ -1,3 +1,7 @@
+use std::collections::BTreeMap;
+use time::OffsetDateTime;
+
+use crate::http::sign::sign_hmac as sign;
 /// Binance API Credentials.
 ///
 /// Communication with Binance API USER_DATA endpoints requires
@@ -51,6 +55,23 @@ impl Credentials {
             api_key: api_key.into(),
             signature: Signature::Ed25519(Ed25519Signature { key: key.into() }),
         }
+    }
+
+    pub fn sign(&self, data: &str) -> String {
+        match &self.signature {
+            Signature::Hmac(hmac) => sign(data, &hmac.api_secret).unwrap(),
+            Signature::Ed25519(_) => todo!(),
+        }
+    }
+
+    pub fn ws_auth_params(&self) -> BTreeMap<String, String> {
+        let mut params = BTreeMap::new();
+        let timestamp = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as u64;
+        let signature = self.sign(&format!("timestamp={}", timestamp));
+        params.insert("apiKey".to_string(), self.api_key.clone());
+        params.insert("timestamp".to_string(), timestamp.to_string());
+        params.insert("signature".to_string(), signature);
+        params
     }
 }
 

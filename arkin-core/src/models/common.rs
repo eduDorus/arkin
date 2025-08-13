@@ -1,11 +1,14 @@
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use sqlx::Type;
 use strum::Display;
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type, Serialize, Deserialize, Default)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "market_side", rename_all = "snake_case")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum MarketSide {
+    #[default]
     Buy,
     Sell,
 }

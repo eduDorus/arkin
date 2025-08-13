@@ -4,7 +4,7 @@ use std::fmt;
 ///
 /// The `Stream` trait is a simplified interface for Binance approved
 /// websocket streams.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Stream {
     stream_name: String,
 }

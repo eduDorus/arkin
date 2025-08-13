@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO execution_orders\n            (\n                id, \n                instance_id, \n                strategy_id,\n                instrument_id, \n                order_type, \n                side, \n                price, \n                quantity, \n                fill_price, \n                filled_quantity, \n                total_commission, \n                status, \n                created, \n                updated\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "execution_order_type",
+            "kind": {
+              "Enum": [
+                "wide_quoter",
+                "marker",
+                "taker"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "market_side",
+            "kind": {
+              "Enum": [
+                "buy",
+                "sell"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        {
+          "Custom": {
+            "name": "execution_order_status",
+            "kind": {
+              "Enum": [
+                "new",
+                "placed",
+                "rejected",
+                "partially_filled",
+                "filled",
+                "cancelling",
+                "partially_filled_cancelled",
+                "cancelled",
+                "partially_filled_expired",
+                "expired"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5723fd77439381ea16b438d05acf1d925c1867574fb6c305e824ec2e96af163d"
+}

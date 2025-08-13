@@ -90,6 +90,8 @@ pub struct VenueOrder {
     pub id: VenueOrderId,
     #[builder(default = None)]
     pub execution_order_id: Option<ExecutionOrderId>,
+    #[builder(default = None)]
+    pub venue_order_id: Option<String>,
     pub instrument: Arc<Instrument>,
     pub strategy: Option<Arc<Strategy>>,
     pub side: MarketSide,

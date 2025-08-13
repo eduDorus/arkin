@@ -1,61 +1,134 @@
-use std::sync::Arc;
+use std::{pin::Pin, sync::Arc};
 
 use async_trait::async_trait;
-use tracing::info;
+use tracing::{error, info};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
 use crate::{
-    common::config::ConfigurationWebsocketStreams,
+    common::{
+        config::ConfigurationWebsocketStreams,
+        models::{WebsocketEvent, WebsocketMode},
+    },
     derivatives_trading_usds_futures::{
-        websocket_streams::IndividualSymbolBookTickerStreamsParams, DerivativesTradingUsdsFuturesWsStreams,
+        models::market::{BinanceUSDMMarketEvent, BinanceUSDMMarketStreamEvent},
+        websocket_streams::{AggregateTradeStreamsParams, IndividualSymbolBookTickerStreamsParams},
+        DerivativesTradingUsdsFuturesWsStreams,
     },
 };
 
 #[derive(TypedBuilder)]
 pub struct BinanceIngestor {
-    identifier: String,
-    _time: Arc<dyn SystemTime>,
-    _publisher: Arc<dyn Publisher>,
+    pub instruments: Vec<Arc<Instrument>>,
+}
+
+pub async fn start_md_task(ingestor: Arc<BinanceIngestor>, core_ctx: Arc<CoreCtx>, service_ctx: Arc<ServiceCtx>) {
+    // Build WebSocket Streams config
+    let ws_streams_conf = ConfigurationWebsocketStreams::builder().mode(WebsocketMode::Pool(3)).build();
+
+    // Create the DerivativesTradingUsdsFutures WebSocket Streams client
+    let ws_streams_client = DerivativesTradingUsdsFuturesWsStreams::production(ws_streams_conf);
+
+    // Connect to WebSocket
+    let connection = ws_streams_client.connect().await.expect("Failed to connect to WebSocket");
+
+    // Subscribe to the streams
+    for inst in ingestor.instruments.iter() {
+        connection
+            .individual_symbol_book_ticker_streams(
+                IndividualSymbolBookTickerStreamsParams::builder()
+                    .symbol(inst.venue_symbol.clone())
+                    .build(),
+            )
+            .await
+            .expect("Failed to subscribe to the book ticker stream");
+
+        connection
+            .aggregate_trade_streams(AggregateTradeStreamsParams::builder().symbol(inst.venue_symbol.clone()).build())
+            .await
+            .expect("Failed to subscribe to the agg trade stream");
+    }
+
+    let mut rx = connection.subscribe_on_ws_message();
+
+    let shutdown = service_ctx.get_shutdown_token();
+
+    loop {
+        tokio::select! {
+              Ok(event) = rx.recv() => {
+                match event {
+                  WebsocketEvent::Message(msg) => {
+                    match serde_json::from_str::<BinanceUSDMMarketStreamEvent>(&msg) {
+                        Ok(e) => {
+                            match e.data {
+                                BinanceUSDMMarketEvent::AggTrade(trade) => {
+                                    let instrument = core_ctx.persistence.get_instrument_by_venue_symbol(&trade.instrument).await;
+                                    // "m": true: The buyer is the market maker.
+                                    // • The trade was initiated by a sell order from the taker.
+                                    // • The taker is selling, and the maker (buyer) is buying.
+                                    // "m": false: The seller is the market maker.
+                                    // • The trade was initiated by a buy order from the taker.
+                                    // • The taker is buying, and the maker (seller) is selling.
+                                    let side = if trade.maker {
+                                        MarketSide::Sell
+                                    } else {
+                                        MarketSide::Buy
+                                    };
+                                    let trade = AggTrade::new(
+                                        trade.event_time,
+                                        instrument,
+                                        trade.agg_trade_id,
+                                        side,
+                                        trade.price,
+                                        trade.quantity,
+                                    );
+                                    let trade = Arc::new(trade);
+                                    core_ctx.publish(Event::AggTradeUpdate(trade)).await;
+                                }
+                                BinanceUSDMMarketEvent::Tick(tick) => {
+                                    let instrument = core_ctx.persistence.get_instrument_by_venue_symbol(&tick.instrument).await;
+                                    let tick = Tick::new(
+                                        tick.event_time,
+                                        instrument,
+                                        tick.update_id,
+                                        tick.bid_price,
+                                        tick.bid_quantity,
+                                        tick.ask_price,
+                                        tick.ask_quantity,
+                                    );
+                                    let tick = Arc::new(tick);
+                                    core_ctx.publish(Event::TickUpdate(tick)).await;
+                                }
+                                _ => error!("type not implemented"),
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to parse WebSocket message: {:?}", e);
+                        }
+                    }
+                  }
+                  _ => {}
+                }
+              }
+              _ = shutdown.cancelled() => {
+                info!("Shutdown signal received, stopping WebSocket task.");
+                connection.disconnect().await.unwrap();
+                break;
+              }
+        }
+    }
+    info!(target: "ingestor::binance", "WebSocket task finished");
 }
 
 #[async_trait]
 impl Runnable for BinanceIngestor {
-    async fn start_tasks(self: Arc<Self>, ctx: Arc<ServiceCtx>) {
-        info!(target: "ingestor::binance", "starting simulation tasks");
-
-        // let _publisher = self._publisher.clone();
-        let shutdown = ctx.get_shutdown_token();
-
-        // Build WebSocket Streams config
-        let ws_streams_conf = ConfigurationWebsocketStreams::builder().build();
-
-        // Create the DerivativesTradingUsdsFutures WebSocket Streams client
-        let ws_streams_client = DerivativesTradingUsdsFuturesWsStreams::production(ws_streams_conf);
-
-        // Connect to WebSocket
-        let connection = ws_streams_client.connect().await.unwrap();
-
-        ctx.spawn(async move {
-            // Setup the stream parameters
-            let params = IndividualSymbolBookTickerStreamsParams::builder()
-                .symbol("btcusdt".to_string())
-                .build();
-
-            // Subscribe to the stream
-            let stream = connection.individual_symbol_book_ticker_streams(params).await.unwrap();
-            // Register callback for incoming messages
-            stream.on_message(|data| {
-                info!("{:?}", data);
-                // Here we will publish
-            });
-
-            shutdown.cancelled().await;
-            info!(target: "ingestor::binance", "binance sim ingestor received shutdown");
-            connection.disconnect().await.unwrap();
-            info!(target: "ingestor::binance", "binance sim ingestor finished task");
-        });
+    async fn get_tasks(
+        self: Arc<Self>,
+        service_ctx: Arc<ServiceCtx>,
+        core_ctx: Arc<CoreCtx>,
+    ) -> Vec<Pin<Box<dyn Future<Output = ()> + Send>>> {
+        vec![Box::pin(start_md_task(self, core_ctx.clone(), service_ctx.clone()))]
     }
 }
 

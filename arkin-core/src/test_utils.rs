@@ -1,6 +1,7 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use futures::Stream;
 use rust_decimal::prelude::*;
 use time::{macros::datetime, OffsetDateTime, UtcDateTime};
 use tokio::sync::{Mutex, RwLock};
@@ -8,8 +9,9 @@ use tracing::{debug, instrument};
 use uuid::Uuid;
 
 use crate::{
-    Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus, InstrumentType, Pipeline, Price,
-    PubSub, Publisher, Quantity, Strategy, SystemTime, Tick, Venue, VenueType,
+    utils::Frequency, AggTrade, Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus,
+    InstrumentType, PersistenceReader, Pipeline, Price, PubSub, Publisher, Quantity, Strategy, SystemTime, Tick, Venue,
+    VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -115,6 +117,72 @@ impl MockPublisher {
 impl Publisher for MockPublisher {
     async fn publish(&self, event: Event) {
         self.events.lock().await.push(event);
+    }
+}
+
+#[derive(Default)]
+pub struct MockPersistence {
+    // This struct can be expanded to include mock implementations of persistence methods
+}
+
+impl MockPersistence {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+}
+
+#[async_trait]
+impl PersistenceReader for MockPersistence {
+    async fn get_instance_by_id(&self, _id: &Uuid) -> Arc<Instance> {
+        test_instance()
+    }
+
+    async fn get_instance_by_name(&self, _name: &str) -> Arc<Instance> {
+        test_instance()
+    }
+    async fn get_pipeline_by_id(&self, _id: &Uuid) -> Arc<Pipeline> {
+        test_pipeline()
+    }
+    async fn get_pipeline_by_name(&self, _name: &str) -> Arc<Pipeline> {
+        test_pipeline()
+    }
+    async fn get_venue_by_id(&self, _id: &Uuid) -> Arc<Venue> {
+        test_binance_venue()
+    }
+    async fn get_venue_by_name(&self, _name: &str) -> Arc<Venue> {
+        test_binance_venue()
+    }
+    async fn get_instrument_by_id(&self, _id: &Uuid) -> Arc<Instrument> {
+        test_inst_binance_btc_usdt_perp()
+    }
+    async fn get_instrument_by_venue_symbol(&self, _symbol: &str) -> Arc<Instrument> {
+        test_inst_binance_btc_usdt_perp()
+    }
+    async fn get_asset_by_id(&self, _id: &Uuid) -> Arc<Asset> {
+        test_usdt_asset()
+    }
+    async fn get_asset_by_symbol(&self, _symbol: &str) -> Arc<Asset> {
+        test_usdt_asset()
+    }
+    async fn tick_stream_range_buffered(
+        &self,
+        _instruments: &[Arc<Instrument>],
+        _start: UtcDateTime,
+        _end: UtcDateTime,
+        _buffer_size: usize,
+        _frequency: Frequency,
+    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin> {
+        todo!()
+    }
+    async fn trade_stream_range_buffered(
+        &self,
+        _instruments: &[Arc<Instrument>],
+        _start: UtcDateTime,
+        _end: UtcDateTime,
+        _buffer_size: usize,
+        _frequency: Frequency,
+    ) -> Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin> {
+        todo!()
     }
 }
 

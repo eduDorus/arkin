@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE strategies\n            SET\n                name = $2,\n                description = $3,\n                updated = $4\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d95f40e9a05e9a6290d178b29f1e60eac41ccfead342ad196dc9f7c23732cdd6"
+}

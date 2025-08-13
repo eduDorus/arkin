@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO pipelines \n            (\n                id, \n                name, \n                description,\n                created,\n                updated\n            ) VALUES ($1, $2, $3, $4, $5)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0f0ffa3092a21c9d47b364faa550aa9fa58e54f4cd655ed2109012b5431a88a9"
+}

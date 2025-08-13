@@ -1,0 +1,60 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO transfers\n            (\n                id, \n                instance_id, \n                transfer_group_id, \n                transfer_group_type, \n                transfer_type, \n                debit_account_id, \n                credit_account_id, \n                amount, \n                unit_price, \n                strategy_id, \n                instrument_id,\n                asset_id, \n                created\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "transfer_group_type",
+            "kind": {
+              "Enum": [
+                "initial",
+                "deposit",
+                "withdrawal",
+                "trade",
+                "exchange",
+                "interest",
+                "funding",
+                "settlement",
+                "liquidation",
+                "adjustment",
+                "reconciliation"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "transfer_type",
+            "kind": {
+              "Enum": [
+                "transfer",
+                "pnl",
+                "unrealized_pnl",
+                "margin",
+                "commission",
+                "rebate",
+                "reconciliation"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Uuid",
+        "Numeric",
+        "Numeric",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7667923024fd632d64db7db5f89d3e7562b8661b8762e86a68dd17667a2e25d7"
+}

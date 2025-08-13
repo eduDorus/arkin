@@ -324,8 +324,8 @@ impl Runnable for BinanceExecution {
                 info!(target: "execution::binance", "symbol_order_book_ticker data: {:?}", data);
 
                 // Get a subscription handle
-                let _stream =
-                    api.subscribe_on_ws_events(|e| debug!(target: "execution::binance", "USER STREAM EVENT: {:?}", e));
+                // let _stream =
+                //     api.subscribe_on_ws_events(|e| debug!(target: "execution::binance", "USER STREAM EVENT: {:?}", e));
 
                 *api_guard = Some(api);
             }
@@ -362,34 +362,53 @@ mod tests {
     use std::{env, time::Duration};
 
     use anyhow::{Context, Result};
+    use reqwest::Client;
     use rust_decimal::prelude::*;
     use tracing::info;
     use uuid::Uuid;
 
     use crate::{
-        common::{config::ConfigurationWebsocketApi, models::WebsocketMode, utils::SignatureGenerator},
+        common::{
+            config::{AgentConnector, ConfigurationRestApi, ConfigurationWebsocketApi, ConfigurationWebsocketStreams},
+            models::WebsocketMode,
+            utils::SignatureGenerator,
+            websocket::WebsocketHandler,
+        },
         derivatives_trading_usds_futures::{
+            rest_api::{CurrentAllOpenOrdersParams, RestApi},
             websocket_api::{
-                CancelOrderParams, NewOrderParams, NewOrderSideEnum, NewOrderTimeInForceEnum, StartUserDataStreamParams,
+                AccountInformationV2Params, CancelOrderParams, FuturesAccountBalanceV2Params,
+                KeepaliveUserDataStreamParams, NewOrderParams, NewOrderSideEnum, NewOrderTimeInForceEnum,
+                PositionInformationV2Params, StartUserDataStreamParams,
             },
-            DerivativesTradingUsdsFuturesWsApi,
+            websocket_streams::{AggregateTradeStreamsParams, IndividualSymbolBookTickerStreamsParams},
+            DerivativesTradingUsdsFuturesRestApi, DerivativesTradingUsdsFuturesWsApi,
+            DerivativesTradingUsdsFuturesWsStreams,
         },
     };
 
     #[tokio::test]
     #[test_log::test]
-    #[ignore]
     async fn subscribe_user_stream() -> Result<()> {
         // Load credentials from env
         let api_key = env::var("API_KEY").expect("API_KEY must be set in the environment");
         let api_secret = env::var("API_SECRET").expect("API_SECRET must be set in the environment");
 
+        let cfg = ConfigurationRestApi::builder()
+            .api_key(&api_key)
+            .api_secret(&api_secret)
+            .client(Client::builder().gzip(true).build().expect("Failed to build HTTP client"))
+            .user_agent("unknown".to_owned())
+            .signature_gen(SignatureGenerator::new(Some(api_secret.clone()), None, None))
+            .build();
+        let rest_api = DerivativesTradingUsdsFuturesRestApi::production(cfg);
+
         // Build WebSocket API config
         let signature_gen = SignatureGenerator::new(Some(api_secret.clone()), None, None);
         let configuration = ConfigurationWebsocketApi::builder()
-            .api_key(api_key)
-            .api_secret(api_secret)
-            .mode(WebsocketMode::Pool(1)) // Use pool mode with a pool size of 3
+            .api_key(&api_key)
+            .api_secret(&api_secret)
+            .mode(WebsocketMode::Pool(3)) // Use pool mode with a pool size of 3
             .user_agent("unknown".to_owned())
             .signature_gen(signature_gen)
             .build();
@@ -398,14 +417,18 @@ mod tests {
         let connection = client.connect().await?;
 
         // Subscribe to the stream
-        let _stream = connection
-            .subscribe_on_ws_events(|e| info!(target: "execution::binance", "USER DATA SUBSCRIPTION STREAM: {:?}", e));
+        // let _stream = connection
+        //     .subscribe_on_ws_events(|e| info!(target: "execution::binance", "USER DATA SUBSCRIPTION STREAM: {:?}", e));
+        let mut rx = connection.subscribe_on_ws_message();
+        tokio::spawn(async move {
+            while let Ok(event) = rx.recv().await {
+                info!("SUBSCRIPTION: {:?}", event);
+            }
+        });
 
         let params = StartUserDataStreamParams::builder().build();
-        let response = connection.start_user_data_stream(params).await?;
-        // info!(target: "execution::binance", ?response.rate_limits, "start_user_data_stream rate limits");
-        let _data = response.data()?;
-        // info!(target: "execution::binance", ?data, "start_user_data_stream data");
+        let res = connection.start_user_data_stream(params).await?.data()?;
+        info!(target: "execution::binance", "start_user_data_stream data: {:?}", res);
 
         // let params = AccountInformationV2Params::builder().build();
         // let response = connection.account_information_v2(params).await?;
@@ -416,27 +439,127 @@ mod tests {
         let params = NewOrderParams::builder()
             .side(NewOrderSideEnum::Buy)
             .price(Some(dec!(110000)))
-            .quantity(Some(dec!(0.01)))
+            .quantity(Some(dec!(0.001)))
             .r#type("LIMIT")
             .symbol("btcusdt")
             .time_in_force(Some(NewOrderTimeInForceEnum::Gtc))
             .new_client_order_id(Some(client_order_id.to_string()))
             .build();
-        let response = connection.new_order(params).await?;
-        let _data = response.data()?;
-        // info!(target: "execution::binance", ?data, "new order data");
+        let res = connection.new_order(params).await?.data()?;
+        info!(target: "execution::binance", "new order data: {:?}", res);
 
         tokio::time::sleep(Duration::from_secs(3)).await;
+        let res = rest_api
+            .current_all_open_orders(CurrentAllOpenOrdersParams::builder().build())
+            .await
+            .context("Failed to get current all open orders")?
+            .data()
+            .await?;
+        info!(target: "execution::binance", "current all open orders data: {:?}", res);
+        info!(target: "execution::binance", "current all open orders count: {}", res.len());
+
         let params = CancelOrderParams::builder()
             .symbol("btcusdt")
             .orig_client_order_id(client_order_id.to_string())
             .build();
-        let response = connection.cancel_order(params).await?;
-        let _data = response.data()?;
-        // info!(target: "execution::binance", ?data, "cancel order data");
+        let res = connection.cancel_order(params).await?.data()?;
+        info!(target: "execution::binance", "cancel order data: {:?}", res);
+
+        connection
+            .keepalive_user_data_stream(KeepaliveUserDataStreamParams::builder().build())
+            .await?;
+
+        let res = connection
+            .account_information_v2(AccountInformationV2Params::builder().build())
+            .await?
+            .data()?;
+        info!(target: "execution::binance", "account information data: {:?}", res);
+
+        let res = connection
+            .futures_account_balance_v2(FuturesAccountBalanceV2Params::builder().build())
+            .await?
+            .data()?;
+        info!(target: "execution::binance", "futures account balance data: {:?}", res);
+
+        let res = connection
+            .position_information_v2(PositionInformationV2Params::builder().build())
+            .await?
+            .data()?;
+        info!(target: "execution::binance", "position information data: {:?}", res);
 
         // Disconnect after 10 seconds
         tokio::time::sleep(Duration::from_secs(10)).await;
+        connection.disconnect().await.context("Failed to disconnect WebSocket client")?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn subscribe_binance_agg_trades() -> Result<()> {
+        // Build WebSocket Streams config
+        let ws_streams_conf = ConfigurationWebsocketStreams::builder().mode(WebsocketMode::Pool(3)).build();
+
+        // Create the DerivativesTradingUsdsFutures WebSocket Streams client
+        let ws_streams_client = DerivativesTradingUsdsFuturesWsStreams::production(ws_streams_conf);
+
+        // Connect to WebSocket
+        let connection = ws_streams_client
+            .connect()
+            .await
+            .context("Failed to connect to WebSocket Streams")?;
+
+        // Subscribe to the streams
+        connection
+            .individual_symbol_book_ticker_streams(
+                IndividualSymbolBookTickerStreamsParams::builder()
+                    .symbol("btcusdt".to_string())
+                    .build(),
+            )
+            .await
+            .context("Failed to subscribe to the stream")?;
+
+        // Subscribe to the streams
+        connection
+            .individual_symbol_book_ticker_streams(
+                IndividualSymbolBookTickerStreamsParams::builder()
+                    .symbol("ethusdt".to_string())
+                    .build(),
+            )
+            .await
+            .context("Failed to subscribe to the stream")?;
+
+        connection
+            .individual_symbol_book_ticker_streams(
+                IndividualSymbolBookTickerStreamsParams::builder()
+                    .symbol("solusdt".to_string())
+                    .build(),
+            )
+            .await
+            .context("Failed to subscribe to the stream")?;
+
+        connection
+            .aggregate_trade_streams(AggregateTradeStreamsParams::builder().symbol("btcusdt".to_string()).build())
+            .await
+            .context("Failed to subscribe to the stream")?;
+        connection
+            .aggregate_trade_streams(AggregateTradeStreamsParams::builder().symbol("ethusdt".to_string()).build())
+            .await
+            .context("Failed to subscribe to the stream")?;
+        connection
+            .aggregate_trade_streams(AggregateTradeStreamsParams::builder().symbol("solusdt".to_string()).build())
+            .await
+            .context("Failed to subscribe to the stream")?;
+
+        let mut rx = connection.subscribe_on_ws_message();
+        tokio::spawn(async move {
+            while let Ok(event) = rx.recv().await {
+                info!("{:?}", event);
+            }
+        });
+
+        // Disconnect after 20 seconds
+        tokio::time::sleep(Duration::from_secs(20)).await;
         connection.disconnect().await.context("Failed to disconnect WebSocket client")?;
 
         Ok(())
