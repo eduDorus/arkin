@@ -1,4 +1,5 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use rust_decimal::{dec, Decimal};
 use time::UtcDateTime;
 
 use arkin_core::prelude::*;
@@ -223,6 +224,14 @@ pub struct WideQuoterArgs {
     /// Instruments to process live (comma-separated, e.g., "BTCUSDT,ETHUSDT").
     #[arg(long, short = 'i', value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,
+
+    /// Quote percentage from mid price
+    #[arg(long, short, default_value_t = dec!(0.005))]
+    pub quote_spread: Decimal,
+
+    /// Requote threshold
+    #[arg(long, short, default_value_t = dec!(0.0002))]
+    pub requote_threshold: Decimal,
 }
 
 /// Arguments for the `wide-quoter` subcommand.

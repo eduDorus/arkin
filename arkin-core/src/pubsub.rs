@@ -8,7 +8,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use kanal::{AsyncReceiver, AsyncSender};
-use strum::{IntoDiscriminant, IntoEnumIterator};
+use strum::IntoEnumIterator;
 use tokio::select;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
@@ -102,7 +102,7 @@ impl PubSub {
 
     pub fn subscribe(&self, filter: EventFilter) -> Arc<PubSubSubscriber> {
         info!(target: "pubsub", "new subscriber");
-        let (tx, rx) = kanal::bounded_async(1);
+        let (tx, rx) = kanal::bounded_async(1024);
 
         // Update the subscriber list
         let id = self.get_next_id();
@@ -170,7 +170,7 @@ impl PubSub {
 
     async fn broadcast_event(&self, event: Event) {
         let mut ack_counter = 0;
-        let event_type = event.discriminant();
+        let event_type = event.event_type();
 
         // Get subscriber ids (DashMap returns a ref, not a Vec)
         let subscriber_ids: Vec<u64> = self
@@ -178,7 +178,10 @@ impl PubSub {
             .get(&event_type)
             .map(|v| v.value().clone())
             .unwrap_or_default();
-        debug!(target: "pubsub", "sending event {} to {} subscribers", event_type,  subscriber_ids.len());
+
+        if !event_type.is_market_data() {
+            info!(target: "pubsub", "sending event {} to {} subscribers", event_type,  subscriber_ids.len());
+        }
 
         // Send to subscribers and check for closed connections (DashMap version)
         let mut to_remove = Vec::new();

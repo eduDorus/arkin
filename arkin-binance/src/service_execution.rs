@@ -2,7 +2,7 @@ use std::{env, pin::Pin, sync::Arc};
 
 use async_trait::async_trait;
 use reqwest::Client;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 use typed_builder::TypedBuilder;
 
@@ -29,7 +29,7 @@ const LISTEN_KEY_RENEWAL: u64 = 30 * 60;
 #[derive(TypedBuilder)]
 pub struct BinanceExecution {
     ws_handle: WebsocketApiHandle,
-    ws_stream: Mutex<Option<WebsocketApi>>,
+    ws_stream: RwLock<Option<WebsocketApi>>,
     http_handle: RestApi,
 }
 
@@ -59,7 +59,7 @@ impl BinanceExecution {
 
         Arc::new(Self {
             ws_handle: handle,
-            ws_stream: Mutex::new(None),
+            ws_stream: RwLock::new(None),
             http_handle: rest_api,
         })
     }
@@ -67,7 +67,7 @@ impl BinanceExecution {
     pub async fn place_order(&self, ctx: Arc<CoreCtx>, order: &VenueOrder) {
         info!(target: "execution::binance", "received new order {}", order.id);
 
-        if let Some(api) = self.ws_stream.lock().await.as_ref() {
+        if let Some(api) = self.ws_stream.read().await.as_ref() {
             let side = match order.side {
                 MarketSide::Buy => NewOrderSideEnum::Buy,
                 MarketSide::Sell => NewOrderSideEnum::Sell,
@@ -154,7 +154,7 @@ impl BinanceExecution {
     pub async fn cancel_order(&self, ctx: Arc<CoreCtx>, order: &VenueOrder) {
         info!(target: "execution::binance", "received cancel order for {}", order.id);
 
-        if let Some(api) = self.ws_stream.lock().await.as_ref() {
+        if let Some(api) = self.ws_stream.read().await.as_ref() {
             let params = CancelOrderParams::builder()
                 .symbol(order.instrument.venue_symbol.clone())
                 .orig_client_order_id(order.id.to_string())
@@ -186,7 +186,7 @@ impl BinanceExecution {
 }
 
 async fn binance_exec_task(exec: Arc<BinanceExecution>, _ctx: Arc<CoreCtx>, service_ctx: Arc<ServiceCtx>) {
-    let mut rx = if let Some(api) = exec.ws_stream.lock().await.as_ref() {
+    let mut rx = if let Some(api) = exec.ws_stream.read().await.as_ref() {
         api.subscribe_on_ws_message()
     } else {
         error!(target: "execution::binance", "WebSocket API not connected, could not start task");
@@ -238,7 +238,7 @@ impl Runnable for BinanceExecution {
                     .data()
                     .expect("Failed to get data from user data stream");
                 info!(target: "execution::binance", "start_user_data_stream data: {:?}", res);
-                let mut streams_guard = self.ws_stream.lock().await;
+                let mut streams_guard = self.ws_stream.write().await;
                 *streams_guard = Some(api);
             }
             Err(e) => error!(target: "execution::binance", "Connect to binance failed: {}", e),
@@ -255,7 +255,7 @@ impl Runnable for BinanceExecution {
 
     async fn teardown(&self, _ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {
         // Disconnect trade stream
-        if let Some(api) = self.ws_stream.lock().await.as_ref() {
+        if let Some(api) = self.ws_stream.read().await.as_ref() {
             if let Err(e) = api.disconnect().await {
                 error!(target: "execution::binance", "Disconnect error from stream api: {}", e);
             } else {

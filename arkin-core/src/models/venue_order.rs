@@ -4,7 +4,7 @@ use rust_decimal::Decimal;
 use sqlx::Type;
 use strum::Display;
 use time::UtcDateTime;
-use tracing::error;
+use tracing::{error, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -190,26 +190,44 @@ impl VenueOrder {
     }
 
     pub fn cancel(&mut self, event_time: UtcDateTime) {
+        // Check if we are already cancelling
+        if self.status == VenueOrderStatus::Cancelling {
+            warn!("Order {} is already cancelling", self.id);
+            return;
+        }
+
         let new_status = VenueOrderStatus::Cancelling;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
             self.updated = event_time;
         } else {
-            error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
     pub fn expire(&mut self, event_time: UtcDateTime) {
+        // Check if we are already expired
+        if self.status == VenueOrderStatus::Expired {
+            warn!("Order {} is already expired", self.id);
+            return;
+        }
+
         let new_status = VenueOrderStatus::Expired;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
             self.updated = event_time;
         } else {
-            error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+            warn!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
         }
     }
 
     pub fn reject(&mut self, event_time: UtcDateTime) {
+        // Check if we are already rejected
+        if self.status == VenueOrderStatus::Rejected {
+            warn!("Order {} is already rejected", self.id);
+            return;
+        }
+
         let new_status = VenueOrderStatus::Rejected;
         if self.is_valid_transition(&new_status) {
             self.status = new_status;

@@ -420,7 +420,7 @@ async fn main() {
             info!("Starting arkin Live Trading 🚀");
             // Init core
             let time = LiveSystemTime::new();
-            let pubsub = PubSub::new(true);
+            let pubsub = PubSub::new(false);
 
             // Init persistence
             let config = load::<PersistenceConfig>();
@@ -441,7 +441,7 @@ async fn main() {
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
             let venue_order_book = VenueOrderBook::new(pubsub.publisher(), true);
             let exec_strat =
-                WideQuoterExecutionStrategy::new(execution_order_book, venue_order_book, dec!(0.005), dec!(0.0005));
+                WideQuoterExecutionStrategy::new(execution_order_book, venue_order_book, dec!(0.005), dec!(0.0002));
 
             // Executor
             let execution = BinanceExecution::new();
@@ -452,9 +452,9 @@ async fn main() {
                 .pubsub(pubsub.clone())
                 .persistence(persistence.clone())
                 .build();
-            engine.register("pubsub", pubsub.clone(), 0, 10, None).await;
+            engine.register("pubsub", pubsub.clone(), 0, 9, None).await;
             engine
-                .register("persistence", persistence, 0, 9, Some(EventFilter::Persistable))
+                .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
                 .await;
             engine.register("ingestor-binance", ingestor, 1, 3, None).await;
             engine
@@ -481,12 +481,14 @@ async fn main() {
                 .register(
                     "exec-binance",
                     execution,
-                    2,
+                    1,
                     2,
                     Some(EventFilter::Events(vec![EventType::NewVenueOrder, EventType::CancelVenueOrder])),
                 )
                 .await;
             engine.start().await;
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
 
             let strategy = Strategy::builder()
                 .id(Uuid::parse_str("41ba36fb-6171-4d5f-a4b4-25eb5415e426").expect("Invalid UUID"))
@@ -570,7 +572,7 @@ async fn main() {
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
             let venue_order_book = VenueOrderBook::new(pubsub.publisher(), true);
             let exec_strat =
-                WideQuoterExecutionStrategy::new(execution_order_book, venue_order_book, dec!(0.005), dec!(0.0005));
+                WideQuoterExecutionStrategy::new(execution_order_book, venue_order_book, dec!(0.005), dec!(0.0002));
 
             // Executor
             let execution = BinanceExecution::new();

@@ -4,7 +4,7 @@ use arkin_core::prelude::*;
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use time::UtcDateTime;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tracing::{debug, info, instrument, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -16,7 +16,7 @@ pub struct WideQuoterExecutionStrategy {
     exec_order_book: Arc<ExecutionOrderBook>,
     venue_order_book: Arc<VenueOrderBook>,
     #[builder(default)]
-    last_quoted_mids: Mutex<HashMap<Uuid, Decimal>>,
+    last_quoted_mids: RwLock<HashMap<Arc<Instrument>, Decimal>>,
     pct_from_mid: Decimal,
     requote_pct_change: Decimal,
 }
@@ -32,7 +32,7 @@ impl WideQuoterExecutionStrategy {
             strategy_type: ExecutionStrategyType::WideQuoter,
             exec_order_book,
             venue_order_book,
-            last_quoted_mids: Mutex::new(HashMap::new()),
+            last_quoted_mids: RwLock::new(HashMap::new()),
             pct_from_mid,
             requote_pct_change,
         }
@@ -181,75 +181,91 @@ impl WideQuoterExecutionStrategy {
         }
     }
 
-    async fn tick_update(&self, ctx: Arc<CoreCtx>, tick: &Tick) {
-        debug!(target: "exec_strat::wide", "received tick update for {}", tick.instrument);
-        // info!(target: "exec_strat::wide", "received tick update for {:?}", tick.instrument);
+    async fn requote(&self, ctx: Arc<CoreCtx>, tick: &Tick) {
         let time = ctx.now().await;
+        let current_mid = tick.mid_price();
 
-        let mid = (tick.bid_price + tick.ask_price) / dec!(2);
         let exec_orders = self
             .exec_order_book
             .list_active_orders_by_instrument_and_strategy(&tick.instrument, self.strategy_type);
 
-        // let all_orders = self.exec_order_book.list_orders();
-        // for order in all_orders {
-        //     info!(target: "exec_strat::wide", " - {:?}", order.instrument);
-        // }
-
-        debug!(target: "exec_strat::wide", "found {} execution orders", exec_orders.len());
         for exec_order in exec_orders {
+            // Cancel existing if any
             let venue_orders = self.venue_order_book.list_orders_by_exec_id(exec_order.id);
-            let has_active_venue = !venue_orders.is_empty() && venue_orders.iter().any(|v| v.is_active());
+            for venue_order in venue_orders {
+                if venue_order.is_active() {
+                    self.venue_order_book.cancel_order(venue_order.id, time).await;
+                    ctx.publish(Event::CancelVenueOrder(venue_order.clone().into())).await;
+                    info!(target: "exec_strat::wide", "cancelling venue order {} for requote", venue_order.id);
+                }
+            }
 
+            // Requote
+            debug!(target: "exec_strat::wide", "requoting for exec order {}", exec_order);
             let desired_price = if exec_order.side == MarketSide::Buy {
-                mid * (Decimal::ONE - self.pct_from_mid)
+                current_mid * (Decimal::ONE - self.pct_from_mid)
             } else {
-                mid * (Decimal::ONE + self.pct_from_mid)
+                current_mid * (Decimal::ONE + self.pct_from_mid)
             };
 
-            let mut last_mids = self.last_quoted_mids.lock().await;
-            let last_mid = last_mids.get(&exec_order.id).cloned().unwrap_or(Decimal::ZERO);
+            // Create new limit order
+            let venue_order = VenueOrder::builder()
+                .id(Uuid::new_v4())
+                .execution_order_id(Some(exec_order.id))
+                .strategy(exec_order.strategy.clone())
+                .instrument(exec_order.instrument.clone())
+                .side(exec_order.side)
+                .set_price(desired_price)
+                .set_quantity(exec_order.remaining_quantity()) // Handle partial fills
+                .order_type(VenueOrderType::Limit)
+                .created(time)
+                .updated(time)
+                .build();
+            self.venue_order_book.insert(venue_order.clone()).await;
 
-            let pct_change = if last_mid != Decimal::ZERO {
-                ((mid - last_mid) / last_mid).abs()
+            // Publish for execution
+            ctx.publish(Event::NewVenueOrder(venue_order.clone().into())).await;
+            info!(target: "exec_strat::wide", "placed new venue order {} at {}", venue_order.id, desired_price);
+        }
+    }
+
+    async fn tick_update(&self, ctx: Arc<CoreCtx>, tick: &Tick) {
+        debug!(target: "exec_strat::wide", "received tick update for {}", tick.instrument);
+
+        // First we check if we have some active exec order for the instrument
+        let has_active_order = !self
+            .exec_order_book
+            .list_active_orders_by_instrument_and_strategy(&tick.instrument, self.strategy_type)
+            .is_empty();
+
+        if has_active_order {
+            let current_mid = tick.mid_price();
+
+            let quoted_mid_price = self
+                .last_quoted_mids
+                .read()
+                .await
+                .get(&tick.instrument)
+                .cloned()
+                .unwrap_or(Decimal::ZERO);
+
+            let pct_change = if quoted_mid_price != Decimal::ZERO {
+                ((current_mid - quoted_mid_price) / quoted_mid_price).abs()
             } else {
                 Decimal::ONE // Force initial placement
             };
-            debug!(target: "exec_strat::wide", "Checking for exec order {}, with {} venue_orders", exec_order, venue_orders.len());
 
-            if !has_active_venue || pct_change > self.requote_pct_change {
-                // Cancel existing if any
-                for venue_order in venue_orders {
-                    if venue_order.is_active() {
-                        self.venue_order_book.cancel_order(venue_order.id, time).await;
-                        ctx.publish(Event::CancelVenueOrder(venue_order.clone().into())).await;
-                        info!(target: "exec_strat::wide", "cancelling venue order {} for requote", venue_order.id);
-                    }
-                }
+            if pct_change > self.requote_pct_change {
+                // Update new mid price
+                self.last_quoted_mids.write().await.insert(tick.instrument.clone(), current_mid);
 
-                // Create new limit order
-                let venue_order = VenueOrder::builder()
-                    .id(Uuid::new_v4())
-                    .execution_order_id(Some(exec_order.id))
-                    .strategy(exec_order.strategy.clone())
-                    .instrument(exec_order.instrument.clone())
-                    .side(exec_order.side)
-                    .set_price(desired_price)
-                    .set_quantity(exec_order.remaining_quantity()) // Handle partial fills
-                    .order_type(VenueOrderType::Limit)
-                    .created(time)
-                    .updated(time)
-                    .build();
-                self.venue_order_book.insert(venue_order.clone()).await;
-                ctx.publish(Event::NewVenueOrder(venue_order.clone().into())).await;
-                info!(target: "exec_strat::wide", "placed new venue order {} at {}", venue_order.id, desired_price);
-
-                // Update last_mid
-                last_mids.insert(exec_order.id, mid);
+                // Trigger requote
+                self.requote(ctx, tick).await;
             }
         }
     }
 }
+
 #[async_trait]
 impl Runnable for WideQuoterExecutionStrategy {
     async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
