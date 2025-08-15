@@ -213,7 +213,7 @@ impl PubSub {
         // Wait for acknowledgements
         if self.subscribers_acknowledge {
             let mut ack_received = 0;
-            if timeout(Duration::from_secs(1), async {
+            if timeout(Duration::from_millis(1000), async {
                 while ack_received < ack_counter {
                     debug!(target: "pubsub", "{} waiting for ack ({}/{})", event_type, ack_received, ack_counter);
                     if let Ok(_) = self.subscribers_acknowledge_channel.1.recv().await {

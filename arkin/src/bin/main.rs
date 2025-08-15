@@ -435,6 +435,8 @@ async fn main() {
 
             let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
 
+            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).build());
+
             // Init wide quoter strategy
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
             let venue_order_book = VenueOrderBook::new(pubsub.publisher(), true);
@@ -442,7 +444,7 @@ async fn main() {
                 WideQuoterExecutionStrategy::new(execution_order_book, venue_order_book, dec!(0.005), dec!(0.0005));
 
             // Executor
-            let execution = BinanceExecution::new(time.clone(), pubsub.publisher(), instruments.clone());
+            let execution = BinanceExecution::new();
 
             // Setup engine
             let engine = Engine::builder()
@@ -452,13 +454,14 @@ async fn main() {
                 .build();
             engine.register("pubsub", pubsub.clone(), 0, 10, None).await;
             engine
-                .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
+                .register("persistence", persistence, 0, 9, Some(EventFilter::Persistable))
                 .await;
+            engine.register("ingestor-binance", ingestor, 1, 3, None).await;
             engine
                 .register(
                     "exec-strat-wide",
                     exec_strat,
-                    2,
+                    3,
                     1,
                     Some(EventFilter::Events(vec![
                         EventType::NewWideQuoterExecutionOrder,
@@ -543,10 +546,6 @@ async fn main() {
             }
 
             engine.wait_for_shutdown().await;
-
-            // info!(target: "integration-test", " --- LOG REVIEW ---");
-            // let event_log = audit.event_log();
-            // info!(target: "integration-test", "received {} events", event_log.len());
         }
         Commands::Agent(a) => {
             info!("Starting arkin Live Trading 🚀");
@@ -574,7 +573,7 @@ async fn main() {
                 WideQuoterExecutionStrategy::new(execution_order_book, venue_order_book, dec!(0.005), dec!(0.0005));
 
             // Executor
-            let execution = BinanceExecution::new(time.clone(), pubsub.publisher(), instruments.clone());
+            let execution = BinanceExecution::new();
 
             // Setup engine
             let engine = Engine::builder()
@@ -584,7 +583,7 @@ async fn main() {
                 .build();
             engine.register("pubsub", pubsub.clone(), 0, 10, None).await;
             engine
-                .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
+                .register("persistence", persistence, 0, 9, Some(EventFilter::Persistable))
                 .await;
             engine
                 .register(

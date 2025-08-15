@@ -169,19 +169,22 @@ impl VenueOrder {
         self.commission += commission;
         self.updated = event_time;
 
-        if self.remaining_quantity().is_zero() {
-            let new_status = VenueOrderStatus::Filled;
-            if self.is_valid_transition(&new_status) {
-                self.status = new_status;
+        // Only transition if not in Cancelling
+        if self.status != VenueOrderStatus::Cancelling {
+            if self.remaining_quantity().is_zero() {
+                let new_status = VenueOrderStatus::Filled;
+                if self.is_valid_transition(&new_status) {
+                    self.status = new_status;
+                } else {
+                    error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+                }
             } else {
-                error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
-            }
-        } else {
-            let new_status = VenueOrderStatus::PartiallyFilled;
-            if self.is_valid_transition(&new_status) {
-                self.status = new_status;
-            } else {
-                error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+                let new_status = VenueOrderStatus::PartiallyFilled;
+                if self.is_valid_transition(&new_status) {
+                    self.status = new_status;
+                } else {
+                    error!("Invalid transition to {} from {} for {}", new_status, self.status, self.id);
+                }
             }
         }
     }
@@ -260,24 +263,35 @@ impl VenueOrder {
     fn is_valid_transition(&self, new_status: &VenueOrderStatus) -> bool {
         matches!(
             (&self.status, new_status),
+            // From New: Allow quick rejections/fills if venue responds instantly
             (VenueOrderStatus::New, VenueOrderStatus::Inflight)
-                | (VenueOrderStatus::New, VenueOrderStatus::Placed)
-                | (VenueOrderStatus::New, VenueOrderStatus::Rejected)
-                | (VenueOrderStatus::New, VenueOrderStatus::Cancelling)
-                | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
-                | (VenueOrderStatus::New, VenueOrderStatus::PartiallyFilled)
-                | (VenueOrderStatus::Inflight, VenueOrderStatus::Placed)
-                | (VenueOrderStatus::Inflight, VenueOrderStatus::Rejected)
-                | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
-                | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelling)
-                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilled)
-                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Cancelling)
-                | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
-                | (VenueOrderStatus::Cancelling, VenueOrderStatus::Cancelling)
-                | (VenueOrderStatus::Cancelling, VenueOrderStatus::Cancelled)
-                | (VenueOrderStatus::Cancelling, VenueOrderStatus::PartiallyFilledCancelled)
-                | (VenueOrderStatus::Cancelling, VenueOrderStatus::Filled)
+            | (VenueOrderStatus::New, VenueOrderStatus::Placed)
+            | (VenueOrderStatus::New, VenueOrderStatus::Rejected)
+            | (VenueOrderStatus::New, VenueOrderStatus::Cancelling)
+            | (VenueOrderStatus::New, VenueOrderStatus::Cancelled)
+            | (VenueOrderStatus::New, VenueOrderStatus::PartiallyFilled)  // Add: direct partial fill
+            | (VenueOrderStatus::New, VenueOrderStatus::Filled)          // Add: direct full fill
+            | (VenueOrderStatus::New, VenueOrderStatus::Expired) // Add: if TIF expires immediately
+            // From Inflight: Venue might fill before confirming placement
+            | (VenueOrderStatus::Inflight, VenueOrderStatus::Placed)
+            | (VenueOrderStatus::Inflight, VenueOrderStatus::Rejected)
+            | (VenueOrderStatus::Inflight, VenueOrderStatus::PartiallyFilled)  // Add
+            | (VenueOrderStatus::Inflight, VenueOrderStatus::Filled)          // Add
+            | (VenueOrderStatus::Inflight, VenueOrderStatus::Cancelling) // Add: cancel mid-flight
+            // From Placed: Existing + expiry
+            | (VenueOrderStatus::Placed, VenueOrderStatus::PartiallyFilled)
+            | (VenueOrderStatus::Placed, VenueOrderStatus::Filled)
+            | (VenueOrderStatus::Placed, VenueOrderStatus::Cancelling)
+            | (VenueOrderStatus::Placed, VenueOrderStatus::Expired) // Add
+            // From PartiallyFilled: Existing + expiry
+            | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilled)  // Self-loop for more fills
+            | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Cancelling)
+            | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::Filled)
+            | (VenueOrderStatus::PartiallyFilled, VenueOrderStatus::PartiallyFilledExpired) // Add
+            // From Cancelling: Tighten—no new Placed/Filled transitions; only finalize paths
+            | (VenueOrderStatus::Cancelling, VenueOrderStatus::Cancelled)
+            | (VenueOrderStatus::Cancelling, VenueOrderStatus::PartiallyFilledCancelled)
+            | (VenueOrderStatus::Cancelling, VenueOrderStatus::Filled) // If fills complete during cancel
         )
     }
 

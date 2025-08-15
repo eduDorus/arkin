@@ -217,10 +217,9 @@ pub struct SimulationArgs {
 /// Arguments for the `wide-quoter` subcommand.
 #[derive(Args, Debug)]
 pub struct WideQuoterArgs {
-    /// Unique name for this live instance.
-    #[arg(long, short = 'n')]
-    pub instance_name: String,
-
+    // /// Unique name for this live instance.
+    // #[arg(long, short = 'n')]
+    // pub instance_name: String,
     /// Instruments to process live (comma-separated, e.g., "BTCUSDT,ETHUSDT").
     #[arg(long, short = 'i', value_delimiter = ',', value_parser)]
     pub instruments: Vec<String>,
