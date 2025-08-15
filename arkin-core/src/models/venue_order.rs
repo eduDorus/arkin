@@ -314,10 +314,7 @@ impl VenueOrder {
     }
 
     pub fn is_active(&self) -> bool {
-        matches!(
-            self.status,
-            VenueOrderStatus::New | VenueOrderStatus::Inflight | VenueOrderStatus::Placed
-        )
+        matches!(self.status, VenueOrderStatus::Placed | VenueOrderStatus::PartiallyFilled)
     }
 
     pub fn is_terminating(&self) -> bool {
