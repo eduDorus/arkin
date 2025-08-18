@@ -47,16 +47,27 @@ impl SystemTime for LiveSystemTime {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct SimTimeState {
+    current: UtcDateTime,
+    next_tick: UtcDateTime,
+}
+
 pub struct SimulationSystemTime {
-    current_time: Arc<RwLock<UtcDateTime>>,
+    state: RwLock<SimTimeState>,
     end_time: UtcDateTime,
+    tick_frequency: Duration,
 }
 
 impl SimulationSystemTime {
-    pub fn new(start_time: UtcDateTime, end_time: UtcDateTime) -> Arc<Self> {
+    pub fn new(start_time: UtcDateTime, end_time: UtcDateTime, tick_frequency: Duration) -> Arc<Self> {
         Self {
-            current_time: Arc::new(RwLock::new(start_time)),
+            state: RwLock::new(SimTimeState {
+                current: start_time,
+                next_tick: start_time + tick_frequency,
+            }),
             end_time,
+            tick_frequency,
         }
         .into()
     }
@@ -65,26 +76,26 @@ impl SimulationSystemTime {
 #[async_trait]
 impl SystemTime for SimulationSystemTime {
     async fn now(&self) -> UtcDateTime {
-        self.current_time.read().await.clone()
+        self.state.read().await.current
     }
 
     async fn advance_time_to(&self, time: UtcDateTime) {
-        self.current_time.write().await.clone_from(&time);
+        self.state.write().await.current = time;
     }
 
     async fn advance_time_by(&self, duration: Duration) {
-        *self.current_time.write().await += duration;
+        self.state.write().await.current += duration;
     }
 
     async fn is_final_hour(&self) -> bool {
-        let current_time = self.current_time.read().await;
+        let current_time = self.state.read().await.current;
         let end_time_minus_one_hour = self.end_time - Duration::from_secs(3600);
-        *current_time >= end_time_minus_one_hour
+        current_time >= end_time_minus_one_hour
     }
 
     async fn is_finished(&self) -> bool {
-        let current_time = self.current_time.read().await;
-        *current_time >= self.end_time
+        let current_time = self.state.read().await.current;
+        current_time >= self.end_time
     }
 
     async fn is_live(&self) -> bool {
@@ -92,7 +103,13 @@ impl SystemTime for SimulationSystemTime {
     }
 
     async fn check_interval(&self) -> Vec<UtcDateTime> {
-        vec![]
+        let mut guard = self.state.write().await;
+        let mut ticks = Vec::new();
+        while guard.current >= guard.next_tick {
+            ticks.push(guard.next_tick);
+            guard.next_tick += self.tick_frequency;
+        }
+        ticks
     }
 }
 
@@ -105,7 +122,12 @@ mod tests {
     async fn test_simulation_clock() {
         let start_time = datetime!(2023-10-01 12:00:00 UTC).to_utc();
         let end_time = datetime!(2023-10-01 14:00:00 UTC).to_utc();
-        let clock = SimulationSystemTime::new(start_time, end_time);
+        let clock = SimulationSystemTime::new(start_time, end_time, Duration::from_secs(60));
+
+        let intervals = clock.check_interval().await;
+        assert_eq!(intervals.len(), 2);
+        assert_eq!(intervals[0], datetime!(2023-10-01 12:00:00 UTC).to_utc());
+        assert_eq!(intervals[1], datetime!(2023-10-01 12:01:00 UTC).to_utc());
 
         assert_eq!(clock.now().await, start_time);
         assert!(!clock.is_finished().await);

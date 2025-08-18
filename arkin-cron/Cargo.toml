@@ -1,0 +1,17 @@
+[package]
+name = "arkin-cron"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-core = { path = "../arkin-core" }
+
+tokio = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+time = { workspace = true }
+
+[dev-dependencies]
+test-log = { workspace = true }

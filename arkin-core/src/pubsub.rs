@@ -22,7 +22,7 @@ pub enum EventFilter {
     AllWithoutMarket,
     Persistable,
     PersistableNoMarket,
-    Insights,
+    InsightUpdates,
     Events(Vec<EventType>),
 }
 
@@ -136,7 +136,7 @@ impl PubSub {
                     }
                 }
             }
-            EventFilter::Insights => {
+            EventFilter::InsightUpdates => {
                 for event_type in EventType::iter() {
                     if event_type.is_insight() {
                         self.event_subscriptions.entry(event_type).or_default().push(id);
@@ -296,21 +296,26 @@ async fn event_processor_task(pubsub: Arc<PubSub>, service_ctx: Arc<ServiceCtx>,
             if !core_ctx.time.is_live().await {
                 debug!(target: "pubsub", "advancing time to {}", event.timestamp());
                 core_ctx.time.advance_time_to(event.timestamp()).await;
-            }
-
-            // Post tick events
-            let intervals = core_ctx.time.check_interval().await;
-            if !intervals.is_empty() {
-                for ts in intervals {
-                    let tick = InsightsTick::builder()
-                        .event_time(ts)
-                        .frequency(Duration::from_secs(60))
-                        .build();
-                    let tick_event = Event::InsightsTick(tick.into());
-                    pubsub.broadcast_event(tick_event).await;
+                // Post tick events
+                let intervals = core_ctx.time.check_interval().await;
+                if !intervals.is_empty() {
+                    for ts in intervals {
+                        let tick = InsightsTick::builder()
+                            .event_time(ts)
+                            .frequency(Duration::from_secs(60))
+                            .build();
+                        let tick_event = Event::InsightsTick(tick.into());
+                        pubsub.broadcast_event(tick_event).await;
+                    }
                 }
             }
+
             pubsub.broadcast_event(event).await;
+
+            if shutdown.is_cancelled() {
+                info!(target: "pubsub", "shutdown signal received, stopping event processor task");
+                break;
+            }
         } else {
             debug!(target: "pubsub", "No events processed, waiting...");
             select! {

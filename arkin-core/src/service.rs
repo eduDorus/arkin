@@ -176,19 +176,19 @@ impl Service {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn start_service(&self) {
+    pub async fn start(&self) {
         info!(target: "service", "starting");
 
         // Starting the service
         self.service_ctx.starting().await;
 
-        // Run service setup functionality
-        self.service.setup(self.service_ctx.to_owned(), self.core_ctx.to_owned()).await;
-
         // Start the service event_loop
         if self.subscriber.is_some() {
             self.event_loop().await;
         }
+
+        // Run service setup functionality
+        self.service.setup(self.service_ctx.to_owned(), self.core_ctx.to_owned()).await;
 
         // Start the service tasks
         let tasks = self
@@ -206,7 +206,7 @@ impl Service {
     }
 
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
-    pub async fn stop_service(&self) {
+    pub async fn stop(&self) {
         info!(target: "service", "stopping");
         // Stopping the srevice
         self.service_ctx.stopping().await;

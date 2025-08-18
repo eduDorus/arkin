@@ -134,7 +134,7 @@ impl BoundedBuffer {
 pub struct InsightsState {
     #[builder(default)]
     features: DashMap<(Option<Arc<Instrument>>, FeatureId), BoundedBuffer>,
-    #[builder(default = 100_000)]
+    #[builder(default = 1_000_000)]
     capacity: usize,
 }
 

@@ -93,7 +93,7 @@ pub async fn read_range(
                 SELECT 
                   ?fields 
                 FROM 
-                  ? 
+                  ? FINAL
                 WHERE 
                   event_time BETWEEN ? AND ? 
                   AND instrument_id IN (?)
@@ -122,7 +122,7 @@ pub async fn stream_range(
                 SELECT 
                   ?fields 
                 FROM 
-                  ? 
+                  ? FINAL
                 WHERE 
                   event_time BETWEEN ? AND ? 
                   AND instrument_id IN (?)
@@ -150,7 +150,7 @@ pub async fn fetch_batch(
             SELECT 
                 ?fields 
             FROM 
-                ? 
+                ? FINAL
             WHERE 
                 event_time BETWEEN ? AND ? 
                 AND instrument_id IN (?)

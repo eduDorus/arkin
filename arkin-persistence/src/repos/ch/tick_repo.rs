@@ -98,7 +98,7 @@ pub async fn read_range(
               SELECT 
                 ?fields 
               FROM 
-                ? 
+                ? FINAL
               WHERE 
                 instrument_id IN (?)
                 AND event_time BETWEEN ? AND ? 
@@ -128,7 +128,7 @@ pub async fn stream_range(
               SELECT 
                 ?fields 
               FROM 
-                ? 
+                ? FINAL
               WHERE 
                 event_time BETWEEN ? AND ? 
                 AND instrument_id IN (?)
@@ -163,7 +163,7 @@ pub async fn fetch_batch(
                   arrayElement(arraySort((x, y) -> y, groupArray(t.ask_price), groupArray(t.event_time)), -1) AS ask_price,
                   arrayElement(arraySort((x, y) -> y, groupArray(t.ask_quantity), groupArray(t.event_time)), -1) AS ask_quantity
               FROM 
-                  ? t 
+                  ? t FINAL
               WHERE 
                   t.event_time BETWEEN ? AND ?
                   AND t.instrument_id IN (?)

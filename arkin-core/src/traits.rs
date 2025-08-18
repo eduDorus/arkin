@@ -32,6 +32,12 @@ pub trait PersistenceReader: Send + Sync {
     async fn get_instrument_by_venue_symbol(&self, symbol: &str) -> Arc<Instrument>;
     async fn get_asset_by_id(&self, id: &Uuid) -> Arc<Asset>;
     async fn get_asset_by_symbol(&self, symbol: &str) -> Arc<Asset>;
+    async fn list_trades(
+        &self,
+        instruments: &[Arc<Instrument>],
+        start: UtcDateTime,
+        end: UtcDateTime,
+    ) -> Vec<Arc<AggTrade>>;
     async fn tick_stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],

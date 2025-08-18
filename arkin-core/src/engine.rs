@@ -70,7 +70,7 @@ impl Engine {
             let mut handles = vec![];
             for name in service_names {
                 if let Some(service) = services.get(name) {
-                    handles.push(service.start_service());
+                    handles.push(service.start());
                 }
             }
             if !handles.is_empty() {
@@ -116,7 +116,7 @@ impl Engine {
             let mut handles = vec![];
             for name in service_names {
                 if let Some(service) = services.get(name) {
-                    handles.push(service.stop_service());
+                    handles.push(service.stop());
                 }
             }
             if !handles.is_empty() {

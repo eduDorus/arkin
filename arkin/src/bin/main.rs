@@ -3,6 +3,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 use arkin_accounting::Accounting;
 use arkin_binance::{BinanceExecution, BinanceIngestor};
 use arkin_cli::{Cli, Commands};
+use arkin_cron::{Cron, CronInterval};
 use arkin_exec_sim::SimulationExecutor;
 use arkin_exec_strat_taker::TakerExecutionStrategy;
 use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
@@ -20,8 +21,8 @@ use tracing::{error, info};
 use arkin_core::prelude::*;
 use uuid::Uuid;
 
-#[tokio::main(flavor = "current_thread")]
-// #[tokio::main(flavor = "multi_thread")]
+// #[tokio::main(flavor = "current_thread")]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     init_tracing();
 
@@ -202,7 +203,7 @@ async fn main() {
                 error!("{}", e);
             }
             let insights =
-                Insights::new(pipeline_info, &pipeline_config.insights_service.pipeline, instruments, a.warmup).await;
+                Insights::new(pipeline_info, &pipeline_config.insights_service.pipeline, instruments, a.warmup);
 
             // Setup engine
             let engine = Engine::builder()
@@ -284,8 +285,7 @@ async fn main() {
                 &pipeline_config.insights_service.pipeline,
                 instruments,
                 a.warmup,
-            )
-            .await;
+            );
 
             // Crossover strategy
             // let strategy_instance = Strategy::builder()
@@ -554,6 +554,11 @@ async fn main() {
             // Init core
             let time = LiveSystemTime::new();
             let pubsub = PubSub::new(true);
+            let cron = Arc::new(Cron::new(vec![CronInterval::new(
+                time.now().await.replace_second(0).unwrap().replace_nanosecond(0).unwrap(),
+                Duration::from_secs(a.tick_frequency),
+                EventType::InsightsTick,
+            )]));
 
             // Init persistence
             let config = load::<PersistenceConfig>();
@@ -568,13 +573,45 @@ async fn main() {
 
             let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
 
+            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).build());
+
+            let pipeline_config = load::<InsightsConfig>();
+            let pipeline_info = Pipeline::builder()
+                .id(Uuid::new_v4())
+                .name(a.pipeline.to_owned())
+                .description("Pipeline used for agent".to_owned())
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+            let insights = Insights::new(
+                pipeline_info.into(),
+                &pipeline_config.insights_service.pipeline,
+                instruments.clone(),
+                a.warmup,
+            );
+
+            let strategy_instance = Strategy::builder()
+                .id(Uuid::parse_str("bf59f914-3304-4f57-89ea-c098b9af3f59").expect("Invalid UUID"))
+                .name("agent".into())
+                .description(Some("RL Agent".into()))
+                .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+                .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+                .build();
+            let strategy_instance = Arc::new(strategy_instance);
+            let agent_strategy = AgentStrategy::new(strategy_instance);
+
             // Init wide quoter strategy
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
             let venue_order_book = VenueOrderBook::new(pubsub.publisher(), true);
-            let exec_strat =
-                WideQuoterExecutionStrategy::new(execution_order_book, venue_order_book, dec!(0.005), dec!(0.0002));
+            let exec_strat_wide = WideQuoterExecutionStrategy::new(
+                execution_order_book.clone(),
+                venue_order_book.clone(),
+                dec!(0.005),
+                dec!(0.0002),
+            );
+            let exec_strat_taker = TakerExecutionStrategy::new(execution_order_book, venue_order_book);
 
-            // Executor
+            // // Executor
             let execution = BinanceExecution::new();
 
             // Setup engine
@@ -587,11 +624,38 @@ async fn main() {
             engine
                 .register("persistence", persistence, 0, 9, Some(EventFilter::Persistable))
                 .await;
+            engine.register("ingestor", ingestor, 1, 9, None).await;
+            engine
+                .register(
+                    "insights",
+                    insights,
+                    2,
+                    8,
+                    Some(EventFilter::Events(vec![
+                        EventType::AggTradeUpdate,
+                        EventType::TickUpdate,
+                        EventType::InsightsTick,
+                    ])),
+                )
+                .await;
+            engine
+                .register(
+                    "agent",
+                    agent_strategy,
+                    1,
+                    10,
+                    Some(EventFilter::Events(vec![
+                        EventType::InsightsUpdate,
+                        EventType::WarmupInsightsUpdate,
+                    ])),
+                )
+                .await;
+            engine.register("cron", cron, 3, 10, None).await;
             engine
                 .register(
                     "exec-strat-wide",
-                    exec_strat,
-                    2,
+                    exec_strat_wide,
+                    1,
                     1,
                     Some(EventFilter::Events(vec![
                         EventType::NewWideQuoterExecutionOrder,
@@ -609,77 +673,36 @@ async fn main() {
                 .await;
             engine
                 .register(
+                    "exec-strat-taker",
+                    exec_strat_taker,
+                    1,
+                    1,
+                    Some(EventFilter::Events(vec![
+                        EventType::NewTakerExecutionOrder,
+                        EventType::CancelTakerExecutionOrder,
+                        EventType::CancelAllTakerExecutionOrders,
+                        EventType::VenueOrderInflight,
+                        EventType::VenueOrderPlaced,
+                        EventType::VenueOrderRejected,
+                        EventType::VenueOrderFill,
+                        EventType::VenueOrderCancelled,
+                        EventType::VenueOrderExpired,
+                    ])),
+                )
+                .await;
+            engine
+                .register(
                     "exec-binance",
                     execution,
-                    2,
+                    1,
                     2,
                     Some(EventFilter::Events(vec![EventType::NewVenueOrder, EventType::CancelVenueOrder])),
                 )
                 .await;
+
             engine.start().await;
-
-            let strategy = Strategy::builder()
-                .id(Uuid::parse_str("41ba36fb-6171-4d5f-a4b4-25eb5415e426").expect("Invalid UUID"))
-                .name("wide_quoter".into())
-                .description(Some("This strategy quotes around the mid price".into()))
-                .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
-                .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
-                .build();
-            let strategy = Arc::new(strategy);
-            for inst in instruments {
-                info!("Sending orders for {}", inst);
-
-                let lot_size = if inst.venue_symbol != "BTCUSDT" {
-                    inst.lot_size * dec!(20)
-                } else {
-                    inst.lot_size
-                };
-
-                // Create Buy exec order
-                let publisher = pubsub.publisher();
-                let buy_exec_id = Uuid::new_v4();
-                let buy_exec = ExecutionOrder::builder()
-                    .id(buy_exec_id)
-                    .strategy(Some(strategy.clone()))
-                    .instrument(inst.clone())
-                    .exec_strategy_type(ExecutionStrategyType::WideQuoter)
-                    .side(MarketSide::Buy)
-                    .set_price(dec!(0))
-                    .set_quantity(lot_size)
-                    .status(ExecutionOrderStatus::New)
-                    .created(time.now().await)
-                    .updated(time.now().await)
-                    .build();
-
-                // Create Sell exec order
-                let sell_exec_id = Uuid::new_v4();
-                let sell_exec = ExecutionOrder::builder()
-                    .id(sell_exec_id)
-                    .strategy(Some(strategy.clone()))
-                    .instrument(inst.clone())
-                    .exec_strategy_type(ExecutionStrategyType::WideQuoter)
-                    .side(MarketSide::Sell)
-                    .set_price(dec!(0))
-                    .set_quantity(lot_size)
-                    .status(ExecutionOrderStatus::New)
-                    .created(time.now().await)
-                    .updated(time.now().await)
-                    .build();
-
-                publisher
-                    .publish(Event::NewWideQuoterExecutionOrder(buy_exec.clone().into()))
-                    .await;
-
-                publisher
-                    .publish(Event::NewWideQuoterExecutionOrder(sell_exec.clone().into()))
-                    .await;
-            }
-
+            info!("Engine started, waiting for shutdown...");
             engine.wait_for_shutdown().await;
-
-            // info!(target: "integration-test", " --- LOG REVIEW ---");
-            // let event_log = audit.event_log();
-            // info!(target: "integration-test", "received {} events", event_log.len());
         }
         _ => todo!(),
     }

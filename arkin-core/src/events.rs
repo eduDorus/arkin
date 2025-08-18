@@ -27,6 +27,7 @@ pub enum Event {
     // Insights
     InsightsTick(Arc<InsightsTick>),
     InsightsUpdate(Arc<InsightsUpdate>),
+    WarmupInsightsUpdate(Arc<InsightsUpdate>),
 
     // Allocation Execution Orders
     NewExecutionOrder(Arc<ExecutionOrder>),
@@ -94,6 +95,7 @@ impl Event {
             // Insights
             Event::InsightsTick(event) => event.event_time,
             Event::InsightsUpdate(event) => event.event_time,
+            Event::WarmupInsightsUpdate(event) => event.event_time,
 
             // Allocation Execution Orders
             Event::NewExecutionOrder(event) => event.updated,

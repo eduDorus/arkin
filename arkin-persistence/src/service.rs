@@ -43,7 +43,7 @@ impl Persistence {
             .database(&pg_config.database)
             .ssl_mode(PgSslMode::Prefer)
             .log_statements("DEBUG".parse().unwrap())
-            .log_slow_statements("DEBUG".parse().unwrap(), Duration::from_secs(300));
+            .log_slow_statements("WARN".parse().unwrap(), Duration::from_secs(300));
 
         let pg_pool = PgPoolOptions::new()
             .min_connections(pg_config.min_connections)
@@ -144,6 +144,15 @@ impl Persistence {
         frequency: Frequency,
     ) -> impl Stream<Item = Arc<Tick>> + 'static {
         tick_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
+    }
+
+    pub async fn list_trades(
+        &self,
+        instruments: &[Arc<Instrument>],
+        start: UtcDateTime,
+        end: UtcDateTime,
+    ) -> Result<Vec<Arc<AggTrade>>, PersistenceError> {
+        trade_store::read_range(&self.ctx, instruments, start, end).await
     }
 
     pub async fn trade_stream_range_buffered(
@@ -377,6 +386,15 @@ impl PersistenceReader for Persistence {
 
     async fn get_asset_by_symbol(&self, symbol: &str) -> Arc<Asset> {
         asset_store::read_by_symbol(&self.ctx, symbol).await.unwrap()
+    }
+
+    async fn list_trades(
+        &self,
+        instruments: &[Arc<Instrument>],
+        start: UtcDateTime,
+        end: UtcDateTime,
+    ) -> Vec<Arc<AggTrade>> {
+        trade_store::read_range(&self.ctx, instruments, start, end).await.unwrap()
     }
 
     async fn tick_stream_range_buffered(

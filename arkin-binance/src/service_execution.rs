@@ -104,10 +104,10 @@ impl BinanceExecution {
                     .symbol(order.instrument.venue_symbol.clone())
                     .new_client_order_id(Some(order.id.to_string()))
                     .side(side)
-                    .price(Some(order.price))
-                    .quantity(Some(order.quantity))
                     .r#type("MARKET".to_string())
-                    .time_in_force(Some(NewOrderTimeInForceEnum::Gtx))
+                    .quantity(Some(order.quantity))
+                    // .price(Some(order.price))
+                    // .time_in_force(Some(NewOrderTimeInForceEnum::Gtx))
                     .build(),
                 _ => {
                     error!(target: "execution::binance", "unsupported order type {}", order.order_type);

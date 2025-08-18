@@ -115,6 +115,22 @@ impl AgentStrategy {
     //         vec![true; possible_weights.len()]
     //     }
     // }
+    async fn warmup_insight_tick(&self, _ctx: Arc<CoreCtx>, update: &InsightsUpdate) {
+        let mut new_features = HashMap::new();
+        for insight in update
+            .insights
+            .iter()
+            .filter(|i| self.input_features_ids.contains(&i.feature_id) && i.insight_type == InsightType::Normalized)
+        {
+            if let Some(mut deque) = self.input_features.get_mut(&insight.feature_id) {
+                new_features.insert(insight.feature_id.clone(), insight.value as f32);
+                deque.push_back(insight.value as f32); // Convert Decimal to f32, default 0 on error
+                if deque.len() > SEQUENCE_LENGTH {
+                    deque.pop_front();
+                }
+            }
+        }
+    }
 
     async fn insight_tick(&self, ctx: Arc<CoreCtx>, update: &InsightsUpdate) {
         let time = ctx.now().await;
@@ -363,7 +379,7 @@ impl AgentStrategy {
                     let order = ExecutionOrder::builder()
                         .id(Uuid::new_v4())
                         .strategy(Some(self.strategy.clone()))
-                        .instrument(instrument)
+                        .instrument(instrument.clone())
                         .exec_strategy_type(ExecutionStrategyType::Taker)
                         .side(if allocation_change > 0.0 {
                             MarketSide::Buy
@@ -371,7 +387,7 @@ impl AgentStrategy {
                             MarketSide::Sell
                         })
                         .set_price(Decimal::ZERO)
-                        .set_quantity(quantity)
+                        .set_quantity(instrument.lot_size)
                         .status(ExecutionOrderStatus::New)
                         .created(time)
                         .updated(time)
@@ -394,6 +410,7 @@ impl AgentStrategy {
 impl Runnable for AgentStrategy {
     async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
         match &event {
+            Event::WarmupInsightsUpdate(vo) => self.warmup_insight_tick(ctx, vo).await,
             Event::InsightsUpdate(vo) => self.insight_tick(ctx, vo).await,
             e => warn!(target: "strat::agent", "received unused event {}", e),
         }

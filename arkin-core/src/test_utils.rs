@@ -61,15 +61,13 @@ impl SystemTime for MockTime {
 
     #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
     async fn advance_time_to(&self, time: UtcDateTime) {
-        let mut guard = self.state.write().await;
-        guard.current = time;
+        self.state.write().await.current = time;
         debug!(target: "mock-time", "advanced time to {}", time);
     }
 
     #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
     async fn advance_time_by(&self, duration: Duration) {
-        let mut guard = self.state.write().await;
-        guard.current += duration;
+        self.state.write().await.current += duration;
         debug!(target: "mock-time", "advanced time by {:?}", duration);
     }
 
@@ -163,6 +161,14 @@ impl PersistenceReader for MockPersistence {
     }
     async fn get_asset_by_symbol(&self, _symbol: &str) -> Arc<Asset> {
         test_usdt_asset()
+    }
+    async fn list_trades(
+        &self,
+        _instruments: &[Arc<Instrument>],
+        _start: UtcDateTime,
+        _end: UtcDateTime,
+    ) -> Vec<Arc<AggTrade>> {
+        todo!()
     }
     async fn tick_stream_range_buffered(
         &self,
