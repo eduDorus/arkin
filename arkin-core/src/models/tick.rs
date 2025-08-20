@@ -82,19 +82,31 @@ impl Tick {
     }
 
     pub fn spread(&self) -> Decimal {
-        self.ask_price - self.bid_price
+        self.round_to_tick(self.ask_price - self.bid_price)
     }
 
     pub fn mid_price(&self) -> Price {
-        (self.bid_price + self.ask_price) / dec!(2)
+        self.round_to_tick((self.bid_price + self.ask_price) / dec!(2))
     }
 
     pub fn bid_price(&self) -> Price {
-        self.bid_price
+        self.round_to_tick(self.bid_price)
     }
 
     pub fn ask_price(&self) -> Price {
-        self.ask_price
+        self.round_to_tick(self.ask_price)
+    }
+
+    fn round_to_tick(&self, value: Decimal) -> Decimal {
+        if value.is_zero() {
+            return Decimal::ZERO;
+        }
+        let tick_size = self.instrument.tick_size;
+        let scaling_factor = Decimal::ONE / tick_size;
+        let scaled = value * scaling_factor;
+        let rounded_scaled = scaled.round();
+        let rounded_value = rounded_scaled * tick_size;
+        rounded_value.round_dp(self.instrument.price_precision)
     }
 }
 

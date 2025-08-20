@@ -12,7 +12,8 @@ use tracing::{info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
-use uuid::Uuid;
+
+use crate::allocation::AllocationEngine;
 
 const BATCH_SIZE: usize = 1;
 const SEQUENCE_LENGTH: usize = 192;
@@ -27,7 +28,9 @@ const SHAPE_1: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_STATE_
 
 #[derive(TypedBuilder)]
 pub struct AgentStrategy {
+    #[allow(unused)]
     strategy: Arc<Strategy>,
+    allocation: AllocationEngine,
     client: Mutex<GrpcInferenceServiceClient<Channel>>,
     input_features_ids: Vec<FeatureId>,
     input_features: DashMap<FeatureId, VecDeque<f32>>,
@@ -36,7 +39,7 @@ pub struct AgentStrategy {
 }
 
 impl AgentStrategy {
-    pub fn new(strategy: Arc<Strategy>) -> Arc<Self> {
+    pub fn new(strategy: Arc<Strategy>, capital_per_inst: Decimal) -> Arc<Self> {
         let url = "http://192.168.100.100:8001";
         let channel = Channel::from_static(url).connect_lazy();
         let client = GrpcInferenceServiceClient::new(channel).send_compressed(CompressionEncoding::Gzip); // Marginally slower with compression (but we will save some bandwith)
@@ -96,7 +99,8 @@ impl AgentStrategy {
             input_state.insert(id.clone(), VecDeque::<f32>::with_capacity(SEQUENCE_LENGTH));
         }
         Self {
-            strategy,
+            strategy: strategy.to_owned(),
+            allocation: AllocationEngine::new(capital_per_inst, strategy.to_owned()),
             client: Mutex::new(client),
             input_features_ids: input_features_ids,
             input_features,
@@ -364,35 +368,13 @@ impl AgentStrategy {
 
             // Now use new_weight: Push to deque
             if let Some(mut deque) = self.input_state.get_mut(&FeatureId::from("weight".to_owned())) {
-                let prev_weight = deque.back().copied().unwrap_or(0.0);
                 deque.push_back(new_weight);
                 if deque.len() > SEQUENCE_LENGTH {
                     deque.pop_front();
                 }
-                let allocation_change = new_weight - prev_weight;
-                if allocation_change != 0.0 {
-                    let instrument = update.instruments[0].clone();
-                    let quantity = Decimal::from_f32_retain(allocation_change.abs()).unwrap_or(Decimal::ZERO);
-                    if quantity.is_zero() {
-                        return;
-                    }
-                    let order = ExecutionOrder::builder()
-                        .id(Uuid::new_v4())
-                        .strategy(Some(self.strategy.clone()))
-                        .instrument(instrument.clone())
-                        .exec_strategy_type(ExecutionStrategyType::Taker)
-                        .side(if allocation_change > 0.0 {
-                            MarketSide::Buy
-                        } else {
-                            MarketSide::Sell
-                        })
-                        .set_price(Decimal::ZERO)
-                        .set_quantity(instrument.lot_size)
-                        .status(ExecutionOrderStatus::New)
-                        .created(time)
-                        .updated(time)
-                        .build();
-
+                let inst = &update.instruments[0];
+                let weight = Decimal::from_f32_retain(new_weight).unwrap();
+                if let Some(order) = self.allocation.update(time, inst, weight) {
                     ctx.publish(Event::NewTakerExecutionOrder(order.clone().into())).await;
                     info!(target: "strat::agent", "send {} execution order for {} quantity {}", order.side, order.instrument, order.quantity);
                 }
@@ -404,6 +386,10 @@ impl AgentStrategy {
             warn!(target: "strat::agent","Missing WEIGHT output");
         }
     }
+
+    async fn tick_update(&self, update: Arc<Tick>) {
+        self.allocation.update_price(update);
+    }
 }
 
 #[async_trait]
@@ -412,6 +398,7 @@ impl Runnable for AgentStrategy {
         match &event {
             Event::WarmupInsightsUpdate(vo) => self.warmup_insight_tick(ctx, vo).await,
             Event::InsightsUpdate(vo) => self.insight_tick(ctx, vo).await,
+            Event::TickUpdate(t) => self.tick_update(t.clone()).await,
             e => warn!(target: "strat::agent", "received unused event {}", e),
         }
     }

@@ -44,10 +44,9 @@ pub enum ExecutionOrderStatus {
     #[mutator(requires = [instrument])]
     pub fn set_price(&mut self, value: Price) {
         if value.is_zero() {
-            self.price = Price::ZERO;  // Or handle as needed.
+            self.price = Price::ZERO; 
             return;
         }
-        // Scale logic (adapted from your code).
         let scaling_factor = Decimal::ONE / self.instrument.tick_size;
         let scaled_price = value * scaling_factor;
         let rounded_scaled_price = scaled_price.round();
@@ -61,7 +60,6 @@ pub enum ExecutionOrderStatus {
             self.quantity = Quantity::ZERO;
             return;
         }
-        // Scale logic.
         let scaling_factor = Decimal::ONE / self.instrument.lot_size;
         let scaled_quantity = value * scaling_factor;
         let rounded_scaled_quantity = scaled_quantity.round();
