@@ -22,19 +22,19 @@ pub struct RobustScaler {
 }
 
 impl RobustScaler {
-    pub fn new(pipeline: &Arc<Pipeline>) -> Self {
+    pub fn new(pipeline: &Arc<Pipeline>, data_location: &str) -> Self {
         let mut feature_data = HashMap::new();
 
-        let quantiles = Self::load(pipeline);
+        let quantiles = Self::load(data_location, pipeline);
         for q in quantiles.data.into_iter() {
             feature_data.insert((q.instrument_id, q.feature_id.into()), (q.median, q.iqr));
         }
         RobustScaler { feature_data }
     }
 
-    fn load(pipeline: &Arc<Pipeline>) -> Quantiles {
+    fn load(data_location: &str, pipeline: &Arc<Pipeline>) -> Quantiles {
         let pipeline_name = pipeline.name.clone();
-        let file = std::fs::File::open(format!("./scalers/{pipeline_name}.json")).expect("Failed to open file");
+        let file = std::fs::File::open(format!("{data_location}/{pipeline_name}.json")).expect("Failed to open file");
         let quantiles: Quantiles = serde_json::from_reader(file).expect("Failed to parse JSON");
         quantiles
     }
@@ -83,8 +83,8 @@ pub struct QuantileTransformer {
 
 impl QuantileTransformer {
     /// Create a new transformer with a specified number of quantiles and output distribution
-    pub fn new(pipeline: &Arc<Pipeline>, output_distribution: DistributionType) -> Self {
-        let quantiles = Self::load(&pipeline);
+    pub fn new(pipeline: &Arc<Pipeline>, output_distribution: DistributionType, data_location: &str) -> Self {
+        let quantiles = Self::load(data_location, &pipeline);
         let references = quantiles.levels;
         let feature_quantiles = quantiles
             .data
@@ -98,9 +98,9 @@ impl QuantileTransformer {
         }
     }
 
-    fn load(pipeline: &Arc<Pipeline>) -> Quantiles {
+    fn load(data_location: &str, pipeline: &Arc<Pipeline>) -> Quantiles {
         let pipeline_name = pipeline.name.clone();
-        let file = std::fs::File::open(format!("./scalers/{pipeline_name}.json")).expect("Failed to open file");
+        let file = std::fs::File::open(format!("{data_location}/{pipeline_name}.json")).expect("Failed to open file");
         let quantile_data: Quantiles = serde_json::from_reader(file).expect("Failed to parse JSON");
         quantile_data
     }
