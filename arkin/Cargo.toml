@@ -24,9 +24,7 @@ arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 arkin-strat-agent = { path = "../arkin-strat-agent" }
 arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
 arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
-
 arkin-exec-sim = { path = "../arkin-exec-sim" }
-
 arkin-binance = { path = "../arkin-binance" }
 
 tokio = { workspace = true }
@@ -44,6 +42,5 @@ reqwest = { workspace = true }
 clickhouse = { workspace = true }
 uuid = { workspace = true }
 statrs = { workspace = true }
-tonic = { workspace = true }
 clap = { workspace = true }
 rust_decimal = { workspace = true }
