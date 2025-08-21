@@ -30,6 +30,7 @@ use tokio::{
 use tokio_tungstenite::{
     connect_async_tls_with_config,
     tungstenite::{
+        self,
         client::IntoClientRequest,
         protocol::{frame::coding::CloseCode, CloseFrame, WebSocketConfig},
         Message,
@@ -848,9 +849,56 @@ impl WebsocketCommon {
                     Err(e) => {
                         error!("WebSocket error on {}: {:?}", reader_conn.id, e);
                         common.events.emit(WebsocketEvent::Error(e.to_string()));
+
+                        // Selective reconnect: only on recoverable connection losses
+                        let should_reconnect = matches!(
+                            &e,
+                            tungstenite::Error::Io(_)
+                                | tungstenite::Error::Protocol(
+                                    tungstenite::error::ProtocolError::ResetWithoutClosingHandshake
+                                )
+                                | tungstenite::Error::Protocol(tungstenite::error::ProtocolError::HandshakeIncomplete)
+                        );
+                        let mut conn_state = reader_conn.state.lock().await;
+                        if should_reconnect
+                            && !conn_state.close_initiated
+                            && !is_renewal
+                            && !conn_state.reconnection_pending
+                        {
+                            warn!("Triggering reconnect due to error on {}", reader_conn.id);
+                            conn_state.reconnection_pending = true;
+                            drop(conn_state);
+                            let reconnect_url = common.get_reconnect_url(&read_url, Arc::clone(&reader_conn)).await;
+                            let _ = common
+                                .reconnect_tx
+                                .send(ReconnectEntry {
+                                    connection_id: reader_conn.id.clone(),
+                                    url: reconnect_url,
+                                    is_renewal: false,
+                                })
+                                .await;
+                        }
+                        // Exit loop on error to avoid spinning
+                        break;
                     }
                     _ => {}
                 }
+            }
+            // New: Post-loop check for unexpected end (e.g., abrupt disconnect without close/error)
+            let mut conn_state = reader_conn.state.lock().await;
+            if !conn_state.close_initiated && !is_renewal && !conn_state.reconnection_pending {
+                error!("Reader stream ended unexpectedly on {}; triggering reconnect", reader_conn.id);
+                conn_state.reconnection_pending = true;
+                drop(conn_state);
+                let reconnect_url = common.get_reconnect_url(&read_url, Arc::clone(&reader_conn)).await;
+                let _ = common
+                    .reconnect_tx
+                    .send(ReconnectEntry {
+                        connection_id: reader_conn.id.clone(),
+                        url: reconnect_url,
+                        is_renewal: false,
+                    })
+                    .await;
             }
             debug!("Reader actor for {} exiting", reader_conn.id);
         });
