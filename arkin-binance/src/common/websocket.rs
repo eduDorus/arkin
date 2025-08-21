@@ -858,6 +858,7 @@ impl WebsocketCommon {
                                     tungstenite::error::ProtocolError::ResetWithoutClosingHandshake
                                 )
                                 | tungstenite::Error::Protocol(tungstenite::error::ProtocolError::HandshakeIncomplete)
+                                | tungstenite::Error::Tls(_)
                         );
                         let mut conn_state = reader_conn.state.lock().await;
                         if should_reconnect
@@ -865,7 +866,8 @@ impl WebsocketCommon {
                             && !is_renewal
                             && !conn_state.reconnection_pending
                         {
-                            warn!("Triggering reconnect due to error on {}", reader_conn.id);
+                            warn!("Triggering reconnect due to recoverable error on {}", reader_conn.id);
+                            conn_state.ws_write_tx = None; // Reset to bypass "Exists" check
                             conn_state.reconnection_pending = true;
                             drop(conn_state);
                             let reconnect_url = common.get_reconnect_url(&read_url, Arc::clone(&reader_conn)).await;
