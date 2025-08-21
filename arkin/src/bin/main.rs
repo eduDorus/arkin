@@ -598,7 +598,7 @@ async fn main() {
                 .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
                 .build();
             let strategy_instance = Arc::new(strategy_instance);
-            let agent_strategy = AgentStrategy::new(strategy_instance, dec!(200), 300);
+            let agent_strategy = AgentStrategy::new(strategy_instance, dec!(200), 60);
 
             // Init wide quoter strategy
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
