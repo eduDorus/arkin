@@ -164,7 +164,7 @@ async fn main() {
             let time = MockTime::new_from(start_time, a.tick_frequency);
 
             // Init pubsub
-            let pubsub = PubSub::new(true);
+            let pubsub = PubSub::new(false);
 
             // Init persistence
             let config = load::<PersistenceConfig>();

@@ -25,7 +25,7 @@ pub struct BinanceIngestor {
 
 pub async fn start_md_task(ingestor: Arc<BinanceIngestor>, core_ctx: Arc<CoreCtx>, service_ctx: Arc<ServiceCtx>) {
     // Build WebSocket Streams config
-    let ws_streams_conf = ConfigurationWebsocketStreams::builder().mode(WebsocketMode::Single).build();
+    let ws_streams_conf = ConfigurationWebsocketStreams::builder().mode(WebsocketMode::Pool(3)).build();
 
     // Create the DerivativesTradingUsdsFutures WebSocket Streams client
     let ws_streams_client = DerivativesTradingUsdsFuturesWsStreams::production(ws_streams_conf);

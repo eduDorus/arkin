@@ -42,7 +42,7 @@ impl BinanceExecution {
         let configuration = ConfigurationWebsocketApi::builder()
             .api_key(&api_key)
             .api_secret(&api_secret)
-            .mode(WebsocketMode::Single)
+            .mode(WebsocketMode::Pool(3))
             .user_agent("unknown".to_owned())
             .signature_gen(signature_gen)
             .build();

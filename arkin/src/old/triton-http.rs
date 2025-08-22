@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing();
 
     // Create HTTP client
-    let url = "http://192.168.100.100:8000/v2/models/agent/infer";
+    let url = "http://192.168.100.100:8000/v2/models/agent/versions/1/infer";
     let client = HTTPInferencer::new(url.to_string());
 
     // Define constants

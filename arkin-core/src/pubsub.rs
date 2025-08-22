@@ -92,7 +92,7 @@ impl PubSub {
             subscribers: DashMap::new(),
             event_subscriptions: DashMap::new(),
             subscribers_acknowledge: ack,
-            subscribers_acknowledge_channel: kanal::bounded_async(1024),
+            subscribers_acknowledge_channel: kanal::bounded_async(10240),
         }
         .into()
     }
@@ -102,7 +102,7 @@ impl PubSub {
 
     pub fn subscribe(&self, filter: EventFilter) -> Arc<PubSubSubscriber> {
         info!(target: "pubsub", "new subscriber");
-        let (tx, rx) = kanal::bounded_async(1024);
+        let (tx, rx) = kanal::bounded_async(10240);
 
         // Update the subscriber list
         let id = self.get_next_id();
