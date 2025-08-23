@@ -1,8 +1,16 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
+use clap::Parser;
+use rust_decimal::dec;
+use time::macros::datetime;
+use tokio_rustls::rustls::crypto::{ring, CryptoProvider};
+use tracing::{error, info};
+use uuid::Uuid;
+
 use arkin_accounting::Accounting;
 use arkin_binance::{BinanceExecution, BinanceIngestor};
 use arkin_cli::{Cli, Commands};
+use arkin_core::prelude::*;
 use arkin_cron::{Cron, CronInterval};
 use arkin_exec_sim::SimulationExecutor;
 use arkin_exec_strat_taker::TakerExecutionStrategy;
@@ -12,14 +20,11 @@ use arkin_ingestor_historical::prelude::*;
 use arkin_insights::{prelude::InsightsConfig, Insights};
 use arkin_persistence::{Persistence, PersistenceConfig};
 use arkin_strat_agent::AgentStrategy;
-use clap::Parser;
-use rust_decimal::dec;
-use time::macros::datetime;
-use tokio_rustls::rustls::crypto::{ring, CryptoProvider};
-use tracing::{error, info};
 
-use arkin_core::prelude::*;
-use uuid::Uuid;
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 // #[tokio::main(flavor = "current_thread")]
 #[tokio::main(flavor = "multi_thread")]
