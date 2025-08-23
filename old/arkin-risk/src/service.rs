@@ -11,7 +11,6 @@ pub struct Risk {}
 
 #[async_trait]
 impl Runnable for Risk {
-    #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn handle_event(&self, event: Event) {
         match &event {
             // Event::InsightsTick(o) => self.place_order(o).await,

@@ -119,10 +119,8 @@ dependencies = [
  "arkin-cli",
  "arkin-core",
  "arkin-cron",
- "arkin-exec-sim",
  "arkin-exec-strat-taker",
  "arkin-exec-strat-wide",
- "arkin-ingestor-binance",
  "arkin-ingestor-historical",
  "arkin-insights",
  "arkin-persistence",
@@ -186,6 +184,7 @@ dependencies = [
  "arkin-core",
  "async-trait",
  "base64 0.22.1",
+ "dashmap",
  "ed25519-dalek",
  "flate2",
  "futures",
@@ -281,22 +280,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arkin-exec-sim"
-version = "0.1.0"
-dependencies = [
- "arkin-core",
- "async-trait",
- "dashmap",
- "rand 0.9.2",
- "rust_decimal",
- "test-log",
- "time",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "arkin-exec-strat-taker"
 version = "0.1.0"
 dependencies = [
@@ -326,33 +309,6 @@ dependencies = [
  "tracing",
  "typed-builder",
  "uuid",
-]
-
-[[package]]
-name = "arkin-ingestor-binance"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arkin-core",
- "async-trait",
- "backoff",
- "bytes",
- "futures",
- "kanal",
- "reqwest",
- "rust_decimal",
- "serde",
- "serde_json",
- "test-log",
- "thiserror 2.0.16",
- "time",
- "tokio",
- "tokio-rustls",
- "tokio-tungstenite",
- "tokio-util",
- "tracing",
- "typed-builder",
- "url",
 ]
 
 [[package]]

@@ -8,14 +8,12 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 use arkin_accounting::Accounting;
-use arkin_binance::{BinanceExecution, BinanceIngestor};
+use arkin_binance::{BinanceExecution, BinanceIngestor, SimBinanceIngestor, SimulationExecutor};
 use arkin_cli::{Cli, Commands};
 use arkin_core::prelude::*;
 use arkin_cron::{Cron, CronInterval};
-use arkin_exec_sim::SimulationExecutor;
 use arkin_exec_strat_taker::TakerExecutionStrategy;
 use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
-use arkin_ingestor_binance::SimBinanceIngestor;
 use arkin_ingestor_historical::prelude::*;
 use arkin_insights::{prelude::InsightsConfig, Insights};
 use arkin_persistence::{Persistence, PersistenceConfig};

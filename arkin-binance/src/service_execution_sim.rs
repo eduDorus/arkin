@@ -7,7 +7,7 @@ use tracing::{debug, info, warn};
 
 use arkin_core::prelude::*;
 
-use crate::book::ExchangeBook;
+use crate::sim_book::ExchangeBook;
 
 #[derive(Clone, Default)]
 struct InternalAccount {

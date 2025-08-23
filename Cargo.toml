@@ -1,6 +1,6 @@
 [workspace]
 # members = [ "arkin-persistence", "arkin-ingestors", "arkin-strategies", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
-members = [ "arkin", "arkin-core", "arkin-cron", "arkin-audit", "arkin-accounting", "arkin-ingestor-binance", "arkin-ingestor-historical", "arkin-insights", "arkin-strat-crossover", "arkin-strat-agent", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-exec-sim", "arkin-binance", "arkin-cli" ]
+members = [ "arkin", "arkin-accounting", "arkin-audit", "arkin-binance", "arkin-cli", "arkin-core", "arkin-cron", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-ingestor-historical", "arkin-insights", "arkin-persistence", "arkin-strat-agent", "arkin-strat-crossover" ]
 
 default-members = [ "arkin" ]
 

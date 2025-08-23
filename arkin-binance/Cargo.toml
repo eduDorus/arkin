@@ -27,6 +27,7 @@ tokio-tungstenite = { workspace = true }
 reqwest = { workspace = true }
 typed-builder = { workspace = true }
 rand = { workspace = true }
+dashmap = { workspace = true }
 
 regex = "1.11"
 hmac = "0.12"
