@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM instances\n            WHERE name = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bf702cda1b613ed3b8bd98f37baeee26a600d0a42d891ecffa675725bc5d4b17"
+}
