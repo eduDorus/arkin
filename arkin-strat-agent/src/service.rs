@@ -6,25 +6,28 @@ use std::{
 use async_trait::async_trait;
 use dashmap::DashMap;
 use rust_decimal::prelude::*;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{allocation::AllocationEngine, infer_http::HTTPInferencer, utils::should_infer};
+use crate::{
+    allocation::AllocationEngine, config::ModelSettings, infer_grpc::GrpcInferencer, infer_http::HTTPInferencer,
+    traits::InferenceService, utils::should_infer,
+};
 
-const BATCH_SIZE: usize = 1;
-const SEQUENCE_LENGTH: usize = 192;
-const NUM_FEATURES_OBS: usize = 40; // Assuming len(FEATURE_COLUMNS) = 5
-const NUM_STATE_OBS: usize = 1;
-const POSSIBLE_WEIGHTS: [f32; 3] = [-1.0, 0.0, 1.0];
+// const BATCH_SIZE: usize = 1;
+// const SEQUENCE_LENGTH: usize = 192;
+// const NUM_FEATURES_OBS: usize = 40; // Assuming len(FEATURE_COLUMNS) = 5
+// const NUM_STATE_OBS: usize = 1;
+// const POSSIBLE_WEIGHTS: [f32; 3] = [-1.0, 0.0, 1.0];
 
-const SHAPE_0: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_FEATURES_OBS as i64];
-const SHAPE_1: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_STATE_OBS as i64];
+// const SHAPE_0: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_FEATURES_OBS as i64];
+// const SHAPE_1: [i64; 3] = [BATCH_SIZE as i64, SEQUENCE_LENGTH as i64, NUM_STATE_OBS as i64];
 
-const INPUT_NAMES: [&str; 2] = ["INPUT__0", "INPUT__1"];
-const OUTPUT_NAMES: [&str; 4] = ["OUTPUT__0", "OUTPUT__1", "OUTPUT__2", "OUTPUT__3"];
-const OUTPUT_WEIGHT_NAME: &str = "OUTPUT__2";
+// const INPUT_NAMES: [&str; 2] = ["INPUT__0", "INPUT__1"];
+// const OUTPUT_NAMES: [&str; 4] = ["OUTPUT__0", "OUTPUT__1", "OUTPUT__2", "OUTPUT__3"];
+// const OUTPUT_WEIGHT_NAME: &str = "OUTPUT__2";
 
 struct AgentState {
     input_features: HashMap<FeatureId, VecDeque<f32>>,
@@ -35,90 +38,61 @@ struct AgentState {
 pub struct AgentStrategy {
     #[allow(unused)]
     strategy: Arc<Strategy>,
-    interval: u64,
     allocation: AllocationEngine,
-    client: HTTPInferencer, // or GRPCInferencer
+    client: Arc<dyn InferenceService>,
+    inference_interval: u64,
     input_features_ids: Vec<FeatureId>,
     input_state_ids: Vec<FeatureId>,
     agent_inst_states: DashMap<Arc<Instrument>, AgentState>,
+    model_settings: ModelSettings,
 }
 
 impl AgentStrategy {
-    pub fn new(strategy: Arc<Strategy>, capital_per_inst: Decimal, interval: u64) -> Arc<Self> {
-        let url = "http://192.168.100.100:8000/v2/models/agent/infer";
-        let client = HTTPInferencer::new(url.to_owned());
+    pub fn new(
+        strategy: Arc<Strategy>,
+        capital_per_inst: Decimal,
+        inference_interval: u64,
+        input_feature_ids: Vec<FeatureId>,
+        input_state_ids: Vec<FeatureId>,
+        inference_host: String,
+        inference_port: u16,
+        inference_type: String,
+        model_settings: ModelSettings,
+    ) -> Arc<Self> {
+        let client = match inference_type.as_str() {
+            "http" => {
+                let base_url = format!("http://{}:{}", inference_host, inference_port);
+                Arc::new(HTTPInferencer::new(base_url)) as Arc<dyn InferenceService>
+            }
+            "grpc" => {
+                let url = format!("http://{}:{}", inference_host, inference_port);
+                Arc::new(GrpcInferencer::new(&url)) as Arc<dyn InferenceService>
+            }
+            _ => {
+                panic!("Unsupported inference type: {}", inference_type);
+            }
+        };
 
-        // Input features
-        let input_features_ids: Vec<FeatureId> = vec![
-            "price_percent_change_10min".to_owned().into(),
-            "price_percent_change_15min".to_owned().into(),
-            "price_percent_change_30min".to_owned().into(),
-            "price_percent_change_60min".to_owned().into(),
-            "price_imbalance_10min".to_owned().into(),
-            "price_imbalance_15min".to_owned().into(),
-            "price_imbalance_30min".to_owned().into(),
-            "price_imbalance_60min".to_owned().into(),
-            "price_relative_position_10min".to_owned().into(),
-            "price_relative_position_15min".to_owned().into(),
-            "price_relative_position_30min".to_owned().into(),
-            "price_relative_position_60min".to_owned().into(),
-            "price_relative_range_10min".to_owned().into(),
-            "price_relative_range_15min".to_owned().into(),
-            "price_relative_range_30min".to_owned().into(),
-            "price_relative_range_60min".to_owned().into(),
-            "price_acceleration_10min".to_owned().into(),
-            "price_acceleration_15min".to_owned().into(),
-            "price_acceleration_30min".to_owned().into(),
-            "price_acceleration_60min".to_owned().into(),
-            "price_volume_covariance_10min".to_owned().into(),
-            "price_volume_covariance_15min".to_owned().into(),
-            "price_volume_covariance_30min".to_owned().into(),
-            "price_volume_covariance_60min".to_owned().into(),
-            "volatility_10min".to_owned().into(),
-            "volatility_15min".to_owned().into(),
-            "volatility_30min".to_owned().into(),
-            "volatility_60min".to_owned().into(),
-            "volume_percent_change_10min".to_owned().into(),
-            "volume_percent_change_15min".to_owned().into(),
-            "volume_percent_change_30min".to_owned().into(),
-            "volume_percent_change_60min".to_owned().into(),
-            "volume_relative_position_10min".to_owned().into(),
-            "volume_relative_position_15min".to_owned().into(),
-            "volume_relative_position_30min".to_owned().into(),
-            "volume_relative_position_60min".to_owned().into(),
-            "volume_relative_range_10min".to_owned().into(),
-            "volume_relative_range_15min".to_owned().into(),
-            "volume_relative_range_30min".to_owned().into(),
-            "volume_relative_range_60min".to_owned().into(),
-        ];
-        // let input_features = HashMap::new();
-        // for feature_id in &input_features_ids {
-        //     input_features.insert(feature_id.clone(), VecDeque::<f32>::with_capacity(SEQUENCE_LENGTH));
-        // }
-
-        // State features
-        let input_state_ids: Vec<FeatureId> = vec!["weight".to_owned().into()];
-        // let input_state = HashMap::new();
-        // for id in &input_state_ids {
-        //     input_state.insert(id.clone(), VecDeque::<f32>::with_capacity(SEQUENCE_LENGTH));
-        // }
         Self {
             strategy: strategy.to_owned(),
-            interval,
             allocation: AllocationEngine::new(capital_per_inst, strategy.to_owned()),
-            client,
-            input_features_ids: input_features_ids,
+            client: client,
+            inference_interval,
+            input_features_ids: input_feature_ids,
             input_state_ids,
             agent_inst_states: DashMap::new(),
+            model_settings,
         }
         .into()
     }
 
     async fn warmup_insight_tick(&self, _ctx: Arc<CoreCtx>, update: &InsightsUpdate) {
-        if !should_infer(update.event_time, self.interval) {
-            warn!(target: "strat::agent", "insights event skipped due to interval misalignment, update at {}", update.event_time);
+        if !should_infer(update.event_time, self.inference_interval) {
+            debug!(target: "strat::agent", "insights event skipped due to interval misalignment, update at {}", update.event_time);
             return;
         }
+
+        let sequence_length = self.model_settings.sequence_length;
 
         // Initialize input state for new instruments
         for inst in &update.instruments {
@@ -126,12 +100,12 @@ impl AgentStrategy {
                 let input_features: HashMap<FeatureId, VecDeque<f32>> = self
                     .input_features_ids
                     .iter()
-                    .map(|id| (id.clone(), VecDeque::with_capacity(SEQUENCE_LENGTH)))
+                    .map(|id| (id.clone(), VecDeque::with_capacity(sequence_length)))
                     .collect();
                 let input_state: HashMap<FeatureId, VecDeque<f32>> = self
                     .input_state_ids
                     .iter()
-                    .map(|id| (id.clone(), VecDeque::with_capacity(SEQUENCE_LENGTH)))
+                    .map(|id| (id.clone(), VecDeque::with_capacity(sequence_length)))
                     .collect();
                 self.agent_inst_states.insert(
                     inst.to_owned(),
@@ -140,6 +114,7 @@ impl AgentStrategy {
                         input_state,
                     },
                 );
+                info!(target: "strat::agent", "Initialized state for instrument {}", inst);
             }
         }
 
@@ -153,7 +128,7 @@ impl AgentStrategy {
                 }) {
                     if let Some(deque) = state.input_features.get_mut(&insight.feature_id) {
                         deque.push_back(insight.value as f32); // Convert Decimal to f32, default 0 on error
-                        if deque.len() > SEQUENCE_LENGTH {
+                        if deque.len() > sequence_length {
                             deque.pop_front();
                         }
                     }
@@ -165,10 +140,23 @@ impl AgentStrategy {
     }
 
     async fn insight_tick(&self, ctx: Arc<CoreCtx>, update: &InsightsUpdate) {
-        if !should_infer(update.event_time, self.interval) {
-            warn!(target: "strat::agent", "insights event skipped due to interval misalignment, update at {}", update.event_time);
+        if !should_infer(update.event_time, self.inference_interval) {
+            debug!(target: "strat::agent", "insights event skipped due to interval misalignment, update at {}", update.event_time);
             return;
         }
+
+        let batch_size = self.model_settings.batch_size;
+        let sequence_length = self.model_settings.sequence_length;
+        let num_features_obs = self.model_settings.num_features_obs;
+        let num_state_obs = self.model_settings.num_state_obs;
+        let possible_weights = &self.model_settings.possible_weights;
+        let input_names: Vec<&str> = self.model_settings.input_names.iter().map(String::as_str).collect();
+        let output_names: Vec<&str> = self.model_settings.output_names.iter().map(String::as_str).collect();
+        let shape_0 = [batch_size as i64, sequence_length as i64, num_features_obs as i64];
+        let shape_1 = [batch_size as i64, sequence_length as i64, num_state_obs as i64];
+        let output_weight_name = &self.model_settings.output_weight_name;
+        let model_name_prefix = &self.model_settings.model_name_prefix;
+        let model_name_postfix = &self.model_settings.model_name_postfix;
 
         // Add new features
         for inst in &update.instruments {
@@ -180,28 +168,28 @@ impl AgentStrategy {
                 }) {
                     if let Some(deque) = state.input_features.get_mut(&insight.feature_id) {
                         deque.push_back(insight.value as f32); // Convert Decimal to f32, default 0 on error
-                        if deque.len() > SEQUENCE_LENGTH {
+                        if deque.len() > sequence_length {
                             deque.pop_front();
                         }
                     }
                 }
 
                 // Check if history full; skip if not (avoids zero-padding obs)
-                if state.input_features.iter().any(|(_k, v)| v.len() < SEQUENCE_LENGTH) {
+                if state.input_features.iter().any(|(_k, v)| v.len() < sequence_length) {
                     info!(target: "strat::agent", "Skipping inference: insufficient history");
                     continue;
                 }
 
                 // Create Feature Input
-                let mut input_data_0: Vec<f32> = Vec::with_capacity(BATCH_SIZE * SEQUENCE_LENGTH * NUM_FEATURES_OBS);
-                for _batch in 0..BATCH_SIZE {
-                    for seq in 0..SEQUENCE_LENGTH {
-                        for feat_idx in 0..NUM_FEATURES_OBS {
+                let mut input_data_0: Vec<f32> = Vec::with_capacity(batch_size * sequence_length * num_features_obs);
+                for _batch in 0..batch_size {
+                    for seq in 0..sequence_length {
+                        for feat_idx in 0..num_features_obs {
                             let feature_id = &self.input_features_ids[feat_idx];
                             if let Some(deque) = state.input_features.get(feature_id) {
                                 let len = deque.len();
-                                let val = if seq >= SEQUENCE_LENGTH - len {
-                                    deque.get(seq - (SEQUENCE_LENGTH - len)).copied().unwrap_or(0.0)
+                                let val = if seq >= sequence_length - len {
+                                    deque.get(seq - (sequence_length - len)).copied().unwrap_or(0.0)
                                 } else {
                                     0.0
                                 };
@@ -214,17 +202,17 @@ impl AgentStrategy {
                 }
 
                 // Create State Input
-                let mut input_data_1: Vec<f32> = Vec::with_capacity(BATCH_SIZE * SEQUENCE_LENGTH * NUM_STATE_OBS);
-                let max_weight = POSSIBLE_WEIGHTS.iter().fold(f32::NEG_INFINITY, |acc, &x| acc.max(x));
+                let mut input_data_1: Vec<f32> = Vec::with_capacity(batch_size * sequence_length * num_state_obs);
+                let max_weight = possible_weights.iter().fold(f32::NEG_INFINITY, |acc, &x| acc.max(x));
                 let scale_factor = 1.0 / (max_weight * 1.3489795003921636);
-                for _batch in 0..BATCH_SIZE {
-                    for seq in 0..SEQUENCE_LENGTH {
-                        for state_idx in 0..NUM_STATE_OBS {
+                for _batch in 0..batch_size {
+                    for seq in 0..sequence_length {
+                        for state_idx in 0..num_state_obs {
                             let state_id = &self.input_state_ids[state_idx];
                             if let Some(deque) = state.input_state.get(state_id) {
                                 let len = deque.len();
-                                let val = if seq >= SEQUENCE_LENGTH - len {
-                                    let weight = deque.get(seq - (SEQUENCE_LENGTH - len)).copied().unwrap_or(0.0);
+                                let val = if seq >= sequence_length - len {
+                                    let weight = deque.get(seq - (sequence_length - len)).copied().unwrap_or(0.0);
                                     weight * scale_factor
                                 } else {
                                     0.0
@@ -241,25 +229,31 @@ impl AgentStrategy {
                 let response = self
                     .client
                     .request(
-                        &INPUT_NAMES,
+                        &format!(
+                            "{}_{}_{}",
+                            model_name_prefix,
+                            inst.venue_symbol.to_lowercase(),
+                            model_name_postfix
+                        ),
+                        &input_names,
                         &[&input_data_0, &input_data_1],
-                        &[&SHAPE_0, &SHAPE_1],
-                        &OUTPUT_NAMES,
+                        &[&shape_0, &shape_1],
+                        &output_names,
                     )
                     .await;
 
                 if let Some(outputs) = response {
-                    let new_weight = outputs.get(OUTPUT_WEIGHT_NAME).cloned().unwrap_or_default()[0];
+                    let new_weight = outputs.get(output_weight_name).cloned().unwrap_or_default()[0];
                     info!(target: "strat::agent", "New weight is {}", new_weight);
 
                     // Now use new_weight: Push to deque
                     if let Some(deque) = state.input_state.get_mut(&FeatureId::from("weight".to_owned())) {
                         deque.push_back(new_weight.to_f32().unwrap_or(0.0)); // Convert Decimal to f32, default 0 on error
-                        if deque.len() > SEQUENCE_LENGTH {
+                        if deque.len() > sequence_length {
                             deque.pop_front();
                         }
                         let time = ctx.now().await;
-                        if let Some(order) = self.allocation.update(time, &update.instruments[0], new_weight) {
+                        if let Some(order) = self.allocation.update(time, inst, new_weight) {
                             ctx.publish(Event::NewTakerExecutionOrder(order.clone().into())).await;
                             info!(target: "strat::agent", "send {} execution order for {} quantity {}", order.side, order.instrument, order.quantity);
                         }

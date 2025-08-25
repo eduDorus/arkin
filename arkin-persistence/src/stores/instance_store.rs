@@ -25,8 +25,14 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Arc<In
     Ok(instance)
 }
 
-pub async fn delete(ctx: &PersistenceContext, instance_id: Uuid) -> Result<(), PersistenceError> {
-    instance_repo::delete(ctx, &instance_id).await?;
+pub async fn delete_by_id(ctx: &PersistenceContext, instance_id: Uuid) -> Result<(), PersistenceError> {
+    instance_repo::delete_by_id(ctx, &instance_id).await?;
     info!("Deleted instance: {}", instance_id);
+    Ok(())
+}
+
+pub async fn delete_by_name(ctx: &PersistenceContext, name: &str) -> Result<(), PersistenceError> {
+    instance_repo::delete_by_name(ctx, &name).await?;
+    info!("Deleted instance: {}", name);
     Ok(())
 }

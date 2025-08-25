@@ -114,7 +114,7 @@ pub struct ConfigurationWebsocketApi {
     #[builder(default = 5000)]
     pub timeout: u64,
 
-    #[builder(default = 5000)]
+    #[builder(default = 1000)]
     pub reconnect_delay: u64,
 
     #[builder(default = WebsocketMode::Single)]
@@ -147,7 +147,7 @@ pub struct ConfigurationWebsocketStreams {
     #[builder(setter(into, strip_option), default)]
     pub ws_url: Option<String>,
 
-    #[builder(default = 5000)]
+    #[builder(default = 1000)]
     pub reconnect_delay: u64,
 
     #[builder(default = WebsocketMode::Single)]

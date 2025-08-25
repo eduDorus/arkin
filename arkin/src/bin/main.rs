@@ -17,7 +17,7 @@ use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
 use arkin_ingestor_historical::prelude::*;
 use arkin_insights::{prelude::InsightsConfig, Insights};
 use arkin_persistence::{Persistence, PersistenceConfig};
-use arkin_strat_agent::AgentStrategy;
+use arkin_strat_agent::{AgentStrategy, AgentStrategyConfig};
 
 use mimalloc::MiMalloc;
 
@@ -316,7 +316,20 @@ async fn main() {
                 .updated(time.now().await)
                 .build()
                 .into();
-            let strategy = AgentStrategy::new(strategy_instance, dec!(10000), 60);
+            let agent_strat_cfg = load::<AgentStrategyConfig>().strategy_agent;
+            let strat_cfg = agent_strat_cfg.strategy;
+            let model_cfg = agent_strat_cfg.model;
+            let strategy = AgentStrategy::new(
+                strategy_instance,
+                strat_cfg.capital_per_inst,
+                strat_cfg.inference_interval,
+                strat_cfg.input_feature_ids,
+                strat_cfg.input_state_ids,
+                strat_cfg.inference_host,
+                strat_cfg.inference_port,
+                strat_cfg.inference_type,
+                model_cfg,
+            );
 
             // Exec Strategy
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
@@ -343,13 +356,13 @@ async fn main() {
                 .build();
             engine.register("pubsub", pubsub, 0, 10, None).await;
             engine
-                .register("persistence", persistence, 0, 10, Some(EventFilter::PersistableNoMarket))
+                .register("persistence", persistence, 1, 10, Some(EventFilter::PersistableSimulation))
                 .await;
             engine
                 .register(
                     "accounting",
                     accounting,
-                    0,
+                    2,
                     10,
                     Some(EventFilter::Events(vec![
                         EventType::InitialAccountUpdate,
@@ -359,12 +372,11 @@ async fn main() {
                     ])),
                 )
                 .await;
-            engine.register("ingestor", binance_sim_ingestor, 0, 10, None).await;
             engine
                 .register(
                     "insights",
                     insights,
-                    0,
+                    3,
                     10,
                     Some(EventFilter::Events(vec![
                         EventType::AggTradeUpdate,
@@ -373,20 +385,25 @@ async fn main() {
                     ])),
                 )
                 .await;
+            engine.register("ingestor", binance_sim_ingestor, 4, 10, None).await;
             engine
                 .register(
-                    "strat-crossover",
+                    "strat-agent",
                     strategy,
-                    0,
+                    2,
                     10,
-                    Some(EventFilter::Events(vec![EventType::InsightsUpdate])),
+                    Some(EventFilter::Events(vec![
+                        EventType::InsightsUpdate,
+                        EventType::WarmupInsightsUpdate,
+                        EventType::TickUpdate,
+                    ])),
                 )
                 .await;
             engine
                 .register(
                     "exec-strat-taker",
                     exec_strategy,
-                    0,
+                    2,
                     10,
                     Some(EventFilter::Events(vec![
                         EventType::NewTakerExecutionOrder,
@@ -405,7 +422,7 @@ async fn main() {
                 .register(
                     "exec",
                     execution,
-                    0,
+                    2,
                     10,
                     Some(EventFilter::Events(vec![
                         EventType::NewVenueOrder,
@@ -601,7 +618,20 @@ async fn main() {
                 .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
                 .build();
             let strategy_instance = Arc::new(strategy_instance);
-            let agent_strategy = AgentStrategy::new(strategy_instance, dec!(200), 60);
+            let agent_strat_cfg = load::<AgentStrategyConfig>().strategy_agent;
+            let strat_cfg = agent_strat_cfg.strategy;
+            let model_cfg = agent_strat_cfg.model;
+            let agent_strategy = AgentStrategy::new(
+                strategy_instance,
+                strat_cfg.capital_per_inst,
+                strat_cfg.inference_interval,
+                strat_cfg.input_feature_ids,
+                strat_cfg.input_state_ids,
+                strat_cfg.inference_host,
+                strat_cfg.inference_port,
+                strat_cfg.inference_type,
+                model_cfg,
+            );
 
             // Init wide quoter strategy
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);

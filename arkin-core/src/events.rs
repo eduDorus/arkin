@@ -148,7 +148,7 @@ impl EventType {
         matches!(self, EventType::InsightsUpdate)
     }
 
-    pub fn is_persistable_no_market(&self) -> bool {
+    pub fn is_simulation(&self) -> bool {
         matches!(
             self,
             EventType::NewAccount

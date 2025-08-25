@@ -451,10 +451,17 @@ impl Runnable for Persistence {
     async fn setup(&self, _service_ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {
         // TODO: NOT FOR PRODUCTION
         if self.ctx.instance.instance_type == InstanceType::Test {
-            if let Err(e) = instance_store::delete(&self.ctx, self.ctx.instance.id).await {
-                error!(target: "persistence", "could not delete instance: {}", e)
+            if let Err(e) = instance_store::delete_by_id(&self.ctx, self.ctx.instance.id).await {
+                warn!(target: "persistence", "could not delete instance: {}", e)
             }
         }
+
+        if self.ctx.instance.instance_type == InstanceType::Simulation {
+            if let Err(e) = instance_store::delete_by_name(&self.ctx, &self.ctx.instance.name).await {
+                warn!(target: "persistence", "could not delete instance: {}", e)
+            }
+        }
+
         // Create the instance
         if let Err(e) = instance_store::insert(&self.ctx, self.ctx.instance.clone()).await {
             error!(target: "persistence", "could not create instance: {}", e)

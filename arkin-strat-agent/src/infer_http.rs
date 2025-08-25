@@ -1,27 +1,38 @@
 #![allow(dead_code)]
 use std::{collections::HashMap, time::Duration};
 
+use async_trait::async_trait;
 use reqwest::Client;
 use rust_decimal::prelude::*;
 use serde_json::json;
 use tracing::error;
 
+use crate::traits::InferenceService;
+
 pub struct HTTPInferencer {
-    url: String,
+    base_url: String,
     client: Client,
 }
 
 impl HTTPInferencer {
-    pub fn new(url: String) -> Self {
+    pub fn new(base_url: String) -> Self {
         let client = Client::builder()
             .pool_idle_timeout(Some(Duration::from_secs(300))) // Keep connections forever
             .build()
             .expect("Failed to create HTTP client");
-        Self { url, client }
+        Self { base_url, client }
     }
 
-    pub async fn request(
+    fn format_url(&self, model_name: &str) -> String {
+        format!("{}/v2/models/{}/infer", self.base_url, model_name)
+    }
+}
+
+#[async_trait]
+impl InferenceService for HTTPInferencer {
+    async fn request(
         &self,
+        model_name: &str,
         input_names: &[&str],
         input_values: &[&[f32]],
         shapes: &[&[i64]],
@@ -59,7 +70,7 @@ impl HTTPInferencer {
         // Send the request
         let res = self
             .client
-            .post(&self.url)
+            .post(&self.format_url(model_name))
             .json(&infer_request)
             .send()
             .await

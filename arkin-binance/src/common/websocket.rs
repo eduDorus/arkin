@@ -100,7 +100,7 @@ impl WebsocketEventEmitter {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            sender: broadcast::channel(1024).0,
+            sender: broadcast::channel(10240).0,
         }
     }
 
@@ -109,7 +109,9 @@ impl WebsocketEventEmitter {
     }
 
     pub fn emit(&self, event: WebsocketEvent) {
-        let _ = self.sender.send(event); // Ignore errors (dropped if no subscribers)
+        if let Err(e) = self.sender.send(event) {
+            error!("Failed to emit WebSocket event: {:?}", e);
+        }
     }
 }
 
@@ -266,25 +268,56 @@ impl WebsocketCommon {
     /// - Handles and logs any reconnection errors
     fn spawn_reconnect_loop(common: Arc<Self>, mut reconnect_rx: Receiver<ReconnectEntry>) {
         spawn(async move {
-            while let Some(entry) = reconnect_rx.recv().await {
+            while let Some(mut entry) = reconnect_rx.recv().await {
                 info!("Scheduling reconnect for id {}", entry.connection_id);
+                let mut attempts = 0;
+                let mut backoff_ms = common.reconnect_delay; // e.g., start at 1000ms
+                let max_backoff_ms = 600000; // Cap at 10min to avoid indefinite waits
+                let jitter_factor = 0.2; // 20% random jitter for desync
 
-                if !entry.is_renewal {
-                    sleep(Duration::from_millis(common.reconnect_delay as u64)).await;
-                }
-
-                if let Some(conn_arc) = common.connection_pool.iter().find(|c| c.id == entry.connection_id).cloned() {
-                    let common_clone = Arc::clone(&common);
-                    if let Err(err) = common_clone
-                        .init_connect(&entry.url, entry.is_renewal, Some(conn_arc.clone()))
-                        .await
-                    {
-                        error!("Reconnect failed for {} → {}: {:?}", entry.connection_id, entry.url, err);
+                loop {
+                    if !entry.is_renewal {
+                        let jitter = (backoff_ms as f64 * jitter_factor * rand::random::<f64>()) as u64;
+                        sleep(Duration::from_millis(backoff_ms as u64 + jitter)).await;
                     }
-
-                    sleep(Duration::from_secs(1)).await;
-                } else {
-                    warn!("No connection {} found for reconnect", entry.connection_id);
+                    if let Some(conn_arc) = common.connection_pool.iter().find(|c| c.id == entry.connection_id).cloned()
+                    {
+                        // New: Reset state for clean attempt
+                        {
+                            let mut conn_state = conn_arc.state.lock().await;
+                            conn_state.reconnection_pending = false;
+                            conn_state.renewal_pending = false;
+                            conn_state.close_initiated = false;
+                            conn_state.ws_write_tx = None; // Ensure bypasses "Exists" check
+                        }
+                        let common_clone = Arc::clone(&common);
+                        match common_clone
+                            .init_connect(&entry.url, entry.is_renewal, Some(conn_arc.clone()))
+                            .await
+                        {
+                            Ok(_) => break, // Success: exit loop
+                            Err(err) => {
+                                error!(
+                                    "Reconnect attempt {} failed for {} → {}: {:?}",
+                                    attempts + 1,
+                                    entry.connection_id,
+                                    entry.url,
+                                    err
+                                );
+                                attempts += 1;
+                                backoff_ms = (backoff_ms * 2).min(max_backoff_ms);
+                                // Exponential, capped
+                                // New: Cleanup stale state for renewals to prevent stuck pending
+                                if entry.is_renewal {
+                                    let mut conn_state = conn_arc.state.lock().await;
+                                    conn_state.renewal_pending = false;
+                                }
+                            }
+                        }
+                    } else {
+                        warn!("No connection {} found for reconnect", entry.connection_id);
+                        break; // Exit if connection gone
+                    }
                 }
             }
         });
@@ -435,6 +468,7 @@ impl WebsocketCommon {
         }
 
         if ready.is_empty() {
+            warn!("No ready WebSocket connections available in get_connection");
             return Err(WebsocketError::NotConnected);
         }
 
@@ -738,7 +772,16 @@ impl WebsocketCommon {
         is_renewal: bool,
         connection: Option<Arc<WebsocketConnection>>,
     ) -> Result<(), WebsocketError> {
-        let conn = connection.unwrap_or(self.get_connection(true).await?);
+        let conn = match connection {
+            Some(conn) => conn,
+            None => match self.get_connection(true).await {
+                Ok(conn) => conn,
+                Err(err) => {
+                    error!("Failed to get connection from pool: {:?}", err);
+                    return Err(err);
+                }
+            },
+        };
 
         {
             let mut conn_state = conn.state.lock().await;
@@ -750,11 +793,9 @@ impl WebsocketCommon {
                 info!("Exists {}; skipping {}", conn.id, url);
                 return Ok(());
             }
-            if is_renewal {
-                conn_state.renewal_pending = true;
-            }
         }
 
+        info!("Establishing WebSocket connection {} → {}", conn.id, url);
         let ws = Self::create_websocket(url, self.agent.clone(), self.user_agent.clone())
             .await
             .map_err(|e| {
@@ -764,6 +805,11 @@ impl WebsocketCommon {
 
         info!("Established {} → {}", conn.id, url);
 
+        // Set only on success, before scheduling renewal
+        if is_renewal {
+            let mut conn_state = conn.state.lock().await;
+            conn_state.renewal_pending = true;
+        }
         if let Err(e) = self.renewal_tx.try_send((conn.id.clone(), url.to_string())) {
             error!("Failed to schedule renewal for {}: {:?}", conn.id, e);
         }
@@ -829,9 +875,10 @@ impl WebsocketCommon {
                         common.events.emit(WebsocketEvent::Close(code, reason.clone()));
 
                         let mut conn_state = reader_conn.state.lock().await;
-                        if !conn_state.close_initiated && !is_renewal && CloseCode::from(code) != CloseCode::Normal {
+                        if !conn_state.close_initiated && CloseCode::from(code) != CloseCode::Normal {
                             warn!("Connection {} closed due to {}: {}", reader_conn.id, code, reason);
                             conn_state.reconnection_pending = true;
+                            conn_state.renewal_pending = false;
                             drop(conn_state);
                             let reconnect_url = common.get_reconnect_url(&read_url, Arc::clone(&reader_conn)).await;
 
@@ -853,22 +900,17 @@ impl WebsocketCommon {
                         // Selective reconnect: only on recoverable connection losses
                         let should_reconnect = matches!(
                             &e,
-                            tungstenite::Error::Io(_)
-                                | tungstenite::Error::Protocol(
-                                    tungstenite::error::ProtocolError::ResetWithoutClosingHandshake
-                                )
-                                | tungstenite::Error::Protocol(tungstenite::error::ProtocolError::HandshakeIncomplete)
-                                | tungstenite::Error::Tls(_)
+                            tungstenite::Error::Io(_) | tungstenite::Error::Protocol(_) | tungstenite::Error::Tls(_) // | tungstenite::Error::Protocol(
+                                                                                                                     //     tungstenite::error::ProtocolError::ResetWithoutClosingHandshake
+                                                                                                                     // )
+                                                                                                                     // | tungstenite::Error::Protocol(tungstenite::error::ProtocolError::HandshakeIncomplete)
                         );
                         let mut conn_state = reader_conn.state.lock().await;
-                        if should_reconnect
-                            && !conn_state.close_initiated
-                            && !is_renewal
-                            && !conn_state.reconnection_pending
-                        {
+                        if should_reconnect && !conn_state.close_initiated && !conn_state.reconnection_pending {
                             warn!("Triggering reconnect due to recoverable error on {}", reader_conn.id);
                             conn_state.ws_write_tx = None; // Reset to bypass "Exists" check
                             conn_state.reconnection_pending = true;
+                            conn_state.renewal_pending = false;
                             drop(conn_state);
                             let reconnect_url = common.get_reconnect_url(&read_url, Arc::clone(&reader_conn)).await;
                             let _ = common
@@ -888,9 +930,11 @@ impl WebsocketCommon {
             }
             // New: Post-loop check for unexpected end (e.g., abrupt disconnect without close/error)
             let mut conn_state = reader_conn.state.lock().await;
-            if !conn_state.close_initiated && !is_renewal && !conn_state.reconnection_pending {
+            if !conn_state.close_initiated && !conn_state.reconnection_pending {
                 error!("Reader stream ended unexpectedly on {}; triggering reconnect", reader_conn.id);
+                conn_state.ws_write_tx = None; // Reset to bypass "Exists" check
                 conn_state.reconnection_pending = true;
+                conn_state.renewal_pending = false;
                 drop(conn_state);
                 let reconnect_url = common.get_reconnect_url(&read_url, Arc::clone(&reader_conn)).await;
                 let _ = common

@@ -21,7 +21,7 @@ pub enum EventFilter {
     All,
     AllWithoutMarket,
     Persistable,
-    PersistableNoMarket,
+    PersistableSimulation,
     InsightUpdates,
     Events(Vec<EventType>),
 }
@@ -129,9 +129,9 @@ impl PubSub {
                     }
                 }
             }
-            EventFilter::PersistableNoMarket => {
+            EventFilter::PersistableSimulation => {
                 for event_type in EventType::iter() {
-                    if event_type.is_persistable_no_market() {
+                    if event_type.is_simulation() {
                         self.event_subscriptions.entry(event_type).or_default().push(id);
                     }
                 }

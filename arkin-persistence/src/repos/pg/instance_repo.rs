@@ -122,13 +122,26 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Instan
     }
 }
 
-pub async fn delete(ctx: &PersistenceContext, id: &Uuid) -> Result<(), PersistenceError> {
+pub async fn delete_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<(), PersistenceError> {
     sqlx::query!(
         r#"
             DELETE FROM instances
             WHERE id = $1
             "#,
         id
+    )
+    .execute(&ctx.pg_pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn delete_by_name(ctx: &PersistenceContext, name: &str) -> Result<(), PersistenceError> {
+    sqlx::query!(
+        r#"
+            DELETE FROM instances
+            WHERE name = $1
+            "#,
+        name
     )
     .execute(&ctx.pg_pool)
     .await?;

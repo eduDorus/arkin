@@ -1,21 +1,24 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
 
+use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use tokio::sync::Mutex;
 use tonic::transport::Channel;
+use tracing::{debug, error, warn};
 
 use arkin_core::prelude::*;
-use tracing::{error, info, warn};
+
+use crate::traits::InferenceService;
 
 // let url = "http://192.168.100.100:8001";
 
-pub struct GRPCInferencer {
+pub struct GrpcInferencer {
     url: String,
     client: Mutex<GrpcInferenceServiceClient<Channel>>,
 }
 
-impl GRPCInferencer {
+impl GrpcInferencer {
     pub fn new(url: &str) -> Self {
         let channel = Channel::from_shared(url.to_string())
             .expect("invalid gRPC server URL")
@@ -26,9 +29,13 @@ impl GRPCInferencer {
             client,
         }
     }
+}
 
-    pub async fn request(
+#[async_trait]
+impl InferenceService for GrpcInferencer {
+    async fn request(
         &self,
+        model_name: &str,
         input_names: &[&str],
         input_values: &[&[f32]],
         shapes: &[&[i64]],
@@ -61,7 +68,7 @@ impl GRPCInferencer {
 
         // Build the inference request
         let infer_request = ModelInferRequest {
-            model_name: "agent".to_string(),
+            model_name: model_name.to_string(),
             model_version: "".to_string(),
             id: "".to_string(),
             parameters: std::collections::HashMap::new(),
@@ -81,7 +88,7 @@ impl GRPCInferencer {
                     return None;
                 }
 
-                info!(target: "strat::agent", "Received outputs: {:?}", outputs);
+                debug!(target: "strat::agent", "Received outputs: {:?}", outputs);
 
                 // Parse outputs to a hashmap
                 let mut result: HashMap<String, Vec<Decimal>> = HashMap::new();
