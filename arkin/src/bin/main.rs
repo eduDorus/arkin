@@ -111,52 +111,52 @@ async fn main() {
             engine.start().await;
             engine.wait_for_shutdown().await;
         }
-        // Commands::Scaler(a) => {
-        //     info!("Starting arkin scaler init 🚀");
+        Commands::Scaler(a) => {
+            info!("Starting arkin scaler init 🚀");
 
-        //     let start = a.start;
-        //     let end = a.end;
+            let start = a.start;
+            let end = a.end;
 
-        //     let time = LiveSystemTime::new();
+            let time = LiveSystemTime::new();
 
-        //     let config = load::<PersistenceConfig>();
-        //     let instance = Instance::builder()
-        //         .id(Uuid::from_str("b787c86a-aff3-4495-b898-008f0fde633c").unwrap())
-        //         .name("insights".to_owned())
-        //         .instance_type(InstanceType::Insights)
-        //         .created(time.now().await)
-        //         .updated(time.now().await)
-        //         .build();
-        //     let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
+            let config = load::<PersistenceConfig>();
+            let instance = Instance::builder()
+                .id(Uuid::from_str("b787c86a-aff3-4495-b898-008f0fde633c").unwrap())
+                .name("insights".to_owned())
+                .instance_type(InstanceType::Insights)
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+            let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
 
-        //     let pipeline = persistence.get_pipeline_by_name(&a.pipeline).await.unwrap();
-        //     let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
+            let pipeline = persistence.get_pipeline_by_name(&a.pipeline).await.unwrap();
+            let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
 
-        //     // Calculate quantiles
-        //     let levels: Vec<f64> = (1..a.n_quantiles).map(|i| i as f64 / a.n_quantiles as f64).collect();
+            // Calculate quantiles
+            let levels: Vec<f64> = (1..a.n_quantiles).map(|i| i as f64 / a.n_quantiles as f64).collect();
 
-        //     let mut quantiles = Vec::new();
-        //     for inst in instruments {
-        //         let data = persistence
-        //             .get_scaler_data(&pipeline, &inst, start, end, &levels)
-        //             .await
-        //             .unwrap();
-        //         quantiles.extend(data);
-        //     }
+            let mut quantiles = Vec::new();
+            for inst in instruments {
+                let data = persistence
+                    .get_scaler_data(&pipeline, &inst, start, end, &levels)
+                    .await
+                    .unwrap();
+                quantiles.extend(data);
+            }
 
-        //     let data = Quantiles {
-        //         pipeline_id: pipeline.id,
-        //         levels,
-        //         data: quantiles,
-        //     };
+            let data = Quantiles {
+                pipeline_id: pipeline.id,
+                levels,
+                data: quantiles,
+            };
 
-        //     // Save to json file:
-        //     if !a.dry_run {
-        //         let pipeline_name = pipeline.name.clone();
-        //         let file = std::fs::File::create(format!("./scalers/{pipeline_name}.json")).unwrap();
-        //         serde_json::to_writer(file, &data).unwrap();
-        //     }
-        // }
+            // Save to json file:
+            if !a.dry_run {
+                let pipeline_name = pipeline.name.clone();
+                let file = std::fs::File::create(format!("./scalers/{pipeline_name}.json")).unwrap();
+                serde_json::to_writer(file, &data).unwrap();
+            }
+        }
         Commands::Insights(a) => {
             info!("Starting arkin insights 🚀");
 
@@ -194,14 +194,7 @@ async fn main() {
 
             // Insights service
             let pipeline_config = load::<InsightsConfig>();
-            let pipeline_info: Arc<Pipeline> = Pipeline::builder()
-                .id(Uuid::from_str("f031d4e2-2ada-4651-83fa-aef515accb29").unwrap())
-                .name(a.pipeline)
-                .description("Pipeline version v1.6.0 (Multi Asset)".to_owned())
-                .created(time.now().await)
-                .updated(time.now().await)
-                .build()
-                .into();
+            let pipeline_info = persistence.get_pipeline_by_name(&a.pipeline).await.unwrap();
             if let Err(e) = persistence.insert_pipeline(pipeline_info.clone()).await {
                 error!("{}", e);
             }
@@ -738,6 +731,5 @@ async fn main() {
             info!("Engine started, waiting for shutdown...");
             engine.wait_for_shutdown().await;
         }
-        _ => todo!(),
     }
 }
