@@ -42,4 +42,4 @@ uuid = { workspace = true }
 statrs = { workspace = true }
 clap = { workspace = true }
 rust_decimal = { workspace = true }
-mimalloc = { version = "0.1.47", features = [ "secure" ] }
+mimalloc = { version = "0.1.48", features = [ "v3" ] }
