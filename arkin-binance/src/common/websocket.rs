@@ -276,9 +276,12 @@ impl WebsocketCommon {
                 let jitter_factor = 0.2; // 20% random jitter for desync
 
                 loop {
-                    if !entry.is_renewal {
+                    if !entry.is_renewal && attempts > 0 {
+                        // New: Skip sleep on first (attempts==0)
                         let jitter = (backoff_ms as f64 * jitter_factor * rand::random::<f64>()) as u64;
                         sleep(Duration::from_millis(backoff_ms as u64 + jitter)).await;
+                    } else {
+                        info!("Trying reconnect immediately for id {}", entry.connection_id);
                     }
                     if let Some(conn_arc) = common.connection_pool.iter().find(|c| c.id == entry.connection_id).cloned()
                     {
@@ -684,7 +687,7 @@ impl WebsocketCommon {
         let handshake = connect_async_tls_with_config(req, ws_config, disable_nagle, connector);
         match timeout(timeout_duration, handshake).await {
             Ok(Ok((ws_stream, response))) => {
-                debug!("WebSocket connected: {:?}", response);
+                info!("WebSocket connected: {:?}", response);
                 Ok(ws_stream)
             }
             Ok(Err(e)) => {
