@@ -236,7 +236,7 @@ async fn main() {
             let start_time = a.start;
             let end_time = a.end;
 
-            let time = MockTime::new_from(start_time, a.tick_frequency);
+            let time = SimulationSystemTime::new(start_time, end_time, Duration::from_secs(a.tick_frequency));
 
             // Init pubsub
             let pubsub = PubSub::new(true);

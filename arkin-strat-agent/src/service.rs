@@ -127,10 +127,13 @@ impl AgentStrategy {
                         && i.instrument == Some(inst.clone())
                 }) {
                     if let Some(deque) = state.input_features.get_mut(&insight.feature_id) {
+                        debug!(target: "strat::agent", "Adding feature {} with value {} for instrument {}", insight.feature_id, insight.value, inst);
                         deque.push_back(insight.value as f32); // Convert Decimal to f32, default 0 on error
                         if deque.len() > sequence_length {
                             deque.pop_front();
                         }
+                    } else {
+                        warn!(target: "strat::agent", "missing feature deque for feature {}", insight.feature_id);
                     }
                 }
             } else {
@@ -167,16 +170,21 @@ impl AgentStrategy {
                         && i.instrument == Some(inst.clone())
                 }) {
                     if let Some(deque) = state.input_features.get_mut(&insight.feature_id) {
+                        debug!(target: "strat::agent", "Adding feature {} with value {} for instrument {}", insight.feature_id, insight.value, inst);
                         deque.push_back(insight.value as f32); // Convert Decimal to f32, default 0 on error
                         if deque.len() > sequence_length {
                             deque.pop_front();
                         }
+                    } else {
+                        warn!(target: "strat::agent", "missing feature deque for feature {}", insight.feature_id);
                     }
                 }
 
                 // Check if history full; skip if not (avoids zero-padding obs)
-                if state.input_features.iter().any(|(_k, v)| v.len() < sequence_length) {
-                    info!(target: "strat::agent", "Skipping inference: insufficient history");
+                // Find the length of each feature:
+                let min_length = state.input_features.values().map(|v| v.len()).min().unwrap_or(0);
+                if min_length < sequence_length {
+                    warn!(target: "strat::agent", "Skipping inference: insufficient history with {} entries", min_length);
                     continue;
                 }
 

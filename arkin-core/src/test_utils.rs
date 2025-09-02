@@ -5,7 +5,7 @@ use futures::Stream;
 use rust_decimal::prelude::*;
 use time::{macros::datetime, OffsetDateTime, UtcDateTime};
 use tokio::sync::{Mutex, RwLock};
-use tracing::{debug, instrument};
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -59,16 +59,26 @@ impl SystemTime for MockTime {
         self.state.read().await.current
     }
 
-    #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
     async fn advance_time_to(&self, time: UtcDateTime) {
-        self.state.write().await.current = time;
-        debug!(target: "mock-time", "advanced time to {}", time);
+        // We can only move forward in time
+        let current_time = self.state.read().await.current;
+        match (current_time, time) {
+            (current, new) if current < new => {
+                self.state.write().await.current = new;
+                debug!(target: "time", "advanced time to {}", new);
+            }
+            (current, new) if current == new => {
+                // No-op
+            }
+            (current, new) => {
+                warn!(target: "time", "attempted to move time backwards from {} to {}", current, new);
+            }
+        }
     }
 
-    #[instrument(parent = None, skip_all, fields(service = "mock-time"))]
     async fn advance_time_by(&self, duration: Duration) {
         self.state.write().await.current += duration;
-        debug!(target: "mock-time", "advanced time by {:?}", duration);
+        debug!(target: "time", "advanced time by {:?}", duration);
     }
 
     async fn is_final_hour(&self) -> bool {

@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use time::UtcDateTime;
 use tokio::sync::RwLock;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::SystemTime;
 
@@ -80,7 +80,20 @@ impl SystemTime for SimulationSystemTime {
     }
 
     async fn advance_time_to(&self, time: UtcDateTime) {
-        self.state.write().await.current = time;
+        // We can only move forward in time
+        let current_time = self.state.read().await.current;
+        match (current_time, time) {
+            (current, new) if current < new => {
+                self.state.write().await.current = new;
+                debug!(target: "time", "advanced time to {}", new);
+            }
+            (current, new) if current == new => {
+                // No-op
+            }
+            (_current, _new) => {
+                // warn!(target: "time", "attempted to move time backwards from {} to {}", current, new);
+            }
+        }
     }
 
     async fn advance_time_by(&self, duration: Duration) {

@@ -110,6 +110,7 @@ impl Runnable for Insights {
             self.warmup_tick(core_ctx.clone(), &tick).await;
             minute += frequency;
         }
+        info!(target: "insights", "finished setup at {}", core_ctx.now().await);
     }
 
     async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
