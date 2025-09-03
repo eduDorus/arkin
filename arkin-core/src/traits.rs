@@ -38,14 +38,6 @@ pub trait PersistenceReader: Send + Sync {
         start: UtcDateTime,
         end: UtcDateTime,
     ) -> Vec<Arc<AggTrade>>;
-    async fn tick_stream_range_buffered(
-        &self,
-        instruments: &[Arc<Instrument>],
-        start: UtcDateTime,
-        end: UtcDateTime,
-        buffer_size: usize,
-        frequency: Frequency,
-    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>;
     async fn trade_stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
@@ -54,6 +46,15 @@ pub trait PersistenceReader: Send + Sync {
         buffer_size: usize,
         frequency: Frequency,
     ) -> Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>;
+    async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Option<Arc<Tick>>;
+    async fn tick_stream_range_buffered(
+        &self,
+        instruments: &[Arc<Instrument>],
+        start: UtcDateTime,
+        end: UtcDateTime,
+        buffer_size: usize,
+        frequency: Frequency,
+    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>;
 }
 
 /// A trait for defining the lifecycle of a service in the system.

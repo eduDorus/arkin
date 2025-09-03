@@ -31,5 +31,5 @@ docker exec -it arkin-clickhouse clickhouse client
 
 Sync from the remote
 ```sql
-INSERT INTO arkin.ticks SELECT * FROM remote('192.168.100.100', 'arkin', 'ticks', 'arkin_admin', 'test1234') WHERE event_time BETWEEN '2025-01-01 00:00:00' AND '2025-06-06 00:00:00';
+INSERT INTO arkin.ticks SELECT * FROM remote('192.168.100.100', 'arkin', 'ticks', 'arkin_admin', 'test1234') WHERE event_time BETWEEN '2023-01-01 00:00:00' AND '2025-06-06 00:00:00';
 ```

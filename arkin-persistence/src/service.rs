@@ -388,6 +388,10 @@ impl PersistenceReader for Persistence {
         asset_store::read_by_symbol(&self.ctx, symbol).await.unwrap()
     }
 
+    async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Option<Arc<Tick>> {
+        tick_store::read_last(&self.ctx, instrument).await.ok()
+    }
+
     async fn list_trades(
         &self,
         instruments: &[Arc<Instrument>],

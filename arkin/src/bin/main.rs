@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
+use std::{cmp::max, collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
 use clap::Parser;
 use rust_decimal::dec;
@@ -453,8 +453,12 @@ async fn main() {
             // Init wide quoter strategy
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
             let venue_order_book = VenueOrderBook::new(pubsub.publisher(), true);
-            let exec_strat =
-                WideQuoterExecutionStrategy::new(execution_order_book, venue_order_book, dec!(0.005), dec!(0.0002));
+            let exec_strat = WideQuoterExecutionStrategy::new(
+                execution_order_book,
+                venue_order_book,
+                a.quote_spread,
+                a.requote_threshold,
+            );
 
             // Executor
             let execution = BinanceExecution::new();
@@ -467,7 +471,7 @@ async fn main() {
                 .build();
             engine.register("pubsub", pubsub.clone(), 0, 9, None).await;
             engine
-                .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
+                .register("persistence", persistence.clone(), 0, 10, Some(EventFilter::Persistable))
                 .await;
             engine.register("ingestor-binance", ingestor, 1, 3, None).await;
             engine
@@ -514,11 +518,9 @@ async fn main() {
             for inst in instruments {
                 info!("Sending orders for {}", inst);
 
-                let lot_size = if inst.venue_symbol != "BTCUSDT" {
-                    inst.lot_size * dec!(20)
-                } else {
-                    inst.lot_size
-                };
+                let last_price = persistence.get_last_tick(&inst).await.unwrap().mid_price();
+
+                let lot_size = max(dec!(100) / last_price, inst.lot_size);
 
                 // Create Buy exec order
                 let publisher = pubsub.publisher();

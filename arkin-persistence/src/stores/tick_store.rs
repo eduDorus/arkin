@@ -19,6 +19,20 @@ pub async fn insert_vec(ctx: &PersistenceContext, ticks: &[Arc<Tick>]) -> Result
     tick_repo::insert_batch(ctx, &ticks).await
 }
 
+pub async fn read_last(ctx: &PersistenceContext, instrument: &Arc<Instrument>) -> Result<Arc<Tick>, PersistenceError> {
+    let dto = tick_repo::read_last(ctx, &instrument.id).await?;
+    let tick = Tick::builder()
+        .event_time(dto.event_time.to_utc())
+        .instrument(Arc::clone(instrument))
+        .tick_id(dto.tick_id as u64)
+        .bid_price(dto.bid_price)
+        .bid_quantity(dto.bid_quantity)
+        .ask_price(dto.ask_price)
+        .ask_quantity(dto.ask_quantity)
+        .build();
+    Ok(Arc::new(tick))
+}
+
 pub async fn read_range(
     ctx: &PersistenceContext,
     instrument_ids: &[Uuid],

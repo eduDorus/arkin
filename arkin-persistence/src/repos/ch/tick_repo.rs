@@ -85,6 +85,28 @@ pub async fn insert_batch(ctx: &PersistenceContext, ticks: &[TickClickhouseDTO])
     Ok(())
 }
 
+pub async fn read_last(ctx: &PersistenceContext, instrument_id: &Uuid) -> Result<TickClickhouseDTO, PersistenceError> {
+    ctx.ch_client
+        .query(
+            r#"
+              SELECT
+                event_time, instrument_id, tick_id, bid_price, bid_quantity, ask_price, ask_quantity
+              FROM
+                ? 
+              WHERE
+                instrument_id = ?
+              ORDER BY
+                event_time DESC
+              LIMIT 1
+              "#,
+        )
+        .bind(Identifier(TABLE_NAME))
+        .bind(instrument_id)
+        .fetch_one::<TickClickhouseDTO>()
+        .await
+        .map_err(|e| e.into())
+}
+
 pub async fn read_range(
     ctx: &PersistenceContext,
     instrument_ids: &[Uuid],

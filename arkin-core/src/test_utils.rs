@@ -180,16 +180,6 @@ impl PersistenceReader for MockPersistence {
     ) -> Vec<Arc<AggTrade>> {
         todo!()
     }
-    async fn tick_stream_range_buffered(
-        &self,
-        _instruments: &[Arc<Instrument>],
-        _start: UtcDateTime,
-        _end: UtcDateTime,
-        _buffer_size: usize,
-        _frequency: Frequency,
-    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin> {
-        todo!()
-    }
     async fn trade_stream_range_buffered(
         &self,
         _instruments: &[Arc<Instrument>],
@@ -198,6 +188,25 @@ impl PersistenceReader for MockPersistence {
         _buffer_size: usize,
         _frequency: Frequency,
     ) -> Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin> {
+        todo!()
+    }
+    async fn get_last_tick(&self, _instrument: &Arc<Instrument>) -> Option<Arc<Tick>> {
+        Some(test_tick(
+            test_inst_binance_btc_usdt_perp(),
+            dec!(30000.00),
+            dec!(0.5),
+            dec!(30010.00),
+            dec!(0.3),
+        ))
+    }
+    async fn tick_stream_range_buffered(
+        &self,
+        _instruments: &[Arc<Instrument>],
+        _start: UtcDateTime,
+        _end: UtcDateTime,
+        _buffer_size: usize,
+        _frequency: Frequency,
+    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin> {
         todo!()
     }
 }
