@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::Result;
 
 use async_trait::async_trait;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use arkin_core::prelude::*;
 
@@ -95,7 +95,13 @@ impl Runnable for Insights {
     async fn setup(&self, _service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
         let end = core_ctx.now().await.replace_second(0).unwrap().replace_nanosecond(0).unwrap();
         let start = end - Duration::from_secs(86400);
-        let trades = core_ctx.persistence.list_trades(&self.instruments, start, end).await;
+        let trades = match core_ctx.persistence.list_trades(&self.instruments, start, end).await {
+            Ok(t) => t,
+            Err(e) => {
+                error!(target: "insights", "Failed to list trades: {}", e);
+                return;
+            }
+        };
 
         // Clone the inner Trade from the Arc so to_insights can take ownership without moving out of the Arc
         let hist_data = trades.iter().flat_map(|t| t.as_ref().clone().to_insights()).collect::<Vec<_>>();

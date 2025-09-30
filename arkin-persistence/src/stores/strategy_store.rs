@@ -4,10 +4,13 @@ use uuid::Uuid;
 
 use arkin_core::Strategy;
 
-use crate::{context::PersistenceContext, repos::pg::strategy_repo, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::pg::strategy_repo};
 
 pub async fn insert(ctx: &PersistenceContext, strategy: Arc<Strategy>) -> Result<(), PersistenceError> {
-    strategy_repo::insert(ctx, strategy.into()).await
+    strategy_repo::insert(ctx, strategy.into()).await?;
+    Ok(())
 }
 
 pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Strategy>, PersistenceError> {
@@ -23,9 +26,11 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Arc<St
 }
 
 pub async fn update(ctx: &PersistenceContext, strategy: Arc<Strategy>) -> Result<(), PersistenceError> {
-    strategy_repo::update(ctx, strategy.into()).await
+    strategy_repo::update(ctx, strategy.into()).await?;
+    Ok(())
 }
 
 pub async fn delete(ctx: &PersistenceContext, id: &Uuid) -> Result<(), PersistenceError> {
-    strategy_repo::delete(ctx, id).await
+    strategy_repo::delete(ctx, id).await?;
+    Ok(())
 }

@@ -125,9 +125,15 @@ const MAPPINGS: &[MappingEntry] = &[
     },
     MappingEntry {
         exchange: Exchange::OkxSpot,
-        channel: Channel::Trades,
+        channel: Channel::AggTrades,
         tardis_id: "okex",
         tardis_channel_str: "trades",
+    },
+    MappingEntry {
+        exchange: Exchange::OkxSpot,
+        channel: Channel::Trades,
+        tardis_id: "okex",
+        tardis_channel_str: "trades-all",
     },
     MappingEntry {
         exchange: Exchange::OkxSpot,
@@ -141,6 +147,12 @@ const MAPPINGS: &[MappingEntry] = &[
         channel: Channel::OrderBook,
         tardis_id: "okex-swap",
         tardis_channel_str: "books",
+    },
+    MappingEntry {
+        exchange: Exchange::OkxSwap,
+        channel: Channel::AggTrades,
+        tardis_id: "okex-swap",
+        tardis_channel_str: "trades",
     },
     MappingEntry {
         exchange: Exchange::OkxSwap,
@@ -177,7 +189,7 @@ const MAPPINGS: &[MappingEntry] = &[
         exchange: Exchange::BybitSpot,
         channel: Channel::Trades,
         tardis_id: "bybit-spot",
-        tardis_channel_str: "trade",
+        tardis_channel_str: "publicTrade", // was "trade" at api v3
     },
     MappingEntry {
         exchange: Exchange::BybitSpot,
@@ -196,7 +208,7 @@ const MAPPINGS: &[MappingEntry] = &[
         exchange: Exchange::BybitDerivatives,
         channel: Channel::Trades,
         tardis_id: "bybit",
-        tardis_channel_str: "trade",
+        tardis_channel_str: "publicTrade", // was "trade" at api v3
     },
     MappingEntry {
         exchange: Exchange::BybitDerivatives,

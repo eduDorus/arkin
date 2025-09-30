@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, errors::PersistenceError, repos::pg::account_repo};
+use crate::{context::PersistenceContext, repos::pg::account_repo};
 
 pub async fn insert(ctx: &PersistenceContext, account: Arc<Account>) -> Result<(), PersistenceError> {
-    account_repo::insert(ctx, account.into()).await?;
-    Ok(())
+    account_repo::insert(ctx, account.into()).await
 }
 
 // pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Account>, PersistenceError> {

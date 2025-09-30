@@ -15,8 +15,8 @@ use tokio::pin;
 use tracing::{debug, error, info};
 use typed_builder::TypedBuilder;
 
-use crate::binance_swap::BinanceSwapsEvent;
 use crate::mapping;
+use crate::models::BinanceSwapsEvent;
 
 use super::http::TardisHttpClient;
 
@@ -59,7 +59,7 @@ pub struct TardisIngestor {
 }
 
 impl TardisIngestor {
-    pub fn download_stream(
+    fn download_stream(
         &self,
         req: TardisRequest,
     ) -> impl Stream<Item = impl Future<Output = Result<Vec<(UtcDateTime, String)>>> + '_> + '_ {
@@ -157,6 +157,14 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
         ingestor.end,
     );
 
+    let venue = match persistence_service.get_venue_by_name(&ingestor.venue.to_string()).await {
+        Ok(v) => v,
+        Err(e) => {
+            error!(target: "ingestor::tardis", "Failed to get venue: {}", e);
+            return;
+        }
+    };
+
     let stream = ingestor.stream(req);
     pin!(stream);
 
@@ -192,9 +200,17 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
                     },
                 };
 
-                let instrument = persistence_service
-                    .get_instrument_by_venue_symbol(&event.venue_symbol())
-                    .await;
+
+
+                let instrument = match persistence_service
+                    .get_instrument_by_venue_symbol(&event.venue_symbol(), &venue)
+                    .await {
+                        Ok(i) => i,
+                        Err(e) => {
+                            error!(target: "ingestor::tardis", "Failed to get instrument: {}", e);
+                            continue;
+                        }
+                    };
 
                 match event {
                     BinanceSwapsEvent::AggTradeStream(stream) => {

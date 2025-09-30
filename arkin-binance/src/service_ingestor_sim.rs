@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use time::UtcDateTime;
 use tokio::pin;
-use tracing::info;
+use tracing::{error, info};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
@@ -30,7 +30,7 @@ async fn market_replay_task(ingestor: Arc<SimBinanceIngestor>, service_ctx: Arc<
         Frequency::Daily
     };
 
-    let tick_stream = core_ctx
+    let tick_stream = match core_ctx
         .persistence
         .tick_stream_range_buffered(
             &ingestor.instruments,
@@ -39,9 +39,16 @@ async fn market_replay_task(ingestor: Arc<SimBinanceIngestor>, service_ctx: Arc<
             ingestor.buffer_size,
             frequency,
         )
-        .await;
+        .await
+    {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to get tick stream: {}", e);
+            return;
+        }
+    };
 
-    let trade_stream = core_ctx
+    let trade_stream = match core_ctx
         .persistence
         .trade_stream_range_buffered(
             &ingestor.instruments,
@@ -50,7 +57,14 @@ async fn market_replay_task(ingestor: Arc<SimBinanceIngestor>, service_ctx: Arc<
             ingestor.buffer_size,
             frequency,
         )
-        .await;
+        .await
+    {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to get trade stream: {}", e);
+            return;
+        }
+    };
 
     pin!(tick_stream);
     pin!(trade_stream);

@@ -5,7 +5,9 @@ use sqlx::prelude::*;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{context::PersistenceContext, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::context::PersistenceContext;
 
 #[derive(FromRow)]
 pub struct AccountDTO {

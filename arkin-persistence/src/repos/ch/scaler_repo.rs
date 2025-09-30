@@ -9,7 +9,9 @@ use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::context::PersistenceContext;
 
 #[derive(Debug, Serialize, Deserialize, Row, Clone)]
 struct ScalerDataDTO {

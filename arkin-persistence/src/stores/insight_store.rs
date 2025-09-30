@@ -2,10 +2,13 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, repos::ch::insight_repo, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::ch::insight_repo};
 
 pub async fn insert(ctx: &PersistenceContext, insight: Arc<Insight>) -> Result<(), PersistenceError> {
-    insight_repo::insert(ctx, insight.into()).await
+    insight_repo::insert(ctx, insight.into()).await?;
+    Ok(())
 }
 
 pub async fn insert_vec(ctx: &PersistenceContext, insights: &[Arc<Insight>]) -> Result<(), PersistenceError> {

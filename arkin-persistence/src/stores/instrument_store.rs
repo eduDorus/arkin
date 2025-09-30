@@ -3,13 +3,12 @@ use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
-use arkin_core::Instrument;
+use arkin_core::{Instrument, PersistenceError, Venue};
 
 use crate::{
     context::PersistenceContext,
     repos::pg::instrument_repo,
     stores::{asset_store, venue_store},
-    PersistenceError,
 };
 
 async fn update_instrument_cache(ctx: &PersistenceContext, instrument: Arc<Instrument>) {
@@ -81,13 +80,14 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Instr
 pub async fn read_by_venue_symbol(
     ctx: &PersistenceContext,
     venue_symbol: &str,
+    venue: &Arc<Venue>,
 ) -> Result<Arc<Instrument>, PersistenceError> {
     // Check cache
     match read_cache_by_venue_symbol(ctx, venue_symbol).await {
         Some(instrument) => Ok(instrument),
         None => {
             debug!("Instrument not found in cache");
-            let instrument_dto = instrument_repo::read_by_venue_symbol(ctx, &venue_symbol).await?;
+            let instrument_dto = instrument_repo::read_by_venue_symbol(ctx, venue_symbol, venue).await?;
             let venue = venue_store::read_by_id(ctx, &instrument_dto.venue_id).await?;
 
             let base_asset = asset_store::read_by_id(ctx, &instrument_dto.base_asset_id).await?;

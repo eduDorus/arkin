@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use crate::{
     utils::Frequency, AggTrade, Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus,
-    InstrumentType, PersistenceReader, Pipeline, Price, PubSub, Publisher, Quantity, Strategy, SystemTime, Tick, Venue,
-    VenueType,
+    InstrumentType, PersistenceError, PersistenceReader, Pipeline, Price, PubSub, Publisher, Quantity, Strategy,
+    SystemTime, Tick, Venue, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -28,7 +28,7 @@ pub struct MockTime {
 
 impl MockTime {
     pub fn new() -> Arc<Self> {
-        let start_time = datetime!(2025-01-01 00:00:00 UTC).to_utc();
+        let start_time = datetime!(2025-01-01 00:00:00).as_utc();
         let tick_frequency = Duration::from_secs(60);
         let next_tick = start_time + tick_frequency;
         Arc::new(Self {
@@ -141,43 +141,47 @@ impl MockPersistence {
 
 #[async_trait]
 impl PersistenceReader for MockPersistence {
-    async fn get_instance_by_id(&self, _id: &Uuid) -> Arc<Instance> {
-        test_instance()
+    async fn get_instance_by_id(&self, _id: &Uuid) -> Result<Arc<Instance>, PersistenceError> {
+        Ok(test_instance())
     }
 
-    async fn get_instance_by_name(&self, _name: &str) -> Arc<Instance> {
-        test_instance()
+    async fn get_instance_by_name(&self, _name: &str) -> Result<Arc<Instance>, PersistenceError> {
+        Ok(test_instance())
     }
-    async fn get_pipeline_by_id(&self, _id: &Uuid) -> Arc<Pipeline> {
-        test_pipeline()
+    async fn get_pipeline_by_id(&self, _id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
+        Ok(test_pipeline())
     }
-    async fn get_pipeline_by_name(&self, _name: &str) -> Arc<Pipeline> {
-        test_pipeline()
+    async fn get_pipeline_by_name(&self, _name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
+        Ok(test_pipeline())
     }
-    async fn get_venue_by_id(&self, _id: &Uuid) -> Arc<Venue> {
-        test_binance_venue()
+    async fn get_venue_by_id(&self, _id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {
+        Ok(test_binance_venue())
     }
-    async fn get_venue_by_name(&self, _name: &str) -> Arc<Venue> {
-        test_binance_venue()
+    async fn get_venue_by_name(&self, _name: &str) -> Result<Arc<Venue>, PersistenceError> {
+        Ok(test_binance_venue())
     }
-    async fn get_instrument_by_id(&self, _id: &Uuid) -> Arc<Instrument> {
-        test_inst_binance_btc_usdt_perp()
+    async fn get_instrument_by_id(&self, _id: &Uuid) -> Result<Arc<Instrument>, PersistenceError> {
+        Ok(test_inst_binance_btc_usdt_perp())
     }
-    async fn get_instrument_by_venue_symbol(&self, _symbol: &str) -> Arc<Instrument> {
-        test_inst_binance_btc_usdt_perp()
+    async fn get_instrument_by_venue_symbol(
+        &self,
+        _symbol: &str,
+        _venue: &Arc<Venue>,
+    ) -> Result<Arc<Instrument>, PersistenceError> {
+        Ok(test_inst_binance_btc_usdt_perp())
     }
-    async fn get_asset_by_id(&self, _id: &Uuid) -> Arc<Asset> {
-        test_usdt_asset()
+    async fn get_asset_by_id(&self, _id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {
+        Ok(test_usdt_asset())
     }
-    async fn get_asset_by_symbol(&self, _symbol: &str) -> Arc<Asset> {
-        test_usdt_asset()
+    async fn get_asset_by_symbol(&self, _symbol: &str) -> Result<Arc<Asset>, PersistenceError> {
+        Ok(test_usdt_asset())
     }
     async fn list_trades(
         &self,
         _instruments: &[Arc<Instrument>],
         _start: UtcDateTime,
         _end: UtcDateTime,
-    ) -> Vec<Arc<AggTrade>> {
+    ) -> Result<Vec<Arc<AggTrade>>, PersistenceError> {
         todo!()
     }
     async fn trade_stream_range_buffered(
@@ -187,17 +191,17 @@ impl PersistenceReader for MockPersistence {
         _end: UtcDateTime,
         _buffer_size: usize,
         _frequency: Frequency,
-    ) -> Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin> {
+    ) -> Result<Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>, PersistenceError> {
         todo!()
     }
-    async fn get_last_tick(&self, _instrument: &Arc<Instrument>) -> Option<Arc<Tick>> {
-        Some(test_tick(
+    async fn get_last_tick(&self, _instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError> {
+        Ok(Some(test_tick(
             test_inst_binance_btc_usdt_perp(),
             dec!(30000.00),
             dec!(0.5),
             dec!(30010.00),
             dec!(0.3),
-        ))
+        )))
     }
     async fn tick_stream_range_buffered(
         &self,
@@ -206,7 +210,7 @@ impl PersistenceReader for MockPersistence {
         _end: UtcDateTime,
         _buffer_size: usize,
         _frequency: Frequency,
-    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin> {
+    ) -> Result<Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>, PersistenceError> {
         todo!()
     }
 }

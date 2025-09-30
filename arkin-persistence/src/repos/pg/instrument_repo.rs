@@ -3,12 +3,14 @@ use std::sync::Arc;
 use rust_decimal::Decimal;
 use sqlx::prelude::*;
 use time::OffsetDateTime;
-use tracing::debug;
+use tracing::{debug, info};
 use uuid::Uuid;
 
-use arkin_core::{Instrument, InstrumentOptionType, InstrumentStatus, InstrumentType, Price};
+use arkin_core::{Instrument, InstrumentOptionType, InstrumentStatus, InstrumentType, Price, Venue};
 
-use crate::{context::PersistenceContext, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::context::PersistenceContext;
 
 #[derive(FromRow)]
 pub struct InstrumentDTO {
@@ -139,8 +141,12 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Instrumen
     }
 }
 
-pub async fn read_by_venue_symbol(ctx: &PersistenceContext, symbol: &str) -> Result<InstrumentDTO, PersistenceError> {
-    debug!("Instrument repo reading instrument by venue symbol: {}", symbol);
+pub async fn read_by_venue_symbol(
+    ctx: &PersistenceContext,
+    symbol: &str,
+    venue: &Arc<Venue>,
+) -> Result<InstrumentDTO, PersistenceError> {
+    info!("Instrument repo reading instrument by venue symbol: {}", symbol);
     let instrument = sqlx::query_as!(
         InstrumentDTO,
         r#"
@@ -167,9 +173,10 @@ pub async fn read_by_venue_symbol(ctx: &PersistenceContext, symbol: &str) -> Res
                 created,
                 updated
             FROM instruments
-            WHERE venue_symbol = $1
+            WHERE venue_symbol = $1 AND venue_id = $2
             "#,
         symbol,
+        venue.id as Uuid,
     )
     .fetch_optional(&ctx.pg_pool)
     .await?;

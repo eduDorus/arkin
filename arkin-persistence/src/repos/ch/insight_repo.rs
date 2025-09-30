@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{context::PersistenceContext, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::context::PersistenceContext;
 
 const TABLE_NAME: &str = "insights";
 

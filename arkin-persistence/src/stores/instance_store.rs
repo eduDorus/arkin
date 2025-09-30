@@ -5,12 +5,13 @@ use tracing::info;
 use arkin_core::Instance;
 use uuid::Uuid;
 
-use crate::{context::PersistenceContext, repos::pg::instance_repo, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::pg::instance_repo};
 
 pub async fn insert(ctx: &PersistenceContext, instance: Arc<Instance>) -> Result<(), PersistenceError> {
     info!("Inserting instance: {}", instance);
-    instance_repo::insert(ctx, instance.into()).await?;
-    Ok(())
+    instance_repo::insert(ctx, instance.into()).await
 }
 
 pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Instance>, PersistenceError> {

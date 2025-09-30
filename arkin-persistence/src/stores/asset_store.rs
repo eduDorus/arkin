@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 use arkin_core::Asset;
 
-use crate::{context::PersistenceContext, repos::pg::asset_repo, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::pg::asset_repo};
 
 async fn update_cache(ctx: &PersistenceContext, asset: Arc<Asset>) {
     ctx.cache.asset_id.insert(asset.id, asset.clone()).await;
@@ -21,8 +23,7 @@ async fn read_cache_by_symbol(ctx: &PersistenceContext, symbol: &str) -> Option<
 
 pub async fn insert(ctx: &PersistenceContext, asset: Arc<Asset>) -> Result<(), PersistenceError> {
     update_cache(ctx, asset.clone()).await;
-    asset_repo::insert(ctx, asset.into()).await?; // Adjusted to use stateless repo
-    Ok(())
+    asset_repo::insert(ctx, asset.into()).await
 }
 
 pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {

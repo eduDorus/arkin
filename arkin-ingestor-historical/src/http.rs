@@ -114,7 +114,7 @@ impl QueryParams {
             offset,
             filters: vec![Filter {
                 channel: channel.to_string(),
-                symbols: symbols.into_iter().map(|s| s.to_lowercase()).collect(),
+                symbols: symbols.into_iter().map(|s| s).collect(),
             }],
         }
     }
@@ -122,8 +122,8 @@ impl QueryParams {
     pub fn to_query(&self) -> [(String, String); 3] {
         [
             ("from".to_string(), self.from.to_string()),
-            ("offset".to_string(), self.offset.to_string()),
             ("filters".to_string(), serde_json::to_string(&self.filters).unwrap()),
+            ("offset".to_string(), self.offset.to_string()),
         ]
     }
 }

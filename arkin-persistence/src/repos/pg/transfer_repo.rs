@@ -7,7 +7,9 @@ use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, PersistenceError, BIND_LIMIT};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, BIND_LIMIT};
 
 const FIELD_COUNT: usize = 9;
 

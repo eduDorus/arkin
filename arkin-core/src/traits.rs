@@ -6,7 +6,8 @@ use time::UtcDateTime;
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, CoreCtx, Event, Instance, Instrument, Pipeline, ServiceCtx, Tick, Venue,
+    utils::Frequency, AggTrade, Asset, CoreCtx, Event, Instance, Instrument, PersistenceError, Pipeline, ServiceCtx,
+    Tick, Venue,
 };
 
 #[async_trait]
@@ -22,22 +23,26 @@ pub trait SystemTime: Send + Sync {
 
 #[async_trait]
 pub trait PersistenceReader: Send + Sync {
-    async fn get_instance_by_id(&self, id: &Uuid) -> Arc<Instance>;
-    async fn get_instance_by_name(&self, name: &str) -> Arc<Instance>;
-    async fn get_pipeline_by_id(&self, id: &Uuid) -> Arc<Pipeline>;
-    async fn get_pipeline_by_name(&self, name: &str) -> Arc<Pipeline>;
-    async fn get_venue_by_id(&self, id: &Uuid) -> Arc<Venue>;
-    async fn get_venue_by_name(&self, name: &str) -> Arc<Venue>;
-    async fn get_instrument_by_id(&self, id: &Uuid) -> Arc<Instrument>;
-    async fn get_instrument_by_venue_symbol(&self, symbol: &str) -> Arc<Instrument>;
-    async fn get_asset_by_id(&self, id: &Uuid) -> Arc<Asset>;
-    async fn get_asset_by_symbol(&self, symbol: &str) -> Arc<Asset>;
+    async fn get_instance_by_id(&self, id: &Uuid) -> Result<Arc<Instance>, PersistenceError>;
+    async fn get_instance_by_name(&self, name: &str) -> Result<Arc<Instance>, PersistenceError>;
+    async fn get_pipeline_by_id(&self, id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError>;
+    async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError>;
+    async fn get_venue_by_id(&self, id: &Uuid) -> Result<Arc<Venue>, PersistenceError>;
+    async fn get_venue_by_name(&self, name: &str) -> Result<Arc<Venue>, PersistenceError>;
+    async fn get_instrument_by_id(&self, id: &Uuid) -> Result<Arc<Instrument>, PersistenceError>;
+    async fn get_instrument_by_venue_symbol(
+        &self,
+        symbol: &str,
+        venue: &Arc<Venue>,
+    ) -> Result<Arc<Instrument>, PersistenceError>;
+    async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError>;
+    async fn get_asset_by_symbol(&self, symbol: &str) -> Result<Arc<Asset>, PersistenceError>;
     async fn list_trades(
         &self,
         instruments: &[Arc<Instrument>],
         start: UtcDateTime,
         end: UtcDateTime,
-    ) -> Vec<Arc<AggTrade>>;
+    ) -> Result<Vec<Arc<AggTrade>>, PersistenceError>;
     async fn trade_stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
@@ -45,8 +50,8 @@ pub trait PersistenceReader: Send + Sync {
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>;
-    async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Option<Arc<Tick>>;
+    ) -> Result<Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>, PersistenceError>;
+    async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError>;
     async fn tick_stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
@@ -54,7 +59,7 @@ pub trait PersistenceReader: Send + Sync {
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>;
+    ) -> Result<Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>, PersistenceError>;
 }
 
 /// A trait for defining the lifecycle of a service in the system.

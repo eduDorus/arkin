@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use async_stream::stream;
 use async_stream::try_stream;
 use futures::{stream, Stream, StreamExt};
 use time::UtcDateTime;
@@ -8,10 +9,13 @@ use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, repos::ch::tick_repo, stores::instrument_store, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::ch::tick_repo, stores::instrument_store};
 
 pub async fn insert(ctx: &PersistenceContext, tick: Arc<Tick>) -> Result<(), PersistenceError> {
-    tick_repo::insert(ctx, tick.into()).await
+    tick_repo::insert(ctx, tick.into()).await?;
+    Ok(())
 }
 
 pub async fn insert_vec(ctx: &PersistenceContext, ticks: &[Arc<Tick>]) -> Result<(), PersistenceError> {
@@ -19,18 +23,25 @@ pub async fn insert_vec(ctx: &PersistenceContext, ticks: &[Arc<Tick>]) -> Result
     tick_repo::insert_batch(ctx, &ticks).await
 }
 
-pub async fn read_last(ctx: &PersistenceContext, instrument: &Arc<Instrument>) -> Result<Arc<Tick>, PersistenceError> {
-    let dto = tick_repo::read_last(ctx, &instrument.id).await?;
-    let tick = Tick::builder()
-        .event_time(dto.event_time.to_utc())
-        .instrument(Arc::clone(instrument))
-        .tick_id(dto.tick_id as u64)
-        .bid_price(dto.bid_price)
-        .bid_quantity(dto.bid_quantity)
-        .ask_price(dto.ask_price)
-        .ask_quantity(dto.ask_quantity)
-        .build();
-    Ok(Arc::new(tick))
+pub async fn read_last(
+    ctx: &PersistenceContext,
+    instrument: &Arc<Instrument>,
+) -> Result<Option<Arc<Tick>>, PersistenceError> {
+    match tick_repo::read_last(ctx, &instrument.id).await? {
+        Some(dto) => {
+            let tick = Tick::builder()
+                .event_time(dto.event_time.to_utc())
+                .instrument(Arc::clone(instrument))
+                .tick_id(dto.tick_id as u64)
+                .bid_price(dto.bid_price)
+                .bid_quantity(dto.bid_quantity)
+                .ask_price(dto.ask_price)
+                .ask_quantity(dto.ask_quantity)
+                .build();
+            Ok(Some(Arc::new(tick)))
+        }
+        None => Ok(None),
+    }
 }
 
 pub async fn read_range(
@@ -66,26 +77,33 @@ pub async fn stream_range(
     let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
     let mut cursor = tick_repo::stream_range(ctx, &ids, from, to).await?;
 
-    // Build a "try_stream" that yields trades.
+    // Build a stream that yields ticks.
     let ctx_clone = ctx.clone();
-    let stream = try_stream! {
-        // Get the async cursor from the repository.
-
-        // Loop over rows in the cursor.
-        while let Some(row) = cursor.next().await? {
-            // For each row, do your transformations.
-            let instrument = instrument_store::read_by_id(&ctx_clone, &row.instrument_id).await?;
-            let tick = Tick::builder()
-            .event_time(row.event_time.to_utc())
-            .instrument(instrument)
-            .tick_id(row.tick_id as u64)
-            .bid_price(row.bid_price)
-            .bid_quantity(row.bid_quantity)
-            .ask_price(row.ask_price)
-            .ask_quantity(row.ask_quantity)
-            .build();
-            let tick_arc = Arc::new(tick);
-            yield tick_arc;
+    let stream = stream! {
+        loop {
+            match cursor.next().await {
+                Ok(Some(row)) => {
+                    // For each row, do your transformations.
+                    match instrument_store::read_by_id(&ctx_clone, &row.instrument_id).await {
+                        Ok(instrument) => {
+                            let tick = Tick::builder()
+                                .event_time(row.event_time.to_utc())
+                                .instrument(instrument)
+                                .tick_id(row.tick_id as u64)
+                                .bid_price(row.bid_price)
+                                .bid_quantity(row.bid_quantity)
+                                .ask_price(row.ask_price)
+                                .ask_quantity(row.ask_quantity)
+                                .build();
+                            let tick_arc = Arc::new(tick);
+                            yield Ok(tick_arc);
+                        }
+                        Err(e) => yield Err(e),
+                    }
+                }
+                Ok(None) => break,
+                Err(e) => yield Err(PersistenceError::ClickhouseError(e)),
+            }
         }
     };
     Ok(stream)

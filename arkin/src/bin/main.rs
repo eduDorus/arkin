@@ -93,10 +93,13 @@ async fn main() {
                 .updated(time.now().await)
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
+            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let instruments = persistence
+                .list_instruments_by_venue_symbol(&a.instruments, &venue)
+                .await
+                .unwrap();
 
-            let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
-
-            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).build());
+            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).venue(venue).build());
 
             let engine = Engine::builder()
                 .time(time.clone())
@@ -130,7 +133,11 @@ async fn main() {
             let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
 
             let pipeline = persistence.get_pipeline_by_name(&a.pipeline).await.unwrap();
-            let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
+            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let instruments = persistence
+                .list_instruments_by_venue_symbol(&a.instruments, &venue)
+                .await
+                .unwrap();
 
             // Calculate quantiles
             let levels: Vec<f64> = (1..a.n_quantiles).map(|i| i as f64 / a.n_quantiles as f64).collect();
@@ -180,7 +187,11 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, a.only_normalized, a.only_predictions, a.dry_run);
 
-            let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
+            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let instruments = persistence
+                .list_instruments_by_venue_symbol(&a.instruments, &venue)
+                .await
+                .unwrap();
 
             // Init sim ingestor
             let binance_ingestor = Arc::new(
@@ -251,7 +262,12 @@ async fn main() {
                 .updated(time.now().await)
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
-            let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
+
+            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let instruments = persistence
+                .list_instruments_by_venue_symbol(&a.instruments, &venue)
+                .await
+                .unwrap();
 
             // Init accounting
             let ledger = Ledger::new(pubsub.publisher());
@@ -335,8 +351,8 @@ async fn main() {
             );
 
             // Executor
-            let sim_venue = persistence.get_venue_by_name("binance").await;
-            let usdt_asset = persistence.get_asset_by_symbol("usdt").await;
+            let sim_venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let usdt_asset = persistence.get_asset_by_symbol("usdt").await.unwrap();
             let mut init_balance = HashMap::new();
             init_balance.insert(usdt_asset, dec!(100000));
             let execution = SimulationExecutor::new(sim_venue, init_balance);
@@ -446,9 +462,13 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, false);
 
-            let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
+            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let instruments = persistence
+                .list_instruments_by_venue_symbol(&a.instruments, &venue)
+                .await
+                .unwrap();
 
-            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).build());
+            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).venue(venue).build());
 
             // Init wide quoter strategy
             let execution_order_book = ExecutionOrderBook::new(pubsub.publisher(), true);
@@ -518,7 +538,7 @@ async fn main() {
             for inst in instruments {
                 info!("Sending orders for {}", inst);
 
-                let last_price = persistence.get_last_tick(&inst).await.unwrap().mid_price();
+                let last_price = persistence.get_last_tick(&inst).await.unwrap().unwrap().mid_price();
 
                 let lot_size = max(dec!(100) / last_price, inst.lot_size);
 
@@ -586,9 +606,13 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, false);
 
-            let instruments = persistence.list_instruments_by_venue_symbol(&a.instruments).await.unwrap();
+            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let instruments = persistence
+                .list_instruments_by_venue_symbol(&a.instruments, &venue)
+                .await
+                .unwrap();
 
-            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).build());
+            let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).venue(venue).build());
 
             let pipeline_config = load::<InsightsConfig>();
             let pipeline_info = Pipeline::builder()

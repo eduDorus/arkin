@@ -1,5 +1,6 @@
 mod constants;
 mod engine;
+mod errors;
 mod events;
 mod logging;
 mod models;
@@ -12,6 +13,7 @@ mod types;
 mod utils;
 
 pub use engine::*;
+pub use errors::*;
 pub use events::*;
 pub use models::*;
 pub use pubsub::*;
@@ -31,6 +33,7 @@ pub mod triton {
 pub mod prelude {
     pub use crate::constants::*;
     pub use crate::engine::*;
+    pub use crate::errors::*;
     pub use crate::events::*;
     pub use crate::logging::*;
     pub use crate::models::*;

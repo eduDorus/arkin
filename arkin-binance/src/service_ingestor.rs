@@ -21,6 +21,7 @@ use crate::{
 #[derive(TypedBuilder)]
 pub struct BinanceIngestor {
     pub instruments: Vec<Arc<Instrument>>,
+    pub venue: Arc<Venue>,
 }
 
 pub async fn start_md_task(ingestor: Arc<BinanceIngestor>, core_ctx: Arc<CoreCtx>, service_ctx: Arc<ServiceCtx>) {
@@ -63,7 +64,13 @@ pub async fn start_md_task(ingestor: Arc<BinanceIngestor>, core_ctx: Arc<CoreCtx
                         Ok(e) => {
                             match e.data {
                                 BinanceUSDMMarketEvent::AggTrade(trade) => {
-                                    let instrument = core_ctx.persistence.get_instrument_by_venue_symbol(&trade.instrument).await;
+                                    let instrument = match core_ctx.persistence.get_instrument_by_venue_symbol(&trade.instrument, &ingestor.venue).await {
+                                        Ok(i) => i,
+                                        Err(e) => {
+                                            error!("Failed to get instrument: {}", e);
+                                            continue;
+                                        }
+                                    };
                                     // "m": true: The buyer is the market maker.
                                     // • The trade was initiated by a sell order from the taker.
                                     // • The taker is selling, and the maker (buyer) is buying.
@@ -87,7 +94,13 @@ pub async fn start_md_task(ingestor: Arc<BinanceIngestor>, core_ctx: Arc<CoreCtx
                                     core_ctx.publish(Event::AggTradeUpdate(trade)).await;
                                 }
                                 BinanceUSDMMarketEvent::Tick(tick) => {
-                                    let instrument = core_ctx.persistence.get_instrument_by_venue_symbol(&tick.instrument).await;
+                                    let instrument = match core_ctx.persistence.get_instrument_by_venue_symbol(&tick.instrument, &ingestor.venue).await {
+                                        Ok(i) => i,
+                                        Err(e) => {
+                                            error!("Failed to get instrument: {}", e);
+                                            continue;
+                                        }
+                                    };
                                     let tick = Tick::new(
                                         tick.event_time,
                                         instrument,

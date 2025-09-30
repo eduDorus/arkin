@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, repos::pg::transfer_repo, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::pg::transfer_repo};
 
 pub async fn insert(ctx: &PersistenceContext, transfer: Arc<Transfer>) -> Result<(), PersistenceError> {
     transfer_repo::insert(ctx, transfer.into()).await

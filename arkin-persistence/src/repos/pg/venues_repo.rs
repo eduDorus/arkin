@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use arkin_core::{Venue, VenueType};
 
-use crate::{context::PersistenceContext, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::context::PersistenceContext;
 
 #[derive(FromRow)]
 pub struct VenueDTO {

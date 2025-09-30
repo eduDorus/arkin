@@ -256,9 +256,14 @@ mod tests {
     }
 
     #[test]
-
     fn test_binance_futures_agg_trade() {
         let json_data = r#"{"stream":"gasusdt@aggTrade","data":{"e":"aggTrade","E":1698796800043,"a":3863267,"s":"GASUSDT","p":"6.279000","q":"141.2","f":15146241,"l":15146244,"T":1698796799890,"m":false}}"#;
+        let _ = serde_json::from_str::<BinanceSwapsAggTrade>(json_data).unwrap();
+    }
+
+    #[test]
+    fn test_binance_spot_agg_trade() {
+        let json_data = r#"{"stream":"btcusdt@aggTrade","data":{"e":"aggTrade","E":1735689659952,"s":"BTCUSDT","a":3358805182,"p":"93610.93000000","q":"0.01530000","f":4359938016,"l":4359938016,"T":1735689659952,"m":false,"M":true}}"#;
         let _ = serde_json::from_str::<BinanceSwapsAggTrade>(json_data).unwrap();
     }
 

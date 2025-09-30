@@ -15,7 +15,7 @@ use arkin_core::prelude::*;
 
 use crate::context::PersistenceContext;
 use crate::stores::*;
-use crate::{PersistenceConfig, PersistenceError};
+use crate::PersistenceConfig;
 
 pub struct Persistence {
     mode: InstanceType,
@@ -76,10 +76,6 @@ impl Persistence {
         .into()
     }
 
-    pub async fn get_instance_by_name(&self, name: &str) -> Result<Arc<Instance>, PersistenceError> {
-        instance_store::read_by_name(&self.ctx, name).await
-    }
-
     pub async fn get_pipeline(&self, id: Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
         pipeline_store::read_by_id(&self.ctx, &id).await
     }
@@ -100,24 +96,17 @@ impl Persistence {
         instrument_store::read_by_id(&self.ctx, &id).await
     }
 
-    pub async fn get_instrument_by_venue_symbol(&self, symbol: &str) -> Result<Arc<Instrument>, PersistenceError> {
-        instrument_store::read_by_venue_symbol(&self.ctx, &symbol).await
-    }
-
     pub async fn list_instruments_by_venue_symbol(
         &self,
         symbols: &[String],
+        venue: &Arc<Venue>,
     ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
         let mut instruments = Vec::with_capacity(symbols.len());
         for symbol in symbols {
-            let inst = instrument_store::read_by_venue_symbol(&self.ctx, symbol).await?;
+            let inst = instrument_store::read_by_venue_symbol(&self.ctx, symbol, venue).await?;
             instruments.push(inst);
         }
         Ok(instruments)
-    }
-
-    pub async fn get_venue_by_id(&self, id: Uuid) -> Result<Arc<Venue>, PersistenceError> {
-        venue_store::read_by_id(&self.ctx, &id).await
     }
 
     pub async fn get_asset(&self, id: Uuid) -> Result<Arc<Asset>, PersistenceError> {
@@ -133,26 +122,6 @@ impl Persistence {
         levels: &[f64],
     ) -> Result<Vec<QuantileData>, PersistenceError> {
         scaler_store::get_iqr(&self.ctx, &pipeline, &instrument, from, till, levels).await
-    }
-
-    pub async fn tick_stream_range_buffered(
-        &self,
-        instruments: &[Arc<Instrument>],
-        start: UtcDateTime,
-        end: UtcDateTime,
-        buffer_size: usize,
-        frequency: Frequency,
-    ) -> impl Stream<Item = Arc<Tick>> + 'static {
-        tick_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
-    }
-
-    pub async fn list_trades(
-        &self,
-        instruments: &[Arc<Instrument>],
-        start: UtcDateTime,
-        end: UtcDateTime,
-    ) -> Result<Vec<Arc<AggTrade>>, PersistenceError> {
-        trade_store::read_range(&self.ctx, instruments, start, end).await
     }
 
     pub async fn trade_stream_range_buffered(
@@ -348,48 +317,52 @@ async fn flush_task(persistence: Arc<Persistence>, service_ctx: Arc<ServiceCtx>,
 
 #[async_trait]
 impl PersistenceReader for Persistence {
-    async fn get_instance_by_id(&self, id: &Uuid) -> Arc<Instance> {
-        instance_store::read_by_id(&self.ctx, id).await.unwrap()
+    async fn get_instance_by_id(&self, id: &Uuid) -> Result<Arc<Instance>, PersistenceError> {
+        instance_store::read_by_id(&self.ctx, id).await
     }
 
-    async fn get_instance_by_name(&self, name: &str) -> Arc<Instance> {
-        instance_store::read_by_name(&self.ctx, name).await.unwrap()
+    async fn get_instance_by_name(&self, name: &str) -> Result<Arc<Instance>, PersistenceError> {
+        instance_store::read_by_name(&self.ctx, name).await
     }
 
-    async fn get_pipeline_by_id(&self, id: &Uuid) -> Arc<Pipeline> {
-        pipeline_store::read_by_id(&self.ctx, id).await.unwrap()
+    async fn get_pipeline_by_id(&self, id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
+        pipeline_store::read_by_id(&self.ctx, id).await
     }
 
-    async fn get_pipeline_by_name(&self, name: &str) -> Arc<Pipeline> {
-        pipeline_store::read_by_name(&self.ctx, name).await.unwrap()
+    async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
+        pipeline_store::read_by_name(&self.ctx, name).await
     }
 
-    async fn get_venue_by_id(&self, id: &Uuid) -> Arc<Venue> {
-        venue_store::read_by_id(&self.ctx, id).await.unwrap()
+    async fn get_venue_by_id(&self, id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {
+        venue_store::read_by_id(&self.ctx, id).await
     }
 
-    async fn get_venue_by_name(&self, name: &str) -> Arc<Venue> {
-        venue_store::read_by_name(&self.ctx, name).await.unwrap()
+    async fn get_venue_by_name(&self, name: &str) -> Result<Arc<Venue>, PersistenceError> {
+        venue_store::read_by_name(&self.ctx, name).await
     }
 
-    async fn get_instrument_by_id(&self, id: &Uuid) -> Arc<Instrument> {
-        instrument_store::read_by_id(&self.ctx, id).await.unwrap()
+    async fn get_instrument_by_id(&self, id: &Uuid) -> Result<Arc<Instrument>, PersistenceError> {
+        instrument_store::read_by_id(&self.ctx, id).await
     }
 
-    async fn get_instrument_by_venue_symbol(&self, symbol: &str) -> Arc<Instrument> {
-        instrument_store::read_by_venue_symbol(&self.ctx, symbol).await.unwrap()
+    async fn get_instrument_by_venue_symbol(
+        &self,
+        symbol: &str,
+        venue: &Arc<Venue>,
+    ) -> Result<Arc<Instrument>, PersistenceError> {
+        instrument_store::read_by_venue_symbol(&self.ctx, symbol, venue).await
     }
 
-    async fn get_asset_by_id(&self, id: &Uuid) -> Arc<Asset> {
-        asset_store::read_by_id(&self.ctx, id).await.unwrap()
+    async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {
+        asset_store::read_by_id(&self.ctx, id).await
     }
 
-    async fn get_asset_by_symbol(&self, symbol: &str) -> Arc<Asset> {
-        asset_store::read_by_symbol(&self.ctx, symbol).await.unwrap()
+    async fn get_asset_by_symbol(&self, symbol: &str) -> Result<Arc<Asset>, PersistenceError> {
+        asset_store::read_by_symbol(&self.ctx, symbol).await
     }
 
-    async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Option<Arc<Tick>> {
-        tick_store::read_last(&self.ctx, instrument).await.ok()
+    async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError> {
+        tick_store::read_last(&self.ctx, instrument).await
     }
 
     async fn list_trades(
@@ -397,8 +370,8 @@ impl PersistenceReader for Persistence {
         instruments: &[Arc<Instrument>],
         start: UtcDateTime,
         end: UtcDateTime,
-    ) -> Vec<Arc<AggTrade>> {
-        trade_store::read_range(&self.ctx, instruments, start, end).await.unwrap()
+    ) -> Result<Vec<Arc<AggTrade>>, PersistenceError> {
+        trade_store::read_range(&self.ctx, instruments, start, end).await
     }
 
     async fn tick_stream_range_buffered(
@@ -408,8 +381,8 @@ impl PersistenceReader for Persistence {
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin> {
-        tick_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
+    ) -> Result<Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>, PersistenceError> {
+        Ok(tick_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await)
     }
 
     async fn trade_stream_range_buffered(
@@ -419,8 +392,8 @@ impl PersistenceReader for Persistence {
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin> {
-        trade_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
+    ) -> Result<Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>, PersistenceError> {
+        Ok(trade_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await)
     }
 }
 

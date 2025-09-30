@@ -3,10 +3,13 @@ use std::sync::Arc;
 use arkin_core::Pipeline;
 use uuid::Uuid;
 
-use crate::{context::PersistenceContext, repos::pg::pipeline_repo, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::pg::pipeline_repo};
 
 pub async fn insert(ctx: &PersistenceContext, pipeline: Arc<Pipeline>) -> Result<(), PersistenceError> {
-    pipeline_repo::insert(ctx, pipeline.into()).await
+    pipeline_repo::insert(ctx, pipeline.into()).await?;
+    Ok(())
 }
 
 pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError> {

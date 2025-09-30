@@ -44,7 +44,7 @@ pub enum ExecutionOrderStatus {
     #[mutator(requires = [instrument])]
     pub fn set_price(&mut self, value: Price) {
         if value.is_zero() {
-            self.price = Price::ZERO; 
+            self.price = Price::ZERO;
             return;
         }
         let scaling_factor = Decimal::ONE / self.instrument.tick_size;

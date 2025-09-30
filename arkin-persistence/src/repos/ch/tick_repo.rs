@@ -8,7 +8,9 @@ use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::context::PersistenceContext;
 
 const TABLE_NAME: &str = "ticks";
 
@@ -85,8 +87,12 @@ pub async fn insert_batch(ctx: &PersistenceContext, ticks: &[TickClickhouseDTO])
     Ok(())
 }
 
-pub async fn read_last(ctx: &PersistenceContext, instrument_id: &Uuid) -> Result<TickClickhouseDTO, PersistenceError> {
-    ctx.ch_client
+pub async fn read_last(
+    ctx: &PersistenceContext,
+    instrument_id: &Uuid,
+) -> Result<Option<TickClickhouseDTO>, PersistenceError> {
+    let res = ctx
+        .ch_client
         .query(
             r#"
               SELECT
@@ -102,9 +108,9 @@ pub async fn read_last(ctx: &PersistenceContext, instrument_id: &Uuid) -> Result
         )
         .bind(Identifier(TABLE_NAME))
         .bind(instrument_id)
-        .fetch_one::<TickClickhouseDTO>()
-        .await
-        .map_err(|e| e.into())
+        .fetch_optional::<TickClickhouseDTO>()
+        .await?;
+    Ok(res)
 }
 
 pub async fn read_range(

@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 use arkin_core::Venue;
 
-use crate::{context::PersistenceContext, repos::pg::venues_repo, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::pg::venues_repo};
 
 async fn update_venue_cache(ctx: &PersistenceContext, venue: Arc<Venue>) {
     ctx.cache.venue_id.insert(venue.id, venue.clone()).await;
@@ -21,8 +23,7 @@ async fn read_venue_name_cache(ctx: &PersistenceContext, name: &str) -> Option<A
 
 pub async fn insert(ctx: &PersistenceContext, venue: Arc<Venue>) -> Result<(), PersistenceError> {
     update_venue_cache(ctx, venue.clone()).await;
-    venues_repo::insert(ctx, venue.into()).await?;
-    Ok(())
+    venues_repo::insert(ctx, venue.into()).await
 }
 
 pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {

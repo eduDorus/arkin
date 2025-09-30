@@ -4,7 +4,9 @@ use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, repos::ch::scaler_repo, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::ch::scaler_repo};
 
 pub async fn get_iqr(
     ctx: &PersistenceContext,

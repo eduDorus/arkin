@@ -6,7 +6,9 @@ use arkin_core::prelude::*;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{context::PersistenceContext, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::context::PersistenceContext;
 
 #[derive(Debug, Clone)]
 pub struct ExecutionOrderDTO {

@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use async_stream::stream;
 use async_stream::try_stream;
 use futures::{stream, Stream, StreamExt};
 use time::UtcDateTime;
@@ -7,7 +8,9 @@ use tracing::info;
 
 use arkin_core::prelude::*;
 
-use crate::{context::PersistenceContext, repos::ch::trade_repo, stores::instrument_store, PersistenceError};
+use arkin_core::PersistenceError;
+
+use crate::{context::PersistenceContext, repos::ch::trade_repo, stores::instrument_store};
 
 pub async fn insert(ctx: &PersistenceContext, trade: Arc<AggTrade>) -> Result<(), PersistenceError> {
     trade_repo::insert(ctx, trade.into()).await
@@ -56,26 +59,33 @@ pub async fn stream_range(
     let ids = instruments.iter().map(|i| i.id).collect::<Vec<_>>();
     let mut cursor = trade_repo::stream_range(ctx, &ids, from, to).await?;
 
-    // Build a "try_stream" that yields trades.
+    // Build a stream that yields trades.
     let ctx_clone = ctx.clone();
-    let stream = try_stream! {
-        // Get the async cursor from the repository.
+    let stream = stream! {
+        loop {
+            match cursor.next().await {
+                Ok(Some(row)) => {
+                    // For each row, do your transformations.
+                    match instrument_store::read_by_id(&ctx_clone, &row.instrument_id).await {
+                        Ok(instrument) => {
+                            let trade = AggTrade::builder()
+                                .event_time(row.event_time.to_utc())
+                                .instrument(instrument)
+                                .trade_id(row.trade_id as u64)
+                                .side(row.side.into())
+                                .price(row.price)
+                                .quantity(row.quantity)
+                                .build();
 
-        // Loop over rows in the cursor.
-        while let Some(row) = cursor.next().await? {
-            // For each row, do your transformations.
-            let instrument = instrument_store::read_by_id(&ctx_clone, &row.instrument_id).await?;
-            let trade = AggTrade::builder()
-                .event_time(row.event_time.to_utc())
-                .instrument(instrument)
-                .trade_id(row.trade_id as u64)
-                .side(row.side.into())
-                .price(row.price)
-                .quantity(row.quantity)
-                .build();
-
-            // Yield the constructed trade to the stream.
-            yield Arc::new(trade);
+                            // Yield the constructed trade to the stream.
+                            yield Ok(Arc::new(trade));
+                        }
+                        Err(e) => yield Err(e),
+                    }
+                }
+                Ok(None) => break,
+                Err(e) => yield Err(PersistenceError::ClickhouseError(e)),
+            }
         }
     };
     Ok(stream)
