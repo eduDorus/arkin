@@ -7,6 +7,7 @@ use arkin_core::prelude::*;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream, Stream, StreamExt};
+use rust_decimal::prelude::*;
 use serde::de::DeserializeOwned;
 use time::macros::format_description;
 use time::UtcDateTime;
@@ -21,11 +22,167 @@ use super::http::TardisHttpClient;
 
 pub fn parse_stream_event(json: &str, venue: &Exchange, channel: &Channel) -> Result<ExchangeStreamEvent> {
     match venue {
-        Exchange::BinanceSpot
-        | Exchange::BinanceUsdmFutures
-        | Exchange::BinanceCoinmFutures
-        | Exchange::BinanceOptions => match channel {
-            Channel::AggTrades | Channel::Trades | Channel::OrderBook | Channel::LongShortRatio | Channel::Ticker => {
+        Exchange::BinanceSpot => match channel {
+            Channel::AggTrades => {
+                // Binance spot uses the same format as futures for agg trades
+                let stream_event: BinanceSwapsStreamEvent =
+                    serde_json::from_str(json).map_err(|e| anyhow!("Binance spot agg trade parse error: {}", e))?;
+
+                let instrument = stream_event.data.venue_symbol().to_string();
+                let timestamp = stream_event.data.event_time();
+
+                Ok(ExchangeStreamEvent {
+                    venue: *venue,
+                    channel: *channel,
+                    instrument,
+                    timestamp,
+                    data: stream_event.data.to_unified(),
+                })
+            }
+            Channel::Trades => {
+                // Binance spot trades have a different format - parse manually
+                // Try parsing with stream field first, then fallback to direct data parsing
+                let trade_data = if let Ok(stream_event) = serde_json::from_str::<serde_json::Value>(json) {
+                    if let Some(data) = stream_event.get("data") {
+                        serde_json::from_value(data.clone())
+                            .map_err(|e| anyhow!("Binance spot trade data parse error: {}", e))?
+                    } else {
+                        // Direct data format without stream wrapper
+                        serde_json::from_value(stream_event)
+                            .map_err(|e| anyhow!("Binance spot trade direct parse error: {}", e))?
+                    }
+                } else {
+                    return Err(anyhow!("Binance spot trade JSON parse error"));
+                };
+
+                #[derive(serde::Deserialize)]
+                struct SpotTradeData {
+                    #[serde(rename = "E", with = "custom_serde::timestamp")]
+                    event_time: time::UtcDateTime,
+                    #[serde(rename = "T", with = "custom_serde::timestamp")]
+                    transaction_time: time::UtcDateTime,
+                    #[serde(rename = "s")]
+                    instrument: String,
+                    #[serde(rename = "t")]
+                    trade_id: u64,
+                    #[serde(rename = "p")]
+                    price: rust_decimal::Decimal,
+                    #[serde(rename = "q")]
+                    quantity: rust_decimal::Decimal,
+                    #[serde(rename = "m")]
+                    maker: bool,
+                }
+
+                let trade_data: SpotTradeData = trade_data;
+
+                let instrument = trade_data.instrument.clone();
+                let timestamp = trade_data.event_time;
+
+                // Convert to unified TradeData
+                let trade_data_unified = TradeData {
+                    event_time: trade_data.event_time,
+                    transaction_time: trade_data.transaction_time,
+                    trade_id: trade_data.trade_id.to_string(),
+                    price: trade_data.price,
+                    quantity: trade_data.quantity,
+                    side: if trade_data.maker {
+                        MarketSide::Sell
+                    } else {
+                        MarketSide::Buy
+                    },
+                    maker: trade_data.maker,
+                };
+
+                Ok(ExchangeStreamEvent {
+                    venue: *venue,
+                    channel: *channel,
+                    instrument,
+                    timestamp,
+                    data: ExchangeEventData::Trade(trade_data_unified),
+                })
+            }
+            Channel::Ticker => {
+                // Binance spot book ticker has a different format - no E/T timestamp fields
+                // Try parsing with stream field first, then fallback to direct data parsing
+                let ticker_data = if let Ok(stream_event) = serde_json::from_str::<serde_json::Value>(json) {
+                    if let Some(data) = stream_event.get("data") {
+                        serde_json::from_value(data.clone())
+                            .map_err(|e| anyhow!("Binance spot ticker data parse error: {}", e))?
+                    } else {
+                        // Direct data format without stream wrapper
+                        serde_json::from_value(stream_event)
+                            .map_err(|e| anyhow!("Binance spot ticker direct parse error: {}", e))?
+                    }
+                } else {
+                    return Err(anyhow!("Binance spot ticker JSON parse error"));
+                };
+
+                #[derive(serde::Deserialize)]
+                struct BinanceSpotBookTickerData {
+                    #[serde(rename = "u")]
+                    update_id: u64,
+                    #[serde(rename = "s")]
+                    instrument: String,
+                    #[serde(rename = "b")]
+                    bid_price: rust_decimal::Decimal,
+                    #[serde(rename = "B")]
+                    bid_quantity: rust_decimal::Decimal,
+                    #[serde(rename = "a")]
+                    ask_price: rust_decimal::Decimal,
+                    #[serde(rename = "A")]
+                    ask_quantity: rust_decimal::Decimal,
+                }
+
+                let ticker_data: BinanceSpotBookTickerData = ticker_data;
+
+                let instrument = ticker_data.instrument.clone();
+                // For spot tickers, we don't have event time, so use current time as approximation
+                let timestamp = time::UtcDateTime::now();
+
+                // Convert to unified TickData
+                let tick_data = TickData {
+                    event_time: timestamp,
+                    transaction_time: timestamp,
+                    update_id: ticker_data.update_id,
+                    bid_price: ticker_data.bid_price,
+                    bid_quantity: ticker_data.bid_quantity,
+                    ask_price: ticker_data.ask_price,
+                    ask_quantity: ticker_data.ask_quantity,
+                };
+
+                Ok(ExchangeStreamEvent {
+                    venue: *venue,
+                    channel: *channel,
+                    instrument,
+                    timestamp,
+                    data: ExchangeEventData::Tick(tick_data),
+                })
+            }
+            Channel::OrderBook | Channel::LongShortRatio | Channel::OpenInterest => {
+                // For other channels, use the futures format for now
+                let stream_event: BinanceSwapsStreamEvent =
+                    serde_json::from_str(json).map_err(|e| anyhow!("Binance parse error: {}", e))?;
+
+                let instrument = stream_event.data.venue_symbol().to_string();
+                let timestamp = stream_event.data.event_time();
+
+                Ok(ExchangeStreamEvent {
+                    venue: *venue,
+                    channel: *channel,
+                    instrument,
+                    timestamp,
+                    data: stream_event.data.to_unified(),
+                })
+            }
+            _ => Err(anyhow!("Unsupported Binance spot channel: {:?}", channel)),
+        },
+        Exchange::BinanceUsdmFutures | Exchange::BinanceCoinmFutures | Exchange::BinanceOptions => match channel {
+            Channel::AggTrades
+            | Channel::Trades
+            | Channel::OrderBook
+            | Channel::LongShortRatio
+            | Channel::Ticker
+            | Channel::OpenInterest => {
                 let stream_event: BinanceSwapsStreamEvent =
                     serde_json::from_str(json).map_err(|e| anyhow!("Binance parse error: {}", e))?;
 
@@ -65,22 +222,72 @@ pub fn parse_stream_event(json: &str, venue: &Exchange, channel: &Channel) -> Re
                     })
                 }
                 Channel::Ticker => {
-                    let root: BybitTickerMessage =
-                        serde_json::from_str(json).map_err(|e| anyhow!("Bybit ticker parse error: {}", e))?;
+                    // Bybit spot and derivatives use orderbook.1 channel for ticker data (has bid/ask prices)
+                    let root: BybitOrderbookMessage =
+                        serde_json::from_str(json).map_err(|e| anyhow!("Bybit orderbook parse error: {}", e))?;
+
+                    // Only process snapshot messages, skip delta messages for ticker data
+                    if root.type_field != "snapshot" {
+                        return Err(anyhow!("Skipping Bybit orderbook delta message (type: {}), only processing snapshots for ticker data", root.type_field));
+                    }
+
+                    // Skip messages that don't provide complete bid/ask data
+                    if root.data.bids.is_empty() || root.data.asks.is_empty() {
+                        return Err(anyhow!(
+                            "Skipping Bybit orderbook snapshot with incomplete data: bids.len={}, asks.len={}",
+                            root.data.bids.len(),
+                            root.data.asks.len()
+                        ));
+                    }
 
                     let timestamp =
                         time::UtcDateTime::from_unix_timestamp(root.ts / 1000).unwrap_or(time::UtcDateTime::UNIX_EPOCH);
                     let instrument = root.data.symbol.clone();
 
-                    // Create tick data directly since we have the timestamp
+                    // Extract best bid and ask from orderbook data
+                    let bid_price = root
+                        .data
+                        .bids
+                        .first()
+                        .and_then(|bid| Decimal::from_str(&bid[0]).ok())
+                        .unwrap_or(Decimal::ZERO);
+                    let bid_quantity = root
+                        .data
+                        .bids
+                        .first()
+                        .and_then(|bid| Decimal::from_str(&bid[1]).ok())
+                        .unwrap_or(Decimal::ZERO);
+                    let ask_price = root
+                        .data
+                        .asks
+                        .first()
+                        .and_then(|ask| Decimal::from_str(&ask[0]).ok())
+                        .unwrap_or(Decimal::ZERO);
+                    let ask_quantity = root
+                        .data
+                        .asks
+                        .first()
+                        .and_then(|ask| Decimal::from_str(&ask[1]).ok())
+                        .unwrap_or(Decimal::ZERO);
+
+                    debug!(
+                        "Bybit orderbook parsing: type={}, bids.len={}, asks.len={}, bid_price={}, ask_price={}",
+                        root.type_field,
+                        root.data.bids.len(),
+                        root.data.asks.len(),
+                        bid_price,
+                        ask_price
+                    );
+
+                    // Create tick data
                     let tick_data = TickData {
                         event_time: timestamp,
                         transaction_time: timestamp,
-                        update_id: 0, // Bybit doesn't provide update IDs in ticker data
-                        bid_price: root.data.bid_price,
-                        bid_quantity: root.data.bid_quantity,
-                        ask_price: root.data.ask_price,
-                        ask_quantity: root.data.ask_quantity,
+                        update_id: root.data.update_id as u64,
+                        bid_price,
+                        bid_quantity,
+                        ask_price,
+                        ask_quantity,
                     };
 
                     Ok(ExchangeStreamEvent {
@@ -91,7 +298,11 @@ pub fn parse_stream_event(json: &str, venue: &Exchange, channel: &Channel) -> Re
                         data: ExchangeEventData::Tick(tick_data),
                     })
                 }
-                _ => Err(anyhow!("Unsupported Bybit channel: {:?}", channel)),
+                Channel::OrderBook
+                | Channel::AggTrades
+                | Channel::OpenInterest
+                | Channel::FundingRate
+                | Channel::LongShortRatio => Err(anyhow!("Channel {:?} not yet implemented for Bybit", channel)),
             }
         }
         Exchange::OkxSpot | Exchange::OkxSwap | Exchange::OkxFutures | Exchange::OkxOptions => {
@@ -105,7 +316,7 @@ pub fn parse_stream_event(json: &str, venue: &Exchange, channel: &Channel) -> Re
                 .ok_or_else(|| anyhow!("OKX message missing arg.channel field"))?;
 
             match channel_name {
-                "trades" => {
+                "trades" | "trades-all" => {
                     let root: OkxTradeMessage =
                         serde_json::from_str(json).map_err(|e| anyhow!("OKX trade parse error: {}", e))?;
                     // For now, assume first trade
@@ -165,7 +376,7 @@ pub fn parse_stream_event(json: &str, venue: &Exchange, channel: &Channel) -> Re
                 _ => Err(anyhow!("Unsupported OKX channel: {}", channel_name)),
             }
         }
-        _ => Err(anyhow!("Unsupported venue for parsing: {}", venue)),
+        Exchange::Deribit => Err(anyhow!("Exchange {:?} not yet implemented", venue)),
     }
 }
 

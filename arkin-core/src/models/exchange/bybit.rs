@@ -114,28 +114,72 @@ pub struct BybitTickerMessage {
 /// Individual ticker data from Bybit.
 ///
 /// Represents ticker information including best bid/ask prices and quantities.
+/// For spot markets, only general ticker data may be available.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct BybitTickerData {
     /// Trading pair symbol
     pub symbol: String,
-    /// Best bid price
+    /// Best bid price (may be None for spot general ticker data)
     #[serde(rename = "bid1Price")]
-    pub bid_price: Decimal,
-    /// Bid quantity
+    pub bid_price: Option<Decimal>,
+    /// Bid quantity (may be None for spot general ticker data)
     #[serde(rename = "bid1Size")]
-    pub bid_quantity: Decimal,
-    /// Best ask price
+    pub bid_quantity: Option<Decimal>,
+    /// Best ask price (may be None for spot general ticker data)
     #[serde(rename = "ask1Price")]
-    pub ask_price: Decimal,
-    /// Ask quantity
+    pub ask_price: Option<Decimal>,
+    /// Ask quantity (may be None for spot general ticker data)
     #[serde(rename = "ask1Size")]
-    pub ask_quantity: Decimal,
+    pub ask_quantity: Option<Decimal>,
+    /// Last price (available in general ticker data)
+    #[serde(rename = "lastPrice")]
+    pub last_price: Option<Decimal>,
 }
 
-impl BybitTickerData {
+/// Orderbook message from Bybit.
+///
+/// Represents a WebSocket message containing orderbook data from Bybit.
+/// Contains metadata about the message and orderbook data.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct BybitOrderbookMessage {
+    /// Topic/channel identifier (e.g., "orderbook.1.BTCUSDT")
+    pub topic: String,
+    /// Message timestamp
+    pub ts: i64,
+    /// Message type (e.g., "snapshot", "delta")
+    #[serde(rename = "type")]
+    pub type_field: String,
+    /// Orderbook data
+    pub data: BybitOrderbookData,
+    /// Client timestamp
+    pub cts: i64,
+}
+
+/// Individual orderbook data from Bybit.
+///
+/// Represents level 1 orderbook information with best bid and ask prices and quantities.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct BybitOrderbookData {
+    /// Trading pair symbol
+    #[serde(rename = "s")]
+    pub symbol: String,
+    /// Best bid levels: [[price, quantity], ...]
+    #[serde(rename = "b")]
+    pub bids: Vec<[String; 2]>,
+    /// Best ask levels: [[price, quantity], ...]
+    #[serde(rename = "a")]
+    pub asks: Vec<[String; 2]>,
+    /// Update ID
+    #[serde(rename = "u")]
+    pub update_id: i64,
+    /// Sequence number
+    pub seq: i64,
+}
+
+impl BybitOrderbookData {
     /// Get the venue symbol for instrument lookup.
     ///
-    /// Returns the trading pair symbol (e.g., "BTCUSDT") for this ticker data.
+    /// Returns the trading pair symbol (e.g., "BTCUSDT") for this orderbook data.
     pub fn venue_symbol(&self) -> &str {
         &self.symbol
     }
