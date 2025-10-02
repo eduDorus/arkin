@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use arkin_core::prelude::*;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -12,13 +12,108 @@ use time::macros::format_description;
 use time::UtcDateTime;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::pin;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use typed_builder::TypedBuilder;
 
 use crate::mapping;
-use crate::models::BinanceSwapsEvent;
 
 use super::http::TardisHttpClient;
+
+pub fn parse_stream_event(json: &str, venue: &Exchange, channel: &Channel) -> Result<ExchangeStreamEvent> {
+    match venue {
+        Exchange::BinanceSpot
+        | Exchange::BinanceUsdmFutures
+        | Exchange::BinanceCoinmFutures
+        | Exchange::BinanceOptions => {
+            let stream_event: BinanceSwapsStreamEvent =
+                serde_json::from_str(json).map_err(|e| anyhow!("Binance parse error: {}", e))?;
+
+            let instrument = stream_event.data.venue_symbol().to_string();
+            let timestamp = stream_event.data.event_time(); // Need to add this method
+
+            Ok(ExchangeStreamEvent {
+                venue: *venue,
+                channel: *channel,
+                instrument,
+                timestamp,
+                data: stream_event.data.to_unified(),
+            })
+        }
+        Exchange::BybitSpot | Exchange::BybitDerivatives | Exchange::BybitOptions => {
+            let root: BybitTradeMessage =
+                serde_json::from_str(json).map_err(|e| anyhow!("Bybit parse error: {}", e))?;
+
+            // For now, assume first trade, need to handle properly
+            let trade = &root.data[0];
+            let timestamp = trade.transaction_time;
+            let instrument = trade.instrument.clone();
+
+            // Use unified conversion method
+            let data = trade.clone().to_unified();
+
+            Ok(ExchangeStreamEvent {
+                venue: *venue,
+                channel: *channel,
+                instrument,
+                timestamp,
+                data,
+            })
+        }
+        Exchange::OkxSpot | Exchange::OkxSwap | Exchange::OkxFutures | Exchange::OkxOptions => {
+            // First parse the arg to determine the channel type
+            let arg_value: serde_json::Value =
+                serde_json::from_str(json).map_err(|e| anyhow!("OKX arg parse error: {}", e))?;
+            let channel_name = arg_value
+                .get("arg")
+                .and_then(|arg| arg.get("channel"))
+                .and_then(|channel| channel.as_str())
+                .ok_or_else(|| anyhow!("OKX message missing arg.channel field"))?;
+
+            match channel_name {
+                "trades" => {
+                    let root: OkxTradeMessage =
+                        serde_json::from_str(json).map_err(|e| anyhow!("OKX trade parse error: {}", e))?;
+                    // For now, assume first trade
+                    let trade = &root.data[0];
+                    let timestamp = trade.transaction_time;
+                    let instrument = trade.instrument.clone();
+
+                    // Use unified conversion method
+                    let data = trade.clone().to_unified();
+
+                    Ok(ExchangeStreamEvent {
+                        venue: *venue,
+                        channel: *channel,
+                        instrument,
+                        timestamp,
+                        data,
+                    })
+                }
+                "open-interest" => {
+                    let root: OkxOpenInterestMessage =
+                        serde_json::from_str(json).map_err(|e| anyhow!("OKX open interest parse error: {}", e))?;
+                    // For now, assume first open interest data point
+                    let oi = &root.data[0];
+                    let timestamp = oi.timestamp;
+                    let instrument = oi.instrument.clone();
+
+                    // Use unified conversion method
+                    let data = oi.clone().to_unified();
+
+                    Ok(ExchangeStreamEvent {
+                        venue: *venue,
+                        channel: *channel,
+                        instrument,
+                        timestamp,
+                        data,
+                    })
+                }
+                _ => Err(anyhow!("Unsupported OKX channel: {}", channel_name)),
+            }
+        }
+        _ => Err(anyhow!("Unsupported venue for parsing: {}", venue)),
+    }
+}
 
 pub struct TardisRequest {
     pub exchange: Exchange,
@@ -179,31 +274,29 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
                       break;
                   }
                 };
-                debug!(target: "ingestor::tardis", "Received data: {}", json);
-                let event = match serde_json::from_str::<BinanceSwapsEvent>(&json) {
-                    Ok(e) => Some(e),
+                // Dynamic parsing based on venue (bulletproof with error handling)
+                let stream_event = match parse_stream_event(&json, &ingestor.venue, &ingestor.channel) {
+                    Ok(e) => e,
                     Err(e) => {
-                        error!(target: "ingestor::tardis", "Failed to parse Binance event: {}", e);
-                        error!(target: "ingestor::tardis", "Data: {}", json);
-                        None
+                        error!(target: "ingestor::tardis", "Failed to parse stream event for venue {}: {}", ingestor.venue, e);
+                        error!(target: "ingestor::tardis", "Raw JSON: {}", json);
+                        // Bulletproof: Inspect JSON structure for debugging (e.g., check event type)
+                        if let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(&json) {
+                            if let Some(event_type) = map.get("e").and_then(|v| v.as_str()) {
+                                warn!(target: "ingestor::tardis", "Detected event type in JSON: {} (may indicate unsupported exchange or malformed data)", event_type);
+                            } else {
+                                warn!(target: "ingestor::tardis", "No event type ('e') found in JSON; structure may be invalid");
+                            }
+                        } else {
+                            warn!(target: "ingestor::tardis", "JSON is not a valid object; skipping");
+                        }
+                        continue; // Skip malformed data and continue processing
                     }
                 };
 
-                let event = match event {
-                    Some(e) => {
-                        debug!(target: "ingestor::tardis", "{}", e);
-                        e
-                    }
-                    None => {
-                        error!(target: "ingestor::tardis", "Failed to parse event, skipping...");
-                        continue
-                    },
-                };
-
-
-
+                // Get instrument once (remove duplicate block)
                 let instrument = match persistence_service
-                    .get_instrument_by_venue_symbol(&event.venue_symbol(), &venue)
+                    .get_instrument_by_venue_symbol(&stream_event.venue_symbol(), &venue)
                     .await {
                         Ok(i) => i,
                         Err(e) => {
@@ -212,18 +305,14 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
                         }
                     };
 
-                match event {
-                    BinanceSwapsEvent::AggTradeStream(stream) => {
-                        let trade = stream.data;
-                        let side = if trade.maker {
-                            MarketSide::Sell
-                        } else {
-                            MarketSide::Buy
-                        };
+                // Handle the inner event data dynamically based on exchange
+                match stream_event.into_inner() {
+                    ExchangeEventData::AggTrade(trade) => {
+                        let side = if trade.maker { MarketSide::Sell } else { MarketSide::Buy };
                         let trade = AggTrade::new(
                             trade.event_time,
-                            instrument,
-                            trade.agg_trade_id,
+                            instrument.clone(),
+                            trade.trade_id,
                             side,
                             trade.price,
                             trade.quantity,
@@ -231,11 +320,10 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
                         debug!(target: "ingestor::tardis", "Send agg trade update");
                         core_ctx.publish(Event::AggTradeUpdate(trade.into())).await;
                     }
-                    BinanceSwapsEvent::TickStream(stream) => {
-                        let tick = stream.data;
+                    ExchangeEventData::Tick(tick) => {
                         let tick = Tick::new(
                             tick.event_time,
-                            instrument,
+                            instrument.clone(),
                             tick.update_id,
                             tick.bid_price,
                             tick.bid_quantity,
@@ -244,6 +332,16 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
                         );
                         core_ctx.publish(Event::TickUpdate(tick.into())).await;
                         debug!(target: "ingestor::tardis", "Send tick update");
+                    }
+                    ExchangeEventData::Trade(trade) => {
+                        // Individual trades are not currently handled as events
+                        // They could be converted to AggTrade with trade_id as agg_trade_id
+                        debug!(target: "ingestor::tardis", "Individual trade received: {} {} {}@{}",
+                               trade.event_time, instrument.venue_symbol, trade.quantity, trade.price);
+                    }
+                    ExchangeEventData::BookUpdate(book) => {
+                        // Handle book updates - this would need more work for full implementation
+                        debug!(target: "ingestor::tardis", "Book update received: {} bids, {} asks", book.bids.len(), book.asks.len());
                     }
                 }
             },

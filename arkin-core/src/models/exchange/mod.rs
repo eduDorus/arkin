@@ -1,0 +1,309 @@
+//! # Exchange Models
+//!
+//! This module provides unified data models for handling market data from multiple cryptocurrency exchanges.
+//! It defines a common interface that all exchanges implement, allowing the rest of the system to work
+//! with exchange data in a consistent way regardless of the underlying exchange.
+//!
+//! ## Architecture
+//!
+//! The module follows a unified architecture where:
+//! - [`ExchangeStreamEvent`] represents a complete market data event from any exchange
+//! - [`ExchangeEventData`] is an enum containing all possible event types (trades, order books, etc.)
+//! - Each exchange implements conversion methods to transform their native data into unified types
+//!
+//! ## Supported Exchanges
+//!
+//! - **Binance**: Spot and futures markets via their WebSocket API
+//! - **Bybit**: Spot and derivatives markets
+//! - **OKX**: Spot and perpetual swap markets
+//!
+//! ## Event Types
+//!
+//! - **Trades**: Individual trade executions
+//! - **AggTrades**: Aggregated trades (multiple trades combined)
+//! - **BookUpdates**: Order book depth updates
+//! - **Ticks**: Best bid/ask price updates
+//!
+//! ## Usage
+//!
+//! ```rust,no_run
+//! use arkin_core::prelude::*;
+//!
+//! // Parse exchange-specific data into unified format
+//! let event = ExchangeStreamEvent {
+//!     venue: Exchange::BinanceSpot,
+//!     channel: Channel::AggTrades,
+//!     instrument: "BTCUSDT".to_string(),
+//!     timestamp: time::UtcDateTime::now(),
+//!     data: ExchangeEventData::AggTrade(AggTradeData {
+//!         event_time: time::UtcDateTime::now(),
+//!         transaction_time: time::UtcDateTime::now(),
+//!         trade_id: 12345,
+//!         first_trade_id: 12340,
+//!         last_trade_id: 12345,
+//!         price: rust_decimal::Decimal::new(50000, 0),
+//!         quantity: rust_decimal::Decimal::new(1000, 4),
+//!         side: MarketSide::Buy,
+//!         maker: false,
+//!     }),
+//! };
+//!
+//! // Access unified data regardless of exchange
+//! match event.data {
+//!     ExchangeEventData::AggTrade(trade) => {
+//!         println!("Trade: {}@{}", trade.quantity, trade.price);
+//!     }
+//!     _ => {}
+//! }
+//! ```
+
+mod binance_usdm;
+mod binance_spot;
+mod bybit;
+mod okx;
+
+pub use binance_usdm::*;
+pub use binance_spot::*;
+pub use bybit::*;
+pub use okx::*;
+
+use crate::prelude::*;
+
+/// A unified market data event from any cryptocurrency exchange.
+///
+/// This struct represents a complete market data event that has been normalized
+/// across all supported exchanges. It contains metadata about the event source
+/// and the actual market data payload.
+///
+/// # Fields
+///
+/// * `venue` - The exchange this event originated from
+/// * `channel` - The type of market data (trades, order book, etc.)
+/// * `instrument` - The trading pair symbol (e.g., "BTCUSDT")
+/// * `timestamp` - When this event was received/processed
+/// * `data` - The actual market data payload
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # use arkin_core::prelude::*;
+/// let event = ExchangeStreamEvent {
+///     venue: Exchange::BinanceSpot,
+///     channel: Channel::AggTrades,
+///     instrument: "BTCUSDT".to_string(),
+///     timestamp: time::UtcDateTime::now(),
+///     data: ExchangeEventData::AggTrade(AggTradeData {
+///         event_time: time::UtcDateTime::now(),
+///         transaction_time: time::UtcDateTime::now(),
+///         trade_id: 12345,
+///         first_trade_id: 12340,
+///         last_trade_id: 12345,
+///         price: rust_decimal::Decimal::new(50000, 0),
+///         quantity: rust_decimal::Decimal::new(1000, 4),
+///         side: MarketSide::Buy,
+///         maker: false,
+///     }),
+/// };
+/// ```
+#[derive(Debug, Clone)]
+pub struct ExchangeStreamEvent {
+    /// Which exchange this event is from
+    pub venue: Exchange,
+    /// The channel/market data type
+    pub channel: Channel,
+    /// The instrument symbol (e.g., "BTCUSDT")
+    pub instrument: String,
+    /// Event timestamp
+    pub timestamp: time::UtcDateTime,
+    /// The actual event data
+    pub data: ExchangeEventData,
+}
+
+/// Unified event data types that all exchanges can provide.
+///
+/// This enum represents all possible types of market data events that can be
+/// received from cryptocurrency exchanges. Each variant contains the specific
+/// data structure for that event type, normalized across all exchanges.
+#[derive(Debug, Clone)]
+pub enum ExchangeEventData {
+    /// Individual trade execution data
+    Trade(TradeData),
+    /// Aggregated trade data (combines multiple individual trades)
+    AggTrade(AggTradeData),
+    /// Order book depth update
+    BookUpdate(BookUpdateData),
+    /// Best bid/ask price update
+    Tick(TickData),
+}
+
+/// Data for an individual trade execution.
+///
+/// Represents a single trade that occurred on an exchange, including
+/// the price, quantity, and market participant information.
+#[derive(Debug, Clone)]
+pub struct TradeData {
+    /// When the trade event was generated by the exchange
+    pub event_time: time::UtcDateTime,
+    /// When the trade actually executed
+    pub transaction_time: time::UtcDateTime,
+    /// Unique identifier for this trade
+    pub trade_id: String,
+    /// Price at which the trade executed
+    pub price: rust_decimal::Decimal,
+    /// Quantity traded
+    pub quantity: rust_decimal::Decimal,
+    /// Whether this was a buy or sell
+    pub side: MarketSide,
+    /// Whether the trade was executed by a market maker (true) or taker (false)
+    pub maker: bool,
+}
+
+/// Data for an aggregated trade (combines multiple individual trades).
+///
+/// Some exchanges provide aggregated trade data that combines multiple
+/// individual trades into a single event for efficiency.
+#[derive(Debug, Clone)]
+pub struct AggTradeData {
+    /// When the aggregated trade event was generated
+    pub event_time: time::UtcDateTime,
+    /// When the last trade in this aggregate executed
+    pub transaction_time: time::UtcDateTime,
+    /// Unique identifier for this aggregated trade
+    pub trade_id: u64,
+    /// ID of the first individual trade in this aggregate
+    pub first_trade_id: u64,
+    /// ID of the last individual trade in this aggregate
+    pub last_trade_id: u64,
+    /// Weighted average price of all trades in this aggregate
+    pub price: rust_decimal::Decimal,
+    /// Total quantity of all trades in this aggregate
+    pub quantity: rust_decimal::Decimal,
+    /// Whether this aggregate represents buy or sell trades
+    pub side: MarketSide,
+    /// Whether the last trade was executed by a market maker
+    pub maker: bool,
+}
+
+/// Data for an order book update event.
+///
+/// Represents changes to the order book depth, including both bid and ask sides.
+/// Contains multiple price levels that were updated in this event.
+#[derive(Debug, Clone)]
+pub struct BookUpdateData {
+    /// When this order book update event was generated
+    pub event_time: time::UtcDateTime,
+    /// When the last update in this batch occurred
+    pub transaction_time: time::UtcDateTime,
+    /// First update ID in this batch
+    pub first_update_id: u64,
+    /// Final update ID in this batch
+    pub final_update_id: u64,
+    /// ID of the last final update (for synchronization)
+    pub last_final_update_id: u64,
+    /// Updated bid (buy) price levels
+    pub bids: Vec<BookLevel>,
+    /// Updated ask (sell) price levels
+    pub asks: Vec<BookLevel>,
+}
+
+/// A single price level in an order book.
+///
+/// Represents one price level with its available quantity in the order book.
+#[derive(Debug, Clone)]
+pub struct BookLevel {
+    /// Price for this level
+    pub price: rust_decimal::Decimal,
+    /// Available quantity at this price level
+    pub quantity: rust_decimal::Decimal,
+}
+
+/// Data for a best bid/ask price update (ticker).
+///
+/// Represents the current best prices and quantities available for immediate execution.
+#[derive(Debug, Clone)]
+pub struct TickData {
+    /// When this ticker update event was generated
+    pub event_time: time::UtcDateTime,
+    /// When the last trade occurred that affected this ticker
+    pub transaction_time: time::UtcDateTime,
+    /// Update sequence number
+    pub update_id: u64,
+    /// Best bid price (highest buy price)
+    pub bid_price: rust_decimal::Decimal,
+    /// Quantity available at best bid price
+    pub bid_quantity: rust_decimal::Decimal,
+    /// Best ask price (lowest sell price)
+    pub ask_price: rust_decimal::Decimal,
+    /// Quantity available at best ask price
+    pub ask_quantity: rust_decimal::Decimal,
+}
+
+impl ExchangeStreamEvent {
+    /// Extract the venue symbol for instrument lookup.
+    ///
+    /// Returns the instrument symbol that can be used to look up
+    /// the corresponding instrument in the system.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use arkin_core::prelude::*;
+    /// let event = ExchangeStreamEvent {
+    ///     venue: Exchange::BinanceSpot,
+    ///     channel: Channel::AggTrades,
+    ///     instrument: "BTCUSDT".to_string(),
+    ///     timestamp: time::UtcDateTime::now(),
+    ///     data: ExchangeEventData::Trade(TradeData {
+    ///         event_time: time::UtcDateTime::now(),
+    ///         transaction_time: time::UtcDateTime::now(),
+    ///         trade_id: "123".to_string(),
+    ///         price: rust_decimal::Decimal::new(50000, 0),
+    ///         quantity: rust_decimal::Decimal::new(1000, 4),
+    ///         side: MarketSide::Buy,
+    ///         maker: false,
+    ///     }),
+    /// };
+    ///
+    /// assert_eq!(event.venue_symbol(), "BTCUSDT");
+    /// ```
+    pub fn venue_symbol(&self) -> &str {
+        &self.instrument
+    }
+
+    /// Consume this event and return the inner event data.
+    ///
+    /// This method consumes the `ExchangeStreamEvent` and returns just
+    /// the `ExchangeEventData` payload, discarding the metadata.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use arkin_core::prelude::*;
+    /// let event = ExchangeStreamEvent {
+    ///     venue: Exchange::BinanceSpot,
+    ///     channel: Channel::AggTrades,
+    ///     instrument: "BTCUSDT".to_string(),
+    ///     timestamp: time::UtcDateTime::now(),
+    ///     data: ExchangeEventData::Trade(TradeData {
+    ///         event_time: time::UtcDateTime::now(),
+    ///         transaction_time: time::UtcDateTime::now(),
+    ///         trade_id: "123".to_string(),
+    ///         price: rust_decimal::Decimal::new(50000, 0),
+    ///         quantity: rust_decimal::Decimal::new(1000, 4),
+    ///         side: MarketSide::Buy,
+    ///         maker: false,
+    ///     }),
+    /// };
+    ///
+    /// let data = event.into_inner();
+    /// match data {
+    ///     ExchangeEventData::Trade(trade) => {
+    ///         println!("Trade price: {}", trade.price);
+    ///     }
+    ///     _ => {}
+    /// }
+    /// ```
+    pub fn into_inner(self) -> ExchangeEventData {
+        self.data
+    }
+}

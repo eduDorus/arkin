@@ -7,12 +7,17 @@ use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 
+// Re-export core models for convenience
+// pub use arkin_core::models::exchange::*;
+
+/// Live market data stream event from Binance
 #[derive(Debug, Deserialize)]
 pub struct BinanceUSDMMarketStreamEvent {
     pub stream: String,
     pub data: BinanceUSDMMarketEvent, // Tagged enum based on "e" field
 }
 
+/// Tagged enum for live Binance market events
 #[derive(Debug, Deserialize)]
 #[serde(tag = "e")]
 pub enum BinanceUSDMMarketEvent {
@@ -51,120 +56,6 @@ pub enum BinanceUSDMMarketEvent {
 //         "takerlongshortRatio"
 //     ]
 // },
-
-#[derive(Debug, Deserialize)]
-pub struct BinanceSwapsTradeData {
-    // #[serde(rename = "e")]
-    // pub event_type: String,
-    #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: UtcDateTime,
-    #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub transaction_time: UtcDateTime,
-    #[serde(rename = "s")]
-    pub instrument: String,
-    #[serde(rename = "t")]
-    pub trade_id: u64,
-    #[serde(rename = "p")]
-    pub price: Decimal,
-    #[serde(rename = "q")]
-    pub quantity: Decimal,
-    #[serde(rename = "X")]
-    pub trade_type: String,
-    #[serde(rename = "m")]
-    pub maker: bool, // The true = sell, false = buy
-}
-
-// "m": true: The buyer is the market maker.
-// • The trade was initiated by a sell order from the taker.
-// • The taker is selling, and the maker (buyer) is buying.
-// "m": false: The seller is the market maker.
-// • The trade was initiated by a buy order from the taker.
-// • The taker is buying, and the maker (seller) is selling.
-#[derive(Debug, Deserialize)]
-pub struct BinanceSwapsAggTradeData {
-    // #[serde(rename = "e")]
-    // pub event_type: String,
-    #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: UtcDateTime,
-    #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub transaction_time: UtcDateTime,
-    #[serde(rename = "s")]
-    pub instrument: String,
-    #[serde(rename = "a")]
-    pub agg_trade_id: u64,
-    #[serde(rename = "f")]
-    pub first_trade_id: u64,
-    #[serde(rename = "l")]
-    pub last_trade_id: u64,
-    #[serde(rename = "p")]
-    pub price: Decimal,
-    #[serde(rename = "q")]
-    pub quantity: Decimal,
-    #[serde(rename = "m")]
-    pub maker: bool, // The true = sell, false = buy
-}
-
-#[derive(Debug, Deserialize)]
-pub struct BinanceSwapsBookData {
-    // #[serde(rename = "e")]
-    // pub event_type: String,
-    #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: UtcDateTime,
-    #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub transaction_time: UtcDateTime,
-    #[serde(rename = "s")]
-    pub instrument: String,
-    #[serde(rename = "U")]
-    pub first_update_id: u64,
-    #[serde(rename = "u")]
-    pub final_update_id: u64,
-    #[serde(rename = "pu")]
-    pub last_final_update_id: u64,
-    #[serde(rename = "b")]
-    pub bids: Vec<BinanceSwapsBookUpdate>,
-    #[serde(rename = "a")]
-    pub asks: Vec<BinanceSwapsBookUpdate>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct BinanceSwapsBookUpdate {
-    pub price: Decimal,
-    pub quantity: Decimal,
-}
-
-// {
-//     "e":"bookTicker",         // event type
-//     "u":400900217,            // order book updateId
-//     "E": 1568014460893,       // event time
-//     "T": 1568014460891,       // transaction time
-//     "s":"BNBUSDT",            // symbol
-//     "b":"25.35190000",        // best bid price
-//     "B":"31.21000000",        // best bid qty
-//     "a":"25.36520000",        // best ask price
-//     "A":"40.66000000"         // best ask qty
-//   }
-
-#[derive(Debug, Deserialize)]
-pub struct BinanceSwapsTickData {
-    // #[serde(rename = "e")]
-    // pub event_type: String,
-    #[serde(rename = "E", with = "custom_serde::timestamp")]
-    pub event_time: UtcDateTime,
-    #[serde(rename = "T", with = "custom_serde::timestamp")]
-    pub transaction_time: UtcDateTime,
-    #[serde(rename = "u")]
-    pub update_id: u64,
-    #[serde(rename = "s")]
-    pub instrument: String,
-    #[serde(rename = "b")]
-    pub bid_price: Decimal,
-    #[serde(rename = "B")]
-    pub bid_quantity: Decimal,
-    #[serde(rename = "a")]
-    pub ask_price: Decimal,
-    #[serde(rename = "A")]
-    pub ask_quantity: Decimal,
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

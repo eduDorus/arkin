@@ -155,7 +155,7 @@ mod tests {
     #[tokio::test]
     async fn test_query() {
         let channel = "trades".to_string();
-        let symbols = vec!["BTCUSDT".to_string(), "ETHUSDT".to_string()];
+        let symbols = vec!["btcusdt".to_string(), "ethusdt".to_string()];
         let date = datetime!(2021 - 01 - 01 01:00:00 UTC).to_utc();
         let offset = 1;
 
@@ -163,9 +163,9 @@ mod tests {
         let query = params.to_query();
         assert_eq!(query[0].0, "from");
         assert_eq!(query[0].1, date.date().to_string());
-        assert_eq!(query[1].0, "offset");
-        assert_eq!(query[1].1, date.hour().to_string().as_str());
-        assert_eq!(query[2].0, "filters");
-        assert_eq!(query[2].1, r#"[{"channel":"trades","symbols":["btcusdt","ethusdt"]}]"#);
+        assert_eq!(query[2].0, "offset");
+        assert_eq!(query[2].1, date.hour().to_string().as_str());
+        assert_eq!(query[1].0, "filters");
+        assert_eq!(query[1].1, r#"[{"channel":"trades","symbols":["btcusdt","ethusdt"]}]"#);
     }
 }
