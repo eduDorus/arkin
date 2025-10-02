@@ -76,7 +76,6 @@ pub struct OkxTrade {
 ///
 /// Represents the current open interest for a specific instrument on OKX,
 /// including both contract count and currency-denominated values.
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct OkxOpenInterest {
     /// Instrument identifier
@@ -86,13 +85,49 @@ pub struct OkxOpenInterest {
     #[serde(rename = "instType")]
     pub instrument_type: String,
     /// Open interest in contracts
-    #[serde_as(as = "DisplayFromStr")]
     pub oi: Decimal,
     /// Open interest in currency terms
-    #[serde_as(as = "DisplayFromStr")]
     #[serde(rename = "oiCcy")]
     pub oi_ccy: Decimal,
     /// Timestamp when this data was recorded
+    #[serde(rename = "ts", with = "custom_serde::timestamp")]
+    pub timestamp: UtcDateTime,
+}
+
+/// Ticker message from OKX.
+///
+/// Represents a WebSocket message containing ticker data from OKX.
+/// Contains channel arguments and an array of individual ticker data.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OkxTickerMessage {
+    /// Channel subscription arguments
+    pub arg: OkxArg,
+    /// Array of individual ticker data
+    pub data: Vec<OkxTickerData>,
+}
+
+/// Individual ticker data from OKX.
+///
+/// Represents ticker information including best bid/ask prices and quantities.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct OkxTickerData {
+    /// Instrument identifier
+    #[serde(rename = "instId")]
+    pub instrument: String,
+    /// Best bid price
+    #[serde(rename = "bidPx")]
+    pub bid_price: Decimal,
+    /// Bid quantity
+    #[serde(rename = "bidSz")]
+    pub bid_quantity: Decimal,
+    /// Best ask price
+    #[serde(rename = "askPx")]
+    pub ask_price: Decimal,
+    /// Ask quantity
+    #[serde(rename = "askSz")]
+    pub ask_quantity: Decimal,
+    /// Timestamp
     #[serde(rename = "ts", with = "custom_serde::timestamp")]
     pub timestamp: UtcDateTime,
 }
@@ -176,6 +211,38 @@ impl OkxOpenInterest {
     }
 }
 
+impl OkxTickerData {
+    /// Convert this OKX ticker to the unified exchange event data format.
+    ///
+    /// Transforms OKX-specific ticker data into the standardized
+    /// [`ExchangeEventData`] format used across all exchanges.
+    pub fn to_unified(self) -> crate::models::exchange::ExchangeEventData {
+        crate::models::exchange::ExchangeEventData::Tick(crate::models::exchange::TickData {
+            event_time: self.timestamp,
+            transaction_time: self.timestamp,
+            update_id: 0, // OKX doesn't provide update IDs in ticker data
+            bid_price: self.bid_price,
+            bid_quantity: self.bid_quantity,
+            ask_price: self.ask_price,
+            ask_quantity: self.ask_quantity,
+        })
+    }
+
+    /// Get the event time for this ticker data.
+    ///
+    /// Returns the timestamp when this ticker data was recorded.
+    pub fn event_time(&self) -> time::UtcDateTime {
+        self.timestamp
+    }
+
+    /// Get the venue symbol for instrument lookup.
+    ///
+    /// Returns the instrument identifier (e.g., "BTC-USDT", "BTC-USD-SWAP") for this ticker data.
+    pub fn venue_symbol(&self) -> &str {
+        &self.instrument
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,5 +263,11 @@ mod tests {
     fn test_okx_open_interest() {
         let json_data = r#"{"arg":{"channel":"open-interest","instId":"BTC-USD-SWAP"},"data":[{"instId":"BTC-USD-SWAP","instType":"SWAP","oi":"8824028","oiCcy":"9450.4815189266069195","ts":"1735689601474"}]}"#;
         let _ = serde_json::from_str::<OkxOpenInterestMessage>(json_data).unwrap();
+    }
+
+    #[test]
+    fn test_okx_ticker() {
+        let json_data = r#"{"arg":{"channel":"tickers","instId":"BTC-USD-SWAP"},"data":[{"instType":"SWAP","instId":"BTC-USD-SWAP","last":"42294.4","lastSz":"1","askPx":"42296.9","askSz":"150","bidPx":"42296.8","bidSz":"310","open24h":"42194.5","high24h":"42919.9","low24h":"41976.6","sodUtc0":"42294.3","sodUtc8":"42471.7","volCcy24h":"11070.3779","vol24h":"4701006","ts":"1704067200108"}]}"#;
+        let _ = serde_json::from_str::<OkxTickerMessage>(json_data).unwrap();
     }
 }

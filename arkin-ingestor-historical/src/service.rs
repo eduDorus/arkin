@@ -24,40 +24,75 @@ pub fn parse_stream_event(json: &str, venue: &Exchange, channel: &Channel) -> Re
         Exchange::BinanceSpot
         | Exchange::BinanceUsdmFutures
         | Exchange::BinanceCoinmFutures
-        | Exchange::BinanceOptions => {
-            let stream_event: BinanceSwapsStreamEvent =
-                serde_json::from_str(json).map_err(|e| anyhow!("Binance parse error: {}", e))?;
+        | Exchange::BinanceOptions => match channel {
+            Channel::AggTrades | Channel::Trades | Channel::OrderBook | Channel::LongShortRatio | Channel::Ticker => {
+                let stream_event: BinanceSwapsStreamEvent =
+                    serde_json::from_str(json).map_err(|e| anyhow!("Binance parse error: {}", e))?;
 
-            let instrument = stream_event.data.venue_symbol().to_string();
-            let timestamp = stream_event.data.event_time(); // Need to add this method
+                let instrument = stream_event.data.venue_symbol().to_string();
+                let timestamp = stream_event.data.event_time();
 
-            Ok(ExchangeStreamEvent {
-                venue: *venue,
-                channel: *channel,
-                instrument,
-                timestamp,
-                data: stream_event.data.to_unified(),
-            })
-        }
+                Ok(ExchangeStreamEvent {
+                    venue: *venue,
+                    channel: *channel,
+                    instrument,
+                    timestamp,
+                    data: stream_event.data.to_unified(),
+                })
+            }
+            _ => Err(anyhow!("Unsupported Binance channel: {:?}", channel)),
+        },
         Exchange::BybitSpot | Exchange::BybitDerivatives | Exchange::BybitOptions => {
-            let root: BybitTradeMessage =
-                serde_json::from_str(json).map_err(|e| anyhow!("Bybit parse error: {}", e))?;
+            match channel {
+                Channel::Trades => {
+                    let root: BybitTradeMessage =
+                        serde_json::from_str(json).map_err(|e| anyhow!("Bybit trade parse error: {}", e))?;
 
-            // For now, assume first trade, need to handle properly
-            let trade = &root.data[0];
-            let timestamp = trade.transaction_time;
-            let instrument = trade.instrument.clone();
+                    // For now, assume first trade, need to handle properly
+                    let trade = &root.data[0];
+                    let timestamp = trade.transaction_time;
+                    let instrument = trade.instrument.clone();
 
-            // Use unified conversion method
-            let data = trade.clone().to_unified();
+                    // Use unified conversion method
+                    let data = trade.clone().to_unified();
 
-            Ok(ExchangeStreamEvent {
-                venue: *venue,
-                channel: *channel,
-                instrument,
-                timestamp,
-                data,
-            })
+                    Ok(ExchangeStreamEvent {
+                        venue: *venue,
+                        channel: *channel,
+                        instrument,
+                        timestamp,
+                        data,
+                    })
+                }
+                Channel::Ticker => {
+                    let root: BybitTickerMessage =
+                        serde_json::from_str(json).map_err(|e| anyhow!("Bybit ticker parse error: {}", e))?;
+
+                    let timestamp =
+                        time::UtcDateTime::from_unix_timestamp(root.ts / 1000).unwrap_or(time::UtcDateTime::UNIX_EPOCH);
+                    let instrument = root.data.symbol.clone();
+
+                    // Create tick data directly since we have the timestamp
+                    let tick_data = TickData {
+                        event_time: timestamp,
+                        transaction_time: timestamp,
+                        update_id: 0, // Bybit doesn't provide update IDs in ticker data
+                        bid_price: root.data.bid_price,
+                        bid_quantity: root.data.bid_quantity,
+                        ask_price: root.data.ask_price,
+                        ask_quantity: root.data.ask_quantity,
+                    };
+
+                    Ok(ExchangeStreamEvent {
+                        venue: *venue,
+                        channel: *channel,
+                        instrument,
+                        timestamp,
+                        data: ExchangeEventData::Tick(tick_data),
+                    })
+                }
+                _ => Err(anyhow!("Unsupported Bybit channel: {:?}", channel)),
+            }
         }
         Exchange::OkxSpot | Exchange::OkxSwap | Exchange::OkxFutures | Exchange::OkxOptions => {
             // First parse the arg to determine the channel type
@@ -99,6 +134,25 @@ pub fn parse_stream_event(json: &str, venue: &Exchange, channel: &Channel) -> Re
 
                     // Use unified conversion method
                     let data = oi.clone().to_unified();
+
+                    Ok(ExchangeStreamEvent {
+                        venue: *venue,
+                        channel: *channel,
+                        instrument,
+                        timestamp,
+                        data,
+                    })
+                }
+                "tickers" => {
+                    let root: OkxTickerMessage =
+                        serde_json::from_str(json).map_err(|e| anyhow!("OKX ticker parse error: {}", e))?;
+                    // For now, assume first ticker data point
+                    let ticker = &root.data[0];
+                    let timestamp = ticker.timestamp;
+                    let instrument = ticker.instrument.clone();
+
+                    // Use unified conversion method
+                    let data = ticker.clone().to_unified();
 
                     Ok(ExchangeStreamEvent {
                         venue: *venue,
