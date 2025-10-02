@@ -91,6 +91,55 @@ const MAPPINGS: &[MappingEntry] = &[
         tardis_id: "binance-futures",
         tardis_channel_str: "markPrice",
     },
+    MappingEntry {
+        exchange: Exchange::BinanceUsdmFutures,
+        channel: Channel::LongShortRatio,
+        tardis_id: "binance-futures",
+        tardis_channel_str: "globalLongShortAccountRatio",
+    },
+    // BinanceCoinmFutures (COIN Futures)
+    MappingEntry {
+        exchange: Exchange::BinanceCoinmFutures,
+        channel: Channel::OrderBook,
+        tardis_id: "binance-delivery",
+        tardis_channel_str: "depth",
+    },
+    MappingEntry {
+        exchange: Exchange::BinanceCoinmFutures,
+        channel: Channel::Trades,
+        tardis_id: "binance-delivery",
+        tardis_channel_str: "trade",
+    },
+    MappingEntry {
+        exchange: Exchange::BinanceCoinmFutures,
+        channel: Channel::AggTrades,
+        tardis_id: "binance-delivery",
+        tardis_channel_str: "aggTrade",
+    },
+    MappingEntry {
+        exchange: Exchange::BinanceCoinmFutures,
+        channel: Channel::Ticker,
+        tardis_id: "binance-delivery",
+        tardis_channel_str: "bookTicker",
+    },
+    MappingEntry {
+        exchange: Exchange::BinanceCoinmFutures,
+        channel: Channel::OpenInterest,
+        tardis_id: "binance-delivery",
+        tardis_channel_str: "openInterest",
+    },
+    MappingEntry {
+        exchange: Exchange::BinanceCoinmFutures,
+        channel: Channel::FundingRate,
+        tardis_id: "binance-delivery",
+        tardis_channel_str: "markPrice",
+    },
+    MappingEntry {
+        exchange: Exchange::BinanceCoinmFutures,
+        channel: Channel::LongShortRatio,
+        tardis_id: "binance-delivery",
+        tardis_channel_str: "globalLongShortAccountRatio",
+    },
     // BinanceOptions (verified: European; no AggTrades)
     MappingEntry {
         exchange: Exchange::BinanceOptions,
@@ -227,6 +276,12 @@ const MAPPINGS: &[MappingEntry] = &[
         channel: Channel::FundingRate,
         tardis_id: "bybit",
         tardis_channel_str: "tickers",
+    },
+    MappingEntry {
+        exchange: Exchange::BybitDerivatives,
+        channel: Channel::LongShortRatio,
+        tardis_id: "bybit",
+        tardis_channel_str: "long_short_ratio",
     },
     // BybitOptions (verified: no AggTrades; OI in "tickers")
     MappingEntry {

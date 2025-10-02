@@ -59,4 +59,5 @@ pub enum Channel {
     Ticker,
     OpenInterest,
     FundingRate,
+    LongShortRatio,
 }

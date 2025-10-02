@@ -367,3 +367,159 @@ async fn test_integration_okx_swap_open_interest() {
     }
     assert!(event_count > 0, "Should have received at least one event");
 }
+
+#[tokio::test]
+#[test_log::test]
+async fn test_integration_binance_usdm_long_short_ratio() {
+    info!("Testing Binance USDM Long/Short Ratio integration");
+
+    let start = utc_datetime!(2024 - 01 - 01 00:00:00);
+    let end = utc_datetime!(2024 - 01 - 01 00:01:00);
+
+    let venue = Exchange::BinanceUsdmFutures;
+    let channel = Channel::LongShortRatio;
+    let instruments = vec!["btcusdt".to_string()];
+
+    let cfg = load::<TardisConfig>();
+    let ingestor = Arc::new(
+        TardisIngestor::builder()
+            .venue(venue.clone())
+            .channel(channel.clone())
+            .start(start)
+            .end(end)
+            .instruments(instruments.clone())
+            .max_concurrent_requests(1)
+            .base_url(cfg.tardis.http_url)
+            .api_secret(None)
+            .build(),
+    );
+
+    let req = TardisRequest::new(
+        ingestor.venue.clone(),
+        ingestor.channel.clone(),
+        ingestor.instruments.clone(),
+        ingestor.start,
+        ingestor.end,
+    );
+
+    let stream = ingestor.stream(req);
+    pin!(stream);
+
+    // Collect and print the events for demonstration purposes
+    let mut event_count = 0;
+    while let Some((ts, json)) = stream.next().await {
+        info!("Raw JSON: {}", json);
+        // For now, just log the raw data since parsing might not be implemented yet
+        info!("Binance USDM Long/Short Ratio Event: {}: {}", ts, json);
+        event_count += 1;
+        if event_count >= 3 {
+            // Limit output for testing
+            break;
+        }
+    }
+    assert!(event_count > 0, "Should have received at least one event");
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn test_integration_binance_coinm_long_short_ratio() {
+    info!("Testing Binance COIN Long/Short Ratio integration");
+
+    let start = utc_datetime!(2024 - 01 - 01 00:00:00);
+    let end = utc_datetime!(2024 - 01 - 01 00:01:00);
+
+    let venue = Exchange::BinanceCoinmFutures;
+    let channel = Channel::LongShortRatio;
+    let instruments = vec!["btcusd".to_string()];
+
+    let cfg = load::<TardisConfig>();
+    let ingestor = Arc::new(
+        TardisIngestor::builder()
+            .venue(venue.clone())
+            .channel(channel.clone())
+            .start(start)
+            .end(end)
+            .instruments(instruments.clone())
+            .max_concurrent_requests(1)
+            .base_url(cfg.tardis.http_url)
+            .api_secret(None)
+            .build(),
+    );
+
+    let req = TardisRequest::new(
+        ingestor.venue.clone(),
+        ingestor.channel.clone(),
+        ingestor.instruments.clone(),
+        ingestor.start,
+        ingestor.end,
+    );
+
+    let stream = ingestor.stream(req);
+    pin!(stream);
+
+    // Collect and print the events for demonstration purposes
+    let mut event_count = 0;
+    while let Some((ts, json)) = stream.next().await {
+        info!("Raw JSON: {}", json);
+        // For now, just log the raw data since parsing might not be implemented yet
+        info!("Binance COIN Long/Short Ratio Event: {}: {}", ts, json);
+        event_count += 1;
+        if event_count >= 3 {
+            // Limit output for testing
+            break;
+        }
+    }
+    assert!(event_count > 0, "Should have received at least one event");
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn test_integration_bybit_long_short_ratio() {
+    info!("Testing Bybit Long/Short Ratio integration");
+
+    let start = utc_datetime!(2025 - 01 - 01 00:00:00);
+    let end = utc_datetime!(2025 - 01 - 01 00:01:00);
+
+    let venue = Exchange::BybitDerivatives;
+    let channel = Channel::LongShortRatio;
+    let instruments = vec!["BTCUSDT".to_string()];
+
+    let cfg = load::<TardisConfig>();
+    let ingestor = Arc::new(
+        TardisIngestor::builder()
+            .venue(venue.clone())
+            .channel(channel.clone())
+            .start(start)
+            .end(end)
+            .instruments(instruments.clone())
+            .max_concurrent_requests(1)
+            .base_url(cfg.tardis.http_url)
+            .api_secret(None)
+            .build(),
+    );
+
+    let req = TardisRequest::new(
+        ingestor.venue.clone(),
+        ingestor.channel.clone(),
+        ingestor.instruments.clone(),
+        ingestor.start,
+        ingestor.end,
+    );
+
+    let stream = ingestor.stream(req);
+    pin!(stream);
+
+    // Collect and print the events for demonstration purposes
+    let mut event_count = 0;
+    while let Some((ts, json)) = stream.next().await {
+        info!("Raw JSON: {}", json);
+        // For now, just log the raw data since parsing might not be implemented yet
+        info!("Bybit Long/Short Ratio Event: {}: {}", ts, json);
+        event_count += 1;
+        if event_count >= 3 {
+            // Limit output for testing
+            break;
+        }
+    }
+    assert!(event_count > 0, "Should have received at least one event");
+}
