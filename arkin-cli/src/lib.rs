@@ -25,7 +25,12 @@ pub enum Commands {
     /// Download historical market data from specified venues.
     ///
     /// This command fetches raw data for analysis or ingestion. Supports dry runs to simulate without actual downloads.
-    Download(DownloadArgs),
+    DownloadBinance(DownloadBinanceArgs),
+
+    /// Download historical market data from specified venues.
+    ///
+    /// This command fetches raw data for analysis or ingestion. Supports dry runs to simulate without actual downloads.
+    DownloadTardis(DownloadTardisArgs),
 
     /// Run data ingestors to process and store incoming data streams.
     ///
@@ -60,14 +65,42 @@ pub enum Commands {
 
 /// Arguments for the `download` subcommand.
 #[derive(Args, Debug)]
-pub struct DownloadArgs {
+pub struct DownloadBinanceArgs {
     /// Instruments to download data for (comma-separated, e.g., "BTCUSDT,ETHUSDT").
-    #[arg(long, value_delimiter = ',', value_parser)]
-    pub instruments: Vec<String>,
+    // #[arg(long, value_delimiter = ',', value_parser)]
+    // pub instruments: Vec<String>,
 
     /// Exchange venue to fetch data from (e.g., Binance, Coinbase).
     #[arg(long, short)]
-    pub venue: Exchange,
+    pub venue: VenueName,
+
+    /// Data channel/type (e.g., trades, order books).
+    #[arg(long, short)]
+    pub channel: Channel,
+
+    /// Start datetime in "YYYY-MM-DD HH:MM" UTC format.
+    #[arg(long, value_parser = parse_datetime)]
+    pub start: UtcDateTime,
+
+    /// End datetime in "YYYY-MM-DD HH:MM" UTC format (exclusive).
+    #[arg(long, value_parser = parse_datetime)]
+    pub end: UtcDateTime,
+
+    /// Perform a dry run: simulate download without saving files.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+/// Arguments for the `download` subcommand.
+#[derive(Args, Debug)]
+pub struct DownloadTardisArgs {
+    /// Instruments to download data for (comma-separated, e.g., "BTCUSDT,ETHUSDT").
+    // #[arg(long, value_delimiter = ',', value_parser)]
+    // pub instruments: Vec<String>,
+
+    /// Exchange venue to fetch data from (e.g., Binance, Coinbase).
+    #[arg(long, short)]
+    pub venue: VenueName,
 
     /// Data channel/type (e.g., trades, order books).
     #[arg(long, short)]

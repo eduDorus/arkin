@@ -4,6 +4,7 @@ pub mod execution_order_store;
 pub mod insight_store;
 pub mod instance_store;
 pub mod instrument_store;
+pub mod metric_store;
 pub mod pipeline_store;
 pub mod scaler_store;
 pub mod strategy_store;

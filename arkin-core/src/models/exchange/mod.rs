@@ -57,15 +57,15 @@
 //! }
 //! ```
 
-mod binance_usdm;
 mod binance_spot;
-mod bybit;
-mod okx;
+mod binance_usdm_futures;
+mod bybit_perp;
+mod okx_spot;
 
-pub use binance_usdm::*;
 pub use binance_spot::*;
-pub use bybit::*;
-pub use okx::*;
+pub use binance_usdm_futures::*;
+pub use bybit_perp::*;
+pub use okx_spot::*;
 
 use crate::prelude::*;
 
@@ -108,7 +108,7 @@ use crate::prelude::*;
 #[derive(Debug, Clone)]
 pub struct ExchangeStreamEvent {
     /// Which exchange this event is from
-    pub venue: Exchange,
+    pub venue: VenueName,
     /// The channel/market data type
     pub channel: Channel,
     /// The instrument symbol (e.g., "BTCUSDT")

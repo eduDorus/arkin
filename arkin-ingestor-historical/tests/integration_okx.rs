@@ -17,7 +17,7 @@ async fn test_integration_okx_spot_agg_trades() {
     let start = utc_datetime!(2025 - 01 - 01 00:00:00);
     let end = utc_datetime!(2025 - 01 - 01 00:01:00);
 
-    let venue = Exchange::OkxSpot;
+    let venue = VenueName::OkxSpot;
     let channel = Channel::AggTrades;
     let instruments = vec!["BTC-USDT".to_string()];
 
@@ -68,7 +68,7 @@ async fn test_integration_okx_spot_book_ticker() {
     let start = utc_datetime!(2024 - 01 - 01 00:00:00);
     let end = utc_datetime!(2024 - 01 - 01 00:01:00);
 
-    let venue = Exchange::OkxSpot;
+    let venue = VenueName::OkxSpot;
     let channel = Channel::Ticker;
     let instruments = vec!["BTC-USDT".to_string()];
 
@@ -141,7 +141,7 @@ async fn test_integration_okx_swap_agg_trades() {
     let start = utc_datetime!(2025 - 01 - 01 00:00:00);
     let end = utc_datetime!(2025 - 01 - 01 00:01:00);
 
-    let venue = Exchange::OkxSwap;
+    let venue = VenueName::OkxSwap;
     let channel = Channel::AggTrades;
     let instruments = vec!["BTC-USD-SWAP".to_string()];
 
@@ -192,7 +192,7 @@ async fn test_integration_okx_swap_book_ticker() {
     let start = utc_datetime!(2024 - 01 - 01 00:00:00);
     let end = utc_datetime!(2024 - 01 - 01 00:01:00);
 
-    let venue = Exchange::OkxSwap;
+    let venue = VenueName::OkxSwap;
     let channel = Channel::Ticker;
     let instruments = vec!["BTC-USD-SWAP".to_string()];
 
@@ -265,7 +265,7 @@ async fn test_integration_okx_swap_open_interest() {
     let start = utc_datetime!(2025 - 01 - 01 00:00:00);
     let end = utc_datetime!(2025 - 01 - 01 00:01:00);
 
-    let venue = Exchange::OkxSwap;
+    let venue = VenueName::OkxSwap;
     let channel = Channel::OpenInterest;
     let instruments = vec!["BTC-USD-SWAP".to_string()];
 

@@ -35,7 +35,7 @@ pub struct Caches {
     pub instrument_id: Cache<Uuid, Arc<Instrument>>,
     pub instrument_venue_symbol: Cache<String, Arc<Instrument>>,
     pub venue_id: Cache<Uuid, Arc<Venue>>,
-    pub venue_name: Cache<String, Arc<Venue>>,
+    pub venue_name: Cache<VenueName, Arc<Venue>>,
 }
 
 impl Caches {
@@ -56,4 +56,5 @@ pub struct Buffers {
     pub insights: Arc<Mutex<Vec<Arc<Insight>>>>,
     pub ticks: Arc<Mutex<Vec<Arc<Tick>>>>,
     pub trades: Arc<Mutex<Vec<Arc<AggTrade>>>>,
+    pub metrics: Arc<Mutex<Vec<Arc<Metric>>>>,
 }

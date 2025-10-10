@@ -18,6 +18,19 @@ pub struct OkxTradeMessage {
     pub data: Vec<OkxTrade>,
 }
 
+/// Trade message from OKX.
+///
+/// Represents a WebSocket message containing trade data from OKX.
+/// Contains channel arguments and an array of individual trade executions.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OkxAggTradeMessage {
+    /// Channel subscription arguments
+    pub arg: OkxArg,
+    /// Array of individual trade data
+    pub data: Vec<OkxTrade>,
+}
+
 /// Open interest message from OKX.
 ///
 /// Represents a WebSocket message containing open interest data from OKX.
@@ -49,7 +62,7 @@ pub struct OkxArg {
 /// and trade direction. The `count` field may be present for aggregated trades.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct OkxTrade {
+pub struct OkxAggTrade {
     /// Instrument identifier
     #[serde(rename = "instId")]
     pub instrument: String,
@@ -68,8 +81,34 @@ pub struct OkxTrade {
     /// Trade side ("buy" or "sell")
     pub side: String,
     /// Number of trades aggregated (optional, may be None)
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    pub count: Option<u64>,
+    #[serde_as(as = "DisplayFromStr")]
+    pub count: u64,
+}
+
+/// Individual trade data from OKX.
+///
+/// Represents a single trade execution on OKX, including price, quantity,
+/// and trade direction. The `count` field may be present for aggregated trades.
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct OkxTrade {
+    /// Instrument identifier
+    #[serde(rename = "instId")]
+    pub instrument: String,
+    /// Transaction timestamp (when the trade executed)
+    #[serde(rename = "ts", with = "custom_serde::timestamp")]
+    pub transaction_time: UtcDateTime,
+    /// Unique trade identifier
+    #[serde(rename = "tradeId")]
+    pub trade_id: String,
+    /// Execution price
+    #[serde(rename = "px")]
+    pub price: Decimal,
+    /// Trade quantity
+    #[serde(rename = "sz")]
+    pub quantity: Decimal,
+    /// Trade side ("buy" or "sell")
+    pub side: String,
 }
 
 /// Individual open interest data from OKX.
@@ -256,7 +295,7 @@ mod tests {
     #[test]
     fn test_okx_perp_trade() {
         let json_data = r#"{"arg":{"channel":"trades","instId":"BTC-USDT-SWAP"},"data":[{"instId":"BTC-USDT-SWAP","tradeId":"1216801608","px":"93630","sz":"2.1","side":"buy","ts":"1735689659701","count":"1"}]}"#;
-        let _ = serde_json::from_str::<OkxTradeMessage>(json_data).unwrap();
+        let _ = serde_json::from_str::<OkxAggTradeMessage>(json_data).unwrap();
     }
 
     #[test]

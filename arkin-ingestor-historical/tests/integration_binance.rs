@@ -17,7 +17,7 @@ async fn test_integration_binance_spot_trades() {
     let start = utc_datetime!(2025 - 01 - 01 00:00:00);
     let end = utc_datetime!(2025 - 01 - 01 00:01:00);
 
-    let venue = Exchange::BinanceSpot;
+    let venue = VenueName::BinanceSpot;
     let channel = Channel::Trades;
     let instruments = vec!["btcusdt".to_string()];
 
@@ -68,7 +68,7 @@ async fn test_integration_binance_spot_agg_trades() {
     let start = utc_datetime!(2025 - 01 - 01 00:00:00);
     let end = utc_datetime!(2025 - 01 - 01 00:01:00);
 
-    let venue = Exchange::BinanceSpot;
+    let venue = VenueName::BinanceSpot;
     let channel = Channel::AggTrades;
     let instruments = vec!["btcusdt".to_string()];
 
@@ -119,7 +119,7 @@ async fn test_integration_binance_spot_book_ticker() {
     let start = utc_datetime!(2024 - 01 - 01 00:00:00);
     let end = utc_datetime!(2024 - 01 - 01 00:01:00);
 
-    let venue = Exchange::BinanceSpot;
+    let venue = VenueName::BinanceSpot;
     let channel = Channel::Ticker;
     let instruments = vec!["btcusdt".to_string()];
 

@@ -192,6 +192,13 @@ impl Persistence {
         }
     }
 
+    pub async fn insert_metric(&self, metric: Arc<Metric>) {
+        if self.mode == InstanceType::Live || self.mode == InstanceType::Utility {
+            let mut lock = self.ctx.buffer.metrics.lock().await;
+            lock.push(metric);
+        }
+    }
+
     pub async fn insert_insights_update(&self, tick: Arc<InsightsUpdate>) {
         if self.mode != InstanceType::Test {
             let insights = if self.only_normalized {
@@ -300,6 +307,34 @@ impl Persistence {
                 }
             });
         }
+
+        let metrics = {
+            let mut lock = self.ctx.buffer.metrics.lock().await;
+            let metrics = std::mem::take(&mut *lock);
+            debug!(target: "persistence", "metric buffer length {}", lock.len());
+            metrics
+        };
+
+        if !metrics.is_empty() {
+            let persistence_ctx = self.ctx.clone();
+            ctx.spawn(async move {
+                debug!(target: "persistence", "flushing {} metrics", metrics.len());
+
+                // Insert the metrics into the database
+                loop {
+                    match metric_store::batch_insert_metric(&persistence_ctx, &metrics).await {
+                        Ok(_) => {
+                            info!(target: "persistence", "successfully flushed {} metrics", metrics.len());
+                            break;
+                        }
+                        Err(e) => {
+                            error!(target: "persistence", "failed to flush metrics: {}", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
+                    }
+                }
+            });
+        }
     }
 }
 
@@ -337,7 +372,7 @@ impl PersistenceReader for Persistence {
         venue_store::read_by_id(&self.ctx, id).await
     }
 
-    async fn get_venue_by_name(&self, name: &str) -> Result<Arc<Venue>, PersistenceError> {
+    async fn get_venue_by_name(&self, name: &VenueName) -> Result<Arc<Venue>, PersistenceError> {
         venue_store::read_by_name(&self.ctx, name).await
     }
 
@@ -351,6 +386,18 @@ impl PersistenceReader for Persistence {
         venue: &Arc<Venue>,
     ) -> Result<Arc<Instrument>, PersistenceError> {
         instrument_store::read_by_venue_symbol(&self.ctx, symbol, venue).await
+    }
+
+    async fn get_instruments_by_venue(&self, venue: &Arc<Venue>) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        instrument_store::list_by_venue(&self.ctx, venue).await
+    }
+
+    async fn get_instruments_by_venue_and_type(
+        &self,
+        venue: &Arc<Venue>,
+        instrument_type: InstrumentType,
+    ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        instrument_store::list_by_venue_and_type(&self.ctx, venue, instrument_type).await
     }
 
     async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {
@@ -408,6 +455,7 @@ impl Runnable for Persistence {
             Event::TickUpdate(t) => self.insert_tick(t).await,
             Event::AggTradeUpdate(t) => self.insert_trade(t).await,
             Event::InsightsUpdate(i) => self.insert_insights_update(i).await,
+            Event::MetricUpdate(i) => self.insert_metric(i).await,
 
             // Ledger
             Event::NewAccount(a) => self.insert_account(a).await,
@@ -443,6 +491,21 @@ impl Runnable for Persistence {
         if let Err(e) = instance_store::insert(&self.ctx, self.ctx.instance.clone()).await {
             error!(target: "persistence", "could not create instance: {}", e)
         }
+
+        // Create tables if not exist
+        if let Err(e) = tick_store::create_table(&self.ctx).await {
+            error!(target: "persistence", "could not create ticks table: {}", e)
+        }
+        if let Err(e) = trade_store::create_table(&self.ctx).await {
+            error!(target: "persistence", "could not create trades table: {}", e)
+        }
+        if let Err(e) = insight_store::create_table(&self.ctx).await {
+            error!(target: "persistence", "could not create insights table: {}", e)
+        }
+        if let Err(e) = metric_store::create_table(&self.ctx).await {
+            error!(target: "persistence", "could not create metrics table: {}", e)
+        }
+        info!(target: "persistence", "service setup complete");
     }
 
     async fn get_tasks(

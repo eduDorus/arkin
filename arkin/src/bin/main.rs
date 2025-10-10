@@ -8,7 +8,9 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 use arkin_accounting::Accounting;
-use arkin_binance::{BinanceExecution, BinanceIngestor, SimBinanceIngestor, SimulationExecutor};
+use arkin_binance::{
+    BinanceExecution, BinanceHistoricalIngestor, BinanceIngestor, SimBinanceIngestor, SimulationExecutor,
+};
 use arkin_cli::{Cli, Commands};
 use arkin_core::prelude::*;
 use arkin_cron::{Cron, CronInterval};
@@ -36,7 +38,48 @@ async fn main() {
     info!("args: {:?}", args);
 
     match args.command {
-        Commands::Download(a) => {
+        Commands::DownloadBinance(a) => {
+            info!("Starting arkin downloader 🚀");
+            let time = LiveSystemTime::new();
+            let pubsub = PubSub::new(true);
+
+            let config = load::<PersistenceConfig>();
+            let instance = Instance::builder()
+                .id(Uuid::from_str("fcdad148-4ecf-4989-89d9-89c21d50f9b1").unwrap())
+                .name("downloader".to_owned())
+                .instance_type(InstanceType::Utility)
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+
+            let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
+
+            let binance_historical_ingestor = Arc::new(
+                BinanceHistoricalIngestor::builder()
+                    .venue(a.venue.clone())
+                    .channel(a.channel.clone())
+                    .start(a.start)
+                    .end(a.end)
+                    .build(),
+            );
+
+            // Create the engine
+            let engine = Engine::builder()
+                .time(time.clone())
+                .pubsub(pubsub.clone())
+                .persistence(persistence.clone())
+                .build();
+            engine.register("pubsub", pubsub, 0, 10, None).await;
+            engine
+                .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
+                .await;
+            engine.register("ingestor", binance_historical_ingestor, 1, 9, None).await;
+
+            // Start the engine
+            engine.start().await;
+            engine.wait_for_shutdown().await;
+        }
+        Commands::DownloadTardis(a) => {
             info!("Starting arkin downloader 🚀");
             let time = LiveSystemTime::new();
 
@@ -52,20 +95,17 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
 
-            let cfg = load::<TardisConfig>();
-            let ingestor = Arc::new(
-                TardisIngestor::builder()
-                    .venue(a.venue.clone())
-                    .channel(a.channel.clone())
-                    .start(a.start)
-                    .end(a.end)
-                    .instruments(a.instruments.clone())
-                    .max_concurrent_requests(cfg.tardis.max_concurrent_requests)
-                    .base_url(cfg.tardis.http_url)
-                    .api_secret(cfg.tardis.api_secret)
-                    .build(),
-            );
+            let venue = persistence.get_venue_by_name(&a.venue).await.unwrap();
+            let instruments = persistence.get_instruments_by_venue(&venue).await.unwrap();
+            let instrument_str = instruments.iter().map(|i| i.venue_symbol.clone()).collect::<Vec<_>>();
+            // Lowercase if exchange is binance
+            let instrument_str = if a.venue.to_string().to_lowercase().contains("binance") {
+                instrument_str.into_iter().map(|s| s.to_lowercase()).collect::<Vec<_>>()
+            } else {
+                instrument_str
+            };
 
+            // Create the engine
             let engine = Engine::builder()
                 .time(time.clone())
                 .pubsub(pubsub.clone())
@@ -75,7 +115,24 @@ async fn main() {
             engine
                 .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
                 .await;
-            engine.register("downloader", ingestor, 1, 9, None).await;
+
+            // Chunk to max 50 instruments per ingestor
+            let cfg = load::<TardisConfig>();
+            for (i, chunk) in instrument_str.chunks(50).enumerate() {
+                let ingestor = Arc::new(
+                    TardisIngestor::builder()
+                        .venue(a.venue.clone())
+                        .channel(a.channel.clone())
+                        .start(a.start)
+                        .end(a.end)
+                        .instruments(chunk.to_vec())
+                        .max_concurrent_requests(cfg.tardis.max_concurrent_requests)
+                        .base_url(cfg.tardis.http_url.clone())
+                        .api_secret(cfg.tardis.api_secret.clone())
+                        .build(),
+                );
+                engine.register(&format!("downloader_{}", i), ingestor, 1, 9, None).await;
+            }
             engine.start().await;
             engine.wait_for_shutdown().await;
         }
@@ -93,7 +150,7 @@ async fn main() {
                 .updated(time.now().await)
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
-            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
             let instruments = persistence
                 .list_instruments_by_venue_symbol(&a.instruments, &venue)
                 .await
@@ -133,7 +190,7 @@ async fn main() {
             let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
 
             let pipeline = persistence.get_pipeline_by_name(&a.pipeline).await.unwrap();
-            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
             let instruments = persistence
                 .list_instruments_by_venue_symbol(&a.instruments, &venue)
                 .await
@@ -187,7 +244,7 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, a.only_normalized, a.only_predictions, a.dry_run);
 
-            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
             let instruments = persistence
                 .list_instruments_by_venue_symbol(&a.instruments, &venue)
                 .await
@@ -263,7 +320,7 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
 
-            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
             let instruments = persistence
                 .list_instruments_by_venue_symbol(&a.instruments, &venue)
                 .await
@@ -351,7 +408,7 @@ async fn main() {
             );
 
             // Executor
-            let sim_venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let sim_venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
             let usdt_asset = persistence.get_asset_by_symbol("usdt").await.unwrap();
             let mut init_balance = HashMap::new();
             init_balance.insert(usdt_asset, dec!(100000));
@@ -462,7 +519,7 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, false);
 
-            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
             let instruments = persistence
                 .list_instruments_by_venue_symbol(&a.instruments, &venue)
                 .await
@@ -606,7 +663,7 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, false);
 
-            let venue = persistence.get_venue_by_name("binance_usdm_futures").await.unwrap();
+            let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
             let instruments = persistence
                 .list_instruments_by_venue_symbol(&a.instruments, &venue)
                 .await

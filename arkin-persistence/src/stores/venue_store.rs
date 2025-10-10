@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use arkin_core::VenueName;
 use uuid::Uuid;
 
 use arkin_core::Venue;
@@ -10,14 +11,14 @@ use crate::{context::PersistenceContext, repos::pg::venues_repo};
 
 async fn update_venue_cache(ctx: &PersistenceContext, venue: Arc<Venue>) {
     ctx.cache.venue_id.insert(venue.id, venue.clone()).await;
-    ctx.cache.venue_name.insert(venue.name.clone(), venue).await;
+    ctx.cache.venue_name.insert(venue.name, venue).await;
 }
 
 async fn read_venue_id_cache(ctx: &PersistenceContext, id: &Uuid) -> Option<Arc<Venue>> {
     ctx.cache.venue_id.get(id).await
 }
 
-async fn read_venue_name_cache(ctx: &PersistenceContext, name: &str) -> Option<Arc<Venue>> {
+async fn read_venue_name_cache(ctx: &PersistenceContext, name: &VenueName) -> Option<Arc<Venue>> {
     ctx.cache.venue_name.get(name).await
 }
 
@@ -38,7 +39,7 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Venue
     }
 }
 
-pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Arc<Venue>, PersistenceError> {
+pub async fn read_by_name(ctx: &PersistenceContext, name: &VenueName) -> Result<Arc<Venue>, PersistenceError> {
     match read_venue_name_cache(ctx, name).await {
         Some(venue) => return Ok(venue),
         None => {

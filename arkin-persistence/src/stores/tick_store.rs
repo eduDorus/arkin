@@ -13,6 +13,10 @@ use arkin_core::PersistenceError;
 
 use crate::{context::PersistenceContext, repos::ch::tick_repo, stores::instrument_store};
 
+pub async fn create_table(ctx: &PersistenceContext) -> Result<(), PersistenceError> {
+    tick_repo::create_table(ctx).await
+}
+
 pub async fn insert(ctx: &PersistenceContext, tick: Arc<Tick>) -> Result<(), PersistenceError> {
     tick_repo::insert(ctx, tick.into()).await?;
     Ok(())

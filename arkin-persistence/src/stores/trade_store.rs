@@ -12,6 +12,10 @@ use arkin_core::PersistenceError;
 
 use crate::{context::PersistenceContext, repos::ch::trade_repo, stores::instrument_store};
 
+pub async fn create_table(ctx: &PersistenceContext) -> Result<(), PersistenceError> {
+    trade_repo::create_table(ctx).await
+}
+
 pub async fn insert(ctx: &PersistenceContext, trade: Arc<AggTrade>) -> Result<(), PersistenceError> {
     trade_repo::insert(ctx, trade.into()).await
 }

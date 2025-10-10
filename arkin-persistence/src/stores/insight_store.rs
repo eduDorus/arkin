@@ -6,6 +6,10 @@ use arkin_core::PersistenceError;
 
 use crate::{context::PersistenceContext, repos::ch::insight_repo};
 
+pub async fn create_table(ctx: &PersistenceContext) -> Result<(), PersistenceError> {
+    insight_repo::create_table(ctx).await
+}
+
 pub async fn insert(ctx: &PersistenceContext, insight: Arc<Insight>) -> Result<(), PersistenceError> {
     insight_repo::insert(ctx, insight.into()).await?;
     Ok(())

@@ -4,7 +4,7 @@ use sqlx::prelude::*;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use arkin_core::{Venue, VenueType};
+use arkin_core::{Venue, VenueName, VenueType};
 
 use arkin_core::PersistenceError;
 
@@ -23,7 +23,7 @@ impl From<Arc<Venue>> for VenueDTO {
     fn from(venue: Arc<Venue>) -> Self {
         Self {
             id: venue.id,
-            name: venue.name.clone(),
+            name: venue.name.to_string(),
             venue_type: venue.venue_type.clone(),
             created: venue.created.into(),
             updated: venue.updated.into(),
@@ -35,7 +35,7 @@ impl From<VenueDTO> for Venue {
     fn from(venue: VenueDTO) -> Self {
         Self {
             id: venue.id,
-            name: venue.name,
+            name: venue.name.parse().expect("Invalid VenueName"),
             venue_type: venue.venue_type,
             created: venue.created.into(),
             updated: venue.updated.into(),
@@ -90,7 +90,7 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<VenueDTO,
     }
 }
 
-pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<VenueDTO, PersistenceError> {
+pub async fn read_by_name(ctx: &PersistenceContext, name: &VenueName) -> Result<VenueDTO, PersistenceError> {
     let id = sqlx::query_as!(
         VenueDTO,
         r#"
@@ -103,7 +103,7 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<VenueD
             FROM venues
             WHERE name = $1
             "#,
-        name,
+        name.to_string(),
     )
     .fetch_optional(&ctx.pg_pool)
     .await?;

@@ -17,7 +17,7 @@ async fn test_integration_bybit_spot_trades() {
     let start = utc_datetime!(2024 - 01 - 01 00:00:00);
     let end = utc_datetime!(2024 - 01 - 01 00:01:00);
 
-    let venue = Exchange::BybitSpot;
+    let venue = VenueName::BybitSpot;
     let channel = Channel::Trades;
     let instruments = vec!["BTCUSDT".to_string()];
 
@@ -68,7 +68,7 @@ async fn test_integration_bybit_spot_book_ticker() {
     let start = utc_datetime!(2024 - 01 - 01 00:00:00);
     let end = utc_datetime!(2024 - 01 - 01 00:01:00);
 
-    let venue = Exchange::BybitSpot;
+    let venue = VenueName::BybitSpot;
     let channel = Channel::Ticker;
     let instruments = vec!["BTCUSDT".to_string()];
 
@@ -111,8 +111,10 @@ async fn test_integration_bybit_spot_book_ticker() {
                 // Validate the tick data
                 match stream_event.data {
                     ExchangeEventData::Tick(tick) => {
-                        info!("Debug - tick values: bid_price={}, bid_quantity={}, ask_price={}, ask_quantity={}",
-                              tick.bid_price, tick.bid_quantity, tick.ask_price, tick.ask_quantity);
+                        info!(
+                            "Debug - tick values: bid_price={}, bid_quantity={}, ask_price={}, ask_quantity={}",
+                            tick.bid_price, tick.bid_quantity, tick.ask_price, tick.ask_quantity
+                        );
                         assert!(tick.bid_price > rust_decimal::Decimal::ZERO);
                         assert!(tick.bid_quantity >= rust_decimal::Decimal::ZERO);
                         assert!(tick.ask_price > rust_decimal::Decimal::ZERO);
@@ -135,8 +137,9 @@ async fn test_integration_bybit_spot_book_ticker() {
                 // Log the raw JSON for debugging
                 info!("Failed to parse JSON: {}", json);
                 // Skip delta messages with incomplete data - this is expected
-                if e.to_string().contains("Skipping Bybit orderbook delta message") ||
-                   e.to_string().contains("Invalid orderbook data") {
+                if e.to_string().contains("Skipping Bybit orderbook delta message")
+                    || e.to_string().contains("Invalid orderbook data")
+                {
                     continue;
                 } else {
                     panic!("Failed to parse stream event: {}", e);
@@ -155,7 +158,7 @@ async fn test_integration_bybit_derivatives_trades() {
     let start = utc_datetime!(2024 - 01 - 01 00:00:00);
     let end = utc_datetime!(2024 - 01 - 01 00:01:00);
 
-    let venue = Exchange::BybitDerivatives;
+    let venue = VenueName::BybitDerivatives;
     let channel = Channel::Trades;
     let instruments = vec!["BTCUSDT".to_string()];
 
@@ -206,7 +209,7 @@ async fn test_integration_bybit_derivatives_book_ticker() {
     let start = utc_datetime!(2024 - 01 - 01 00:00:00);
     let end = utc_datetime!(2024 - 01 - 01 00:01:00);
 
-    let venue = Exchange::BybitDerivatives;
+    let venue = VenueName::BybitDerivatives;
     let channel = Channel::Ticker;
     let instruments = vec!["BTCUSDT".to_string()];
 
@@ -269,8 +272,9 @@ async fn test_integration_bybit_derivatives_book_ticker() {
             }
             Err(e) => {
                 // Skip delta messages with incomplete data - this is expected
-                if e.to_string().contains("Skipping Bybit orderbook delta message") ||
-                   e.to_string().contains("Invalid orderbook data") {
+                if e.to_string().contains("Skipping Bybit orderbook delta message")
+                    || e.to_string().contains("Invalid orderbook data")
+                {
                     continue;
                 } else {
                     panic!("Failed to parse stream event: {}", e);

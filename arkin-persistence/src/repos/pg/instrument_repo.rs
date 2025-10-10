@@ -186,3 +186,90 @@ pub async fn read_by_venue_symbol(
         None => Err(PersistenceError::NotFound),
     }
 }
+
+pub async fn list_by_venue(
+    ctx: &PersistenceContext,
+    venue: &Arc<Venue>,
+) -> Result<Vec<InstrumentDTO>, PersistenceError> {
+    debug!("Instrument repo listing instruments by venue: {}", venue.name);
+    let instruments = sqlx::query_as!(
+        InstrumentDTO,
+        r#"
+            SELECT
+                id,
+                venue_id,
+                symbol,
+                venue_symbol,
+                instrument_type AS "instrument_type:InstrumentType",
+                base_asset_id,
+                quote_asset_id,
+                margin_asset_id,
+                strike,
+                maturity,
+                option_type AS "option_type:InstrumentOptionType",
+                contract_size,
+                price_precision,
+                quantity_precision,
+                base_precision,
+                quote_precision,
+                lot_size,
+                tick_size,
+                status AS "status:InstrumentStatus",
+                created,
+                updated
+            FROM instruments
+            WHERE venue_id = $1
+            "#,
+        venue.id as Uuid,
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+
+    Ok(instruments)
+}
+
+pub async fn list_by_venue_and_type(
+    ctx: &PersistenceContext,
+    venue: &Arc<Venue>,
+    instrument_type: InstrumentType,
+) -> Result<Vec<InstrumentDTO>, PersistenceError> {
+    debug!(
+        "Instrument repo listing instruments by venue: {} and type: {:?}",
+        venue.name, instrument_type
+    );
+    let instruments = sqlx::query_as!(
+        InstrumentDTO,
+        r#"
+            SELECT
+                id,
+                venue_id,
+                symbol,
+                venue_symbol,
+                instrument_type AS "instrument_type:InstrumentType",
+                base_asset_id,
+                quote_asset_id,
+                margin_asset_id,
+                strike,
+                maturity,
+                option_type AS "option_type:InstrumentOptionType",
+                contract_size,
+                price_precision,
+                quantity_precision,
+                base_precision,
+                quote_precision,
+                lot_size,
+                tick_size,
+                status AS "status:InstrumentStatus",
+                created,
+                updated
+            FROM instruments
+            WHERE venue_id = $1 AND instrument_type = $2
+            "#,
+        venue.id as Uuid,
+        instrument_type as InstrumentType,
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+
+    Ok(instruments)
+}

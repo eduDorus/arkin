@@ -15,7 +15,13 @@ cargo run -r download --instruments BTCUSDT,SOLUSDT,ETHUSDT --venue binance-usdm
 cargo run -r download --instruments BTCUSDT,SOLUSDT,ETHUSDT --venue binance-usdm --channel ticks --start '2025-04-22 00:00' --end '2025-06-06 00:00'
 ```
 
+#### BINANCE SPOT
+cargo run -r download -v binance-usdm-futures -c agg-trades -i spot --start "2024-09-01 00:00" --end "2025-09-01 01:00" --dry-run
 
+#### BINANCE PERPETUAL
+cargo run -r download -v binance-usdm-futures -c agg-trades -i perpetual --start "2024-09-01 00:00" --end "2025-09-01 01:00" --dry-run
+
+#### OKX SPOT
 
 # Persistence
 

@@ -12,7 +12,7 @@ use arkin_core::PersistenceError;
 
 use crate::context::PersistenceContext;
 
-const TABLE_NAME: &str = "trades";
+const TABLE_NAME: &str = "agg_trades";
 
 #[derive(Debug, Serialize, Deserialize, Row)]
 pub struct TradeClickhouseDTO {
@@ -48,14 +48,14 @@ pub async fn create_table(ctx: &PersistenceContext) -> Result<(), PersistenceErr
             CREATE TABLE IF NOT EXISTS ?
             (
                 event_time     DateTime64(3, 'UTC') CODEC(Delta, ZSTD(3)),
-                instrument_id  UUID CODEC(ZSTD(3)),
+                instrument_id  LowCardinality(UUID) CODEC(ZSTD(3)),
                 trade_id       UInt64 CODEC(Delta, ZSTD(3)),
                 side           Int8 CODEC(ZSTD(3)),
-                price          Decimal(18, 8) CODEC(GCD, ZSTD(3)),
-                quantity       Decimal(18, 8) CODEC(GCD, ZSTD(3))
+                price          Decimal(18, 8) CODEC(ZSTD(3)),
+                quantity       Decimal(18, 8) CODEC(ZSTD(3))
             )
             ENGINE = ReplacingMergeTree
-            PARTITION BY toYYYYMMDD(event_time)
+            PARTITION BY toYYYYMM(event_time)
             ORDER BY (instrument_id, event_time, trade_id)
             SETTINGS index_granularity = 8192;
             ",

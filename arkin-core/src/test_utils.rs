@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::{
     utils::Frequency, AggTrade, Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus,
     InstrumentType, PersistenceError, PersistenceReader, Pipeline, Price, PubSub, Publisher, Quantity, Strategy,
-    SystemTime, Tick, Venue, VenueType,
+    SystemTime, Tick, Venue, VenueName, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -154,12 +154,14 @@ impl PersistenceReader for MockPersistence {
     async fn get_pipeline_by_name(&self, _name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
         Ok(test_pipeline())
     }
+
     async fn get_venue_by_id(&self, _id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {
         Ok(test_binance_venue())
     }
-    async fn get_venue_by_name(&self, _name: &str) -> Result<Arc<Venue>, PersistenceError> {
+    async fn get_venue_by_name(&self, _name: &VenueName) -> Result<Arc<Venue>, PersistenceError> {
         Ok(test_binance_venue())
     }
+
     async fn get_instrument_by_id(&self, _id: &Uuid) -> Result<Arc<Instrument>, PersistenceError> {
         Ok(test_inst_binance_btc_usdt_perp())
     }
@@ -170,6 +172,17 @@ impl PersistenceReader for MockPersistence {
     ) -> Result<Arc<Instrument>, PersistenceError> {
         Ok(test_inst_binance_btc_usdt_perp())
     }
+    async fn get_instruments_by_venue(&self, _venue: &Arc<Venue>) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        todo!()
+    }
+    async fn get_instruments_by_venue_and_type(
+        &self,
+        _venue: &Arc<Venue>,
+        _instrument_type: InstrumentType,
+    ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        todo!()
+    }
+
     async fn get_asset_by_id(&self, _id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {
         Ok(test_usdt_asset())
     }
@@ -271,7 +284,7 @@ pub fn test_bnb_asset() -> Arc<Asset> {
 pub fn test_binance_venue() -> Arc<Venue> {
     let venue = Venue::builder()
         .id(Uuid::parse_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID"))
-        .name("Binance".into())
+        .name(VenueName::BinanceUsdmFutures)
         .venue_type(VenueType::Cex)
         .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
@@ -282,7 +295,7 @@ pub fn test_binance_venue() -> Arc<Venue> {
 pub fn test_personal_venue() -> Arc<Venue> {
     let venue = Venue::builder()
         .id(Uuid::parse_str("b8b9dcf2-77ea-4d24-964e-8243bb7298ea").expect("Invalid UUID"))
-        .name("Personal".into())
+        .name(VenueName::Personal)
         .venue_type(VenueType::Otc)
         .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())

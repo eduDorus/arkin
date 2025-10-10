@@ -301,6 +301,7 @@ mod tests {
 
     #[tokio::test]
     #[test_log::test]
+    #[ignore = "Long running test, only run manually"]
     async fn subscribe_user_stream() -> Result<()> {
         // Load credentials from env
         let api_key = env::var("API_KEY").expect("API_KEY must be set in the environment");
@@ -408,6 +409,7 @@ mod tests {
 
     #[tokio::test]
     #[test_log::test]
+    #[ignore = "Long running test, only run manually"]
     async fn subscribe_binance_agg_trades() -> Result<()> {
         // Build WebSocket Streams config
         let ws_streams_conf = ConfigurationWebsocketStreams::builder().mode(WebsocketMode::Pool(3)).build();

@@ -4,7 +4,7 @@ use strum::{Display, EnumDiscriminants, EnumIter};
 use time::UtcDateTime;
 
 use crate::{
-    Account, AggTrade, Book, ExecutionOrder, InsightsTick, InsightsUpdate, Tick, Transfer, TransferBatch,
+    Account, AggTrade, Book, ExecutionOrder, InsightsTick, InsightsUpdate, Metric, Tick, Transfer, TransferBatch,
     VenueAccountUpdate, VenueOrder, VenueTradeUpdate,
 };
 
@@ -17,6 +17,7 @@ pub enum Event {
     TickUpdate(Arc<Tick>),
     AggTradeUpdate(Arc<AggTrade>),
     BookUpdate(Arc<Book>),
+    MetricUpdate(Arc<Metric>),
 
     // Accounting
     InitialAccountUpdate(Arc<VenueAccountUpdate>),
@@ -81,6 +82,7 @@ impl Event {
             Event::TickUpdate(event) => event.event_time,
             Event::AggTradeUpdate(event) => event.event_time,
             Event::BookUpdate(event) => event.event_time,
+            Event::MetricUpdate(event) => event.event_time,
 
             // Accounting
             Event::InitialAccountUpdate(event) => event.event_time,
@@ -141,7 +143,10 @@ impl Event {
 
 impl EventType {
     pub fn is_market_data(&self) -> bool {
-        matches!(self, EventType::TickUpdate | EventType::AggTradeUpdate | EventType::BookUpdate)
+        matches!(
+            self,
+            EventType::TickUpdate | EventType::AggTradeUpdate | EventType::BookUpdate | EventType::MetricUpdate
+        )
     }
 
     pub fn is_insight(&self) -> bool {
@@ -167,6 +172,7 @@ impl EventType {
             EventType::TickUpdate
                 | EventType::AggTradeUpdate
                 | EventType::InsightsUpdate
+                | EventType::MetricUpdate
                 | EventType::NewAccount
                 | EventType::NewTransfer
                 | EventType::NewTransferBatch

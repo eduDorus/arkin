@@ -11,7 +11,7 @@ use crate::{Maturity, Price};
 
 use super::{Asset, Venue};
 
-#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, clap::ValueEnum)]
 #[sqlx(type_name = "instrument_type", rename_all = "snake_case")]
 pub enum InstrumentType {
     Spot,

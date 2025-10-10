@@ -6,8 +6,8 @@ use time::UtcDateTime;
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, CoreCtx, Event, Instance, Instrument, PersistenceError, Pipeline, ServiceCtx,
-    Tick, Venue,
+    utils::Frequency, AggTrade, Asset, CoreCtx, Event, Instance, Instrument, InstrumentType, PersistenceError,
+    Pipeline, ServiceCtx, Tick, Venue, VenueName,
 };
 
 #[async_trait]
@@ -27,14 +27,26 @@ pub trait PersistenceReader: Send + Sync {
     async fn get_instance_by_name(&self, name: &str) -> Result<Arc<Instance>, PersistenceError>;
     async fn get_pipeline_by_id(&self, id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError>;
     async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError>;
+
+    // Venues
     async fn get_venue_by_id(&self, id: &Uuid) -> Result<Arc<Venue>, PersistenceError>;
-    async fn get_venue_by_name(&self, name: &str) -> Result<Arc<Venue>, PersistenceError>;
+    async fn get_venue_by_name(&self, name: &VenueName) -> Result<Arc<Venue>, PersistenceError>;
+
+    // Instruments
     async fn get_instrument_by_id(&self, id: &Uuid) -> Result<Arc<Instrument>, PersistenceError>;
     async fn get_instrument_by_venue_symbol(
         &self,
         symbol: &str,
         venue: &Arc<Venue>,
     ) -> Result<Arc<Instrument>, PersistenceError>;
+    async fn get_instruments_by_venue(&self, venue: &Arc<Venue>) -> Result<Vec<Arc<Instrument>>, PersistenceError>;
+    async fn get_instruments_by_venue_and_type(
+        &self,
+        venue: &Arc<Venue>,
+        instrument_type: InstrumentType,
+    ) -> Result<Vec<Arc<Instrument>>, PersistenceError>;
+
+    // Assets
     async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError>;
     async fn get_asset_by_symbol(&self, symbol: &str) -> Result<Arc<Asset>, PersistenceError>;
     async fn list_trades(

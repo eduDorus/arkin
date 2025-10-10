@@ -125,3 +125,30 @@ pub async fn read_by_venue_symbol(
         }
     }
 }
+
+pub async fn list_by_venue(
+    ctx: &PersistenceContext,
+    venue: &Arc<Venue>,
+) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+    let instrument_dtos = instrument_repo::list_by_venue(ctx, venue).await?;
+    let mut instruments = Vec::with_capacity(instrument_dtos.len());
+    for dto in &instrument_dtos {
+        let instrument = read_by_id(ctx, &dto.id).await?;
+        instruments.push(instrument);
+    }
+    Ok(instruments)
+}
+
+pub async fn list_by_venue_and_type(
+    ctx: &PersistenceContext,
+    venue: &Arc<Venue>,
+    instrument_type: arkin_core::InstrumentType,
+) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+    let instrument_dtos = instrument_repo::list_by_venue_and_type(ctx, venue, instrument_type).await?;
+    let mut instruments = Vec::with_capacity(instrument_dtos.len());
+    for dto in &instrument_dtos {
+        let instrument = read_by_id(ctx, &dto.id).await?;
+        instruments.push(instrument);
+    }
+    Ok(instruments)
+}
