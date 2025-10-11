@@ -183,7 +183,7 @@ pub fn construct_urls(
                     // Strip _PERP or _USD suffixes for futures symbols
                     let venue_symbol =
                         if exchange == VenueName::BinanceCoinmFutures && channel == Channel::IndexPriceKlines {
-                            instrument.venue_symbol.replace("_perp", "")
+                            instrument.venue_symbol.replace("_PERP", "")
                         } else {
                             instrument.venue_symbol.clone()
                         };

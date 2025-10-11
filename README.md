@@ -15,11 +15,18 @@ cargo run -r download --instruments BTCUSDT,SOLUSDT,ETHUSDT --venue binance-usdm
 cargo run -r download --instruments BTCUSDT,SOLUSDT,ETHUSDT --venue binance-usdm --channel ticks --start '2025-04-22 00:00' --end '2025-06-06 00:00'
 ```
 
-#### BINANCE SPOT
-cargo run -r download -v binance-usdm-futures -c agg-trades -i spot --start "2024-09-01 00:00" --end "2025-09-01 01:00" --dry-run
+#### Binance
+RUST_LOG=info cargo run -r download-binance -v binance-spot -c agg-trades --start "2024-01-01 00:00" --end "2025-10-08 00:00"
 
-#### BINANCE PERPETUAL
-cargo run -r download -v binance-usdm-futures -c agg-trades -i perpetual --start "2024-09-01 00:00" --end "2025-09-01 01:00" --dry-run
+RUST_LOG=info cargo run -r download-binance -v binance-usdm-futures -c agg-trades --start "2024-01-01 00:00" --end "2025-10-08 00:00"
+RUST_LOG=info cargo run -r download-binance -v binance-usdm-futures -c metrics --start "2024-01-01 00:00" --end "2025-10-08 00:00"
+RUST_LOG=info cargo run -r download-binance -v binance-usdm-futures -c mark-price-klines --start "2024-01-01 00:00" --end "2025-10-08 00:00"
+RUST_LOG=info cargo run -r download-binance -v binance-usdm-futures -c index-price-klines --start "2024-01-01 00:00" --end "2025-10-08 00:00"
+
+RUST_LOG=info cargo run -r download-binance -v binance-coinm-futures -c agg-trades --start "2024-01-01 00:00" --end "2025-10-08 00:00"
+RUST_LOG=info cargo run -r download-binance -v binance-coinm-futures -c metrics --start "2024-01-01 00:00" --end "2025-10-08 00:00"
+RUST_LOG=info cargo run -r download-binance -v binance-coinm-futures -c mark-price-klines --start "2024-01-01 00:00" --end "2025-10-08 00:00"
+RUST_LOG=info cargo run -r download-binance -v binance-coinm-futures -c index-price-klines --start "2024-01-01 00:00" --end "2025-10-08 00:00"
 
 #### OKX SPOT
 
