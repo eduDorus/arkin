@@ -60,14 +60,14 @@ pub async fn create_table(ctx: &PersistenceContext) -> Result<(), PersistenceErr
 
 pub async fn insert(ctx: &PersistenceContext, metric: MetricsClickhouseDTO) -> Result<(), PersistenceError> {
     info!(target: "persistence", "inserting metric: {:?}", metric);
-    let mut insert = ctx.ch_client.insert(TABLE_NAME)?;
+    let mut insert = ctx.ch_client.insert::<MetricsClickhouseDTO>(TABLE_NAME).await?;
     insert.write(&metric).await?;
     insert.end().await?;
     Ok(())
 }
 
 pub async fn insert_batch(ctx: &PersistenceContext, metrics: &[MetricsClickhouseDTO]) -> Result<(), PersistenceError> {
-    let mut insert = ctx.ch_client.insert(TABLE_NAME)?;
+    let mut insert = ctx.ch_client.insert::<MetricsClickhouseDTO>(TABLE_NAME).await?;
     for metric in metrics {
         insert.write(metric).await?;
     }

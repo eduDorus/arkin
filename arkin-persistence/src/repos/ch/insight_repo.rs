@@ -64,14 +64,14 @@ pub async fn create_table(ctx: &PersistenceContext) -> Result<(), PersistenceErr
 }
 
 pub async fn insert(ctx: &PersistenceContext, insight: InsightClickhouseDTO) -> Result<(), PersistenceError> {
-    let mut insert = ctx.ch_client.insert(TABLE_NAME)?;
+    let mut insert = ctx.ch_client.insert::<InsightClickhouseDTO>(TABLE_NAME).await?;
     insert.write(&insight).await?;
     insert.end().await?;
     Ok(())
 }
 
 pub async fn insert_batch(ctx: &PersistenceContext, insights: &[InsightClickhouseDTO]) -> Result<(), PersistenceError> {
-    let mut insert = ctx.ch_client.insert(TABLE_NAME)?;
+    let mut insert = ctx.ch_client.insert::<InsightClickhouseDTO>(TABLE_NAME).await?;
     for insight in insights {
         insert.write(insight).await?;
     }

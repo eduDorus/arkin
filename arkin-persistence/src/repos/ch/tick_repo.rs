@@ -72,14 +72,14 @@ pub async fn create_table(ctx: &PersistenceContext) -> Result<(), PersistenceErr
 }
 
 pub async fn insert(ctx: &PersistenceContext, tick: TickClickhouseDTO) -> Result<(), PersistenceError> {
-    let mut insert = ctx.ch_client.insert(TABLE_NAME)?;
+    let mut insert = ctx.ch_client.insert::<TickClickhouseDTO>(TABLE_NAME).await?;
     insert.write(&tick).await?;
     insert.end().await?;
     Ok(())
 }
 
 pub async fn insert_batch(ctx: &PersistenceContext, ticks: &[TickClickhouseDTO]) -> Result<(), PersistenceError> {
-    let mut insert = ctx.ch_client.insert(TABLE_NAME)?;
+    let mut insert = ctx.ch_client.insert::<TickClickhouseDTO>(TABLE_NAME).await?;
     for tick in ticks {
         insert.write(tick).await?;
     }
