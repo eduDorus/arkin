@@ -41,13 +41,13 @@ impl Insights {
 
     pub async fn insert(&self, insight: Arc<Insight>) -> Result<(), InsightsError> {
         debug!(target: "insights", "insert to state");
-        self.state.insert(insight);
+        self.state.insert_buffered(insight).await;
         Ok(())
     }
 
     pub async fn insert_batch(&self, insights: &[Arc<Insight>]) {
         debug!(target: "insights", "insert to state {} insights", insights.len());
-        self.state.insert_batch(insights);
+        self.state.insert_batch_buffered(insights).await;
     }
 
     pub async fn warmup_tick(&self, ctx: Arc<CoreCtx>, tick: &InsightsTick) {

@@ -8,7 +8,7 @@ mod math;
 mod pipeline;
 mod service;
 mod state;
-mod ta;
+// mod ta;
 mod traits;
 
 pub use errors::*;

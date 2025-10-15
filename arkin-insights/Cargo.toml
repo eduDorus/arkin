@@ -21,13 +21,13 @@ rayon = { workspace = true }
 kanal = { workspace = true }
 rust_decimal = { workspace = true }
 uuid = { workspace = true }
-yata = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 typed-builder = { workspace = true }
 statrs = { workspace = true }
 strum = { workspace = true }
 parking_lot = { workspace = true }
+rand = { workspace = true }
 # ort = { workspace = true }
 # ndarray = { workspace = true }
 # rustfft = "6.4.0"
@@ -37,3 +37,8 @@ parking_lot = { workspace = true }
 
 [dev-dependencies]
 test-log = { workspace = true }
+criterion = { version = "0.7", features = [ "html_reports", "async_tokio" ] }
+
+[[bench]]
+name = "storage_bench"
+harness = false

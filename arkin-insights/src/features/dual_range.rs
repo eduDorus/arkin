@@ -50,7 +50,7 @@ impl Feature for DualRangeFeature {
         let data_1 = match self.data {
             RangeData::Interval(i) => {
                 self.insight_state
-                    .intervals(Some(instrument.clone()), self.input_1.clone(), event_time, i)
+                    .last_n(Some(instrument.clone()), self.input_1.clone(), event_time, i)
             }
             RangeData::Window(w) => self.insight_state.window(
                 Some(instrument.clone()),
@@ -62,7 +62,7 @@ impl Feature for DualRangeFeature {
         let data_2 = match self.data {
             RangeData::Interval(i) => {
                 self.insight_state
-                    .intervals(Some(instrument.clone()), self.input_2.clone(), event_time, i)
+                    .last_n(Some(instrument.clone()), self.input_2.clone(), event_time, i)
             }
             RangeData::Window(w) => self.insight_state.window(
                 Some(instrument.clone()),

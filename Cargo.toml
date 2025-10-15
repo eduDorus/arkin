@@ -41,12 +41,11 @@ tokio-util = { version = "0.7", features = [ "rt", "time" ] }
 
 # HTTP & Websockets
 tokio-rustls = { version = "0.26", features = [ "ring" ], default-features = false }
-# async-tungstenite = { version = "0.29", features = [ "tokio-runtime", "tokio-rustls-webpki-roots" ], default-features = false }
 tokio-tungstenite = { version = "0.28", features = [ "rustls-tls-webpki-roots" ] }
 reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "http2", "gzip", "socks", "hickory-dns", "multipart" ], default-features = false }
 
 # Data Types
-rust_decimal = { version = "1.38", features = [ "maths", "serde", "std", "macros" ], default-features = false }
+rust_decimal = { version = "1.39", features = [ "maths", "serde", "std", "macros" ], default-features = false }
 bytes = "1.10"
 
 # Data Structures
@@ -59,7 +58,7 @@ serde_with = { version = "3" }
 
 # Database
 sqlx = { version = "0.8", features = [ "runtime-tokio", "postgres", "time", "rust_decimal", "uuid", "derive", "macros" ], default-features = false }
-clickhouse = { version = "0.13", features = [ "lz4", "uuid", "time" ] }
+clickhouse = { version = "0.14", features = [ "lz4", "uuid", "time" ] }
 
 # Time
 time = { version = "0.3", features = [ "macros", "serde-human-readable" ] }
@@ -86,7 +85,7 @@ petgraph = { version = "0.8", features = [ "graphmap" ], default-features = fals
 moka2 = { version = "0.13.0", features = [ "future" ] }
 
 # TA
-yata = "0.7"
+#yata = "0.7"
 
 # GRPC
 tonic = { version = "0.14", features = [ "gzip" ] }

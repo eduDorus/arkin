@@ -9,10 +9,10 @@ use crate::{
         RangeFeature, RobustScaler, TimeFeature, TwoValueFeature,
     },
     state::InsightsState,
-    ta::{
-        AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
-        RelativeStrengthIndexFeature,
-    },
+    // ta::{
+    //     AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
+    //     RelativeStrengthIndexFeature,
+    // },
     Feature,
 };
 
@@ -111,58 +111,58 @@ impl FeatureFactory {
                             .persist(c.persist)
                             .build(),
                     ),
-                    FeatureConfig::MA(c) => Arc::new(
-                        MovingAverageFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .ma_type(c.ma_type.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .periods(c.periods)
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::RSI(c) => Arc::new(
-                        RelativeStrengthIndexFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .periods(c.periods)
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::ADX(c) => Arc::new(
-                        AverageDirectionalIndexFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .periods(c.periods)
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::CMF(c) => Arc::new(
-                        ChaikinMoneyFlowFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .periods(c.periods)
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::CO(c) => Arc::new(
-                        ChaikinOscillatorFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .periods_fast(c.periods_fast)
-                            .periods_slow(c.periods_slow)
-                            .persist(c.persist)
-                            .build(),
-                    ),
+                    // FeatureConfig::MA(c) => Arc::new(
+                    //     MovingAverageFeature::builder()
+                    //         .pipeline(pipeline.clone())
+                    //         .insight_state(state.clone())
+                    //         .ma_type(c.ma_type.clone())
+                    //         .input(c.input.clone())
+                    //         .output(c.output.clone())
+                    //         .periods(c.periods)
+                    //         .persist(c.persist)
+                    //         .build(),
+                    // ),
+                    // FeatureConfig::RSI(c) => Arc::new(
+                    //     RelativeStrengthIndexFeature::builder()
+                    //         .pipeline(pipeline.clone())
+                    //         .insight_state(state.clone())
+                    //         .input(c.input.clone())
+                    //         .output(c.output.clone())
+                    //         .periods(c.periods)
+                    //         .persist(c.persist)
+                    //         .build(),
+                    // ),
+                    // FeatureConfig::ADX(c) => Arc::new(
+                    //     AverageDirectionalIndexFeature::builder()
+                    //         .pipeline(pipeline.clone())
+                    //         .insight_state(state.clone())
+                    //         .input(c.input.clone())
+                    //         .output(c.output.clone())
+                    //         .periods(c.periods)
+                    //         .persist(c.persist)
+                    //         .build(),
+                    // ),
+                    // FeatureConfig::CMF(c) => Arc::new(
+                    //     ChaikinMoneyFlowFeature::builder()
+                    //         .pipeline(pipeline.clone())
+                    //         .insight_state(state.clone())
+                    //         .input(c.input.clone())
+                    //         .output(c.output.clone())
+                    //         .periods(c.periods)
+                    //         .persist(c.persist)
+                    //         .build(),
+                    // ),
+                    // FeatureConfig::CO(c) => Arc::new(
+                    //     ChaikinOscillatorFeature::builder()
+                    //         .pipeline(pipeline.clone())
+                    //         .insight_state(state.clone())
+                    //         .input(c.input.clone())
+                    //         .output(c.output.clone())
+                    //         .periods_fast(c.periods_fast)
+                    //         .periods_slow(c.periods_slow)
+                    //         .persist(c.persist)
+                    //         .build(),
+                    // ),
                     FeatureConfig::Normalize(c) => {
                         let transformer =
                             QuantileTransformer::new(&pipeline, DistributionType::Normal, &c.data_location);
