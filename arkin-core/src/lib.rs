@@ -1,3 +1,4 @@
+mod barrier;
 mod constants;
 mod engine;
 mod errors;
@@ -12,6 +13,7 @@ mod traits;
 mod types;
 mod utils;
 
+pub use barrier::*;
 pub use engine::*;
 pub use errors::*;
 pub use events::*;
@@ -31,6 +33,7 @@ pub mod triton {
 }
 
 pub mod prelude {
+    pub use crate::barrier::*;
     pub use crate::constants::*;
     pub use crate::engine::*;
     pub use crate::errors::*;

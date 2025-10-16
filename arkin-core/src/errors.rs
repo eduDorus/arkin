@@ -10,4 +10,7 @@ pub enum PersistenceError {
 
     #[error("Entity not found")]
     NotFound,
+
+    #[error("Other error: {0}")]
+    Other(String),
 }

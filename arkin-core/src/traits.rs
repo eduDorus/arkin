@@ -6,8 +6,8 @@ use time::UtcDateTime;
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, CoreCtx, Event, Instance, Instrument, InstrumentType, PersistenceError,
-    Pipeline, ServiceCtx, Tick, Venue, VenueName,
+    utils::Frequency, AggTrade, Asset, CoreCtx, Event, Instance, Instrument, InstrumentType, MetricType,
+    PersistenceError, Pipeline, ServiceCtx, Tick, Venue, VenueName,
 };
 
 #[async_trait]
@@ -49,21 +49,25 @@ pub trait PersistenceReader: Send + Sync {
     // Assets
     async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError>;
     async fn get_asset_by_symbol(&self, symbol: &str) -> Result<Arc<Asset>, PersistenceError>;
+
     async fn list_trades(
         &self,
         instruments: &[Arc<Instrument>],
         start: UtcDateTime,
         end: UtcDateTime,
     ) -> Result<Vec<Arc<AggTrade>>, PersistenceError>;
-    async fn trade_stream_range_buffered(
+
+    async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError>;
+
+    async fn agg_trade_stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
         start: UtcDateTime,
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> Result<Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>, PersistenceError>;
-    async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError>;
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError>;
+
     async fn tick_stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
@@ -71,7 +75,17 @@ pub trait PersistenceReader: Send + Sync {
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> Result<Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>, PersistenceError>;
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError>;
+
+    async fn metric_stream_range_buffered(
+        &self,
+        instruments: &[Arc<Instrument>],
+        metric_type: MetricType,
+        start: UtcDateTime,
+        end: UtcDateTime,
+        buffer_size: usize,
+        frequency: Frequency,
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError>;
 }
 
 /// A trait for defining the lifecycle of a service in the system.

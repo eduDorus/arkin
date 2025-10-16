@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, AssetType, Event, Instance, InstanceType, Instrument, InstrumentStatus,
+    utils::Frequency, AggTrade, Asset, AssetType, MetricType, Event, Instance, InstanceType, Instrument, InstrumentStatus,
     InstrumentType, PersistenceError, PersistenceReader, Pipeline, Price, PubSub, Publisher, Quantity, Strategy,
     SystemTime, Tick, Venue, VenueName, VenueType,
 };
@@ -197,16 +197,6 @@ impl PersistenceReader for MockPersistence {
     ) -> Result<Vec<Arc<AggTrade>>, PersistenceError> {
         todo!()
     }
-    async fn trade_stream_range_buffered(
-        &self,
-        _instruments: &[Arc<Instrument>],
-        _start: UtcDateTime,
-        _end: UtcDateTime,
-        _buffer_size: usize,
-        _frequency: Frequency,
-    ) -> Result<Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>, PersistenceError> {
-        todo!()
-    }
     async fn get_last_tick(&self, _instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError> {
         Ok(Some(test_tick(
             test_inst_binance_btc_usdt_perp(),
@@ -216,6 +206,18 @@ impl PersistenceReader for MockPersistence {
             dec!(0.3),
         )))
     }
+
+    async fn agg_trade_stream_range_buffered(
+        &self,
+        _instruments: &[Arc<Instrument>],
+        _start: UtcDateTime,
+        _end: UtcDateTime,
+        _buffer_size: usize,
+        _frequency: Frequency,
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError> {
+        todo!()
+    }
+
     async fn tick_stream_range_buffered(
         &self,
         _instruments: &[Arc<Instrument>],
@@ -223,7 +225,19 @@ impl PersistenceReader for MockPersistence {
         _end: UtcDateTime,
         _buffer_size: usize,
         _frequency: Frequency,
-    ) -> Result<Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>, PersistenceError> {
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError> {
+        todo!()
+    }
+
+    async fn metric_stream_range_buffered(
+        &self,
+        _instruments: &[Arc<Instrument>],
+        _metric_type: MetricType,
+        _start: UtcDateTime,
+        _end: UtcDateTime,
+        _buffer_size: usize,
+        _frequency: Frequency,
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError> {
         todo!()
     }
 }

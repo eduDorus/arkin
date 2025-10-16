@@ -1,16 +1,15 @@
 use std::{cmp::max, collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
+use arkin_sim_ingestor::{ReplayTask, SimIngestor};
 use clap::Parser;
 use rust_decimal::dec;
 use time::macros::datetime;
 use tokio_rustls::rustls::crypto::{ring, CryptoProvider};
-use tracing::{error, info};
+use tracing::info;
 use uuid::Uuid;
 
 use arkin_accounting::Accounting;
-use arkin_binance::{
-    BinanceExecution, BinanceHistoricalIngestor, BinanceIngestor, SimBinanceIngestor, SimulationExecutor,
-};
+use arkin_binance::{BinanceExecution, BinanceHistoricalIngestor, BinanceIngestor, SimulationExecutor};
 use arkin_cli::{Cli, Commands};
 use arkin_core::prelude::*;
 use arkin_cron::{Cron, CronInterval};
@@ -244,30 +243,59 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, a.only_normalized, a.only_predictions, a.dry_run);
 
-            let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
-            let instruments = persistence
-                .list_instruments_by_venue_symbol(&a.instruments, &venue)
-                .await
-                .unwrap();
+            let tasks = vec![
+                // ReplayTask::builder()
+                //     .venue(VenueName::BinanceUsdmFutures)
+                //     .channel(Channel::AggTrades)
+                //     .build(),
+                // ReplayTask::builder()
+                //     .venue(VenueName::BinanceSpot)
+                //     .channel(Channel::AggTrades)
+                //     .build(),
+                // ReplayTask::builder()
+                //     .venue(VenueName::BinanceUsdmFutures)
+                //     .channel(Channel::MarkPriceKlines)
+                //     .build(),
+                ReplayTask::builder()
+                    .venue(VenueName::BinanceUsdmFutures)
+                    .channel(Channel::Ticker)
+                    .build(),
+            ];
 
-            // Init sim ingestor
-            let binance_ingestor = Arc::new(
-                SimBinanceIngestor::builder()
+            let ingestor = Arc::new(
+                SimIngestor::builder()
+                    .replay_tasks(tasks)
                     .start(start_time)
-                    .end(end_time + Duration::from_secs(3600))
-                    .instruments(instruments.clone())
-                    .buffer_size(1)
+                    .end(end_time)
                     .build(),
             );
+            // let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
+            // let instruments = persistence
+            //     .list_instruments_by_venue_symbol(&a.instruments, &venue)
+            //     .await
+            //     .unwrap();
+
+            // Init sim ingestor
+            // let binance_ingestor = Arc::new(
+            //     SimBinanceIngestor::builder()
+            //         .start(start_time)
+            //         .end(end_time + Duration::from_secs(3600))
+            //         .instruments(instruments.clone())
+            //         .buffer_size(1)
+            //         .build(),
+            // );
 
             // Insights service
-            let pipeline_config = load::<InsightsConfig>();
-            let pipeline_info = persistence.get_pipeline_by_name(&a.pipeline).await.unwrap();
-            if let Err(e) = persistence.insert_pipeline(pipeline_info.clone()).await {
-                error!("{}", e);
-            }
-            let insights =
-                Insights::new(pipeline_info, &pipeline_config.insights_service.pipeline, instruments, a.warmup);
+            // let pipeline_config = load::<InsightsConfig>();
+            // let pipeline_info = persistence
+            //     .get_pipeline_by_name(&a.pipeline)
+            //     .await
+            //     .expect("Pipeline not found in database");
+            // if let Err(e) = persistence.insert_pipeline(pipeline_info.clone()).await {
+            //     error!("{}", e);
+            // }
+            // let insights =
+            //     Insights::new(pipeline_info, &pipeline_config.insights_service.pipeline, instruments, a.warmup);
 
             // Setup engine
             let engine = Engine::builder()
@@ -279,20 +307,20 @@ async fn main() {
             engine
                 .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
                 .await;
-            engine
-                .register(
-                    "insights",
-                    insights,
-                    0,
-                    8,
-                    Some(EventFilter::Events(vec![
-                        EventType::AggTradeUpdate,
-                        EventType::TickUpdate,
-                        EventType::InsightsTick,
-                    ])),
-                )
-                .await;
-            engine.register("ingestor", binance_ingestor, 1, 7, None).await;
+            // engine
+            //     .register(
+            //         "insights",
+            //         insights,
+            //         0,
+            //         8,
+            //         Some(EventFilter::Events(vec![
+            //             EventType::AggTradeUpdate,
+            //             EventType::TickUpdate,
+            //             EventType::InsightsTick,
+            //         ])),
+            //     )
+            //     .await;
+            engine.register("ingestor", ingestor, 1, 7, None).await;
 
             engine.start().await;
             engine.wait_for_shutdown().await;
@@ -331,14 +359,14 @@ async fn main() {
             let accounting = Arc::new(Accounting::new(ledger));
 
             // Init sim ingestor
-            let binance_sim_ingestor = Arc::new(
-                SimBinanceIngestor::builder()
-                    .start(start_time)
-                    .end(end_time + Duration::from_secs(3600))
-                    .instruments(instruments.clone())
-                    .buffer_size(1)
-                    .build(),
-            );
+            // let binance_sim_ingestor = Arc::new(
+            //     SimBinanceIngestor::builder()
+            //         .start(start_time)
+            //         .end(end_time + Duration::from_secs(3600))
+            //         .instruments(instruments.clone())
+            //         .buffer_size(1)
+            //         .build(),
+            // );
 
             // Insights service
             let pipeline_config = load::<InsightsConfig>();
@@ -451,7 +479,7 @@ async fn main() {
                     ])),
                 )
                 .await;
-            engine.register("ingestor", binance_sim_ingestor, 4, 10, None).await;
+            // engine.register("ingestor", binance_sim_ingestor, 4, 10, None).await;
             engine
                 .register(
                     "strat-agent",

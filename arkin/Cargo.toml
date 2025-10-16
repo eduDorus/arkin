@@ -24,6 +24,7 @@ arkin-strat-agent = { path = "../arkin-strat-agent" }
 arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
 arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
 arkin-binance = { path = "../arkin-binance" }
+arkin-sim-ingestor = { path = "../arkin-sim-ingestor" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
@@ -44,6 +45,3 @@ clap = { workspace = true }
 rust_decimal = { workspace = true }
 mimalloc = { version = "0.1.48", features = [ "v3" ] }
 tonic = { workspace = true }
-
-
-

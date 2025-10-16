@@ -60,8 +60,9 @@ impl Persistence {
             .with_database(ch_config.database)
             .with_user(ch_config.user)
             .with_password(ch_config.password)
-            .with_option("buffer_size", "1048576");
-        // .with_option("wait_end_of_query", "1");
+            .with_option("buffer_size", "1048576")
+            .with_validation(false)
+            .with_option("wait_end_of_query", "0");
 
         let ctx = PersistenceContext::new(pg_pool.clone(), ch_client.clone(), instance.clone().into());
 
@@ -124,17 +125,6 @@ impl Persistence {
         scaler_store::get_iqr(&self.ctx, &pipeline, &instrument, from, till, levels).await
     }
 
-    pub async fn trade_stream_range_buffered(
-        &self,
-        instruments: &[Arc<Instrument>],
-        start: UtcDateTime,
-        end: UtcDateTime,
-        buffer_size: usize,
-        frequency: Frequency,
-    ) -> impl Stream<Item = Arc<AggTrade>> + 'static {
-        trade_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
-    }
-
     pub async fn insert_account(&self, account: Arc<Account>) {
         if let Err(e) = account_store::insert(&self.ctx, account).await {
             error!(target: "persistence", "error in inserting account: {}",e);
@@ -184,7 +174,7 @@ impl Persistence {
         }
     }
 
-    pub async fn insert_trade(&self, trade: Arc<AggTrade>) {
+    pub async fn insert_agg_trade(&self, trade: Arc<AggTrade>) {
         if self.mode == InstanceType::Live || self.mode == InstanceType::Utility {
             let mut lock = self.ctx.buffer.trades.lock().await;
             lock.push(trade);
@@ -428,19 +418,32 @@ impl PersistenceReader for Persistence {
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> Result<Box<dyn Stream<Item = Arc<Tick>> + Send + Unpin>, PersistenceError> {
-        Ok(tick_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await)
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError> {
+        tick_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
     }
 
-    async fn trade_stream_range_buffered(
+    async fn agg_trade_stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
         start: UtcDateTime,
         end: UtcDateTime,
         buffer_size: usize,
         frequency: Frequency,
-    ) -> Result<Box<dyn Stream<Item = Arc<AggTrade>> + Send + Unpin>, PersistenceError> {
-        Ok(trade_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await)
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError> {
+        trade_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
+    }
+
+    async fn metric_stream_range_buffered(
+        &self,
+        instruments: &[Arc<Instrument>],
+        metric_type: MetricType,
+        start: UtcDateTime,
+        end: UtcDateTime,
+        buffer_size: usize,
+        frequency: Frequency,
+    ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError> {
+        metric_store::stream_range_buffered(&self.ctx, instruments, metric_type, start, end, buffer_size, frequency)
+            .await
     }
 }
 
@@ -453,7 +456,7 @@ impl Runnable for Persistence {
 
         match event {
             Event::TickUpdate(t) => self.insert_tick(t).await,
-            Event::AggTradeUpdate(t) => self.insert_trade(t).await,
+            Event::AggTradeUpdate(t) => self.insert_agg_trade(t).await,
             Event::InsightsUpdate(i) => self.insert_insights_update(i).await,
             Event::MetricUpdate(i) => self.insert_metric(i).await,
 

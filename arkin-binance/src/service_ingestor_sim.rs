@@ -50,7 +50,7 @@ async fn market_replay_task(ingestor: Arc<SimBinanceIngestor>, service_ctx: Arc<
 
     let trade_stream = match core_ctx
         .persistence
-        .trade_stream_range_buffered(
+        .agg_trade_stream_range_buffered(
             &ingestor.instruments,
             ingestor.start,
             ingestor.end,

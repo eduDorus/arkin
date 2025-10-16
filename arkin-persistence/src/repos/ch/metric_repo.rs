@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use clickhouse::{sql::Identifier, Row};
+use clickhouse::{query::RowCursor, sql::Identifier, Row};
+use futures::channel;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::{OffsetDateTime, UtcDateTime};
 use tracing::info;
 use uuid::Uuid;
 
@@ -73,4 +74,70 @@ pub async fn insert_batch(ctx: &PersistenceContext, metrics: &[MetricsClickhouse
     }
     insert.end().await?;
     Ok(())
+}
+
+pub async fn stream_range(
+    ctx: &PersistenceContext,
+    instrument_ids: &[Uuid],
+    metric_type: MetricType,
+    start: UtcDateTime,
+    end: UtcDateTime,
+) -> Result<RowCursor<MetricsClickhouseDTO>, PersistenceError> {
+    let cursor = ctx
+        .ch_client
+        .query(
+            r#"
+                SELECT 
+                ?fields 
+            FROM ? 
+            WHERE 
+                event_time BETWEEN ? AND ? 
+                AND instrument_id IN (?) 
+                AND metric_type = ?
+            ORDER BY 
+                event_time ASC
+        "#,
+        )
+        .bind(Identifier(TABLE_NAME))
+        .bind(start.unix_timestamp())
+        .bind(end.unix_timestamp())
+        .bind(instrument_ids)
+        .bind(metric_type.to_string())
+        .fetch::<MetricsClickhouseDTO>()?;
+    Ok(cursor)
+}
+
+pub async fn fetch_batch(
+    ctx: &PersistenceContext,
+    instrument_ids: &[Uuid],
+    metric_type: MetricType,
+    start: UtcDateTime,
+    end: UtcDateTime,
+) -> Result<Vec<MetricsClickhouseDTO>, PersistenceError> {
+    let rows = ctx
+        .ch_client
+        .query(
+            r#"
+            SELECT 
+                ?fields 
+            FROM ? 
+            WHERE 
+                event_time BETWEEN ? AND ? 
+                AND instrument_id IN (?) 
+                AND metric_type = ?
+            ORDER BY 
+                event_time ASC
+        "#,
+        )
+        .bind(Identifier(TABLE_NAME))
+        .bind(start.unix_timestamp())
+        .bind(end.unix_timestamp())
+        .bind(instrument_ids)
+        .bind(metric_type.to_string())
+        .fetch_all::<MetricsClickhouseDTO>()
+        .await?;
+
+    info!(target: "persistence", "fetched {} metrics", rows.len());
+
+    Ok(rows)
 }

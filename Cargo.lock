@@ -159,6 +159,7 @@ dependencies = [
  "arkin-ingestor-historical",
  "arkin-insights",
  "arkin-persistence",
+ "arkin-sim-ingestor",
  "arkin-strat-agent",
  "arkin-strat-crossover",
  "clap",
@@ -429,6 +430,30 @@ dependencies = [
  "tokio-util",
  "tracing",
  "typed-builder",
+ "uuid",
+]
+
+[[package]]
+name = "arkin-sim-ingestor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-core",
+ "async-trait",
+ "futures",
+ "kanal",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "test-log",
+ "thiserror 2.0.17",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+ "typed-builder",
+ "url",
  "uuid",
 ]
 
