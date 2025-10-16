@@ -7,13 +7,11 @@ use tracing::{info, instrument};
 use typed_builder::TypedBuilder;
 
 use crate::service::Service;
-use crate::{EventFilter, PersistenceReader, PubSub, Runnable, SystemTime};
+use crate::{CoreCtx, EventFilter, PersistenceReader, PubSub, Runnable, Subscriber, SystemTime};
 
 #[derive(TypedBuilder)]
 pub struct Engine {
-    time: Arc<dyn SystemTime>,
-    pubsub: Arc<PubSub>,
-    persistence: Arc<dyn PersistenceReader>,
+    core_ctx: Arc<CoreCtx>,
     #[builder(default)]
     services: RwLock<HashMap<String, Arc<Service>>>,
     #[builder(default)]
@@ -23,6 +21,16 @@ pub struct Engine {
 }
 
 impl Engine {
+    pub fn new(time: Arc<dyn SystemTime>, pubsub: Arc<PubSub>, persistence: Arc<dyn PersistenceReader>) -> Arc<Self> {
+        Self {
+            core_ctx: Arc::new(CoreCtx::new(time, pubsub, persistence)),
+            services: RwLock::new(HashMap::new()),
+            start_order: RwLock::new(BTreeMap::new()),
+            stop_order: RwLock::new(BTreeMap::new()),
+        }
+        .into()
+    }
+
     pub async fn register(
         &self,
         identifier: &str,
@@ -31,17 +39,11 @@ impl Engine {
         stop_priority: u64,
         event_filter: Option<EventFilter>,
     ) {
-        let service = Service::new(
-            identifier,
-            service,
-            self.time.clone(),
-            self.pubsub.publisher(),
-            match event_filter {
-                Some(f) => Some(self.pubsub.subscribe(f)),
-                None => None,
-            },
-            self.persistence.clone(),
-        );
+        let subscriber: Option<Arc<dyn Subscriber>> = match event_filter {
+            Some(f) => Some(self.core_ctx.pubsub.subscribe(f)),
+            None => None,
+        };
+        let service = Service::new(identifier, service, self.core_ctx.clone(), subscriber);
         info!(target: "engine", "register services {}", service.identifier());
         let name = service.identifier().to_owned();
         self.services.write().await.insert(name.clone(), service);

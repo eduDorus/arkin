@@ -63,11 +63,12 @@ async fn main() {
             );
 
             // Create the engine
-            let engine = Engine::builder()
-                .time(time.clone())
-                .pubsub(pubsub.clone())
-                .persistence(persistence.clone())
-                .build();
+            let engine = Engine::new(time.clone(), pubsub.clone(), persistence.clone());
+            // let engine = Engine::builder()
+            //     .time(time.clone())
+            //     .pubsub(pubsub.clone())
+            //     .persistence(persistence.clone())
+            //     .build();
             engine.register("pubsub", pubsub, 0, 10, None).await;
             engine
                 .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
@@ -105,11 +106,7 @@ async fn main() {
             };
 
             // Create the engine
-            let engine = Engine::builder()
-                .time(time.clone())
-                .pubsub(pubsub.clone())
-                .persistence(persistence.clone())
-                .build();
+            let engine = Engine::new(time.clone(), pubsub.clone(), persistence.clone());
             engine.register("pubsub", pubsub, 0, 10, None).await;
             engine
                 .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
@@ -157,11 +154,7 @@ async fn main() {
 
             let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).venue(venue).build());
 
-            let engine = Engine::builder()
-                .time(time.clone())
-                .pubsub(pubsub.clone())
-                .persistence(persistence.clone())
-                .build();
+            let engine = Engine::new(time.clone(), pubsub.clone(), persistence.clone());
             engine.register("pubsub", pubsub, 0, 10, None).await;
             engine
                 .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
@@ -244,22 +237,22 @@ async fn main() {
             let persistence = Persistence::new(&config, instance, a.only_normalized, a.only_predictions, a.dry_run);
 
             let tasks = vec![
-                // ReplayTask::builder()
-                //     .venue(VenueName::BinanceUsdmFutures)
-                //     .channel(Channel::AggTrades)
-                //     .build(),
-                // ReplayTask::builder()
-                //     .venue(VenueName::BinanceSpot)
-                //     .channel(Channel::AggTrades)
-                //     .build(),
-                // ReplayTask::builder()
-                //     .venue(VenueName::BinanceUsdmFutures)
-                //     .channel(Channel::MarkPriceKlines)
-                //     .build(),
                 ReplayTask::builder()
                     .venue(VenueName::BinanceUsdmFutures)
-                    .channel(Channel::Ticker)
+                    .channel(Channel::AggTrades)
                     .build(),
+                ReplayTask::builder()
+                    .venue(VenueName::BinanceSpot)
+                    .channel(Channel::AggTrades)
+                    .build(),
+                ReplayTask::builder()
+                    .venue(VenueName::BinanceUsdmFutures)
+                    .channel(Channel::MarkPriceKlines)
+                    .build(),
+                // ReplayTask::builder()
+                //     .venue(VenueName::BinanceUsdmFutures)
+                //     .channel(Channel::Ticker)
+                //     .build(),
             ];
 
             let ingestor = Arc::new(
@@ -275,38 +268,25 @@ async fn main() {
             //     .await
             //     .unwrap();
 
-            // Init sim ingestor
-            // let binance_ingestor = Arc::new(
-            //     SimBinanceIngestor::builder()
-            //         .start(start_time)
-            //         .end(end_time + Duration::from_secs(3600))
-            //         .instruments(instruments.clone())
-            //         .buffer_size(1)
-            //         .build(),
-            // );
-
             // Insights service
             // let pipeline_config = load::<InsightsConfig>();
             // let pipeline_info = persistence
             //     .get_pipeline_by_name(&a.pipeline)
             //     .await
             //     .expect("Pipeline not found in database");
-            // if let Err(e) = persistence.insert_pipeline(pipeline_info.clone()).await {
-            //     error!("{}", e);
-            // }
+            // // if let Err(e) = persistence.insert_pipeline(pipeline_info.clone()).await {
+            // //     error!("{}", e);
+            // // }
             // let insights =
             //     Insights::new(pipeline_info, &pipeline_config.insights_service.pipeline, instruments, a.warmup);
 
             // Setup engine
-            let engine = Engine::builder()
-                .time(time.clone())
-                .pubsub(pubsub.clone())
-                .persistence(persistence.clone())
-                .build();
+            let engine = Engine::new(time.clone(), pubsub.clone(), persistence.clone());
             engine.register("pubsub", pubsub, 0, 10, None).await;
             engine
                 .register("persistence", persistence, 0, 10, Some(EventFilter::Persistable))
                 .await;
+            engine.register("ingestor", ingestor, 1, 7, None).await;
             // engine
             //     .register(
             //         "insights",
@@ -316,11 +296,11 @@ async fn main() {
             //         Some(EventFilter::Events(vec![
             //             EventType::AggTradeUpdate,
             //             EventType::TickUpdate,
+            //             EventType::MetricUpdate,
             //             EventType::InsightsTick,
             //         ])),
             //     )
             //     .await;
-            engine.register("ingestor", ingestor, 1, 7, None).await;
 
             engine.start().await;
             engine.wait_for_shutdown().await;
@@ -443,11 +423,7 @@ async fn main() {
             let execution = SimulationExecutor::new(sim_venue, init_balance);
 
             // Setup engine
-            let engine = Engine::builder()
-                .time(time.clone())
-                .pubsub(pubsub.clone())
-                .persistence(persistence.clone())
-                .build();
+            let engine = Engine::new(time.clone(), pubsub.clone(), persistence.clone());
             engine.register("pubsub", pubsub, 0, 10, None).await;
             engine
                 .register("persistence", persistence, 1, 10, Some(EventFilter::PersistableSimulation))
@@ -569,11 +545,7 @@ async fn main() {
             let execution = BinanceExecution::new();
 
             // Setup engine
-            let engine = Engine::builder()
-                .time(time.clone())
-                .pubsub(pubsub.clone())
-                .persistence(persistence.clone())
-                .build();
+            let engine = Engine::new(time.clone(), pubsub.clone(), persistence.clone());
             engine.register("pubsub", pubsub.clone(), 0, 9, None).await;
             engine
                 .register("persistence", persistence.clone(), 0, 10, Some(EventFilter::Persistable))
@@ -752,11 +724,7 @@ async fn main() {
             let execution = BinanceExecution::new();
 
             // Setup engine
-            let engine = Engine::builder()
-                .time(time.clone())
-                .pubsub(pubsub.clone())
-                .persistence(persistence.clone())
-                .build();
+            let engine = Engine::new(time.clone(), pubsub.clone(), persistence.clone());
             engine.register("pubsub", pubsub.clone(), 0, 10, None).await;
             engine
                 .register("persistence", persistence, 0, 9, Some(EventFilter::Persistable))

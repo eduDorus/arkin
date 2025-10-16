@@ -14,7 +14,6 @@ use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
-use crate::utils::PeekableReceiver;
 use crate::{CoreCtx, Event, EventType, InsightsTick, Publisher, Runnable, ServiceCtx, Subscriber};
 
 pub enum EventFilter {
@@ -28,16 +27,15 @@ pub enum EventFilter {
 
 #[derive(Debug, Clone)]
 pub struct PubSubPublisher {
-    tx: AsyncSender<Event>,
+    event_queue: Arc<Mutex<BinaryHeap<Reverse<Event>>>>,
 }
 
 #[async_trait]
 impl Publisher for PubSubPublisher {
     async fn publish(&self, event: Event) {
         debug!(target: "publisher", "publishing event {}", event);
-        if let Err(e) = self.tx.send(event.into()).await {
-            error!("Failed to publish event: {}", e);
-        }
+        let mut queue = self.event_queue.lock().await;
+        queue.push(Reverse(event));
     }
 }
 
@@ -74,8 +72,7 @@ impl Subscriber for PubSubSubscriber {
 }
 
 pub struct PubSub {
-    event_queue: Mutex<BinaryHeap<Reverse<Event>>>,
-    publishers: DashMap<u64, PeekableReceiver<Event>>,
+    event_queue: Arc<Mutex<BinaryHeap<Reverse<Event>>>>,
     next_id: AtomicU64,
     subscribers: DashMap<u64, AsyncSender<Event>>,
     event_subscriptions: DashMap<EventType, Vec<u64>>,
@@ -86,8 +83,7 @@ pub struct PubSub {
 impl PubSub {
     pub fn new(ack: bool) -> Arc<Self> {
         Self {
-            event_queue: Mutex::new(BinaryHeap::<Reverse<Event>>::new()),
-            publishers: DashMap::new(),
+            event_queue: Arc::new(Mutex::new(BinaryHeap::<Reverse<Event>>::new())),
             next_id: AtomicU64::new(0),
             subscribers: DashMap::new(),
             event_subscriptions: DashMap::new(),
@@ -158,14 +154,32 @@ impl PubSub {
         .into()
     }
 
+    pub async fn publish(&self, event: Event) {
+        debug!(target: "pubsub", "publishing event {}", event);
+        let mut queue = self.event_queue.lock().await;
+        queue.push(Reverse(event));
+    }
+
+    pub async fn publish_batch(&self, events: Vec<Event>) {
+        if events.is_empty() {
+            return;
+        }
+
+        let mut queue = self.event_queue.lock().await;
+        queue.reserve(events.len());
+        queue.extend(events.into_iter().map(Reverse));
+        // let mut queue = self.event_queue.lock().await;
+        // for event in events {
+        //     queue.push(Reverse(event));
+        // }
+    }
+
     pub fn publisher(&self) -> Arc<PubSubPublisher> {
         info!(target: "pubsub", "new publisher");
-        let (tx, rx) = kanal::bounded_async(100000);
-
-        // Update publisher list
-        let id = self.get_next_id();
-        self.publishers.insert(id, PeekableReceiver::new(rx));
-        PubSubPublisher { tx }.into()
+        PubSubPublisher {
+            event_queue: self.event_queue.clone(),
+        }
+        .into()
     }
 
     async fn broadcast_event(&self, event: Event) {
@@ -237,86 +251,64 @@ impl PubSub {
     }
 }
 
-async fn event_collector_task(pubsub: Arc<PubSub>, service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
-    info!(target: "pubsub", "starting event collector task");
-
-    let shutdown = service_ctx.get_shutdown_token();
-    loop {
-        let mut collected_any = false;
-        for mut receiver in pubsub.publishers.iter_mut() {
-            // Peek if there is a element and if it is within 24h
-            if let Some(peeked) = receiver.value_mut().peek() {
-                debug!(target: "pubsub", "found event");
-                // TODO: This is not optimal
-                if peeked.timestamp() > core_ctx.time.now().await + Duration::from_secs(86400) {
-                    debug!(target: "pubsub", "timestamp to big, we continue");
-                    continue;
-                }
-            } else {
-                debug!(target: "pubsub", "No events we continue");
-                continue;
-            }
-            if let Some(event) = receiver.take() {
-                collected_any = true;
-
-                let mut lock = pubsub.event_queue.lock().await;
-                lock.push(Reverse(event));
-                if lock.len() > 10000000 {
-                    drop(lock);
-                    warn!(target: "pubsub", "event queue is full, waiting 1s");
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                }
-            }
-        }
-        if !collected_any {
-            debug!(target: "pubsub", "No events collected, waiting...");
-            select! {
-                _ = shutdown.cancelled() => break,
-                _ = tokio::time::sleep(Duration::from_millis(1)) => {},
-            }
-        }
-    }
-    info!(target: "pubsub", "event collector task has stopped");
-}
-
 async fn event_processor_task(pubsub: Arc<PubSub>, service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
     info!(target: "pubsub", "starting event processor task");
 
     let shutdown = service_ctx.get_shutdown_token();
     loop {
-        // let length = self.event_queue.lock().await.len();
-        // info!(target: "pubsub", "event queue length: {}", length);
-        if let Some(Reverse(event)) = pubsub.event_queue.lock().await.pop() {
-            //  I think we don't need this anymore
-            if !event.event_type().is_market_data() {
-                debug!(target: "pubsub", "processing event: {}", event);
-            }
+        // In simulation mode, wait at barrier before processing each window
+        // This ensures all ingestors have loaded their data before we process
+        if let Some(barrier) = core_ctx.simulation_barrier.read().await.as_ref() {
+            info!(target: "pubsub", "event processor waiting at barrier");
+            barrier.release_ingestors().await;
+            barrier.pubsub_confirm_and_wait().await;
+            info!(target: "pubsub", "event processor released from barrier");
+        }
 
-            // Advance time in simulation
-            if !core_ctx.time.is_live().await {
-                debug!(target: "pubsub", "advancing time to {}", event.timestamp());
-                core_ctx.time.advance_time_to(event.timestamp()).await;
-                // Post tick events
-                let intervals = core_ctx.time.check_interval().await;
-                if !intervals.is_empty() {
-                    for ts in intervals {
-                        let tick = InsightsTick::builder()
-                            .event_time(ts)
-                            .frequency(Duration::from_secs(60))
-                            .build();
-                        let tick_event = Event::InsightsTick(tick.into());
-                        pubsub.broadcast_event(tick_event).await;
+        let mut processed_any = false;
+
+        // Drain and process all available events from the queue
+        loop {
+            let event_opt = pubsub.event_queue.lock().await.pop();
+
+            if let Some(Reverse(event)) = event_opt {
+                processed_any = true;
+
+                if !event.event_type().is_market_data() {
+                    debug!(target: "pubsub", "processing event: {}", event);
+                }
+
+                // Advance time in simulation
+                if !core_ctx.time.is_live().await {
+                    debug!(target: "pubsub", "advancing time to {}", event.timestamp());
+                    core_ctx.time.advance_time_to(event.timestamp()).await;
+                    // Post tick events
+                    let intervals = core_ctx.time.check_interval().await;
+                    if !intervals.is_empty() {
+                        for ts in intervals {
+                            let tick = InsightsTick::builder()
+                                .event_time(ts)
+                                .frequency(Duration::from_secs(60))
+                                .build();
+                            debug!(target: "pubsub", "posting insight tick event: {}", tick.event_time);
+                            pubsub.broadcast_event(Event::InsightsTick(tick.into())).await;
+                        }
                     }
                 }
-            }
 
-            pubsub.broadcast_event(event).await;
-
-            if shutdown.is_cancelled() {
-                info!(target: "pubsub", "shutdown signal received, stopping event processor task");
+                pubsub.broadcast_event(event).await;
+            } else {
+                // No more events available, break out of drain loop
                 break;
             }
-        } else {
+        }
+
+        if shutdown.is_cancelled() {
+            info!(target: "pubsub", "shutdown signal received, stopping event processor task");
+            break;
+        }
+
+        if !processed_any {
             debug!(target: "pubsub", "No events processed, waiting...");
             select! {
                 _ = shutdown.cancelled() => break,
@@ -334,9 +326,10 @@ impl Runnable for PubSub {
         service_ctx: Arc<ServiceCtx>,
         core_ctx: Arc<CoreCtx>,
     ) -> Vec<Pin<Box<dyn Future<Output = ()> + Send>>> {
-        vec![
-            Box::pin(event_collector_task(self.clone(), service_ctx.clone(), core_ctx.clone())),
-            Box::pin(event_processor_task(self.clone(), service_ctx.clone(), core_ctx.clone())),
-        ]
+        vec![Box::pin(event_processor_task(
+            self.clone(),
+            service_ctx.clone(),
+            core_ctx.clone(),
+        ))]
     }
 }

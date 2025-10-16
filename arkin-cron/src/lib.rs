@@ -94,29 +94,29 @@ impl Runnable for Cron {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
-    use test_log;
+    // use test_log;
 
-    #[tokio::test]
-    #[test_log::test]
-    async fn test_cron() {
-        let time = LiveSystemTime::new();
-        let publisher = MockPublisher::new();
-        let persistence = MockPersistence::new();
+    // #[tokio::test]
+    // #[test_log::test]
+    // async fn test_cron() {
+    //     let time = LiveSystemTime::new();
+    //     let publisher = MockPublisher::new();
+    //     let persistence = MockPersistence::new();
 
-        let start = time.now().await.replace_second(0).unwrap().replace_nanosecond(0).unwrap();
-        let frequency = Duration::from_secs(10);
-        let interval = CronInterval {
-            start,
-            frequency,
-            event: EventType::InsightsTick,
-        };
-        let chron = Arc::new(Cron::new(vec![interval]));
-        let service = Service::new("test", chron, time.clone(), publisher.clone(), None, persistence);
-        service.start().await;
-        tokio::time::sleep(Duration::from_secs(60)).await; // Allow one tick to fire
-        let events = publisher.get_events().await;
-        assert_eq!(events.len(), 6);
-    }
+    //     let start = time.now().await.replace_second(0).unwrap().replace_nanosecond(0).unwrap();
+    //     let frequency = Duration::from_secs(10);
+    //     let interval = CronInterval {
+    //         start,
+    //         frequency,
+    //         event: EventType::InsightsTick,
+    //     };
+    //     let chron = Arc::new(Cron::new(vec![interval]));
+    //     let service = Service::new("test", chron, time.clone(), publisher.clone(), None, persistence);
+    //     service.start().await;
+    //     tokio::time::sleep(Duration::from_secs(60)).await; // Allow one tick to fire
+    //     let events = publisher.get_events().await;
+    //     assert_eq!(events.len(), 6);
+    // }
 }

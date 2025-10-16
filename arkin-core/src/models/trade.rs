@@ -42,7 +42,7 @@ impl AggTrade {
         }
     }
 
-    pub fn to_insights(self) -> Vec<Arc<Insight>> {
+    pub fn to_insights(&self) -> Vec<Arc<Insight>> {
         let insights = vec![
             Insight::builder()
                 .event_time(self.event_time)

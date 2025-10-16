@@ -7,8 +7,9 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{info, instrument};
 
 use crate::{
+    barrier::SyncBarrier,
     traits::{Runnable, Subscriber},
-    Event, PersistenceReader, Publisher, SystemTime,
+    Event, PersistenceReader, PubSub, SystemTime,
 };
 
 #[derive(PartialEq, Debug, Copy, Clone, Default, Display)]
@@ -88,16 +89,18 @@ impl ServiceCtx {
 
 pub struct CoreCtx {
     pub time: Arc<dyn SystemTime>,
-    pub publisher: Arc<dyn Publisher>,
+    pub pubsub: Arc<PubSub>,
     pub persistence: Arc<dyn PersistenceReader>,
+    pub simulation_barrier: RwLock<Option<Arc<SyncBarrier>>>,
 }
 
 impl CoreCtx {
-    fn new(time: Arc<dyn SystemTime>, publisher: Arc<dyn Publisher>, persistence: Arc<dyn PersistenceReader>) -> Self {
+    pub fn new(time: Arc<dyn SystemTime>, pubsub: Arc<PubSub>, persistence: Arc<dyn PersistenceReader>) -> Self {
         Self {
             time,
-            publisher,
+            pubsub,
             persistence,
+            simulation_barrier: RwLock::new(None),
         }
     }
 
@@ -106,7 +109,11 @@ impl CoreCtx {
     }
 
     pub async fn publish(&self, event: Event) {
-        self.publisher.publish(event).await
+        self.pubsub.publish(event).await
+    }
+
+    pub async fn publish_batch(&self, events: Vec<Event>) {
+        self.pubsub.publish_batch(events).await
     }
 }
 
@@ -122,14 +129,12 @@ impl Service {
     pub fn new(
         identifier: &str,
         service: Arc<dyn Runnable>,
-        time: Arc<dyn SystemTime>,
-        publisher: Arc<dyn Publisher>,
+        core_ctx: Arc<CoreCtx>,
         subscriber: Option<Arc<dyn Subscriber>>,
-        persistence: Arc<dyn PersistenceReader>,
     ) -> Arc<Self> {
         Self {
             service_ctx: Arc::new(ServiceCtx::new()),
-            core_ctx: Arc::new(CoreCtx::new(time, publisher, persistence)),
+            core_ctx,
             identifier: identifier.to_owned(),
             subscriber,
             service,
