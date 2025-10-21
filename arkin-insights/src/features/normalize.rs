@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use arkin_core::prelude::*;
 
-use crate::{math::interp, state::InsightsState, Feature};
+use crate::{math::interp, Feature, FeatureState};
 
 #[derive(Debug, Clone)]
 pub struct RobustScaler {
@@ -205,7 +205,7 @@ impl Feature for NormalizeFeature {
 
     fn calculate(
         &self,
-        state: &InsightsState,
+        state: &FeatureState,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,

@@ -12,11 +12,11 @@ use arkin_insights::prelude::*;
 pub fn build_simple_pipeline_config() -> InsightsConfig {
     InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_steps: 10,   // e.g., 10 ticks
-            state_ttl: 3600,    // 1 hour
-            frequency_secs: 60, // 1 minute
             pipeline: PipelineConfig {
-                name: "crypto_market_index".to_string(),
+                version: "test_pipeline".to_string(),
+                warmup_steps: 10,
+                state_ttl: 3600,
+                frequency_secs: 60,
                 features: vec![
                     // ========================================================================
                     // STAGE 1: Raw Trades → 1m Aggregates (per instrument)
@@ -82,22 +82,14 @@ pub fn build_simple_pipeline_config() -> InsightsConfig {
                     // STAGE 2: 1m → Multi-timeframe Aggregates (per instrument)
                     // ========================================================================
 
-                    // Notional for 5m, 01h, 04h (single config for all timeframes)
+                    // Notional for 5m, 01h (single config for all timeframes)
                     FeatureConfig::Range(RangeConfig {
                         aggregation_type: AggregationType::Instrument,
                         filter: InstrumentFilter::default(),
                         group_by: GroupBy::default(),
-                        input: vec![
-                            "notional_01m".to_string(),
-                            "notional_01m".to_string(),
-                            "notional_01m".to_string(),
-                        ],
-                        output: vec![
-                            "notional_05m".to_string(),
-                            "notional_01h".to_string(),
-                            "notional_04h".to_string(),
-                        ],
-                        data: vec![RangeData::Interval(5), RangeData::Interval(60), RangeData::Interval(240)],
+                        input: vec!["notional_01m".to_string(), "notional_01m".to_string()],
+                        output: vec!["notional_05m".to_string(), "notional_01h".to_string()],
+                        data: vec![RangeData::Interval(5), RangeData::Interval(60)],
                         method: RangeAlgo::Sum,
                         persist: true,
                     }),
@@ -109,26 +101,20 @@ pub fn build_simple_pipeline_config() -> InsightsConfig {
                         input: vec![
                             "notional_buy_01m".to_string(),
                             "notional_buy_01m".to_string(),
-                            "notional_buy_01m".to_string(),
-                            "notional_sell_01m".to_string(),
                             "notional_sell_01m".to_string(),
                             "notional_sell_01m".to_string(),
                         ],
                         output: vec![
                             "notional_buy_05m".to_string(),
                             "notional_buy_01h".to_string(),
-                            "notional_buy_04h".to_string(),
                             "notional_sell_05m".to_string(),
                             "notional_sell_01h".to_string(),
-                            "notional_sell_04h".to_string(),
                         ],
                         data: vec![
                             RangeData::Interval(5),
                             RangeData::Interval(60),
-                            RangeData::Interval(240),
                             RangeData::Interval(5),
                             RangeData::Interval(60),
-                            RangeData::Interval(240),
                         ],
                         method: RangeAlgo::Sum,
                         persist: true,
@@ -138,22 +124,10 @@ pub fn build_simple_pipeline_config() -> InsightsConfig {
                         aggregation_type: AggregationType::Instrument,
                         filter: InstrumentFilter::default(),
                         group_by: GroupBy::default(),
-                        input_1: vec![
-                            "notional_buy_05m".to_string(),
-                            "notional_buy_01h".to_string(),
-                            "notional_buy_04h".to_string(),
-                        ],
-                        input_2: vec![
-                            "notional_sell_05m".to_string(),
-                            "notional_sell_01h".to_string(),
-                            "notional_sell_04h".to_string(),
-                        ],
-                        output: vec![
-                            "notional_imbalance_05m".to_string(),
-                            "notional_imbalance_01h".to_string(),
-                            "notional_imbalance_04h".to_string(),
-                        ],
-                        horizons: vec![RangeData::Interval(1), RangeData::Interval(1), RangeData::Interval(1)],
+                        input_1: vec!["notional_buy_05m".to_string(), "notional_buy_01h".to_string()],
+                        input_2: vec!["notional_sell_05m".to_string(), "notional_sell_01h".to_string()],
+                        output: vec!["notional_imbalance_05m".to_string(), "notional_imbalance_01h".to_string()],
+                        horizons: vec![RangeData::Interval(1), RangeData::Interval(1)],
                         method: TwoValueAlgo::Imbalance,
                         persist: true,
                     }),
@@ -168,19 +142,15 @@ pub fn build_simple_pipeline_config() -> InsightsConfig {
                         method: RangeAlgo::Mean,
                         persist: true,
                     }),
-                    // VWAP for all timeframes (5m, 01h, 04h)
+                    // VWAP for all timeframes (5m, 01h)
                     FeatureConfig::DualRange(DualRangeConfig {
                         aggregation_type: AggregationType::Instrument,
                         filter: InstrumentFilter::default(),
                         group_by: GroupBy::default(),
-                        input_1: vec!["vwap_01m".to_string(), "vwap_01m".to_string(), "vwap_01m".to_string()],
-                        input_2: vec![
-                            "notional_01m".to_string(),
-                            "notional_01m".to_string(),
-                            "notional_01m".to_string(),
-                        ],
-                        output: vec!["vwap_05m".to_string(), "vwap_01h".to_string(), "vwap_04h".to_string()],
-                        data: vec![RangeData::Interval(5), RangeData::Interval(60), RangeData::Interval(240)],
+                        input_1: vec!["vwap_01m".to_string(), "vwap_01m".to_string()],
+                        input_2: vec!["notional_01m".to_string(), "notional_01m".to_string()],
+                        output: vec!["vwap_05m".to_string(), "vwap_01h".to_string()],
+                        data: vec![RangeData::Interval(5), RangeData::Interval(60)],
                         method: DualRangeAlgo::WeightedMean,
                         persist: true,
                     }),
@@ -197,7 +167,7 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
 
     // Let's stream some agg trades from the database
     let start = utc_datetime!(2025-01-01 00:00:00);
-    let end = utc_datetime!(2025-01-02 00:00:00);
+    let end = utc_datetime!(2025-01-01 03:00:00);
 
     let persistence = integration_tests::init_test_persistence().await;
     info!("Initialized test persistence.");
@@ -205,7 +175,7 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
     // Build pipeline graph directly (no service wrapper)
     let config = build_simple_pipeline_config();
     let features = FeatureFactory::from_config(&persistence, &config.insights_service.pipeline.features).await;
-    let pipeline = Arc::new(
+    let pipeline_meta = Arc::new(
         Pipeline::builder()
             .name("test_pipeline".to_string())
             .description("test_pipeline".to_string())
@@ -213,8 +183,8 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
             .updated(start)
             .build(),
     );
-    let graph = PipelineGraph::new(features);
-    let state = InsightsState::new(config.insights_service.state_ttl);
+
+    let pipeline = FeaturePipeline::new(pipeline_meta.clone(), features, &config.insights_service.pipeline);
 
     let venue = persistence.get_venue_by_name(&VenueName::BinanceSpot).await?;
     let instruments = persistence.get_instruments_by_venue(&venue).await?;
@@ -237,7 +207,7 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
     }
 
     let stream = persistence
-        .agg_trade_stream_range_buffered(instruments.as_slice(), start, end, 1, arkin_core::prelude::Frequency::Daily)
+        .agg_trade_stream_range_buffered(instruments.as_slice(), start, end, 3, arkin_core::prelude::Frequency::Hourly)
         .await?;
 
     tokio::pin!(stream);
@@ -283,16 +253,16 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
                 .build()
                 .into(),
         ];
-        state.insert_batch_buffered(&insights).await;
+        pipeline.insert_batch(&insights).await;
 
         // THEN check if we should calculate
         if trade.event_time >= next_insights_tick {
             info!("Processing tick at {}", next_insights_tick);
             // Commit state
-            state.commit(next_insights_tick).await;
+            pipeline.commit(next_insights_tick).await;
 
             // Calculate insights for this tick
-            let calculated_insights = graph.calculate(&state, &pipeline, next_insights_tick, &instruments);
+            let calculated_insights = pipeline.calculate(next_insights_tick, &instruments);
             info!(
                 "Calculated {} insights for {} instruments",
                 calculated_insights.len(),

@@ -11,14 +11,14 @@ pub struct InsightsConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct InsightsServiceConfig {
     pub pipeline: PipelineConfig,
-    pub warmup_steps: u64,
-    pub state_ttl: u64,
-    pub frequency_secs: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PipelineConfig {
-    pub name: String,
+    pub version: String,
+    pub warmup_steps: u16,
+    pub state_ttl: u64,
+    pub frequency_secs: u64,
     pub features: Vec<FeatureConfig>,
 }
 

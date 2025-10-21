@@ -16,7 +16,7 @@ use arkin_cron::{Cron, CronInterval};
 use arkin_exec_strat_taker::TakerExecutionStrategy;
 use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
 use arkin_ingestor_historical::prelude::*;
-use arkin_insights::{prelude::InsightsConfig, Insights};
+use arkin_insights::{prelude::InsightsConfig, InsightService};
 use arkin_persistence::{Persistence, PersistenceConfig};
 use arkin_strat_agent::{AgentStrategy, AgentStrategyConfig};
 
@@ -357,7 +357,7 @@ async fn main() {
                 .created(time.now().await)
                 .updated(time.now().await)
                 .build();
-            let insights = Insights::new(
+            let insights = InsightService::new(
                 persistence.clone(),
                 pipeline_info.into(),
                 &pipeline_config.insights_service.pipeline,
@@ -680,7 +680,7 @@ async fn main() {
                 .created(time.now().await)
                 .updated(time.now().await)
                 .build();
-            let insights = Insights::new(
+            let insights = InsightService::new(
                 persistence.clone(),
                 pipeline_info.into(),
                 &pipeline_config.insights_service.pipeline,

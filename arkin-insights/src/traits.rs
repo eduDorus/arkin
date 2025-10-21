@@ -5,7 +5,7 @@ use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 
-use crate::state::InsightsState;
+use crate::FeatureState;
 
 #[async_trait]
 pub trait Feature: std::fmt::Debug + Send + Sync {
@@ -13,7 +13,7 @@ pub trait Feature: std::fmt::Debug + Send + Sync {
     fn outputs(&self) -> Vec<FeatureId>;
     fn calculate(
         &self,
-        state: &InsightsState,
+        state: &FeatureState,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,

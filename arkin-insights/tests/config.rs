@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use arkin_core::{prelude::MockPersistence, InstrumentType};
-use arkin_insights::{prelude::*, PipelineGraph};
+use arkin_insights::{prelude::*, FeatureFactory, FeatureGraph};
 use tracing::info;
 
 #[tokio::test]
@@ -10,11 +10,11 @@ async fn load_config() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_steps: 10,
-            state_ttl: 60,
-            frequency_secs: 5,
             pipeline: PipelineConfig {
-                name: "test_pipeline".to_string(),
+                version: "test_pipeline".to_string(),
+                warmup_steps: 10,
+                state_ttl: 3600,
+                frequency_secs: 60,
                 features: vec![FeatureConfig::Lag(LagConfig {
                     aggregation_type: AggregationType::Instrument,
                     filter: InstrumentFilter::default(),
@@ -54,11 +54,11 @@ async fn load_config_range() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_steps: 10,
-            state_ttl: 60,
-            frequency_secs: 5,
             pipeline: PipelineConfig {
-                name: "test_pipeline".to_string(),
+                version: "test_pipeline".to_string(),
+                warmup_steps: 10,
+                state_ttl: 3600,
+                frequency_secs: 60,
                 features: vec![FeatureConfig::Range(RangeConfig {
                     aggregation_type: AggregationType::Instrument,
                     filter: InstrumentFilter::default(),
@@ -88,11 +88,11 @@ async fn load_config_dual_range() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_steps: 10,
-            state_ttl: 60,
-            frequency_secs: 5,
             pipeline: PipelineConfig {
-                name: "test_pipeline".to_string(),
+                version: "test_pipeline".to_string(),
+                warmup_steps: 10,
+                state_ttl: 3600,
+                frequency_secs: 60,
                 features: vec![FeatureConfig::DualRange(DualRangeConfig {
                     aggregation_type: AggregationType::Instrument,
                     filter: InstrumentFilter::default(),
@@ -123,11 +123,11 @@ async fn load_config_two_value() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_steps: 10,
-            state_ttl: 60,
-            frequency_secs: 5,
             pipeline: PipelineConfig {
-                name: "test_pipeline".to_string(),
+                version: "test_pipeline".to_string(),
+                warmup_steps: 10,
+                state_ttl: 3600,
+                frequency_secs: 60,
                 features: vec![FeatureConfig::TwoValue(TwoValueConfig {
                     aggregation_type: AggregationType::Instrument,
                     filter: InstrumentFilter::default(),
@@ -158,11 +158,11 @@ async fn load_config_with_filter_and_groupby() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_steps: 10,
-            state_ttl: 60,
-            frequency_secs: 5,
             pipeline: PipelineConfig {
-                name: "test_pipeline".to_string(),
+                version: "test_pipeline".to_string(),
+                warmup_steps: 10,
+                state_ttl: 3600,
+                frequency_secs: 60,
                 features: vec![
                     // Example 1: Filter to specific instruments
                     FeatureConfig::Lag(LagConfig {
@@ -302,11 +302,11 @@ async fn crypto_market_index_construction() {
 
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_steps: 10,
-            state_ttl: 3600,
-            frequency_secs: 5,
             pipeline: PipelineConfig {
-                name: "crypto_market_index".to_string(),
+                version: "test_pipeline".to_string(),
+                warmup_steps: 10,
+                state_ttl: 3600,
+                frequency_secs: 60,
                 features: vec![
                     // ========================================================================
                     // STAGE 1: Raw Trades → 1m Aggregates (per instrument)
@@ -652,7 +652,7 @@ async fn crypto_market_index_construction() {
     assert!(features.len() > 0, "Should create features from the crypto market index config");
 
     // Build the pipeline graph and validate it
-    let graph = PipelineGraph::new(features);
+    let graph = FeatureGraph::new(features);
 
     // Print comprehensive summary
     graph.print_summary();

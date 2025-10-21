@@ -154,7 +154,7 @@ impl BoundedBuffer {
 }
 
 #[derive(Debug, TypedBuilder)]
-pub struct InsightsState {
+pub struct FeatureState {
     /// In-memory feature store: (instrument, feature_id) -> BoundedBuffer of (timestamp, value)
     #[builder(default)]
     features: DashMap<(Arc<Instrument>, FeatureId), BoundedBuffer>,
@@ -166,7 +166,7 @@ pub struct InsightsState {
     wal_buffer: Mutex<Vec<Arc<Insight>>>,
 }
 
-impl InsightsState {
+impl FeatureState {
     pub fn new(ttl: u64) -> Self {
         Self {
             features: DashMap::new(),

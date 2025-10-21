@@ -1,4 +1,3 @@
-use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -8,99 +7,72 @@ use tracing::{debug, info, warn};
 use arkin_core::prelude::*;
 
 use crate::config::PipelineConfig;
-use crate::pipeline::PipelineGraph;
-use crate::prelude::FeatureFactory;
-use crate::state::InsightsState;
+use crate::FeatureFactory;
+use crate::FeaturePipeline;
 
-pub struct Insights {
+pub struct InsightService {
     persistence: Arc<dyn PersistenceReader>,
-    warmup_steps: AtomicU16,
-    pipeline: Arc<Pipeline>,
-    graph: PipelineGraph,
-    state: Arc<InsightsState>,
+    pipeline: FeaturePipeline,
 }
 
-impl Insights {
+impl InsightService {
     pub async fn new(
         persistence: Arc<dyn PersistenceReader>,
-        pipeline: Arc<Pipeline>,
-        pipeline_config: &PipelineConfig,
-        warmup: u16,
+        pipeline_meta: Arc<Pipeline>,
+        config: &PipelineConfig,
     ) -> Arc<Self> {
-        let state = Arc::new(InsightsState::builder().build());
-        let features = FeatureFactory::from_config(&persistence, &pipeline_config.features).await;
-        let graph = PipelineGraph::new(features);
+        let features = FeatureFactory::from_config(&persistence, &config.features).await;
+        let pipeline = FeaturePipeline::new(pipeline_meta, features, config);
         let service = Self {
             persistence,
-            warmup_steps: AtomicU16::new(warmup),
             pipeline,
-            graph,
-            state,
         };
         Arc::new(service)
     }
 
     pub async fn insert(&self, insight: Arc<Insight>) {
         debug!(target: "insights", "insert to state");
-        self.state.insert_buffered(insight).await;
+        self.pipeline.insert(insight).await;
     }
 
     pub async fn insert_batch(&self, insights: &[Arc<Insight>]) {
         debug!(target: "insights", "insert to state {} insights", insights.len());
-        self.state.insert_batch_buffered(insights).await;
-    }
-
-    pub async fn warmup_tick(&self, ctx: Arc<CoreCtx>, tick: &InsightsTick) {
-        self.state.commit(tick.event_time).await;
-        // TODO FIX INSTRUMENTS
-        let insights = self.graph.calculate(&self.state, &self.pipeline, tick.event_time, &[]);
-        info!(target: "insights", "calculated {} insights", insights.len());
-
-        if self.warmup_steps.load(std::sync::atomic::Ordering::Relaxed) > 0 {
-            let number = self.warmup_steps.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-            info!(target: "insights", "warmup tick {}, need {} more", tick.event_time, number);
-        } else {
-            let insights_tick = InsightsUpdate::builder()
-                .event_time(tick.event_time)
-                // TODO: FIX INSTRUMENTS
-                .instruments(vec![])
-                .insights(insights.to_owned())
-                .build();
-
-            ctx.publish(Event::WarmupInsightsUpdate(insights_tick.into())).await;
-            debug!(target: "insights", "warmup done...");
-        }
+        self.pipeline.insert_batch(insights).await;
     }
 
     pub async fn process_tick(&self, ctx: Arc<CoreCtx>, tick: &InsightsTick) {
-        self.state.commit(tick.event_time).await;
+        // Commit buffered insights
+        self.pipeline.commit(tick.event_time).await;
 
-        // TODO: We might want to span this calculation with spawn blocking
-        // TODO: FIX INSTRUMETNS
-        let insights =
-            self.graph
-                .calculate(&self.state, &self.pipeline, tick.event_time, &[] /* all instruments */);
-        debug!(target: "insights", "calculated {} insights", insights.len());
+        // Calculate features - during warmup this builds up derived features but returns empty vec
+        // TODO: FIX INSTRUMENTS
+        let insights = self.pipeline.calculate(tick.event_time, &[]);
 
-        if self.warmup_steps.load(std::sync::atomic::Ordering::Relaxed) > 0 {
-            let number = self.warmup_steps.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-            info!(target: "insights", "warmup tick {} not published",number);
-        } else {
-            let insights_tick = InsightsUpdate::builder()
+        // Only publish if we have insights (warmup complete)
+        if !insights.is_empty() {
+            info!(target: "insights", "calculated {} insights", insights.len());
+
+            let insights_update = InsightsUpdate::builder()
                 .event_time(tick.event_time)
                 // TODO: FIX INSTRUMENTS
                 .instruments(vec![])
-                .insights(insights.to_owned())
+                .insights(insights)
                 .build();
 
-            ctx.publish(Event::InsightsUpdate(insights_tick.into())).await;
-            debug!(target: "insights", "published inside update");
+            ctx.publish(Event::InsightsUpdate(insights_update.into())).await;
+            debug!(target: "insights", "published insights update");
+        } else if !self.pipeline.is_ready() {
+            debug!(
+                target: "insights",
+                "warmup in progress, {} steps remaining",
+                self.pipeline.warmup_remaining()
+            );
         }
     }
 }
 
 #[async_trait]
-impl Runnable for Insights {
+impl Runnable for InsightService {
     // async fn setup(&self, _service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
     //     let end = core_ctx.now().await.replace_second(0).unwrap().replace_nanosecond(0).unwrap();
     //     let start = end - Duration::from_secs(86400);
@@ -230,26 +202,3 @@ impl Runnable for Insights {
         }
     }
 }
-
-// // Features
-// pub static TRADE_PRICE_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("trade_price".to_string()));
-// pub static TRADE_QUANTITY_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("trade_quantity".to_string()));
-// pub static TRADE_NOTIONAL_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("trade_notional".to_string()));
-// pub static TICK_BID_PRICE_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("tick_bid_price".to_string()));
-// pub static TICK_BID_QUANTITY_FEATURE_ID: LazyLock<FeatureId> =
-//     LazyLock::new(|| Arc::new("tick_bid_quantity".to_string()));
-// pub static TICK_ASK_PRICE_FEATURE_ID: LazyLock<FeatureId> = LazyLock::new(|| Arc::new("tick_ask_price".to_string()));
-// pub static TICK_ASK_QUANTITY_FEATURE_ID: LazyLock<FeatureId> =
-//     LazyLock::new(|| Arc::new("tick_ask_quantity".to_string()));
-
-// pub static RAW_FEATURE_IDS: LazyLock<Vec<FeatureId>> = LazyLock::new(|| {
-//     vec![
-//         TRADE_PRICE_FEATURE_ID.clone(),
-//         TRADE_QUANTITY_FEATURE_ID.clone(),
-//         TRADE_NOTIONAL_FEATURE_ID.clone(),
-//         TICK_BID_PRICE_FEATURE_ID.clone(),
-//         TICK_BID_QUANTITY_FEATURE_ID.clone(),
-//         TICK_ASK_PRICE_FEATURE_ID.clone(),
-//         TICK_ASK_QUANTITY_FEATURE_ID.clone(),
-//     ]
-// });

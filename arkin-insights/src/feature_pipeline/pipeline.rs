@@ -7,7 +7,7 @@ use arkin_core::{Insight, Instrument, Pipeline};
 use time::UtcDateTime;
 use tracing::info;
 
-use crate::{config::PipelineConfig, state::InsightsState, CompGraph, Feature};
+use crate::{config::PipelineConfig, Feature, FeatureGraph, FeatureState};
 
 /// Unified Pipeline combining state management and computation graph
 ///
@@ -19,8 +19,8 @@ use crate::{config::PipelineConfig, state::InsightsState, CompGraph, Feature};
 pub struct FeaturePipeline {
     meta: Arc<Pipeline>, // Metadata about the pipeline (from arkin-core)
     warmup_steps: AtomicU16,
-    state: InsightsState,
-    graph: CompGraph,
+    state: FeatureState,
+    graph: FeatureGraph,
 }
 
 impl FeaturePipeline {
@@ -28,8 +28,8 @@ impl FeaturePipeline {
         Self {
             meta: pipeline_meta,
             warmup_steps: AtomicU16::new(config.warmup_steps),
-            state: InsightsState::new(config.state_ttl),
-            graph: CompGraph::new(features),
+            state: FeatureState::new(config.state_ttl),
+            graph: FeatureGraph::new(features),
         }
     }
 
@@ -100,12 +100,12 @@ impl FeaturePipeline {
     }
 
     /// Get reference to underlying state
-    pub fn state(&self) -> &InsightsState {
+    pub fn state(&self) -> &FeatureState {
         &self.state
     }
 
     /// Get reference to underlying computation graph
-    pub fn graph(&self) -> &CompGraph {
+    pub fn graph(&self) -> &FeatureGraph {
         &self.graph
     }
 

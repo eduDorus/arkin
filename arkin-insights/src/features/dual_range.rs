@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{features::RangeData, math::*, state::InsightsState, Feature};
+use crate::{features::RangeData, math::*, Feature, FeatureState};
 
 #[derive(Debug, Display, Clone, Deserialize)]
 #[strum(serialize_all = "snake_case")]
@@ -44,7 +44,7 @@ impl Feature for DualRangeFeature {
 
     fn calculate(
         &self,
-        state: &InsightsState,
+        state: &FeatureState,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
