@@ -96,7 +96,7 @@ pub fn median(data: &[f64]) -> f64 {
     let mut sorted_data = data.to_vec();
     sorted_data.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
     let mid = sorted_data.len() / 2;
-    if sorted_data.len() % 2 == 0 {
+    if sorted_data.len().is_multiple_of(2) {
         (sorted_data[mid - 1] + sorted_data[mid]) / 2.0
     } else {
         sorted_data[mid]
@@ -109,7 +109,7 @@ pub fn mode(data: &[f64]) -> Vec<f64> {
         let entry = freq_map.entry(value.to_bits()).or_insert(0);
         *entry += 1;
     }
-    let max_freq = freq_map.values().max().unwrap_or(&0).clone();
+    let max_freq = *freq_map.values().max().unwrap_or(&0);
     freq_map
         .into_iter()
         .filter(|&(_, freq)| freq == max_freq)

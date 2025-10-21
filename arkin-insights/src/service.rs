@@ -53,7 +53,7 @@ impl Insights {
     pub async fn warmup_tick(&self, ctx: Arc<CoreCtx>, tick: &InsightsTick) {
         self.state.commit(tick.event_time).await;
         // TODO FIX INSTRUMENTS
-        let insights = self.graph.calculate(&self.state, &self.pipeline, tick.event_time, &vec![]);
+        let insights = self.graph.calculate(&self.state, &self.pipeline, tick.event_time, &[]);
         info!(target: "insights", "calculated {} insights", insights.len());
 
         if self.warmup_steps.load(std::sync::atomic::Ordering::Relaxed) > 0 {
@@ -79,7 +79,7 @@ impl Insights {
         // TODO: FIX INSTRUMETNS
         let insights =
             self.graph
-                .calculate(&self.state, &self.pipeline, tick.event_time, &vec![] /* all instruments */);
+                .calculate(&self.state, &self.pipeline, tick.event_time, &[] /* all instruments */);
         debug!(target: "insights", "calculated {} insights", insights.len());
 
         if self.warmup_steps.load(std::sync::atomic::Ordering::Relaxed) > 0 {

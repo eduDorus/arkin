@@ -193,12 +193,10 @@ impl SimulationExecutor {
             price // Flip
         } else if amt_closed > dec!(0) {
             entry // Reduce, keep entry
+        } else if current_qty.is_zero() {
+            price // New open
         } else {
-            if current_qty.is_zero() {
-                price // New open
-            } else {
-                (entry * current_qty.abs() + price * quantity) / new_qty.abs() // Increase, average
-            }
+            (entry * current_qty.abs() + price * quantity) / new_qty.abs() // Increase, average
         };
 
         // Margin delta (change to wallet: negative for post, positive for release)
@@ -350,7 +348,7 @@ impl Runnable for SimulationExecutor {
                     .quantity(qty.to_owned())
                     .realized_pnl(dec!(0)) // Incremental; cumulate in full impl
                     .unrealized_pnl(dec!(0)) // Sim no mark
-                    .position_side(if qty.to_owned() > dec!(0) {
+                    .position_side(if *qty > dec!(0) {
                         PositionSide::Long
                     } else {
                         PositionSide::Short

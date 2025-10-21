@@ -115,7 +115,7 @@ impl Ledger {
                 self.accounts.insert(account.id, account.clone());
                 info!("Added account: {} {}", account.id, account);
 
-                self.publisher.publish(Event::NewAccount(account.clone().into())).await;
+                self.publisher.publish(Event::NewAccount(account.clone())).await;
                 account
             }
         }
@@ -169,7 +169,7 @@ impl Ledger {
             let computed = txs
                 .iter()
                 .filter(|t| {
-                    t.has_asset(&asset) && (t.debit_account.id == account.id || t.credit_account.id == account.id)
+                    t.has_asset(asset) && (t.debit_account.id == account.id || t.credit_account.id == account.id)
                 })
                 .fold(dec!(0), |acc, t| {
                     if t.credit_account.id == account.id {
@@ -341,12 +341,10 @@ impl Ledger {
             price
         } else if amt_closed > dec!(0) {
             current_entry
+        } else if current_qty.is_zero() {
+            price
         } else {
-            if current_qty.is_zero() {
-                price
-            } else {
-                (current_entry * current_qty.abs() + price * qty_delta.abs()) / new_qty.abs()
-            }
+            (current_entry * current_qty.abs() + price * qty_delta.abs()) / new_qty.abs()
         };
         (new_entry, new_qty)
     }
@@ -400,8 +398,8 @@ impl Ledger {
                 }
 
                 // Only check positions if TransferType::Transfer (qty only)
-                if t.transfer_type == TransferType::Transfer {
-                    if let Some(inst) = t.instrument.clone() {
+                if t.transfer_type == TransferType::Transfer
+                    && let Some(inst) = t.instrument.clone() {
                         let key = (t.debit_account.to_owned(), inst.to_owned());
                         if self.positions.get(&key).is_none() {
                             let computed_qty = tx_log_lock
@@ -423,7 +421,6 @@ impl Ledger {
                             // Init entry=0
                         };
                     }
-                }
             }
         }
 
@@ -443,8 +440,8 @@ impl Ledger {
             }
 
             // Only update positions if TransferType::Transfer
-            if t.transfer_type == TransferType::Transfer {
-                if let Some(inst) = t.instrument.clone() {
+            if t.transfer_type == TransferType::Transfer
+                && let Some(inst) = t.instrument.clone() {
                     // Determine direction (user receives positive qty on buy/credit)
                     let is_credit_user = t.credit_account.is_user_account();
                     let qty_sign = if is_credit_user { dec!(1) } else { dec!(-1) };
@@ -483,7 +480,6 @@ impl Ledger {
                     self.positions.insert((venue_key, inst), (new_entry, -new_qty));
                     // Entry positive, qty negative
                 }
-            }
         }
 
         self.publisher.publish(Event::NewTransferBatch(transfer_batch)).await;
@@ -493,7 +489,7 @@ impl Ledger {
     /// Dumps the current state of the ledger as a formatted string for debugging.
     /// Includes all accounts with balances and the last N transfers.
     pub async fn dump_state(&self, max_transfers: usize) {
-        let mut accts: Vec<_> = self.accounts.iter().map(|e| (e.key().clone(), e.value().clone())).collect();
+        let mut accts: Vec<_> = self.accounts.iter().map(|e| (*e.key(), e.value().clone())).collect();
         accts.sort_by_key(|(id, _)| *id); // Deterministic order
 
         // User Accounts section with multi-asset balances and positions

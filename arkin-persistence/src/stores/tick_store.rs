@@ -24,7 +24,7 @@ pub async fn insert(ctx: &PersistenceContext, tick: Arc<Tick>) -> Result<(), Per
 }
 
 pub async fn insert_vec(ctx: &PersistenceContext, ticks: &[Arc<Tick>]) -> Result<(), PersistenceError> {
-    let ticks = ticks.into_iter().cloned().map(|t| t.into()).collect::<Vec<_>>();
+    let ticks = ticks.iter().cloned().map(|t| t.into()).collect::<Vec<_>>();
     tick_repo::insert_batch(ctx, &ticks).await
 }
 
@@ -37,7 +37,7 @@ pub async fn read_last(
             let tick = Tick::builder()
                 .event_time(dto.event_time.to_utc())
                 .instrument(Arc::clone(instrument))
-                .tick_id(dto.tick_id as u64)
+                .tick_id(dto.tick_id)
                 .bid_price(dto.bid_price)
                 .bid_quantity(dto.bid_quantity)
                 .ask_price(dto.ask_price)
@@ -55,14 +55,14 @@ pub async fn read_range(
     from: UtcDateTime,
     to: UtcDateTime,
 ) -> Result<Vec<Arc<Tick>>, PersistenceError> {
-    let db_ticks = tick_repo::read_range(ctx, &instrument_ids, from, to).await?;
+    let db_ticks = tick_repo::read_range(ctx, instrument_ids, from, to).await?;
     let mut ticks = Vec::with_capacity(db_ticks.len());
     for dto in &db_ticks {
         let instrument = instrument_store::read_by_id(ctx, &dto.instrument_id).await?;
         let tick = Tick::builder()
             .event_time(dto.event_time.to_utc())
             .instrument(instrument)
-            .tick_id(dto.tick_id as u64)
+            .tick_id(dto.tick_id)
             .bid_price(dto.bid_price)
             .bid_quantity(dto.bid_quantity)
             .ask_price(dto.ask_price)
@@ -94,7 +94,7 @@ pub async fn stream_range(
                             let tick = Tick::builder()
                                 .event_time(row.event_time.to_utc())
                                 .instrument(instrument)
-                                .tick_id(row.tick_id as u64)
+                                .tick_id(row.tick_id)
                                 .bid_price(row.bid_price)
                                 .bid_quantity(row.bid_quantity)
                                 .ask_price(row.ask_price)
@@ -163,7 +163,7 @@ pub async fn stream_range_buffered(
                                     let trade = Tick::builder()
                                         .event_time(dto.event_time.to_utc())
                                         .instrument(instrument.clone())
-                                        .tick_id(dto.tick_id as u64)
+                                        .tick_id(dto.tick_id)
                                         .bid_price(dto.bid_price)
                                         .bid_quantity(dto.bid_quantity)
                                         .ask_price(dto.ask_price)

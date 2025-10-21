@@ -83,7 +83,7 @@ impl Transfer {
     }
 
     pub fn has_asset(&self, asset: &Arc<Asset>) -> bool {
-        self.asset.as_ref() == Some(&asset)
+        self.asset.as_ref() == Some(asset)
     }
 }
 

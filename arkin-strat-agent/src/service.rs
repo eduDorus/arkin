@@ -76,7 +76,7 @@ impl AgentStrategy {
         Self {
             strategy: strategy.to_owned(),
             allocation: AllocationEngine::new(capital_per_inst, strategy.to_owned()),
-            client: client,
+            client,
             inference_interval,
             input_features_ids: input_feature_ids,
             input_state_ids,
@@ -212,7 +212,7 @@ impl AgentStrategy {
                 // Create State Input
                 let mut input_data_1: Vec<f32> = Vec::with_capacity(batch_size * sequence_length * num_state_obs);
                 let max_weight = possible_weights.iter().fold(f32::NEG_INFINITY, |acc, &x| acc.max(x));
-                let scale_factor = 1.0 / (max_weight * 1.3489795003921636);
+                let scale_factor = 1.0 / (max_weight * 1.348_979_5);
                 for _batch in 0..batch_size {
                     for seq in 0..sequence_length {
                         for state_idx in 0..num_state_obs {

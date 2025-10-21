@@ -58,12 +58,11 @@ impl BoundedBuffer {
         }
 
         // Fast path: all new values come after existing data
-        if let Some(last_existing) = self.data.back() {
-            if values[0].0 >= last_existing.0 {
+        if let Some(last_existing) = self.data.back()
+            && values[0].0 >= last_existing.0 {
                 self.data.extend(values.iter().copied());
                 return;
             }
-        }
 
         // Optimized path: find split point where values can be bulk-appended
         // Push individual values until we reach the point where remaining values
@@ -71,13 +70,12 @@ impl BoundedBuffer {
         let mut split_idx = 0;
 
         for (idx, &(timestamp, value)) in values.iter().enumerate() {
-            if let Some(last_existing) = self.data.back() {
-                if timestamp >= last_existing.0 {
+            if let Some(last_existing) = self.data.back()
+                && timestamp >= last_existing.0 {
                     // Found the split point - remaining values can be bulk-appended
                     split_idx = idx;
                     break;
                 }
-            }
             // This value needs individual insertion
             self.push(timestamp, value);
             split_idx = idx + 1;
@@ -171,7 +169,7 @@ impl InsightsState {
     /// Insert an insight immediately into the feature store (bypasses WAL buffer)
     pub fn insert(&self, event: Arc<Insight>) {
         let key = (event.instrument.clone(), event.feature_id.clone());
-        let mut entry = self.features.entry(key).or_insert_with(|| BoundedBuffer::new());
+        let mut entry = self.features.entry(key).or_insert_with(BoundedBuffer::new);
         entry.push(event.event_time, event.value);
     }
 
@@ -256,8 +254,8 @@ impl InsightsState {
     /// Return the last value <= timestamp.
     pub fn last(&self, instrument: &Arc<Instrument>, feature_id: &FeatureId, timestamp: UtcDateTime) -> Option<f64> {
         let key = (instrument.clone(), feature_id.clone());
-        let val = self.features.get(&key).and_then(|buf| buf.last(timestamp));
-        val
+        
+        self.features.get(&key).and_then(|buf| buf.last(timestamp))
     }
 
     /// Return the last `intervals` values up to `timestamp`.
@@ -284,8 +282,8 @@ impl InsightsState {
         lag: usize,
     ) -> Option<f64> {
         let key = (instrument.clone(), feature_id.clone());
-        let val = self.features.get(&key).and_then(|buf| buf.lag(timestamp, lag));
-        val
+        
+        self.features.get(&key).and_then(|buf| buf.lag(timestamp, lag))
     }
 
     /// Return a window of values in [start_time..end_time).
@@ -298,12 +296,12 @@ impl InsightsState {
     ) -> Vec<f64> {
         let start_time = timestamp - window;
         let key = (instrument.clone(), feature_id.clone());
-        let vals = self
+        
+        self
             .features
             .get(&key)
             .map(|buf| buf.window(start_time, timestamp))
-            .unwrap_or_default();
-        vals
+            .unwrap_or_default()
     }
 }
 

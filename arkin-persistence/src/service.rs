@@ -122,7 +122,7 @@ impl Persistence {
         till: UtcDateTime,
         levels: &[f64],
     ) -> Result<Vec<QuantileData>, PersistenceError> {
-        scaler_store::get_iqr(&self.ctx, &pipeline, &instrument, from, till, levels).await
+        scaler_store::get_iqr(&self.ctx, pipeline, instrument, from, till, levels).await
     }
 
     pub async fn insert_account(&self, account: Arc<Account>) {
@@ -204,7 +204,7 @@ impl Persistence {
                     .cloned()
                     .collect::<Vec<_>>()
             } else {
-                tick.insights.iter().cloned().collect::<Vec<_>>()
+                tick.insights.to_vec()
             };
             let mut lock = self.ctx.buffer.insights.lock().await;
             lock.extend(insights);
@@ -482,17 +482,15 @@ impl Runnable for Persistence {
 
     async fn setup(&self, _service_ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {
         // TODO: NOT FOR PRODUCTION
-        if self.ctx.instance.instance_type == InstanceType::Test {
-            if let Err(e) = instance_store::delete_by_id(&self.ctx, self.ctx.instance.id).await {
+        if self.ctx.instance.instance_type == InstanceType::Test
+            && let Err(e) = instance_store::delete_by_id(&self.ctx, self.ctx.instance.id).await {
                 warn!(target: "persistence", "could not delete instance: {}", e)
             }
-        }
 
-        if self.ctx.instance.instance_type == InstanceType::Simulation {
-            if let Err(e) = instance_store::delete_by_name(&self.ctx, &self.ctx.instance.name).await {
+        if self.ctx.instance.instance_type == InstanceType::Simulation
+            && let Err(e) = instance_store::delete_by_name(&self.ctx, &self.ctx.instance.name).await {
                 warn!(target: "persistence", "could not delete instance: {}", e)
             }
-        }
 
         // Create the instance
         if let Err(e) = instance_store::insert(&self.ctx, self.ctx.instance.clone()).await {

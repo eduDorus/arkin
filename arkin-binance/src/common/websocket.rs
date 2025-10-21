@@ -1507,8 +1507,8 @@ impl WebsocketHandler for WebsocketApi {
             return;
         }
 
-        if let Some(event) = msg.get("event") {
-            if event.get("e").is_some() {
+        if let Some(event) = msg.get("event")
+            && event.get("e").is_some() {
                 for callbacks in self.stream_callbacks.lock().await.values() {
                     for callback in callbacks {
                         callback(event);
@@ -1517,7 +1517,6 @@ impl WebsocketHandler for WebsocketApi {
 
                 return;
             }
-        }
 
         warn!("Received response for unknown or timed-out request: {}", data);
     }

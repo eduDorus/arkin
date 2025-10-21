@@ -21,10 +21,10 @@ impl Clock {
             frequency_secs.as_secs()
         );
         Self {
-            start: start.clone(),
-            end: end.clone(),
-            frequency_secs: frequency_secs.clone(),
-            current_timestamp: start.clone(),
+            start: start,
+            end: end,
+            frequency_secs: frequency_secs,
+            current_timestamp: start,
         }
     }
 

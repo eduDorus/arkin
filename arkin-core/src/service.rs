@@ -28,6 +28,12 @@ pub struct ServiceCtx {
     shutdown: CancellationToken,
 }
 
+impl Default for ServiceCtx {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServiceCtx {
     pub fn new() -> Self {
         Self {

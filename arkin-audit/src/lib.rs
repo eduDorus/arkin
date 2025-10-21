@@ -11,6 +11,12 @@ pub struct Audit {
     event_log: DashMap<UtcDateTime, Event>,
 }
 
+impl Default for Audit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Audit {
     pub fn new() -> Self {
         Self {

@@ -33,7 +33,7 @@ pub async fn delete_by_id(ctx: &PersistenceContext, instance_id: Uuid) -> Result
 }
 
 pub async fn delete_by_name(ctx: &PersistenceContext, name: &str) -> Result<(), PersistenceError> {
-    instance_repo::delete_by_name(ctx, &name).await?;
+    instance_repo::delete_by_name(ctx, name).await?;
     info!("Deleted instance: {}", name);
     Ok(())
 }

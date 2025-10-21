@@ -176,10 +176,10 @@ impl ExecutionOrder {
         if self.is_valid_transition(&new_status) {
             self.status = new_status;
             self.updated = event_time;
-            return true;
+            true
         } else {
             error!("Invalid transition to {} from {}", new_status, self.status);
-            return false;
+            false
         }
     }
 

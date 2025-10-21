@@ -55,8 +55,8 @@ async fn main() {
 
             let binance_historical_ingestor = Arc::new(
                 BinanceHistoricalIngestor::builder()
-                    .venue(a.venue.clone())
-                    .channel(a.channel.clone())
+                    .venue(a.venue)
+                    .channel(a.channel)
                     .start(a.start)
                     .end(a.end)
                     .build(),
@@ -117,8 +117,8 @@ async fn main() {
             for (i, chunk) in instrument_str.chunks(50).enumerate() {
                 let ingestor = Arc::new(
                     TardisIngestor::builder()
-                        .venue(a.venue.clone())
-                        .channel(a.channel.clone())
+                        .venue(a.venue)
+                        .channel(a.channel)
                         .start(a.start)
                         .end(a.end)
                         .instruments(chunk.to_vec())

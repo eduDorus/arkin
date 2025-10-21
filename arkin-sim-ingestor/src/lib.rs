@@ -121,7 +121,7 @@ async fn replay_task(
             // Publish accumulated batch before waiting at barrier
             if !batch.is_empty() {
                 info!(target: "ingestor-sim", "publishing batch of {} events for venue: {} channel: {}", batch.len(), config.venue, config.channel);
-                core_ctx.publish_batch(batch.drain(..).collect()).await;
+                core_ctx.publish_batch(std::mem::take(&mut batch)).await;
             }
 
             if let Some(barrier) = core_ctx.simulation_barrier.read().await.as_ref() {

@@ -29,7 +29,7 @@ pub async fn insert(ctx: &PersistenceContext, venue: Arc<Venue>) -> Result<(), P
 
 pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {
     match read_venue_id_cache(ctx, id).await {
-        Some(venue) => return Ok(venue),
+        Some(venue) => Ok(venue),
         None => {
             let venue = venues_repo::read_by_id(ctx, id).await?;
             let venue: Arc<Venue> = Arc::new(venue.into());
@@ -41,7 +41,7 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Venue
 
 pub async fn read_by_name(ctx: &PersistenceContext, name: &VenueName) -> Result<Arc<Venue>, PersistenceError> {
     match read_venue_name_cache(ctx, name).await {
-        Some(venue) => return Ok(venue),
+        Some(venue) => Ok(venue),
         None => {
             let venue = venues_repo::read_by_name(ctx, name).await?;
             let venue: Arc<Venue> = Arc::new(venue.into());

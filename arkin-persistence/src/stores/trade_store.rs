@@ -21,7 +21,7 @@ pub async fn insert(ctx: &PersistenceContext, trade: Arc<AggTrade>) -> Result<()
 }
 
 pub async fn insert_vec(ctx: &PersistenceContext, trades: &[Arc<AggTrade>]) -> Result<(), PersistenceError> {
-    let ticks = trades.into_iter().cloned().map(|t| t.into()).collect::<Vec<_>>();
+    let ticks = trades.iter().cloned().map(|t| t.into()).collect::<Vec<_>>();
     trade_repo::insert_batch(ctx, &ticks).await
 }
 
@@ -40,7 +40,7 @@ pub async fn read_range(
         let trade = AggTrade::builder()
             .event_time(trade.event_time.to_utc())
             .instrument(instrument)
-            .trade_id(trade.trade_id as u64)
+            .trade_id(trade.trade_id)
             .side(trade.side.into())
             .price(trade.price)
             .quantity(trade.quantity)
@@ -75,7 +75,7 @@ pub async fn stream_range(
                             let trade = AggTrade::builder()
                                 .event_time(row.event_time.to_utc())
                                 .instrument(instrument)
-                                .trade_id(row.trade_id as u64)
+                                .trade_id(row.trade_id)
                                 .side(row.side.into())
                                 .price(row.price)
                                 .quantity(row.quantity)
@@ -144,7 +144,7 @@ pub async fn stream_range_buffered(
                                     let trade = AggTrade::builder()
                                         .event_time(dto.event_time.to_utc())
                                         .instrument(Arc::clone(instrument))
-                                        .trade_id(dto.trade_id as u64)
+                                        .trade_id(dto.trade_id)
                                         .side(dto.side.into())
                                         .price(dto.price)
                                         .quantity(dto.quantity)

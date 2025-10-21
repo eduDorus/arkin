@@ -189,15 +189,14 @@ impl SignatureGenerator {
     pub fn get_signature(&self, query_params: &BTreeMap<String, Value>) -> Result<String> {
         let params = build_query_string(query_params)?;
 
-        if let Some(secret) = self.api_secret.as_ref() {
-            if self.private_key.is_none() {
+        if let Some(secret) = self.api_secret.as_ref()
+            && self.private_key.is_none() {
                 let mut mac =
                     Hmac::<Sha256>::new_from_slice(secret.as_bytes()).context("HMAC key initialization failed")?;
                 mac.update(params.as_bytes());
                 let result = mac.finalize().into_bytes();
                 return Ok(hex::encode(result));
             }
-        }
 
         if self.private_key.is_some() {
             let key_obj = self.get_key_object()?;
@@ -304,7 +303,7 @@ pub fn build_client(timeout: u64, keep_alive: bool, proxy: Option<&ProxyConfig>,
 ///
 #[must_use]
 pub fn build_user_agent(_product: &str) -> String {
-    format!("unknown")
+    "unknown".to_string()
 }
 
 /// Validates the time unit string and returns an optional normalized time unit.
@@ -505,8 +504,8 @@ where
     let re = Regex::new(r"x-mbx-(used-weight|order-count)-(\d+)([smhd])").unwrap();
     for (key, value) in headers {
         let normalized_key = key.to_lowercase();
-        if normalized_key.starts_with("x-mbx-used-weight-") || normalized_key.starts_with("x-mbx-order-count-") {
-            if let Some(caps) = re.captures(&normalized_key) {
+        if (normalized_key.starts_with("x-mbx-used-weight-") || normalized_key.starts_with("x-mbx-order-count-"))
+            && let Some(caps) = re.captures(&normalized_key) {
                 let interval_num: u32 = caps.get(2).unwrap().as_str().parse().unwrap_or(0);
                 let interval_letter = caps.get(3).unwrap().as_str().to_uppercase();
                 let interval = match interval_letter.as_str() {
@@ -530,7 +529,6 @@ where
                     retry_after: headers.get("retry-after").and_then(|v| v.parse().ok()),
                 });
             }
-        }
     }
     rate_limits
 }
@@ -926,7 +924,9 @@ where
     let should_lower_head = original.starts_with('/') && PLACEHOLDER_RE.find(body).is_some_and(|m| m.start() == 0);
 
     // Lowercase only that first placeholder's value
-    let result = if should_lower_head {
+    
+
+    if should_lower_head {
         if let Some(caps) = PLACEHOLDER_RE.captures(body) {
             let key = normalize_ws_streams_key(caps.get(2).unwrap().as_str());
             let first_val = normalized.get(&key).cloned().unwrap_or_default();
@@ -941,9 +941,7 @@ where
         }
     } else {
         stripped.clone()
-    };
-
-    result
+    }
 }
 
 // #[cfg(test)]

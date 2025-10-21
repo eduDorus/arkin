@@ -35,7 +35,7 @@ impl From<Arc<Transfer>> for TransferDTO {
             id: transfer.id,
             transfer_group_id: transfer.transfer_group_id,
             transfer_group_type: transfer.transfer_group_type,
-            transfer_type: transfer.transfer_type.clone(),
+            transfer_type: transfer.transfer_type,
             debit_account_id: transfer.debit_account.id,
             credit_account_id: transfer.credit_account.id,
             amount: transfer.amount,
@@ -117,8 +117,8 @@ pub async fn insert_batch(ctx: &PersistenceContext, transfers: Vec<TransferDTO>)
             b.push_bind(t.id)
                 .push_bind(ctx.instance.id)
                 .push_bind(t.transfer_group_id)
-                .push_bind(t.transfer_group_type.clone())
-                .push_bind(t.transfer_type.clone())
+                .push_bind(t.transfer_group_type)
+                .push_bind(t.transfer_type)
                 .push_bind(t.debit_account_id)
                 .push_bind(t.credit_account_id)
                 .push_bind(t.amount)

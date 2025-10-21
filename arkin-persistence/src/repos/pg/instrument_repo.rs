@@ -52,7 +52,7 @@ impl From<Arc<Instrument>> for InstrumentDTO {
             margin_asset_id: instrument.margin_asset.id,
             strike: instrument.strike,
             maturity: instrument.maturity.map(|m| m.into()),
-            option_type: instrument.option_type.as_ref().map(|v| v.clone()),
+            option_type: instrument.option_type.clone(),
             contract_size: instrument.contract_size,
             price_precision: instrument.price_precision as i32,
             quantity_precision: instrument.quantity_precision as i32,
@@ -68,7 +68,7 @@ impl From<Arc<Instrument>> for InstrumentDTO {
 }
 
 pub async fn insert(ctx: &PersistenceContext, instrument: InstrumentDTO) -> Result<(), PersistenceError> {
-    let instrument = InstrumentDTO::from(instrument);
+    let instrument = instrument;
     sqlx::query!(
             r#"
             INSERT INTO instruments (

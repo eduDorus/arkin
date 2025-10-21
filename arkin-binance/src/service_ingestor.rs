@@ -58,70 +58,67 @@ pub async fn start_md_task(ingestor: Arc<BinanceIngestor>, core_ctx: Arc<CoreCtx
     loop {
         tokio::select! {
               Ok(event) = rx.recv() => {
-                match event {
-                  WebsocketEvent::Message(msg) => {
-                    match serde_json::from_str::<BinanceUSDMMarketStreamEvent>(&msg) {
-                        Ok(e) => {
-                            match e.data {
-                                BinanceUSDMMarketEvent::AggTrade(trade) => {
-                                    let instrument = match core_ctx.persistence.get_instrument_by_venue_symbol(&trade.instrument, &ingestor.venue).await {
-                                        Ok(i) => i,
-                                        Err(e) => {
-                                            error!("Failed to get instrument: {}", e);
-                                            continue;
-                                        }
-                                    };
-                                    // "m": true: The buyer is the market maker.
-                                    // • The trade was initiated by a sell order from the taker.
-                                    // • The taker is selling, and the maker (buyer) is buying.
-                                    // "m": false: The seller is the market maker.
-                                    // • The trade was initiated by a buy order from the taker.
-                                    // • The taker is buying, and the maker (seller) is selling.
-                                    let side = if trade.maker {
-                                        MarketSide::Sell
-                                    } else {
-                                        MarketSide::Buy
-                                    };
-                                    let trade = AggTrade::new(
-                                        trade.event_time,
-                                        instrument,
-                                        trade.agg_trade_id,
-                                        side,
-                                        trade.price,
-                                        trade.quantity,
-                                    );
-                                    let trade = Arc::new(trade);
-                                    core_ctx.publish(Event::AggTradeUpdate(trade)).await;
-                                }
-                                BinanceUSDMMarketEvent::Tick(tick) => {
-                                    let instrument = match core_ctx.persistence.get_instrument_by_venue_symbol(&tick.instrument, &ingestor.venue).await {
-                                        Ok(i) => i,
-                                        Err(e) => {
-                                            error!("Failed to get instrument: {}", e);
-                                            continue;
-                                        }
-                                    };
-                                    let tick = Tick::new(
-                                        tick.event_time,
-                                        instrument,
-                                        tick.update_id,
-                                        tick.bid_price,
-                                        tick.bid_quantity,
-                                        tick.ask_price,
-                                        tick.ask_quantity,
-                                    );
-                                    let tick = Arc::new(tick);
-                                    core_ctx.publish(Event::TickUpdate(tick)).await;
-                                }
-                                _ => error!("type not implemented"),
-                            }
-                        }
-                        Err(e) => {
-                            error!("Failed to parse WebSocket message: {:?}", e);
-                        }
-                    }
+                if let WebsocketEvent::Message(msg) = event {
+                  match serde_json::from_str::<BinanceUSDMMarketStreamEvent>(&msg) {
+                      Ok(e) => {
+                          match e.data {
+                              BinanceUSDMMarketEvent::AggTrade(trade) => {
+                                  let instrument = match core_ctx.persistence.get_instrument_by_venue_symbol(&trade.instrument, &ingestor.venue).await {
+                                      Ok(i) => i,
+                                      Err(e) => {
+                                          error!("Failed to get instrument: {}", e);
+                                          continue;
+                                      }
+                                  };
+                                  // "m": true: The buyer is the market maker.
+                                  // • The trade was initiated by a sell order from the taker.
+                                  // • The taker is selling, and the maker (buyer) is buying.
+                                  // "m": false: The seller is the market maker.
+                                  // • The trade was initiated by a buy order from the taker.
+                                  // • The taker is buying, and the maker (seller) is selling.
+                                  let side = if trade.maker {
+                                      MarketSide::Sell
+                                  } else {
+                                      MarketSide::Buy
+                                  };
+                                  let trade = AggTrade::new(
+                                      trade.event_time,
+                                      instrument,
+                                      trade.agg_trade_id,
+                                      side,
+                                      trade.price,
+                                      trade.quantity,
+                                  );
+                                  let trade = Arc::new(trade);
+                                  core_ctx.publish(Event::AggTradeUpdate(trade)).await;
+                              }
+                              BinanceUSDMMarketEvent::Tick(tick) => {
+                                  let instrument = match core_ctx.persistence.get_instrument_by_venue_symbol(&tick.instrument, &ingestor.venue).await {
+                                      Ok(i) => i,
+                                      Err(e) => {
+                                          error!("Failed to get instrument: {}", e);
+                                          continue;
+                                      }
+                                  };
+                                  let tick = Tick::new(
+                                      tick.event_time,
+                                      instrument,
+                                      tick.update_id,
+                                      tick.bid_price,
+                                      tick.bid_quantity,
+                                      tick.ask_price,
+                                      tick.ask_quantity,
+                                  );
+                                  let tick = Arc::new(tick);
+                                  core_ctx.publish(Event::TickUpdate(tick)).await;
+                              }
+                              _ => error!("type not implemented"),
+                          }
+                      }
+                      Err(e) => {
+                          error!("Failed to parse WebSocket message: {:?}", e);
+                      }
                   }
-                  _ => {}
                 }
               }
               _ = shutdown.cancelled() => {

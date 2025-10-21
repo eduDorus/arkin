@@ -70,7 +70,7 @@ impl InferenceService for HTTPInferencer {
         // Send the request
         let res = self
             .client
-            .post(&self.format_url(model_name))
+            .post(self.format_url(model_name))
             .json(&infer_request)
             .send()
             .await

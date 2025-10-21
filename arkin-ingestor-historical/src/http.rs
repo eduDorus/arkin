@@ -63,11 +63,11 @@ impl TardisHttpClient {
             match res.error_for_status() {
                 Ok(res) => {
                     let data = res.bytes().await?;
-                    return Ok(data);
+                    Ok(data)
                 }
                 Err(e) => {
                     error!("Failed to fetch data: {}", e);
-                    return Err(backoff::Error::transient(e));
+                    Err(backoff::Error::transient(e))
                 }
             }
         })
@@ -114,7 +114,7 @@ impl QueryParams {
             offset,
             filters: vec![Filter {
                 channel: channel.to_string(),
-                symbols: symbols.into_iter().map(|s| s).collect(),
+                symbols: symbols.into_iter().collect(),
             }],
         }
     }

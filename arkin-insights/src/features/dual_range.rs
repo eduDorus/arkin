@@ -53,8 +53,8 @@ impl Feature for DualRangeFeature {
 
         // Get data
         let data_1 = match self.data {
-            RangeData::Interval(i) => state.last_n(instrument, &&self.input_1, event_time, i),
-            RangeData::Window(w) => state.window(instrument, &&self.input_1, event_time, Duration::from_secs(w)),
+            RangeData::Interval(i) => state.last_n(instrument, &self.input_1, event_time, i),
+            RangeData::Window(w) => state.window(instrument, &self.input_1, event_time, Duration::from_secs(w)),
         };
         let data_2 = match self.data {
             RangeData::Interval(i) => state.last_n(instrument, &self.input_2, event_time, i),

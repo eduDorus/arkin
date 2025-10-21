@@ -24,8 +24,8 @@ impl From<Arc<Account>> for AccountDTO {
         Self {
             id: account.id,
             venue_id: account.venue.id,
-            owner: account.owner.clone(),
-            account_type: account.account_type.clone(),
+            owner: account.owner,
+            account_type: account.account_type,
             created: account.created.into(),
             updated: account.updated.into(),
         }

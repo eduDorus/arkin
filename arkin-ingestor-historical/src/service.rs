@@ -544,8 +544,8 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
     let shutdown = service_ctx.get_shutdown_token();
 
     let req = TardisRequest::new(
-        ingestor.venue.clone(),
-        ingestor.channel.clone(),
+        ingestor.venue,
+        ingestor.channel,
         ingestor.instruments.clone(),
         ingestor.start,
         ingestor.end,
@@ -595,7 +595,7 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
 
                 // Get instrument once (remove duplicate block)
                 let instrument = match persistence_service
-                    .get_instrument_by_venue_symbol(&stream_event.venue_symbol(), &venue)
+                    .get_instrument_by_venue_symbol(stream_event.venue_symbol(), &venue)
                     .await {
                         Ok(i) => i,
                         Err(e) => {

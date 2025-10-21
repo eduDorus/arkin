@@ -148,8 +148,7 @@ impl Feature for RangeFeature {
                 .value(value)
                 .insight_type(InsightType::Continuous)
                 .persist(self.persist)
-                .build()
-                .into(),
+                .build(),
         )];
 
         // Save insight to state

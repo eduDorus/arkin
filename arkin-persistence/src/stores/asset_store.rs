@@ -38,7 +38,7 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Asset
 
 pub async fn read_by_symbol(ctx: &PersistenceContext, symbol: &str) -> Result<Arc<Asset>, PersistenceError> {
     match read_cache_by_symbol(ctx, symbol).await {
-        Some(asset) => return Ok(asset),
+        Some(asset) => Ok(asset),
         None => {
             let asset_dto = asset_repo::read_by_symbol(ctx, symbol).await?;
             let asset: Arc<Asset> = asset_dto.into();

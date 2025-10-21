@@ -147,7 +147,6 @@ impl BinanceExecution {
             let mut order_clone = order.clone();
             order_clone.reject(ctx.now().await);
             ctx.publish(Event::VenueOrderRejected(order_clone.into())).await;
-            return;
         }
     }
 
@@ -180,8 +179,7 @@ impl BinanceExecution {
             }
         } else {
             error!(target: "execution::binance", "API not connected");
-            return;
-        };
+        }
     }
 }
 

@@ -39,22 +39,21 @@ impl ModifyMultipleOrdersBatchOrdersParameterInner {
 }
 ///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum SideEnum {
     #[serde(rename = "BUY")]
+    #[default]
     Buy,
     #[serde(rename = "SELL")]
     Sell,
 }
 
-impl Default for SideEnum {
-    fn default() -> SideEnum {
-        Self::Buy
-    }
-}
 ///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum PriceMatchEnum {
     #[serde(rename = "NONE")]
+    #[default]
     None,
     #[serde(rename = "OPPONENT")]
     Opponent,
@@ -74,8 +73,3 @@ pub enum PriceMatchEnum {
     Queue20,
 }
 
-impl Default for PriceMatchEnum {
-    fn default() -> PriceMatchEnum {
-        Self::None
-    }
-}

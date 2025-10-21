@@ -124,7 +124,7 @@ impl PipelineGraph {
         for (i, input) in raw_inputs.iter().enumerate() {
             dot.push_str(&format!("  raw_{} [label=\"{}\"];\n", i, input));
         }
-        dot.push_str("\n");
+        dot.push('\n');
 
         // Add feature nodes
         dot.push_str("  // Features\n");
@@ -134,7 +134,7 @@ impl PipelineGraph {
             let label = outputs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
             dot.push_str(&format!("  {} [label=\"{}\"];\n", node.index(), label));
         }
-        dot.push_str("\n");
+        dot.push('\n');
 
         // Create a mapping from raw input names to their pseudo-node IDs
         let mut raw_input_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
@@ -151,7 +151,7 @@ impl PipelineGraph {
                 }
             }
         }
-        dot.push_str("\n");
+        dot.push('\n');
 
         // Add edges between features
         dot.push_str("  // Edges between features\n");
@@ -437,7 +437,7 @@ impl PipelineGraph {
                     // Calculate the feature
                     let insights = instruments
                         .par_iter()
-                        .filter_map(|instrument| feature.calculate(&state, &pipeline, instrument, event_time))
+                        .filter_map(|instrument| feature.calculate(state, pipeline, instrument, event_time))
                         .flatten()
                         .collect::<Vec<_>>();
                     pipeline_result.lock().extend(insights);
@@ -461,8 +461,8 @@ impl PipelineGraph {
         });
         debug!("Finished graph calculation");
         let mut lock = pipeline_result.lock();
-        let res = std::mem::take(&mut *lock);
-        res
+        
+        std::mem::take(&mut *lock)
     }
 
     // pub async fn calculate_async(&self, tick: &InsightsTick) -> Vec<Arc<Insight>> {

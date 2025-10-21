@@ -248,8 +248,8 @@ impl PersistenceReader for MockPersistence {
 }
 
 pub fn test_pubsub() -> Arc<PubSub> {
-    let pubsub = PubSub::new(true);
-    pubsub
+    
+    PubSub::new(true)
 }
 
 pub fn test_btc_asset() -> Arc<Asset> {
@@ -337,10 +337,10 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
         .strike(None)
         .option_type(None)
         .contract_size(dec!(1.0))
-        .price_precision(2 as u32)
-        .quantity_precision(3 as u32)
-        .base_precision(8 as u32)
-        .quote_precision(8 as u32)
+        .price_precision(2_u32)
+        .quantity_precision(3_u32)
+        .base_precision(8_u32)
+        .quote_precision(8_u32)
         .tick_size(dec!(0.10))
         .lot_size(dec!(0.001))
         .status(InstrumentStatus::Trading)
@@ -365,10 +365,10 @@ pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
         .strike(None)
         .option_type(None)
         .contract_size(dec!(1.0))
-        .price_precision(2 as u32)
-        .quantity_precision(3 as u32)
-        .base_precision(8 as u32)
-        .quote_precision(8 as u32)
+        .price_precision(2_u32)
+        .quantity_precision(3_u32)
+        .base_precision(8_u32)
+        .quote_precision(8_u32)
         .tick_size(dec!(0.01))
         .lot_size(dec!(0.001))
         .status(InstrumentStatus::Trading)
@@ -399,7 +399,7 @@ pub fn test_tick(
     let tick = Tick::builder()
         .event_time(OffsetDateTime::now_utc().to_utc())
         .instrument(instrument)
-        .tick_id(0 as u64)
+        .tick_id(0_u64)
         .bid_price(bid_price)
         .bid_quantity(bid_quantity)
         .ask_price(ask_price)

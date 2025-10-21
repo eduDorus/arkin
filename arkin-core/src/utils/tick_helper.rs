@@ -49,7 +49,7 @@ impl TickHelper {
         let mut ts = UtcDateTime::now();
         // Round to nearest second (Tick can be off by a few nanoseconds in either direction)
         if ts.nanosecond() > 500_000_000 {
-            ts = ts + Duration::from_secs(1);
+            ts += Duration::from_secs(1);
         }
         ts = ts.replace_nanosecond(0).expect("Failed to replace nanosecond");
 

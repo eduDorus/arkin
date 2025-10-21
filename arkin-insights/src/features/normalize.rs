@@ -45,7 +45,7 @@ impl RobustScaler {
 
     pub fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
         let key = (instrument_id, feature_id.clone());
-        let (median, iqr) = self.feature_data.get(&key).expect(&format!("Feature ID not found: {:?}", key));
+        let (median, iqr) = self.feature_data.get(&key).unwrap_or_else(|| panic!("Feature ID not found: {:?}", key));
         (x - median) / iqr
     }
 
@@ -56,7 +56,7 @@ impl RobustScaler {
     #[allow(dead_code)]
     pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
         let key = (instrument_id, feature_id.clone());
-        let (median, iqr) = self.feature_data.get(&key).expect(&format!("Feature ID not found: {:?}", key));
+        let (median, iqr) = self.feature_data.get(&key).unwrap_or_else(|| panic!("Feature ID not found: {:?}", key));
         x * iqr + median
     }
 
@@ -91,9 +91,9 @@ impl QuantileTransformer {
             .map(|q| ((q.instrument_id, q.feature_id.into()), q.quantiles))
             .collect();
         QuantileTransformer {
-            feature_quantiles: feature_quantiles,
+            feature_quantiles,
             references,
-            output_distribution: output_distribution,
+            output_distribution,
         }
     }
 
@@ -152,7 +152,7 @@ impl QuantileTransformer {
         let quantiles = self
             .feature_quantiles
             .get(&key)
-            .expect(&format!("Feature ID not found: {:?}", key));
+            .unwrap_or_else(|| panic!("Feature ID not found: {:?}", key));
 
         // Step 2: Compute p based on output distribution
         let p = match self.output_distribution {

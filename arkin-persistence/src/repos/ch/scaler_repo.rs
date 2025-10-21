@@ -86,8 +86,8 @@ pub async fn get_iqr(
         );
         let quantile_data = ctx.ch_client.query(&query).fetch_one::<ScalerDataDTO>().await?;
         let data = QuantileData {
-            instrument_id: instrument_id,
-            feature_id: feature_id,
+            instrument_id,
+            feature_id,
             quantiles: quantile_data.quantiles,
             median: quantile_data.median,
             iqr: quantile_data.iqr,
