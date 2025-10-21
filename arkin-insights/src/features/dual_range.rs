@@ -19,12 +19,11 @@ pub enum DualRangeAlgo {
     Correlation,
     CosineSimilarity,
     Beta,
+    WeightedMean,
 }
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct DualRangeFeature {
-    pipeline: Arc<Pipeline>,
-    insight_state: Arc<InsightsState>,
     input_1: FeatureId,
     input_2: FeatureId,
     output: FeatureId,
@@ -43,33 +42,23 @@ impl Feature for DualRangeFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
+    fn calculate(
+        &self,
+        state: &Arc<InsightsState>,
+        pipeline: &Arc<Pipeline>,
+        instrument: &Arc<Instrument>,
+        event_time: UtcDateTime,
+    ) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating {}...", self.method);
 
         // Get data
         let data_1 = match self.data {
-            RangeData::Interval(i) => {
-                self.insight_state
-                    .last_n(Some(instrument.clone()), self.input_1.clone(), event_time, i)
-            }
-            RangeData::Window(w) => self.insight_state.window(
-                Some(instrument.clone()),
-                self.input_1.clone(),
-                event_time,
-                Duration::from_secs(w),
-            ),
+            RangeData::Interval(i) => state.last_n(instrument, &&self.input_1, event_time, i),
+            RangeData::Window(w) => state.window(instrument, &&self.input_1, event_time, Duration::from_secs(w)),
         };
         let data_2 = match self.data {
-            RangeData::Interval(i) => {
-                self.insight_state
-                    .last_n(Some(instrument.clone()), self.input_2.clone(), event_time, i)
-            }
-            RangeData::Window(w) => self.insight_state.window(
-                Some(instrument.clone()),
-                self.input_2.clone(),
-                event_time,
-                Duration::from_secs(w),
-            ),
+            RangeData::Interval(i) => state.last_n(instrument, &self.input_2, event_time, i),
+            RangeData::Window(w) => state.window(instrument, &self.input_2, event_time, Duration::from_secs(w)),
         };
 
         // Check if we have enough data
@@ -100,6 +89,7 @@ impl Feature for DualRangeFeature {
             DualRangeAlgo::Correlation => correlation(&data_1, &data_2),
             DualRangeAlgo::CosineSimilarity => cosine_similarity(&data_1, &data_2),
             DualRangeAlgo::Beta => beta(&data_1, &data_2),
+            DualRangeAlgo::WeightedMean => weighted_mean(&data_1, &data_2),
         };
 
         // Check if we have a value
@@ -114,20 +104,26 @@ impl Feature for DualRangeFeature {
         // Set precision to 6 decimal places
         value = (value * 1_000_000.0).round() / 1_000_000.0;
 
-        let insight = Insight::builder()
-            .event_time(event_time)
-            .pipeline(Some(self.pipeline.clone()))
-            .instrument(Some(instrument.clone()))
-            .feature_id(self.output.clone())
-            .value(value)
-            .insight_type(InsightType::Continuous)
-            .persist(self.persist)
-            .build();
+        // Return insight
+        let insight = vec![Arc::new(
+            Insight::builder()
+                .event_time(event_time)
+                .pipeline(Some(pipeline.clone()))
+                .instrument(instrument.clone())
+                .feature_id(self.output.clone())
+                .value(value)
+                .insight_type(InsightType::Continuous)
+                .persist(self.persist)
+                .build(),
+        )];
 
-        Some(vec![insight])
+        // Save insight to state
+        state.insert_batch(insight.as_slice());
+
+        Some(insight)
     }
 
-    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
-        self.calculate(instrument, timestamp)
-    }
+    // async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+    //     self.calculate(instrument, timestamp)
+    // }
 }

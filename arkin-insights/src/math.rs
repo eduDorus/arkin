@@ -38,10 +38,58 @@ pub fn sum(data: &[f64]) -> f64 {
     data.par_iter().sum()
 }
 
+pub fn sum_positive(data: &[f64]) -> f64 {
+    data.par_iter().filter(|&&x| x > 0.0).sum()
+}
+
+pub fn sum_negative(data: &[f64]) -> f64 {
+    data.par_iter().filter(|&&x| x < 0.0).sum()
+}
+
+pub fn sum_abs(data: &[f64]) -> f64 {
+    data.par_iter().map(|x| x.abs()).sum()
+}
+
+pub fn sum_abs_positive(data: &[f64]) -> f64 {
+    data.par_iter().filter(|&&x| x > 0.0).map(|x| x.abs()).sum()
+}
+
+pub fn sum_abs_negative(data: &[f64]) -> f64 {
+    data.par_iter().filter(|&&x| x < 0.0).map(|x| x.abs()).sum()
+}
+
 pub fn mean(data: &[f64]) -> f64 {
     let sum: f64 = sum(data);
     let n = data.len() as f64;
     sum / n
+}
+
+/// Calculate weighted mean (e.g., VWAP)
+/// values: the values to average (e.g., prices)
+/// weights: the weights for each value (e.g., volumes or notional)
+pub fn weighted_mean(values: &[f64], weights: &[f64]) -> f64 {
+    if values.len() != weights.len() {
+        warn!("weighted_mean: values and weights must have the same length");
+        return f64::NAN;
+    }
+
+    if values.is_empty() {
+        return f64::NAN;
+    }
+
+    // Calculate sum of (value * weight) and sum of weights
+    let (weighted_sum, total_weight): (f64, f64) = values
+        .par_iter()
+        .zip(weights.par_iter())
+        .map(|(&v, &w)| (v * w.abs(), w.abs())) // Use absolute value of weights
+        .reduce(|| (0.0, 0.0), |a, b| (a.0 + b.0, a.1 + b.1));
+
+    if total_weight == 0.0 {
+        warn!("weighted_mean: total weight is zero");
+        return f64::NAN;
+    }
+
+    weighted_sum / total_weight
 }
 
 pub fn median(data: &[f64]) -> f64 {

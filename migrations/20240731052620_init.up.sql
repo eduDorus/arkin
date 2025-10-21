@@ -94,7 +94,8 @@ CREATE TYPE instrument_type AS ENUM (
   'spot', 
   'perpetual', 
   'future', 
-  'option'
+  'option',
+  'index'
 );
 CREATE TYPE instrument_status AS ENUM (
   'trading', 
@@ -111,6 +112,7 @@ CREATE TABLE IF NOT EXISTS instruments (
     symbol TEXT NOT NULL,
     venue_symbol TEXT NOT NULL,
     instrument_type instrument_type NOT NULL,
+    synthetic BOOLEAN NOT NULL DEFAULT false,
     base_asset_id uuid NOT NULL REFERENCES assets(id),
     quote_asset_id uuid NOT NULL REFERENCES assets(id),
     margin_asset_id uuid NOT NULL REFERENCES assets(id),
@@ -129,9 +131,9 @@ CREATE TABLE IF NOT EXISTS instruments (
     updated TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 INSERT INTO public.instruments (id,venue_id,symbol,venue_symbol,"instrument_type",base_asset_id,quote_asset_id,margin_asset_id,strike,maturity,option_type,contract_size,price_precision,quantity_precision,base_precision,quote_precision,lot_size,tick_size,status,created,updated) VALUES
-	 ('f5dd7db6-89da-4c68-b62e-6f80b763bef6'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-btc-usdt@binance','BTCUSDT','perpetual'::public."instrument_type",'894ff9df-e76e-4b2e-aaec-49988de26a84'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,2,3,8,8,0.001,0.1,'trading'::public."instrument_status",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00'),
-	 ('0a6400f4-abb5-4ff3-8720-cf2eeebef26e'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-eth-usdt@binance','ETHUSDT','perpetual'::public."instrument_type",'3091ac12-64a7-4824-9ea5-e1c27e10af6f'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,2,3,8,8,0.001,0.01,'trading'::public."instrument_status",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00'),
-	 ('461c915c-de28-40af-ad5a-cc2a46e6473d'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-sol-usdt@binance','SOLUSDT','perpetual'::public."instrument_type",'97576805-9c3d-427f-82c4-09df0d796d44'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,4,0,8,8,1,0.0100,'trading'::public."instrument_status",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00');
+	 ('f5dd7db6-89da-4c68-b62e-6f80b763bef6'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-btc-usdt@binance','BTCUSDT','perpetual'::public."instrument_type",false,'894ff9df-e76e-4b2e-aaec-49988de26a84'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,2,3,8,8,0.001,0.1,'trading'::public."instrument_status",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00'),
+	 ('0a6400f4-abb5-4ff3-8720-cf2eeebef26e'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-eth-usdt@binance','ETHUSDT','perpetual'::public."instrument_type",false,'3091ac12-64a7-4824-9ea5-e1c27e10af6f'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,2,3,8,8,0.001,0.01,'trading'::public."instrument_status",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00'),
+	 ('461c915c-de28-40af-ad5a-cc2a46e6473d'::uuid,'48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'perp-sol-usdt@binance','SOLUSDT','perpetual'::public."instrument_type",false,'97576805-9c3d-427f-82c4-09df0d796d44'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,'5ba12a78-1f89-41b6-87c5-020afb7f680d'::uuid,NULL,NULL,NULL,1,4,0,8,8,1,0.0100,'trading'::public."instrument_status",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00');
 
 
 

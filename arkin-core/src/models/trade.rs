@@ -1,17 +1,11 @@
 use std::{cmp::Ordering, fmt, sync::Arc};
 
-use rust_decimal::prelude::*;
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
-use crate::{
-    constants::{TRADE_PRICE_FEATURE_ID, TRADE_QUANTITY_FEATURE_ID},
-    models::Insight,
-    prelude::TIMESTAMP_FORMAT,
-    Price, Quantity,
-};
+use crate::{prelude::TIMESTAMP_FORMAT, Price, Quantity};
 
-use super::{InsightType, Instrument, MarketSide};
+use super::{Instrument, MarketSide};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct AggTrade {
@@ -40,26 +34,6 @@ impl AggTrade {
             price,
             quantity,
         }
-    }
-
-    pub fn to_insights(&self) -> Vec<Arc<Insight>> {
-        let insights = vec![
-            Insight::builder()
-                .event_time(self.event_time)
-                .instrument(Some(self.instrument.clone()))
-                .feature_id(TRADE_PRICE_FEATURE_ID.clone())
-                .value(self.price.to_f64().unwrap_or(f64::NAN))
-                .insight_type(InsightType::Raw)
-                .build(),
-            Insight::builder()
-                .event_time(self.event_time)
-                .instrument(Some(self.instrument.clone()))
-                .feature_id(TRADE_QUANTITY_FEATURE_ID.clone())
-                .value(self.quantity.to_f64().unwrap_or(f64::NAN) * f64::from(self.side))
-                .insight_type(InsightType::Raw)
-                .build(),
-        ];
-        insights.into_iter().map(Arc::new).collect()
     }
 }
 

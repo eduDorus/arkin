@@ -30,7 +30,7 @@ impl From<Arc<Insight>> for InsightClickhouseDTO {
         Self {
             event_time: insight.event_time.into(),
             pipeline_id: insight.pipeline.as_ref().map(|p| p.id).unwrap(),
-            instrument_id: insight.instrument.as_ref().map(|i| i.id).unwrap(),
+            instrument_id: insight.instrument.id,
             feature_id: insight.feature_id.to_string(),
             value: insight.value,
             insight_type: insight.insight_type.to_string(),

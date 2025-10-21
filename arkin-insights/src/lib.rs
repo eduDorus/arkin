@@ -2,24 +2,23 @@ mod config;
 mod errors;
 mod feature_factory;
 mod features;
-// mod fft;
-// mod hdbscan;
 mod math;
 mod pipeline;
 mod service;
 mod state;
-// mod ta;
 mod traits;
 
 pub use errors::*;
+pub use features::*;
+pub use pipeline::PipelineGraph;
 pub use service::Insights;
 pub use traits::*;
 
 pub mod prelude {
     pub use crate::config::*;
     pub use crate::errors::*;
-    // pub use crate::fft::*;
-    // pub use crate::hdbscan::*;
+    pub use crate::feature_factory::*;
+    pub use crate::features::*;
     pub use crate::math::*;
     pub use crate::service::Insights;
     pub use crate::state::*;

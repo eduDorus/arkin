@@ -26,6 +26,11 @@ pub enum RangeAlgo {
     // Basic
     Count,
     Sum,
+    SumPositive,
+    SumNegative,
+    SumAbs,
+    SumAbsPositive,
+    SumAbsNegative,
     Mean,
     Median,
     Min,
@@ -51,8 +56,6 @@ pub enum RangeAlgo {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct RangeFeature {
-    pipeline: Arc<Pipeline>,
-    insight_state: Arc<InsightsState>,
     input: FeatureId,
     output: FeatureId,
     method: RangeAlgo,
@@ -70,21 +73,19 @@ impl Feature for RangeFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
+    fn calculate(
+        &self,
+        state: &Arc<InsightsState>,
+        pipeline: &Arc<Pipeline>,
+        instrument: &Arc<Instrument>,
+        event_time: UtcDateTime,
+    ) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating {}...", self.method);
 
         // Get data
         let data = match self.data {
-            RangeData::Interval(i) => {
-                self.insight_state
-                    .last_n(Some(instrument.clone()), self.input.clone(), event_time, i)
-            }
-            RangeData::Window(w) => self.insight_state.window(
-                Some(instrument.clone()),
-                self.input.clone(),
-                event_time,
-                Duration::from_secs(w),
-            ),
+            RangeData::Interval(i) => state.last_n(instrument, &self.input, event_time, i),
+            RangeData::Window(w) => state.window(instrument, &self.input, event_time, Duration::from_secs(w)),
         };
 
         // Check if we have enough data
@@ -98,6 +99,11 @@ impl Feature for RangeFeature {
             // Basic
             RangeAlgo::Count => data.len() as f64,
             RangeAlgo::Sum => sum(&data),
+            RangeAlgo::SumAbs => sum_abs(&data),
+            RangeAlgo::SumPositive => sum_positive(&data),
+            RangeAlgo::SumNegative => sum_negative(&data),
+            RangeAlgo::SumAbsPositive => sum_abs_positive(&data),
+            RangeAlgo::SumAbsNegative => sum_abs_negative(&data),
             RangeAlgo::Mean => mean(&data),
             RangeAlgo::Median => median(&data),
             RangeAlgo::Min => min(&data),
@@ -133,21 +139,26 @@ impl Feature for RangeFeature {
         // Set precision to 6 decimal places
         value = (value * 1_000_000.0).round() / 1_000_000.0;
 
-        let insight = Insight::builder()
-            .event_time(event_time)
-            .pipeline(Some(self.pipeline.clone()))
-            .instrument(Some(instrument.clone()))
-            .feature_id(self.output.clone())
-            .value(value)
-            .insight_type(InsightType::Continuous)
-            .persist(self.persist)
-            .build()
-            .into();
+        let insight = vec![Arc::new(
+            Insight::builder()
+                .event_time(event_time)
+                .pipeline(Some(pipeline.clone()))
+                .instrument(instrument.clone())
+                .feature_id(self.output.clone())
+                .value(value)
+                .insight_type(InsightType::Continuous)
+                .persist(self.persist)
+                .build()
+                .into(),
+        )];
 
-        Some(vec![insight])
+        // Save insight to state
+        state.insert_batch(insight.as_slice());
+
+        Some(insight)
     }
 
-    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
-        self.calculate(instrument, timestamp)
-    }
+    // async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+    //     self.calculate(instrument, timestamp)
+    // }
 }

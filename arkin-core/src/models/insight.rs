@@ -32,8 +32,7 @@ pub struct Insight {
     pub event_time: UtcDateTime,
     #[builder(default)]
     pub pipeline: Option<Arc<Pipeline>>,
-    #[builder(default)]
-    pub instrument: Option<Arc<Instrument>>,
+    pub instrument: Arc<Instrument>,
     pub feature_id: FeatureId,
     pub value: f64,
     pub insight_type: InsightType,
@@ -46,12 +45,7 @@ impl fmt::Display for Insight {
         write!(
             f,
             "instrument={} feature={} value={}",
-            self.instrument
-                .as_ref()
-                .map(|instrument| instrument.symbol.as_str())
-                .unwrap_or("global value"),
-            self.feature_id,
-            self.value
+            self.instrument, self.feature_id, self.value
         )
     }
 }

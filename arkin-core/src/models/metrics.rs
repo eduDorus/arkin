@@ -6,7 +6,7 @@ use strum::{Display, EnumString};
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
-use crate::{FeatureId, Insight, Instrument};
+use crate::Instrument;
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type, EnumString)]
 #[strum(serialize_all = "snake_case")]
@@ -29,20 +29,6 @@ pub struct Metric {
     pub instrument: Arc<Instrument>,
     pub metric_type: MetricType,
     pub value: Decimal,
-}
-
-impl Metric {
-    pub fn to_insight(&self) -> Arc<Insight> {
-        Insight::builder()
-            .event_time(self.event_time)
-            .instrument(Some(self.instrument.clone()))
-            .feature_id(FeatureId::from(self.metric_type.to_string()))
-            .value(self.value.to_f64().unwrap_or(f64::NAN))
-            .insight_type(crate::InsightType::Raw)
-            .persist(false)
-            .build()
-            .into()
-    }
 }
 
 impl fmt::Display for Metric {

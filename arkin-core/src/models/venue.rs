@@ -1,5 +1,6 @@
 use std::fmt;
 
+use serde::Deserialize;
 use sqlx::prelude::Type;
 use strum::{Display, EnumString};
 use time::UtcDateTime;
@@ -32,7 +33,7 @@ impl fmt::Display for Venue {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, clap::ValueEnum)] // For Clap auto-parsing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, clap::ValueEnum, Deserialize)] // For Clap auto-parsing
 #[strum(serialize_all = "snake_case")]
 pub enum VenueName {
     Personal,

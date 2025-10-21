@@ -9,9 +9,9 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, AssetType, MetricType, Event, Instance, InstanceType, Instrument, InstrumentStatus,
-    InstrumentType, PersistenceError, PersistenceReader, Pipeline, Price, PubSub, Publisher, Quantity, Strategy,
-    SystemTime, Tick, Venue, VenueName, VenueType,
+    utils::Frequency, AggTrade, Asset, AssetType, Event, FeatureId, Instance, InstanceType, Instrument,
+    InstrumentStatus, InstrumentType, MetricType, PersistenceError, PersistenceReader, Pipeline, Price, PubSub,
+    Publisher, Quantity, Strategy, SystemTime, Tick, Venue, VenueName, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -148,6 +148,11 @@ impl PersistenceReader for MockPersistence {
     async fn get_instance_by_name(&self, _name: &str) -> Result<Arc<Instance>, PersistenceError> {
         Ok(test_instance())
     }
+
+    async fn get_feature_id(&self, id: &str) -> FeatureId {
+        FeatureId::new(id.to_string())
+    }
+
     async fn get_pipeline_by_id(&self, _id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
         Ok(test_pipeline())
     }
@@ -324,6 +329,7 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
         .symbol("perp-btc-usdt@binance".into())
         .venue_symbol("BTCUSDT".into())
         .instrument_type(InstrumentType::Perpetual)
+        .synthetic(false)
         .base_asset(test_btc_asset())
         .quote_asset(test_usdt_asset())
         .margin_asset(test_usdt_asset())
@@ -351,6 +357,7 @@ pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
         .symbol("perp-eth-usdt@binance".into())
         .venue_symbol("ETHUSDT".into())
         .instrument_type(InstrumentType::Perpetual)
+        .synthetic(false)
         .base_asset(test_eth_asset())
         .quote_asset(test_usdt_asset())
         .margin_asset(test_usdt_asset())

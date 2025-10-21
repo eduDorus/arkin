@@ -22,8 +22,6 @@ pub enum TwoValueAlgo {
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct TwoValueFeature {
-    pipeline: Arc<Pipeline>,
-    insight_state: Arc<InsightsState>,
     input_1: FeatureId,
     input_2: FeatureId,
     output: FeatureId,
@@ -41,16 +39,18 @@ impl Feature for TwoValueFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
+    fn calculate(
+        &self,
+        state: &Arc<InsightsState>,
+        pipeline: &Arc<Pipeline>,
+        instrument: &Arc<Instrument>,
+        event_time: UtcDateTime,
+    ) -> Option<Vec<Arc<Insight>>> {
         debug!("Calculating {}...", self.method);
 
         //  Get data
-        let value_1 = self
-            .insight_state
-            .last(Some(instrument.clone()), self.input_1.clone(), event_time);
-        let value_2 = self
-            .insight_state
-            .last(Some(instrument.clone()), self.input_2.clone(), event_time);
+        let value_1 = state.last(instrument, &self.input_1, event_time);
+        let value_2 = state.last(instrument, &self.input_2, event_time);
 
         // Check if we have enough data
         if value_1.is_none() || value_2.is_none() {
@@ -91,20 +91,25 @@ impl Feature for TwoValueFeature {
         change = (change * 1_000_000.0).round() / 1_000_000.0;
 
         // Return insight
-        let insight = Insight::builder()
-            .event_time(event_time)
-            .pipeline(Some(self.pipeline.clone()))
-            .instrument(Some(instrument.clone()))
-            .feature_id(self.output.clone())
-            .value(change)
-            .insight_type(InsightType::Continuous)
-            .persist(self.persist)
-            .build();
+        let insight = vec![Arc::new(
+            Insight::builder()
+                .event_time(event_time)
+                .pipeline(Some(pipeline.clone()))
+                .instrument(instrument.clone())
+                .feature_id(self.output.clone())
+                .value(change)
+                .insight_type(InsightType::Continuous)
+                .persist(self.persist)
+                .build(),
+        )];
 
-        Some(vec![insight])
+        // Save insight to state
+        state.insert_batch(insight.as_slice());
+
+        Some(insight)
     }
 
-    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
-        self.calculate(instrument, timestamp)
-    }
+    // async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+    //     self.calculate(instrument, timestamp)
+    // }
 }

@@ -22,19 +22,18 @@ pub struct RobustScaler {
 }
 
 impl RobustScaler {
-    pub fn new(pipeline: &Arc<Pipeline>, data_location: &str) -> Self {
+    pub fn new(data_location: &str, version: &str) -> Self {
         let mut feature_data = HashMap::new();
 
-        let quantiles = Self::load(data_location, pipeline);
+        let quantiles = Self::load(data_location, version);
         for q in quantiles.data.into_iter() {
             feature_data.insert((q.instrument_id, q.feature_id.into()), (q.median, q.iqr));
         }
         RobustScaler { feature_data }
     }
 
-    fn load(data_location: &str, pipeline: &Arc<Pipeline>) -> Quantiles {
-        let pipeline_name = pipeline.name.clone();
-        let file = std::fs::File::open(format!("{data_location}/{pipeline_name}.json")).expect("Failed to open file");
+    fn load(data_location: &str, version: &str) -> Quantiles {
+        let file = std::fs::File::open(format!("{data_location}/{version}.json")).expect("Failed to open file");
         let quantiles: Quantiles = serde_json::from_reader(file).expect("Failed to parse JSON");
         quantiles
     }
@@ -83,8 +82,8 @@ pub struct QuantileTransformer {
 
 impl QuantileTransformer {
     /// Create a new transformer with a specified number of quantiles and output distribution
-    pub fn new(pipeline: &Arc<Pipeline>, output_distribution: DistributionType, data_location: &str) -> Self {
-        let quantiles = Self::load(data_location, &pipeline);
+    pub fn new(data_location: &str, version: &str, output_distribution: DistributionType) -> Self {
+        let quantiles = Self::load(data_location, version);
         let references = quantiles.levels;
         let feature_quantiles = quantiles
             .data
@@ -98,9 +97,8 @@ impl QuantileTransformer {
         }
     }
 
-    fn load(data_location: &str, pipeline: &Arc<Pipeline>) -> Quantiles {
-        let pipeline_name = pipeline.name.clone();
-        let file = std::fs::File::open(format!("{data_location}/{pipeline_name}.json")).expect("Failed to open file");
+    fn load(data_location: &str, version: &str) -> Quantiles {
+        let file = std::fs::File::open(format!("{data_location}/{version}.json")).expect("Failed to open file");
         let quantile_data: Quantiles = serde_json::from_reader(file).expect("Failed to parse JSON");
         quantile_data
     }
@@ -181,8 +179,6 @@ pub enum NormalizeFeatureType {
 
 #[derive(Debug, TypedBuilder)]
 pub struct NormalizeFeature {
-    pipeline: Arc<Pipeline>,
-    insight_state: Arc<InsightsState>,
     transformer: QuantileTransformer,
     scaler: RobustScaler,
     input: Vec<FeatureId>,
@@ -201,7 +197,13 @@ impl Feature for NormalizeFeature {
         vec![self.output.clone()]
     }
 
-    fn calculate(&self, instrument: &Arc<Instrument>, event_time: UtcDateTime) -> Option<Vec<Insight>> {
+    fn calculate(
+        &self,
+        state: &Arc<InsightsState>,
+        pipeline: &Arc<Pipeline>,
+        instrument: &Arc<Instrument>,
+        event_time: UtcDateTime,
+    ) -> Option<Vec<Arc<Insight>>> {
         debug!("Robust scaling...");
 
         //  Get data
@@ -210,7 +212,7 @@ impl Feature for NormalizeFeature {
             .iter()
             .filter_map(|id| {
                 // Get the value
-                let value = self.insight_state.last(Some(instrument.clone()), id.clone(), event_time)?;
+                let value = state.last(instrument, id, event_time)?;
 
                 // Check if value is nan
                 if value.is_nan() {
@@ -231,8 +233,8 @@ impl Feature for NormalizeFeature {
                 Some(
                     Insight::builder()
                         .event_time(event_time)
-                        .pipeline(Some(self.pipeline.clone()))
-                        .instrument(Some(instrument.clone()))
+                        .pipeline(Some(pipeline.clone()))
+                        .instrument(instrument.clone())
                         .feature_id(id.clone())
                         .value(altered_value)
                         .insight_type(InsightType::Normalized)
@@ -240,12 +242,16 @@ impl Feature for NormalizeFeature {
                         .build(),
                 )
             })
+            .map(Arc::new)
             .collect::<Vec<_>>();
+
+        // Save insights to state
+        state.insert_batch(insights.as_slice());
 
         Some(insights)
     }
 
-    async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
-        self.calculate(instrument, timestamp)
-    }
+    // async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {
+    //     self.calculate(instrument, timestamp)
+    // }
 }

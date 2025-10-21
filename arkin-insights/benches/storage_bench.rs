@@ -10,7 +10,7 @@ fn create_test_instrument() -> Arc<Instrument> {
 }
 
 fn create_insight(
-    instrument: Option<Arc<Instrument>>,
+    instrument: Arc<Instrument>,
     feature_id: FeatureId,
     timestamp: UtcDateTime,
     value: f64,
@@ -44,7 +44,7 @@ fn bench_single_insert(c: &mut Criterion) {
                     let insights: Vec<_> = (0..size)
                         .map(|i| {
                             create_insight(
-                                Some(instrument.clone()),
+                                instrument.clone(),
                                 feature_id.clone(),
                                 base_timestamp + time::Duration::seconds(i as i64),
                                 100.0 + i as f64,
@@ -85,7 +85,7 @@ fn bench_batch_insert(c: &mut Criterion) {
                     let insights: Vec<_> = (0..size)
                         .map(|i| {
                             create_insight(
-                                Some(instrument.clone()),
+                                instrument.clone(),
                                 feature_id.clone(),
                                 base_timestamp + time::Duration::seconds(i as i64),
                                 100.0 + i as f64,
@@ -124,7 +124,7 @@ fn bench_insert_buffered(c: &mut Criterion) {
                     let insights: Vec<_> = (0..size)
                         .map(|i| {
                             create_insight(
-                                Some(instrument.clone()),
+                                instrument.clone(),
                                 feature_id.clone(),
                                 base_timestamp + time::Duration::seconds(i as i64),
                                 100.0 + i as f64,
@@ -167,7 +167,7 @@ fn bench_insert_batch_buffered(c: &mut Criterion) {
                     let insights: Vec<_> = (0..size)
                         .map(|i| {
                             create_insight(
-                                Some(instrument.clone()),
+                                instrument.clone(),
                                 feature_id.clone(),
                                 base_timestamp + time::Duration::seconds(i as i64),
                                 100.0 + i as f64,
@@ -202,7 +202,7 @@ fn bench_point_queries(c: &mut Criterion) {
     // Populate with 1000 points
     for i in 0..1000 {
         let insight = create_insight(
-            Some(instrument.clone()),
+            instrument.clone(),
             feature_id.clone(),
             base_timestamp + time::Duration::seconds(i),
             100.0 + i as f64,
@@ -213,35 +213,15 @@ fn bench_point_queries(c: &mut Criterion) {
     let query_time = base_timestamp + time::Duration::seconds(999);
 
     group.bench_function("last", |b| {
-        b.iter(|| {
-            state.last(
-                black_box(Some(instrument.clone())),
-                black_box(feature_id.clone()),
-                black_box(query_time),
-            )
-        });
+        b.iter(|| state.last(&instrument, black_box(&feature_id), black_box(query_time)));
     });
 
     group.bench_function("lag_10", |b| {
-        b.iter(|| {
-            state.lag(
-                black_box(Some(instrument.clone())),
-                black_box(feature_id.clone()),
-                black_box(query_time),
-                black_box(10),
-            )
-        });
+        b.iter(|| state.lag(&instrument, black_box(&feature_id), black_box(query_time), black_box(10)));
     });
 
     group.bench_function("lag_100", |b| {
-        b.iter(|| {
-            state.lag(
-                black_box(Some(instrument.clone())),
-                black_box(feature_id.clone()),
-                black_box(query_time),
-                black_box(100),
-            )
-        });
+        b.iter(|| state.lag(&instrument, black_box(&feature_id), black_box(query_time), black_box(100)));
     });
 
     group.finish();
@@ -258,7 +238,7 @@ fn bench_range_queries(c: &mut Criterion) {
     // Populate with 10000 points
     for i in 0..10000 {
         let insight = create_insight(
-            Some(instrument.clone()),
+            instrument.clone(),
             feature_id.clone(),
             base_timestamp + time::Duration::seconds(i),
             100.0 + i as f64,
@@ -275,8 +255,8 @@ fn bench_range_queries(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("window", window_size), window_size, |b, _| {
             b.iter(|| {
                 state.window(
-                    black_box(Some(instrument.clone())),
-                    black_box(feature_id.clone()),
+                    &instrument,
+                    black_box(&feature_id),
                     black_box(start),
                     black_box(window_duration),
                 )
@@ -298,7 +278,7 @@ fn bench_last_n(c: &mut Criterion) {
     // Populate with 5000 points
     for i in 0..5000 {
         let insight = create_insight(
-            Some(instrument.clone()),
+            instrument.clone(),
             feature_id.clone(),
             base_timestamp + time::Duration::seconds(i),
             100.0 + i as f64,
@@ -312,14 +292,7 @@ fn bench_last_n(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*n as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, &n| {
-            b.iter(|| {
-                state.last_n(
-                    black_box(Some(instrument.clone())),
-                    black_box(feature_id.clone()),
-                    black_box(query_time),
-                    black_box(n),
-                )
-            });
+            b.iter(|| state.last_n(&instrument, black_box(&feature_id), black_box(query_time), black_box(n)));
         });
     }
 

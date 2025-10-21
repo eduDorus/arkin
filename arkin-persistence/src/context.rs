@@ -36,6 +36,7 @@ pub struct Caches {
     pub instrument_venue_symbol: Cache<String, Arc<Instrument>>,
     pub venue_id: Cache<Uuid, Arc<Venue>>,
     pub venue_name: Cache<VenueName, Arc<Venue>>,
+    pub feature_id: Cache<String, Arc<String>>,
 }
 
 impl Caches {
@@ -47,6 +48,7 @@ impl Caches {
             instrument_venue_symbol: Cache::new(capacity),
             venue_id: Cache::new(capacity),
             venue_name: Cache::new(capacity),
+            feature_id: Cache::new(capacity),
         }
     }
 }

@@ -11,3 +11,7 @@
 
 # Models
 /models
+
+# Pipeline Graph
+pipeline_graph.svg
+pipeline_graph.dot

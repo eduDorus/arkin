@@ -350,6 +350,10 @@ impl PersistenceReader for Persistence {
         instance_store::read_by_name(&self.ctx, name).await
     }
 
+    async fn get_feature_id(&self, id: &str) -> FeatureId {
+        feature_store::read_feature_id(&self.ctx, id).await
+    }
+
     async fn get_pipeline_by_id(&self, id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
         pipeline_store::read_by_id(&self.ctx, id).await
     }

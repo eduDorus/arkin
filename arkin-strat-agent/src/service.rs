@@ -124,7 +124,7 @@ impl AgentStrategy {
                 for insight in update.insights.iter().filter(|i| {
                     self.input_features_ids.contains(&i.feature_id)
                         && i.insight_type == InsightType::Normalized
-                        && i.instrument == Some(inst.clone())
+                        && i.instrument == inst.clone()
                 }) {
                     if let Some(deque) = state.input_features.get_mut(&insight.feature_id) {
                         debug!(target: "strat::agent", "Adding feature {} with value {} for instrument {}", insight.feature_id, insight.value, inst);
@@ -167,7 +167,7 @@ impl AgentStrategy {
                 for insight in update.insights.iter().filter(|i| {
                     self.input_features_ids.contains(&i.feature_id)
                         && i.insight_type == InsightType::Normalized
-                        && i.instrument == Some(inst.clone())
+                        && i.instrument == inst.clone()
                 }) {
                     if let Some(deque) = state.input_features.get_mut(&insight.feature_id) {
                         debug!(target: "strat::agent", "Adding feature {} with value {} for instrument {}", insight.feature_id, insight.value, inst);

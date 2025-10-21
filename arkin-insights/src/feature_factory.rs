@@ -1,241 +1,151 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use arkin_core::prelude::*;
+use arkin_core::PersistenceReader;
 
 use crate::{
     config::FeatureConfig,
     features::{
-        DistributionType, DualRangeFeature, LagFeature, NormalizeFeature, OHLCVFeature, QuantileTransformer,
-        RangeFeature, RobustScaler, TimeFeature, TwoValueFeature,
+        DistributionType, DualRangeFeature, LagFeature, NormalizeFeature, QuantileTransformer, RangeFeature,
+        RobustScaler, TwoValueFeature,
     },
-    state::InsightsState,
-    // ta::{
-    //     AverageDirectionalIndexFeature, ChaikinMoneyFlowFeature, ChaikinOscillatorFeature, MovingAverageFeature,
-    //     RelativeStrengthIndexFeature,
-    // },
     Feature,
 };
 
 pub struct FeatureFactory {}
 
 impl FeatureFactory {
-    pub fn from_config(
-        pipeline: Arc<Pipeline>,
-        state: Arc<InsightsState>,
+    pub async fn from_config(
+        persistence: &Arc<dyn PersistenceReader>,
         configs: &[FeatureConfig],
     ) -> Vec<Arc<dyn Feature>> {
-        // Create nodes
-        configs
-            .iter()
-            .map(|config| {
-                let feature: Arc<dyn Feature> = match config {
-                    FeatureConfig::OHLCV(c) => Arc::new(
-                        OHLCVFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input_price(c.input_price.to_owned())
-                            .input_quantity(c.input_quantity.to_owned())
-                            .output_open(c.output_open.to_owned())
-                            .output_high(c.output_high.to_owned())
-                            .output_low(c.output_low.to_owned())
-                            .output_close(c.output_close.to_owned())
-                            .output_typical_price(c.output_typical_price.to_owned())
-                            .output_vwap(c.output_vwap.to_owned())
-                            .output_volume(c.output_volume.to_owned())
-                            .output_buy_volume(c.output_buy_volume.to_owned())
-                            .output_sell_volume(c.output_sell_volume.to_owned())
-                            .output_notional_volume(c.output_notional_volume.to_owned())
-                            .output_buy_notional_volume(c.output_buy_notional_volume.to_owned())
-                            .output_sell_notional_volume(c.output_sell_notional_volume.to_owned())
-                            .output_trade_count(c.output_trade_count.to_owned())
-                            .output_buy_trade_count(c.output_buy_trade_count.to_owned())
-                            .output_sell_trade_count(c.output_sell_trade_count.to_owned())
-                            .window(Duration::from_secs(c.window))
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::Time(c) => Arc::new(
-                        TimeFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .input(c.input.clone())
-                            .output_day_of_week(c.output_day_of_week.clone())
-                            .output_hour_of_day(c.output_hour_of_day.clone())
-                            .output_minute_of_day(c.output_minute_of_day.clone())
-                            .output_minute_of_hour(c.output_minute_of_hour.clone())
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::Lag(c) => Arc::new(
-                        LagFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .lag(c.lag)
-                            .method(c.method.clone())
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::Range(c) => Arc::new(
-                        RangeFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input(c.input.clone())
-                            .output(c.output.clone())
-                            .data(c.data.clone())
-                            .method(c.method.clone())
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    FeatureConfig::DualRange(c) => Arc::new(
-                        DualRangeFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input_1(c.input_1.clone())
-                            .input_2(c.input_2.clone())
-                            .output(c.output.clone())
-                            .data(c.data.clone())
-                            .method(c.method.clone())
-                            .persist(c.persist)
-                            .build(),
-                    ),
+        let mut features = Vec::new();
 
-                    FeatureConfig::TwoValue(c) => Arc::new(
-                        TwoValueFeature::builder()
-                            .pipeline(pipeline.clone())
-                            .insight_state(state.clone())
-                            .input_1(c.input_1.clone())
-                            .input_2(c.input_2.clone())
-                            .output(c.output.clone())
-                            .method(c.method.clone())
-                            .persist(c.persist)
-                            .build(),
-                    ),
-                    // FeatureConfig::MA(c) => Arc::new(
-                    //     MovingAverageFeature::builder()
-                    //         .pipeline(pipeline.clone())
-                    //         .insight_state(state.clone())
-                    //         .ma_type(c.ma_type.clone())
-                    //         .input(c.input.clone())
-                    //         .output(c.output.clone())
-                    //         .periods(c.periods)
-                    //         .persist(c.persist)
-                    //         .build(),
-                    // ),
-                    // FeatureConfig::RSI(c) => Arc::new(
-                    //     RelativeStrengthIndexFeature::builder()
-                    //         .pipeline(pipeline.clone())
-                    //         .insight_state(state.clone())
-                    //         .input(c.input.clone())
-                    //         .output(c.output.clone())
-                    //         .periods(c.periods)
-                    //         .persist(c.persist)
-                    //         .build(),
-                    // ),
-                    // FeatureConfig::ADX(c) => Arc::new(
-                    //     AverageDirectionalIndexFeature::builder()
-                    //         .pipeline(pipeline.clone())
-                    //         .insight_state(state.clone())
-                    //         .input(c.input.clone())
-                    //         .output(c.output.clone())
-                    //         .periods(c.periods)
-                    //         .persist(c.persist)
-                    //         .build(),
-                    // ),
-                    // FeatureConfig::CMF(c) => Arc::new(
-                    //     ChaikinMoneyFlowFeature::builder()
-                    //         .pipeline(pipeline.clone())
-                    //         .insight_state(state.clone())
-                    //         .input(c.input.clone())
-                    //         .output(c.output.clone())
-                    //         .periods(c.periods)
-                    //         .persist(c.persist)
-                    //         .build(),
-                    // ),
-                    // FeatureConfig::CO(c) => Arc::new(
-                    //     ChaikinOscillatorFeature::builder()
-                    //         .pipeline(pipeline.clone())
-                    //         .insight_state(state.clone())
-                    //         .input(c.input.clone())
-                    //         .output(c.output.clone())
-                    //         .periods_fast(c.periods_fast)
-                    //         .periods_slow(c.periods_slow)
-                    //         .persist(c.persist)
-                    //         .build(),
-                    // ),
-                    FeatureConfig::Normalize(c) => {
-                        let transformer =
-                            QuantileTransformer::new(&pipeline, DistributionType::Normal, &c.data_location);
-                        let scaler = RobustScaler::new(&pipeline, &c.data_location);
+        for config in configs {
+            match config {
+                FeatureConfig::Lag(c) => {
+                    // Validate that input, output, and lag have the same length
+                    assert_eq!(c.input.len(), c.output.len(), "input and output must have the same length");
+                    assert_eq!(c.input.len(), c.lag.len(), "input and lag must have the same length");
 
-                        Arc::new(
-                            NormalizeFeature::builder()
-                                .pipeline(pipeline.clone())
-                                .insight_state(state.clone())
-                                .input(c.input.clone())
-                                .output(c.output.clone())
-                                .transformer(transformer)
-                                .scaler(scaler)
+                    for i in 0..c.input.len() {
+                        let input_feature = persistence.get_feature_id(&c.input[i]).await;
+                        let output_feature = persistence.get_feature_id(&c.output[i]).await;
+
+                        features.push(Arc::new(
+                            LagFeature::builder()
+                                .input(input_feature)
+                                .output(output_feature)
+                                .lag(c.lag[i])
                                 .method(c.method.clone())
                                 .persist(c.persist)
                                 .build(),
-                        )
+                        ) as Arc<dyn Feature>);
                     }
-                    // FeatureConfig::Onnx(c) => {
-                    //     let transformer =
-                    //         QuantileTransformer::load(&c.quantile_data_location, DistributionType::Normal);
-                    //     let scaler = RobustScaler::load(&c.quantile_data_location);
+                }
+                FeatureConfig::Range(c) => {
+                    // Validate that input, output, and data have the same length
+                    assert_eq!(c.input.len(), c.output.len(), "input and output must have the same length");
+                    assert_eq!(c.input.len(), c.data.len(), "input and data must have the same length");
 
-                    //     Arc::new(
-                    //         OnnxFeature::builder()
-                    //             .pipeline(pipeline.clone())
-                    //             .insight_state(state.clone())
-                    //             .model_location(c.model_location.clone())
-                    //             .model_name(c.model_name.clone())
-                    //             .model_version(c.model_version.clone())
-                    //             .input(c.input.clone())
-                    //             .output(c.output.clone())
-                    //             .sequence_length(c.sequence_length)
-                    //             .target_feature(c.target_feature.clone())
-                    //             .quantile_transformer(transformer)
-                    //             .robust_scaler(scaler)
-                    //             .persist(c.persist)
-                    //             .build(),
-                    //     )
-                    // }
-                    // FeatureConfig::CatBoost(c) => Arc::new(
-                    //     CatBoostFeature::builder()
-                    //         .insight_state(state.clone())
-                    //         .model_location(c.model_location.clone())
-                    //         .model_name(c.model_name.clone())
-                    //         .model_version(c.model_version.clone())
-                    //         .input_numerical(c.input_numerical.clone())
-                    //         .input_categorical(c.input_categorical.clone())
-                    //         .output(c.output.clone())
-                    //         .persist(c.persist)
-                    //         .build(),
-                    // ),
-                    // FeatureConfig::MeanVariance(c) => Arc::new(
-                    //     MeanVarianceFeature::builder()
-                    //         .insight_state(state.clone())
-                    //         .input_expected_returns(c.input_expected_returns.clone())
-                    //         .input_returns(c.input_returns.clone())
-                    //         .output(c.output.clone())
-                    //         .periods_returns(c.periods_returns)
-                    //         .risk_aversion(c.risk_aversion)
-                    //         .risk_free_rate(c.risk_free_rate)
-                    //         .max_exposure_long(c.max_exposure_long)
-                    //         .max_exposure_short(c.max_exposure_short)
-                    //         .max_exposure_long_per_asset(c.max_exposure_long_per_asset)
-                    //         .max_exposure_short_per_asset(c.max_exposure_short_per_asset)
-                    //         .transaction_cost(c.transaction_cost)
-                    //         .persist(c.persist)
-                    //         .build(),
-                    // ),
-                    _ => unimplemented!(),
-                };
-                feature
-            })
-            .collect()
+                    for i in 0..c.input.len() {
+                        let input_feature = persistence.get_feature_id(&c.input[i]).await;
+                        let output_feature = persistence.get_feature_id(&c.output[i]).await;
+
+                        features.push(Arc::new(
+                            RangeFeature::builder()
+                                .input(input_feature)
+                                .output(output_feature)
+                                .data(c.data[i].clone())
+                                .method(c.method.clone())
+                                .persist(c.persist)
+                                .build(),
+                        ) as Arc<dyn Feature>);
+                    }
+                }
+                FeatureConfig::DualRange(c) => {
+                    // Validate that all arrays have the same length
+                    assert_eq!(
+                        c.input_1.len(),
+                        c.input_2.len(),
+                        "input_1 and input_2 must have the same length"
+                    );
+                    assert_eq!(c.input_1.len(), c.output.len(), "input_1 and output must have the same length");
+                    assert_eq!(c.input_1.len(), c.data.len(), "input_1 and data must have the same length");
+
+                    for i in 0..c.input_1.len() {
+                        let input_1_feature = persistence.get_feature_id(&c.input_1[i]).await;
+                        let input_2_feature = persistence.get_feature_id(&c.input_2[i]).await;
+                        let output_feature = persistence.get_feature_id(&c.output[i]).await;
+
+                        features.push(Arc::new(
+                            DualRangeFeature::builder()
+                                .input_1(input_1_feature)
+                                .input_2(input_2_feature)
+                                .output(output_feature)
+                                .data(c.data[i].clone())
+                                .method(c.method.clone())
+                                .persist(c.persist)
+                                .build(),
+                        ) as Arc<dyn Feature>);
+                    }
+                }
+                FeatureConfig::TwoValue(c) => {
+                    // Validate that all arrays have the same length
+                    assert_eq!(
+                        c.input_1.len(),
+                        c.input_2.len(),
+                        "input_1 and input_2 must have the same length"
+                    );
+                    assert_eq!(c.input_1.len(), c.output.len(), "input_1 and output must have the same length");
+                    assert_eq!(
+                        c.input_1.len(),
+                        c.horizons.len(),
+                        "input_1 and horizons must have the same length"
+                    );
+
+                    for i in 0..c.input_1.len() {
+                        let input_1_feature = persistence.get_feature_id(&c.input_1[i]).await;
+                        let input_2_feature = persistence.get_feature_id(&c.input_2[i]).await;
+                        let output_feature = persistence.get_feature_id(&c.output[i]).await;
+
+                        features.push(Arc::new(
+                            TwoValueFeature::builder()
+                                .input_1(input_1_feature)
+                                .input_2(input_2_feature)
+                                .output(output_feature)
+                                .method(c.method.clone())
+                                .persist(c.persist)
+                                .build(),
+                        ) as Arc<dyn Feature>);
+                    }
+                }
+                FeatureConfig::Normalize(c) => {
+                    let transformer = QuantileTransformer::new(&c.data_location, &c.version, DistributionType::Normal);
+                    let scaler = RobustScaler::new(&c.data_location, &c.version);
+
+                    // Register input features
+                    let mut input_features = Vec::new();
+                    for input in &c.input {
+                        input_features.push(persistence.get_feature_id(input).await);
+                    }
+
+                    // Register output feature
+                    let output_feature = persistence.get_feature_id(&c.output).await;
+
+                    features.push(Arc::new(
+                        NormalizeFeature::builder()
+                            .input(input_features)
+                            .output(output_feature)
+                            .transformer(transformer)
+                            .scaler(scaler)
+                            .method(c.method.clone())
+                            .persist(c.persist)
+                            .build(),
+                    ) as Arc<dyn Feature>);
+                }
+            }
+        }
+
+        features
     }
 }

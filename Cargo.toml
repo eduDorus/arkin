@@ -1,7 +1,7 @@
 [workspace]
 # members = [ "arkin-persistence", "arkin-ingestors", "arkin-strategies", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
 
-members = [ "arkin", "arkin-accounting", "arkin-audit", "arkin-binance", "arkin-cli", "arkin-core", "arkin-cron", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-ingestor-historical", "arkin-insights", "arkin-persistence", "arkin-sim-ingestor", "arkin-strat-agent", "arkin-strat-crossover", "arkin-sim-ingestor" ]
+members = [ "arkin", "arkin-accounting", "arkin-audit", "arkin-binance", "arkin-cli", "arkin-core", "arkin-cron", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-ingestor-historical", "arkin-insights", "arkin-persistence", "arkin-sim-ingestor", "arkin-strat-agent", "arkin-strat-crossover" ]
 
 default-members = [ "arkin" ]
 
@@ -33,7 +33,7 @@ parking_lot = { version = "0.12", features = [  ], default-features = false }
 rayon = "1.11"
 
 # Async
-tokio = { version = "1.47", features = [ "full" ] }
+tokio = { version = "1.48", features = [ "full" ] }
 kanal = { version = "0.1.1", features = [ "std-mutex" ] }
 async-trait = "0.1"
 async-stream = "0.3"
@@ -63,6 +63,7 @@ clickhouse = { version = "0.14", features = [ "lz4", "uuid", "time" ] }
 
 # Time
 time = { version = "0.3", features = [ "macros", "serde-human-readable" ] }
+chrono = { version = "0.4", features = [ "serde" ] }
 
 # Logging & Tracing
 tracing = { version = "0.1", features = [  ] }
@@ -114,6 +115,9 @@ split-debuginfo = "unpacked"
 lto = "thin"
 
 [profile.maxperf]
-codegen-units = 1
 inherits = "release"
+codegen-units = 1
 lto = "fat"
+opt-level = 3
+strip = true
+panic = "abort"

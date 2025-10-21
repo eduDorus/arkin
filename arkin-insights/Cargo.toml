@@ -28,6 +28,7 @@ statrs = { workspace = true }
 strum = { workspace = true }
 parking_lot = { workspace = true }
 rand = { workspace = true }
+graphviz-rust = "0.9.6"
 # ort = { workspace = true }
 # ndarray = { workspace = true }
 # rustfft = "6.4.0"

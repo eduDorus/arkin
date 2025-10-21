@@ -28,21 +28,15 @@ impl CrossoverStrategy {
         // Calculate the crossover signals for each instrument in the tick
         let mut new_weights = HashMap::new();
         for i in &tick.instruments {
-            let fast_ma = tick.insights.iter().find(|x| {
-                if let Some(inst) = x.instrument.as_ref() {
-                    inst == i && x.feature_id == self.fast_ma
-                } else {
-                    false
-                }
-            });
+            let fast_ma = tick
+                .insights
+                .iter()
+                .find(|x| x.instrument == *i && x.feature_id == self.fast_ma);
 
-            let slow_ma = tick.insights.iter().find(|x| {
-                if let Some(inst) = x.instrument.as_ref() {
-                    inst == i && x.feature_id == self.slow_ma
-                } else {
-                    false
-                }
-            });
+            let slow_ma = tick
+                .insights
+                .iter()
+                .find(|x| x.instrument == *i && x.feature_id == self.slow_ma);
 
             let new_weight = match (fast_ma, slow_ma) {
                 (Some(f), Some(s)) => match f.value > s.value {

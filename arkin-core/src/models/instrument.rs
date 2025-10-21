@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use rust_decimal::prelude::Decimal;
+use serde::Deserialize;
 use sqlx::Type;
 use strum::Display;
 use time::UtcDateTime;
@@ -11,13 +12,14 @@ use crate::{Maturity, Price};
 
 use super::{Asset, Venue};
 
-#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, clap::ValueEnum)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, clap::ValueEnum, Deserialize)]
 #[sqlx(type_name = "instrument_type", rename_all = "snake_case")]
 pub enum InstrumentType {
     Spot,
     Perpetual,
     Future,
     Option,
+    Index,
 }
 
 #[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type)]
@@ -45,6 +47,7 @@ pub struct Instrument {
     pub base_asset: Arc<Asset>,
     pub quote_asset: Arc<Asset>,
     pub margin_asset: Arc<Asset>,
+    pub synthetic: bool, // NEW: Marks synthetic instruments
     pub maturity: Option<Maturity>,
     pub strike: Option<Price>,
     pub option_type: Option<InstrumentOptionType>,

@@ -6,7 +6,7 @@ use time::UtcDateTime;
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, CoreCtx, Event, Instance, Instrument, InstrumentType, MetricType,
+    utils::Frequency, AggTrade, Asset, CoreCtx, Event, FeatureId, Instance, Instrument, InstrumentType, MetricType,
     PersistenceError, Pipeline, ServiceCtx, Tick, Venue, VenueName,
 };
 
@@ -25,6 +25,9 @@ pub trait SystemTime: Send + Sync {
 pub trait PersistenceReader: Send + Sync {
     async fn get_instance_by_id(&self, id: &Uuid) -> Result<Arc<Instance>, PersistenceError>;
     async fn get_instance_by_name(&self, name: &str) -> Result<Arc<Instance>, PersistenceError>;
+
+    async fn get_feature_id(&self, id: &str) -> FeatureId;
+
     async fn get_pipeline_by_id(&self, id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError>;
     async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError>;
 

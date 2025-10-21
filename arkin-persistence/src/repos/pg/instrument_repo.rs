@@ -19,6 +19,7 @@ pub struct InstrumentDTO {
     pub symbol: String,
     pub venue_symbol: String,
     pub instrument_type: InstrumentType,
+    pub synthetic: bool,
     pub base_asset_id: Uuid,
     pub quote_asset_id: Uuid,
     pub margin_asset_id: Uuid,
@@ -45,6 +46,7 @@ impl From<Arc<Instrument>> for InstrumentDTO {
             symbol: instrument.symbol.clone(),
             venue_symbol: instrument.venue_symbol.clone(),
             instrument_type: instrument.instrument_type.clone(),
+            synthetic: instrument.synthetic,
             base_asset_id: instrument.base_asset.id,
             quote_asset_id: instrument.quote_asset.id,
             margin_asset_id: instrument.margin_asset.id,
@@ -70,10 +72,10 @@ pub async fn insert(ctx: &PersistenceContext, instrument: InstrumentDTO) -> Resu
     sqlx::query!(
             r#"
             INSERT INTO instruments (
-                id, venue_id, symbol, venue_symbol, instrument_type, base_asset_id, quote_asset_id, margin_asset_id, strike, maturity, option_type,
+                id, venue_id, symbol, venue_symbol, instrument_type, synthetic, base_asset_id, quote_asset_id, margin_asset_id, strike, maturity, option_type,
                 contract_size, price_precision, quantity_precision, base_precision, quote_precision, lot_size, tick_size, status
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11, $12, $13, $14, $15, $16, $17, $18, $19
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11, $12, $13, $14, $15, $16, $17, $18, $19, $20
             )
             "#,
             instrument.id,
@@ -81,6 +83,7 @@ pub async fn insert(ctx: &PersistenceContext, instrument: InstrumentDTO) -> Resu
             instrument.symbol,
             instrument.venue_symbol,
             instrument.instrument_type as InstrumentType,
+            instrument.synthetic,
             instrument.base_asset_id,
             instrument.quote_asset_id,
             instrument.margin_asset_id,
@@ -111,6 +114,7 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Instrumen
                 symbol,
                 venue_symbol,
                 instrument_type AS "instrument_type:InstrumentType",
+                synthetic,
                 base_asset_id,
                 quote_asset_id,
                 margin_asset_id,
@@ -156,6 +160,7 @@ pub async fn read_by_venue_symbol(
                 symbol,
                 venue_symbol,
                 instrument_type AS "instrument_type:InstrumentType",
+                synthetic,
                 base_asset_id,
                 quote_asset_id,
                 margin_asset_id,
@@ -201,6 +206,7 @@ pub async fn list_by_venue(
                 symbol,
                 venue_symbol,
                 instrument_type AS "instrument_type:InstrumentType",
+                synthetic,
                 base_asset_id,
                 quote_asset_id,
                 margin_asset_id,
@@ -246,6 +252,7 @@ pub async fn list_by_venue_and_type(
                 symbol,
                 venue_symbol,
                 instrument_type AS "instrument_type:InstrumentType",
+                synthetic,
                 base_asset_id,
                 quote_asset_id,
                 margin_asset_id,

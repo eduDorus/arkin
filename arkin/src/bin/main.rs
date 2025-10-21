@@ -328,11 +328,11 @@ async fn main() {
                 .build();
             let persistence = Persistence::new(&config, instance, false, false, a.dry_run);
 
-            let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
-            let instruments = persistence
-                .list_instruments_by_venue_symbol(&a.instruments, &venue)
-                .await
-                .unwrap();
+            // let venue = persistence.get_venue_by_name(&VenueName::BinanceUsdmFutures).await.unwrap();
+            // let instruments = persistence
+            //     .list_instruments_by_venue_symbol(&a.instruments, &venue)
+            //     .await
+            //     .unwrap();
 
             // Init accounting
             let ledger = Ledger::new(pubsub.publisher());
@@ -358,11 +358,12 @@ async fn main() {
                 .updated(time.now().await)
                 .build();
             let insights = Insights::new(
+                persistence.clone(),
                 pipeline_info.into(),
                 &pipeline_config.insights_service.pipeline,
-                instruments,
                 a.warmup,
-            );
+            )
+            .await;
 
             // Crossover strategy
             // let strategy_instance = Strategy::builder()
@@ -680,11 +681,12 @@ async fn main() {
                 .updated(time.now().await)
                 .build();
             let insights = Insights::new(
+                persistence.clone(),
                 pipeline_info.into(),
                 &pipeline_config.insights_service.pipeline,
-                instruments.clone(),
                 a.warmup,
-            );
+            )
+            .await;
 
             let strategy_instance = Strategy::builder()
                 .id(Uuid::parse_str("bf59f914-3304-4f57-89ea-c098b9af3f59").expect("Invalid UUID"))

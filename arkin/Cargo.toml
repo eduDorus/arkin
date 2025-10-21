@@ -45,3 +45,18 @@ clap = { workspace = true }
 rust_decimal = { workspace = true }
 mimalloc = { version = "0.1.48", features = [ "v3" ] }
 tonic = { workspace = true }
+
+# polars = { version = "0.51", features = [
+#   "lazy",           # Lazy API with query optimization
+#   "sql",            # SQL query support
+#   "dtype-datetime", # DateTime type support
+#   "temporal",       # Chrono conversions
+#   "nightly",        # SIMD acceleration
+#   "performant",     # Additional fast paths
+#   "rolling_window", # Rolling window operations (for our 15-min rolling avg)
+#   "cum_agg",        # Cumulative aggregations
+#   "is_in",          # Membership checks
+#   "concat_str",     # String concatenation in linear time
+#   "rows",           # DataFrame row operations
+#   "fmt",            # Pretty printing DataFrames
+# ] }

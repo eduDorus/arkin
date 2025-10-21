@@ -4,16 +4,9 @@ use rust_decimal::prelude::*;
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
-use crate::{
-    constants::{
-        TICK_ASK_PRICE_FEATURE_ID, TICK_ASK_QUANTITY_FEATURE_ID, TICK_BID_PRICE_FEATURE_ID,
-        TICK_BID_QUANTITY_FEATURE_ID,
-    },
-    prelude::TIMESTAMP_FORMAT,
-    Price, Quantity,
-};
+use crate::{prelude::TIMESTAMP_FORMAT, Price, Quantity};
 
-use super::{Insight, InsightType, Instrument};
+use super::Instrument;
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct Tick {
@@ -45,40 +38,6 @@ impl Tick {
             ask_price,
             ask_quantity,
         }
-    }
-
-    pub fn to_insights(&self) -> Vec<Arc<Insight>> {
-        let insights = vec![
-            Insight::builder()
-                .event_time(self.event_time)
-                .instrument(Some(self.instrument.clone()))
-                .feature_id(TICK_BID_PRICE_FEATURE_ID.clone())
-                .value(self.bid_price.to_f64().unwrap_or(f64::NAN))
-                .insight_type(InsightType::Raw)
-                .build(),
-            Insight::builder()
-                .event_time(self.event_time)
-                .instrument(Some(self.instrument.clone()))
-                .feature_id(TICK_BID_QUANTITY_FEATURE_ID.clone())
-                .value(self.bid_quantity.to_f64().unwrap_or(f64::NAN))
-                .insight_type(InsightType::Raw)
-                .build(),
-            Insight::builder()
-                .event_time(self.event_time)
-                .instrument(Some(self.instrument.clone()))
-                .feature_id(TICK_ASK_PRICE_FEATURE_ID.clone())
-                .value(self.ask_price.to_f64().unwrap_or(f64::NAN))
-                .insight_type(InsightType::Raw)
-                .build(),
-            Insight::builder()
-                .event_time(self.event_time)
-                .instrument(Some(self.instrument.clone()))
-                .feature_id(TICK_ASK_QUANTITY_FEATURE_ID.clone())
-                .value(self.ask_quantity.to_f64().unwrap_or(f64::NAN))
-                .insight_type(InsightType::Raw)
-                .build(),
-        ];
-        insights.into_iter().map(Arc::new).collect::<Vec<_>>()
     }
 
     pub fn spread(&self) -> Decimal {
