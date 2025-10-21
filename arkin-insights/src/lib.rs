@@ -20,6 +20,7 @@ pub mod prelude {
     pub use crate::feature_factory::*;
     pub use crate::features::*;
     pub use crate::math::*;
+    pub use crate::pipeline::PipelineGraph;
     pub use crate::service::Insights;
     pub use crate::state::*;
     pub use crate::traits::*;

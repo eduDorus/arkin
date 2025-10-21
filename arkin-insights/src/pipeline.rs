@@ -21,7 +21,7 @@ use crate::Feature;
 
 #[derive(Debug)]
 pub struct PipelineGraph {
-    graph: Arc<DiGraph<Arc<dyn Feature>, ()>>,
+    graph: DiGraph<Arc<dyn Feature>, ()>,
     order: Vec<NodeIndex>,
     indegrees: Vec<i32>,
     pool: ThreadPool,
@@ -101,12 +101,12 @@ impl PipelineGraph {
     }
 
     pub fn print_dot(&self) {
-        info!("{:?}", Dot::with_config(&*self.graph, &[Config::EdgeIndexLabel]));
+        info!("{:?}", Dot::with_config(&self.graph, &[Config::EdgeIndexLabel]));
     }
 
     /// Export graph to DOT format for visualization with Graphviz
     pub fn to_dot_string(&self) -> String {
-        format!("{:?}", Dot::with_config(&*self.graph, &[Config::EdgeNoLabel]))
+        format!("{:?}", Dot::with_config(&self.graph, &[Config::EdgeNoLabel]))
     }
 
     /// Export graph to DOT format with custom node labels (simplified output names only)
@@ -238,7 +238,7 @@ impl PipelineGraph {
     /// Validate the DAG structure - checks for cycles and unreachable nodes
     pub fn validate(&self) -> Result<(), String> {
         // Check for cycles using petgraph's is_cyclic_directed
-        if petgraph::algo::is_cyclic_directed(&*self.graph) {
+        if petgraph::algo::is_cyclic_directed(&self.graph) {
             return Err("Cycle detected in graph".to_string());
         }
 
@@ -403,7 +403,7 @@ impl PipelineGraph {
     // Topological Sorting in parallel, which can be efficiently implemented using Kahn's algorithm
     pub fn calculate(
         &self,
-        state: &Arc<InsightsState>,
+        state: &InsightsState,
         pipeline: &Arc<Pipeline>,
         event_time: UtcDateTime,
         instruments: &[Arc<Instrument>],
@@ -424,7 +424,7 @@ impl PipelineGraph {
         let pipeline_result = Arc::new(Mutex::new(Vec::new()));
         self.pool.scope(|s| {
             while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
-                let graph = Arc::clone(&self.graph);
+                // let graph = Arc::clone(&self.graph);
                 let in_degrees = Arc::clone(&in_degrees);
                 let queue_tx = queue_tx.clone();
                 let pipeline_result = Arc::clone(&pipeline_result);
@@ -432,7 +432,7 @@ impl PipelineGraph {
 
                 s.spawn(move |_| {
                     // Process the node
-                    let feature = &graph[node];
+                    let feature = &self.graph[node];
 
                     // Calculate the feature
                     let insights = instruments
@@ -443,7 +443,7 @@ impl PipelineGraph {
                     pipeline_result.lock().extend(insights);
 
                     // Update in-degrees of neighbors and enqueue new zero in-degree nodes
-                    for neighbor in graph.neighbors_directed(node, petgraph::Outgoing) {
+                    for neighbor in self.graph.neighbors_directed(node, petgraph::Outgoing) {
                         let mut in_degrees = in_degrees.write();
                         in_degrees[neighbor.index()] -= 1;
                         if in_degrees[neighbor.index()] == 0 {
@@ -461,7 +461,7 @@ impl PipelineGraph {
         });
         debug!("Finished graph calculation");
         let mut lock = pipeline_result.lock();
-        
+
         std::mem::take(&mut *lock)
     }
 

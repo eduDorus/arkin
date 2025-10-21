@@ -41,7 +41,7 @@ impl Feature for TwoValueFeature {
 
     fn calculate(
         &self,
-        state: &Arc<InsightsState>,
+        state: &InsightsState,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
@@ -65,11 +65,10 @@ impl Feature for TwoValueFeature {
         let value_2 = value_2.expect("Value 2 should not be None");
 
         // If our method is imbalance we need to make sure the values are positve
-        if self.method == TwoValueAlgo::Imbalance
-            && (value_1 < 0.0 || value_2 < 0.0) {
-                warn!("Imbalance values must be positive");
-                return None;
-            }
+        if self.method == TwoValueAlgo::Imbalance && (value_1 < 0.0 || value_2 < 0.0) {
+            warn!("Imbalance values must be positive");
+            return None;
+        }
 
         let mut change = match self.method {
             TwoValueAlgo::Imbalance => imbalance(value_1, value_2),

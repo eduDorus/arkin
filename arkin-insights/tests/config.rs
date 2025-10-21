@@ -10,8 +10,8 @@ async fn load_config() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_secs: 10,
-            state_lookback_secs: 60,
+            warmup_steps: 10,
+            state_ttl: 60,
             frequency_secs: 5,
             pipeline: PipelineConfig {
                 name: "test_pipeline".to_string(),
@@ -54,8 +54,8 @@ async fn load_config_range() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_secs: 10,
-            state_lookback_secs: 60,
+            warmup_steps: 10,
+            state_ttl: 60,
             frequency_secs: 5,
             pipeline: PipelineConfig {
                 name: "test_pipeline".to_string(),
@@ -88,8 +88,8 @@ async fn load_config_dual_range() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_secs: 10,
-            state_lookback_secs: 60,
+            warmup_steps: 10,
+            state_ttl: 60,
             frequency_secs: 5,
             pipeline: PipelineConfig {
                 name: "test_pipeline".to_string(),
@@ -123,8 +123,8 @@ async fn load_config_two_value() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_secs: 10,
-            state_lookback_secs: 60,
+            warmup_steps: 10,
+            state_ttl: 60,
             frequency_secs: 5,
             pipeline: PipelineConfig {
                 name: "test_pipeline".to_string(),
@@ -158,8 +158,8 @@ async fn load_config_with_filter_and_groupby() {
     let mock_persistence: Arc<dyn arkin_core::PersistenceReader> = MockPersistence::new();
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_secs: 10,
-            state_lookback_secs: 60,
+            warmup_steps: 10,
+            state_ttl: 60,
             frequency_secs: 5,
             pipeline: PipelineConfig {
                 name: "test_pipeline".to_string(),
@@ -302,8 +302,8 @@ async fn crypto_market_index_construction() {
 
     let config = InsightsConfig {
         insights_service: InsightsServiceConfig {
-            warmup_secs: 10,
-            state_lookback_secs: 3600,
+            warmup_steps: 10,
+            state_ttl: 3600,
             frequency_secs: 5,
             pipeline: PipelineConfig {
                 name: "crypto_market_index".to_string(),
@@ -368,8 +368,6 @@ async fn crypto_market_index_construction() {
                         method: DualRangeAlgo::WeightedMean,
                         persist: true,
                     }),
-                    // ========================================================================
-                    // STAGE 2: 1m → Multi-timeframe Aggregates (per instrument)
                     // ========================================================================
                     // STAGE 2: 1m → Multi-timeframe Aggregates (per instrument)
                     // ========================================================================

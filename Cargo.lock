@@ -2209,6 +2209,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "integration-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arkin-accounting",
+ "arkin-audit",
+ "arkin-binance",
+ "arkin-core",
+ "arkin-exec-strat-taker",
+ "arkin-exec-strat-wide",
+ "arkin-insights",
+ "arkin-persistence",
+ "arkin-strat-agent",
+ "arkin-strat-crossover",
+ "clickhouse",
+ "futures",
+ "kanal",
+ "rand 0.9.2",
+ "reqwest",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "statrs",
+ "test-log",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "into-attr"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

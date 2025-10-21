@@ -44,7 +44,7 @@ impl Feature for DualRangeFeature {
 
     fn calculate(
         &self,
-        state: &Arc<InsightsState>,
+        state: &InsightsState,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,

@@ -43,7 +43,7 @@ impl Feature for LagFeature {
 
     fn calculate(
         &self,
-        state: &Arc<InsightsState>,
+        state: &InsightsState,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,

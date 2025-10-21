@@ -59,10 +59,11 @@ impl BoundedBuffer {
 
         // Fast path: all new values come after existing data
         if let Some(last_existing) = self.data.back()
-            && values[0].0 >= last_existing.0 {
-                self.data.extend(values.iter().copied());
-                return;
-            }
+            && values[0].0 >= last_existing.0
+        {
+            self.data.extend(values.iter().copied());
+            return;
+        }
 
         // Optimized path: find split point where values can be bulk-appended
         // Push individual values until we reach the point where remaining values
@@ -71,11 +72,12 @@ impl BoundedBuffer {
 
         for (idx, &(timestamp, value)) in values.iter().enumerate() {
             if let Some(last_existing) = self.data.back()
-                && timestamp >= last_existing.0 {
-                    // Found the split point - remaining values can be bulk-appended
-                    split_idx = idx;
-                    break;
-                }
+                && timestamp >= last_existing.0
+            {
+                // Found the split point - remaining values can be bulk-appended
+                split_idx = idx;
+                break;
+            }
             // This value needs individual insertion
             self.push(timestamp, value);
             split_idx = idx + 1;
@@ -153,7 +155,6 @@ impl BoundedBuffer {
 
 #[derive(Debug, TypedBuilder)]
 pub struct InsightsState {
-    // pipeline: Arc<Pipeline>,
     /// In-memory feature store: (instrument, feature_id) -> BoundedBuffer of (timestamp, value)
     #[builder(default)]
     features: DashMap<(Arc<Instrument>, FeatureId), BoundedBuffer>,
@@ -166,6 +167,14 @@ pub struct InsightsState {
 }
 
 impl InsightsState {
+    pub fn new(ttl: u64) -> Self {
+        Self {
+            features: DashMap::new(),
+            ttl: Duration::from_secs(ttl),
+            wal_buffer: Mutex::new(Vec::new()),
+        }
+    }
+
     /// Insert an insight immediately into the feature store (bypasses WAL buffer)
     pub fn insert(&self, event: Arc<Insight>) {
         let key = (event.instrument.clone(), event.feature_id.clone());
@@ -254,7 +263,7 @@ impl InsightsState {
     /// Return the last value <= timestamp.
     pub fn last(&self, instrument: &Arc<Instrument>, feature_id: &FeatureId, timestamp: UtcDateTime) -> Option<f64> {
         let key = (instrument.clone(), feature_id.clone());
-        
+
         self.features.get(&key).and_then(|buf| buf.last(timestamp))
     }
 
@@ -282,7 +291,7 @@ impl InsightsState {
         lag: usize,
     ) -> Option<f64> {
         let key = (instrument.clone(), feature_id.clone());
-        
+
         self.features.get(&key).and_then(|buf| buf.lag(timestamp, lag))
     }
 
@@ -296,9 +305,8 @@ impl InsightsState {
     ) -> Vec<f64> {
         let start_time = timestamp - window;
         let key = (instrument.clone(), feature_id.clone());
-        
-        self
-            .features
+
+        self.features
             .get(&key)
             .map(|buf| buf.window(start_time, timestamp))
             .unwrap_or_default()

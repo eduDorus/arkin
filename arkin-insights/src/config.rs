@@ -11,8 +11,8 @@ pub struct InsightsConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct InsightsServiceConfig {
     pub pipeline: PipelineConfig,
-    pub warmup_secs: u64,
-    pub state_lookback_secs: u64,
+    pub warmup_steps: u64,
+    pub state_ttl: u64,
     pub frequency_secs: u64,
 }
 

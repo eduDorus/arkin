@@ -13,7 +13,7 @@ pub trait Feature: std::fmt::Debug + Send + Sync {
     fn outputs(&self) -> Vec<FeatureId>;
     fn calculate(
         &self,
-        state: &Arc<InsightsState>,
+        state: &InsightsState,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,

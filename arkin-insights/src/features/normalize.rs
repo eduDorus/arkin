@@ -45,7 +45,10 @@ impl RobustScaler {
 
     pub fn transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
         let key = (instrument_id, feature_id.clone());
-        let (median, iqr) = self.feature_data.get(&key).unwrap_or_else(|| panic!("Feature ID not found: {:?}", key));
+        let (median, iqr) = self
+            .feature_data
+            .get(&key)
+            .unwrap_or_else(|| panic!("Feature ID not found: {:?}", key));
         (x - median) / iqr
     }
 
@@ -56,7 +59,10 @@ impl RobustScaler {
     #[allow(dead_code)]
     pub fn inverse_transform(&self, instrument_id: Uuid, feature_id: &FeatureId, x: f64) -> f64 {
         let key = (instrument_id, feature_id.clone());
-        let (median, iqr) = self.feature_data.get(&key).unwrap_or_else(|| panic!("Feature ID not found: {:?}", key));
+        let (median, iqr) = self
+            .feature_data
+            .get(&key)
+            .unwrap_or_else(|| panic!("Feature ID not found: {:?}", key));
         x * iqr + median
     }
 
@@ -199,7 +205,7 @@ impl Feature for NormalizeFeature {
 
     fn calculate(
         &self,
-        state: &Arc<InsightsState>,
+        state: &InsightsState,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,

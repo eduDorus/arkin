@@ -248,7 +248,6 @@ impl PersistenceReader for MockPersistence {
 }
 
 pub fn test_pubsub() -> Arc<PubSub> {
-    
     PubSub::new(true)
 }
 
