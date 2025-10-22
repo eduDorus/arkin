@@ -184,9 +184,10 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
 
     // Let's stream some agg trades from the database
     let start = utc_datetime!(2025-01-01 00:00:00);
-    let end = utc_datetime!(2025-01-07 00:00:00);
+    let end = utc_datetime!(2025-01-01 03:00:00);
 
     let persistence = integration_tests::init_test_persistence().await;
+    persistence.refresh().await?;
     info!("Initialized test persistence.");
 
     // Build pipeline graph directly (no service wrapper)
@@ -211,20 +212,23 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
     //     .export_svg("test_crypto_index_pipeline.svg")
     //     .expect("Failed to export graph svg");
 
-    let venue = persistence.get_venue_by_name(&VenueName::BinanceSpot).await?;
-    let instruments = persistence.get_instruments_by_venue(&venue).await?;
-
-    // Filter instruments for base asset BTC, ETH, SOL, BNB, XRP and quote asset USDT, USDC
-    let instruments: Vec<_> = instruments
-        .into_iter()
-        .filter(|inst| {
-            matches!(
-                inst.base_asset.symbol.to_uppercase().as_str(),
-                "BTC" | "ETH" | "SOL" | "BNB" | "XRP"
-            )
-        })
-        .filter(|inst| matches!(inst.quote_asset.symbol.to_uppercase().as_str(), "USDT"))
-        .collect();
+    // Query instruments using the new flexible API
+    let instruments = persistence
+        .query_instruments(
+            &InstrumentQuery::builder()
+                .venues(vec![VenueName::BinanceUsdmFutures])
+                .base_asset_symbols(vec![
+                    "BTC".to_string(),
+                    "ETH".to_string(),
+                    "SOL".to_string(),
+                    "BNB".to_string(),
+                    "XRP".to_string(),
+                ])
+                .quote_asset_symbols(vec!["USDT".to_string()])
+                .synthetic(Some(false))
+                .build(),
+        )
+        .await?;
 
     info!("Fetched instruments: {:?}", instruments.len());
     for inst in &instruments {

@@ -22,6 +22,21 @@ async fn read_venue_name_cache(ctx: &PersistenceContext, name: &VenueName) -> Op
     ctx.cache.venue_name.get(name).await
 }
 
+/// Load all venues from database into cache
+/// This should be called once during persistence initialization
+pub async fn load_venues(ctx: &PersistenceContext) -> Result<Vec<Arc<Venue>>, PersistenceError> {
+    let venue_dtos = venues_repo::list_all(ctx).await?;
+    let mut venues = Vec::with_capacity(venue_dtos.len());
+
+    for dto in venue_dtos {
+        let venue: Arc<Venue> = Arc::new(dto.into());
+        update_venue_cache(ctx, venue.clone()).await;
+        venues.push(venue);
+    }
+
+    Ok(venues)
+}
+
 pub async fn insert(ctx: &PersistenceContext, venue: Arc<Venue>) -> Result<(), PersistenceError> {
     update_venue_cache(ctx, venue.clone()).await;
     venues_repo::insert(ctx, venue.into()).await

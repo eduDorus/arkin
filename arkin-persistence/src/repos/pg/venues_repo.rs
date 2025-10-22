@@ -113,3 +113,23 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &VenueName) -> Result<
         None => Err(PersistenceError::NotFound),
     }
 }
+
+pub async fn list_all(ctx: &PersistenceContext) -> Result<Vec<VenueDTO>, PersistenceError> {
+    let venues = sqlx::query_as!(
+        VenueDTO,
+        r#"
+            SELECT 
+                id,
+                name,
+                venue_type AS "venue_type:VenueType",
+                created,
+                updated
+            FROM venues
+            ORDER BY name
+            "#,
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+
+    Ok(venues)
+}

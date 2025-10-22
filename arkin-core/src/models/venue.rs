@@ -1,15 +1,16 @@
 use std::fmt;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::prelude::Type;
 use strum::{Display, EnumString};
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-#[derive(Debug, Display, Clone, PartialEq, Eq, Hash, Type)]
+#[derive(Debug, Display, Clone, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "venue_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum VenueType {
     Cex,
     Dex,
@@ -33,8 +34,9 @@ impl fmt::Display for Venue {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, clap::ValueEnum, Deserialize)] // For Clap auto-parsing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, clap::ValueEnum, Serialize, Deserialize)] // For Clap auto-parsing
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum VenueName {
     Personal,
     BinanceSpot,

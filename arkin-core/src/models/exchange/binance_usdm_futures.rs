@@ -415,6 +415,32 @@ pub struct BinanceSwapsTickData {
     pub ask_quantity: Decimal,
 }
 
+/// Book ticker data from Binance Spot (without event timestamps).
+///
+/// Contains the current best prices and available quantities
+/// for immediate execution on both bid and ask sides.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BinanceSpotTickData {
+    /// Update ID
+    #[serde(rename = "u")]
+    pub update_id: u64,
+    /// Trading pair symbol
+    #[serde(rename = "s")]
+    pub instrument: String,
+    /// Best bid price
+    #[serde(rename = "b")]
+    pub bid_price: Decimal,
+    /// Bid quantity
+    #[serde(rename = "B")]
+    pub bid_quantity: Decimal,
+    /// Best ask price
+    #[serde(rename = "a")]
+    pub ask_price: Decimal,
+    /// Ask quantity
+    #[serde(rename = "A")]
+    pub ask_quantity: Decimal,
+}
+
 /// Open interest data from Binance.
 ///
 /// Contains the current open interest for a futures contract,
@@ -445,7 +471,17 @@ impl fmt::Display for BinanceSwapsTickData {
             self.bid_price,
             self.bid_quantity,
             self.ask_price,
-            self.ask_quantity,
+            self.ask_quantity
+        )
+    }
+}
+
+impl fmt::Display for BinanceSpotTickData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Tick (Spot) {} id: {} bid: {} {} ask: {} {}",
+            self.instrument, self.update_id, self.bid_price, self.bid_quantity, self.ask_price, self.ask_quantity
         )
     }
 }
@@ -486,8 +522,20 @@ mod tests {
 
     #[test]
     fn test_binance_spot_ticker() {
+        // Spot ticker doesn't have stream wrapper and uses BinanceSpotTickData
         let json_data = r#"{"stream":"btcusdt@bookTicker","data":{"u":76861015827,"s":"BTCUSDT","b":"109257.64000000","B":"0.77163000","a":"109257.65000000","A":"6.27706000"}}"#;
-        let _ = serde_json::from_str::<BinanceSwapsStreamEvent>(json_data).unwrap();
+
+        // Parse the wrapper manually to extract the data
+        #[derive(Deserialize)]
+        struct SpotTickerWrapper {
+            stream: String,
+            data: BinanceSpotTickData,
+        }
+
+        let wrapper = serde_json::from_str::<SpotTickerWrapper>(json_data).unwrap();
+        assert_eq!(wrapper.data.instrument, "BTCUSDT");
+        assert!(wrapper.data.bid_price > Decimal::ZERO);
+        assert!(wrapper.data.ask_price > Decimal::ZERO);
     }
 
     #[test]

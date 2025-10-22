@@ -6,7 +6,7 @@ use time::OffsetDateTime;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-use arkin_core::{Instrument, InstrumentOptionType, InstrumentStatus, InstrumentType, Price, Venue};
+use arkin_core::{Instrument, InstrumentOptionType, InstrumentQuery, InstrumentStatus, InstrumentType, Price, Venue};
 
 use arkin_core::PersistenceError;
 
@@ -274,6 +274,44 @@ pub async fn list_by_venue_and_type(
             "#,
         venue.id as Uuid,
         instrument_type as InstrumentType,
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+
+    Ok(instruments)
+}
+
+/// List all instruments (for bulk loading into cache)
+pub async fn list_all(ctx: &PersistenceContext) -> Result<Vec<InstrumentDTO>, PersistenceError> {
+    let instruments = sqlx::query_as!(
+        InstrumentDTO,
+        r#"
+            SELECT
+                id,
+                venue_id,
+                symbol,
+                venue_symbol,
+                instrument_type AS "instrument_type:InstrumentType",
+                synthetic,
+                base_asset_id,
+                quote_asset_id,
+                margin_asset_id,
+                strike,
+                maturity,
+                option_type AS "option_type:InstrumentOptionType",
+                contract_size,
+                price_precision,
+                quantity_precision,
+                base_precision,
+                quote_precision,
+                lot_size,
+                tick_size,
+                status AS "status:InstrumentStatus",
+                created,
+                updated
+            FROM instruments
+            ORDER BY symbol
+            "#,
     )
     .fetch_all(&ctx.pg_pool)
     .await?;

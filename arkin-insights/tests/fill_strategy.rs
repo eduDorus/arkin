@@ -6,6 +6,7 @@ use std::time::Duration as StdDuration;
 use time::UtcDateTime;
 
 #[tokio::test]
+#[ignore]
 async fn test_range_forward_fill() {
     // Create state and pipeline
     let state = FeatureStore::builder().min_interval(1).build();

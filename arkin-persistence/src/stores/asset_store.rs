@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use arkin_core::Asset;
+use arkin_core::{Asset, AssetQuery};
 
 use arkin_core::PersistenceError;
 
@@ -19,6 +19,38 @@ async fn read_cache_by_id(ctx: &PersistenceContext, id: &Uuid) -> Option<Arc<Ass
 
 async fn read_cache_by_symbol(ctx: &PersistenceContext, symbol: &str) -> Option<Arc<Asset>> {
     ctx.cache.asset_symbol.get(symbol).await
+}
+
+/// Load all assets from database into cache
+/// This should be called once during persistence initialization
+pub async fn load_assets(ctx: &PersistenceContext) -> Result<Vec<Arc<Asset>>, PersistenceError> {
+    let asset_dtos = asset_repo::list_all(ctx).await?;
+    let mut assets = Vec::with_capacity(asset_dtos.len());
+
+    for dto in asset_dtos {
+        let asset: Arc<Asset> = dto.into();
+        update_cache(ctx, asset.clone()).await;
+        assets.push(asset);
+    }
+
+    Ok(assets)
+}
+
+/// Query assets with in-memory filtering from cache
+/// Assumes cache is already populated via load_assets()
+pub async fn query(ctx: &PersistenceContext, query: &AssetQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
+    // Get all cached assets by iterating over the cache
+    let all_assets: Vec<Arc<Asset>> = ctx.cache.asset_id.iter().map(|(_, asset)| asset).collect();
+
+    // If query is empty, return all
+    if query.is_empty() {
+        return Ok(all_assets);
+    }
+
+    // Filter in memory using the query's matches method
+    let filtered: Vec<Arc<Asset>> = all_assets.into_iter().filter(|asset| query.matches(asset)).collect();
+
+    Ok(filtered)
 }
 
 pub async fn insert(ctx: &PersistenceContext, asset: Arc<Asset>) -> Result<(), PersistenceError> {

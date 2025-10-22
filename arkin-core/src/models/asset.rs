@@ -1,19 +1,22 @@
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
 use sqlx::Type;
 use strum::Display;
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-#[derive(Debug, Display, Clone, PartialEq, Eq, Hash, Type)]
+#[derive(Debug, Display, Clone, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "asset_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum AssetType {
     Crypto,
     Stock,
     Fiat,
     Commodity,
+    Stablecoin,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]

@@ -9,9 +9,9 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, AssetType, Event, FeatureId, Instance, InstanceType, Instrument,
-    InstrumentStatus, InstrumentType, MetricType, PersistenceError, PersistenceReader, Pipeline, Price, PubSub,
-    Publisher, Quantity, Strategy, SystemTime, Tick, Venue, VenueName, VenueType,
+    utils::Frequency, AggTrade, Asset, AssetQuery, AssetType, Event, FeatureId, Instance, InstanceType, Instrument,
+    InstrumentQuery, InstrumentStatus, InstrumentType, MetricType, PersistenceError, PersistenceReader, Pipeline,
+    Price, PubSub, Publisher, Quantity, Strategy, SystemTime, Tick, Venue, VenueName, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -141,6 +141,10 @@ impl MockPersistence {
 
 #[async_trait]
 impl PersistenceReader for MockPersistence {
+    async fn refresh(&self) -> Result<(), PersistenceError> {
+        Ok(())
+    }
+
     async fn get_instance_by_id(&self, _id: &Uuid) -> Result<Arc<Instance>, PersistenceError> {
         Ok(test_instance())
     }
@@ -188,12 +192,21 @@ impl PersistenceReader for MockPersistence {
         todo!()
     }
 
+    async fn query_instruments(&self, _query: &InstrumentQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        unimplemented!()
+    }
+
     async fn get_asset_by_id(&self, _id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {
         Ok(test_usdt_asset())
     }
     async fn get_asset_by_symbol(&self, _symbol: &str) -> Result<Arc<Asset>, PersistenceError> {
         Ok(test_usdt_asset())
     }
+
+    async fn query_assets(&self, _query: &AssetQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
+        unimplemented!()
+    }
+
     async fn list_trades(
         &self,
         _instruments: &[Arc<Instrument>],

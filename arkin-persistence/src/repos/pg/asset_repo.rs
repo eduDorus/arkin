@@ -120,3 +120,25 @@ pub async fn read_by_symbol(ctx: &PersistenceContext, symbol: &str) -> Result<As
         None => Err(PersistenceError::NotFound),
     }
 }
+
+/// List all assets (for bulk loading into cache)
+pub async fn list_all(ctx: &PersistenceContext) -> Result<Vec<AssetDTO>, PersistenceError> {
+    let assets = sqlx::query_as!(
+        AssetDTO,
+        r#"
+            SELECT
+                id,
+                symbol,
+                name,
+                asset_type AS "asset_type:AssetType",
+                created,
+                updated
+            FROM assets
+            ORDER BY symbol
+            "#,
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+
+    Ok(assets)
+}

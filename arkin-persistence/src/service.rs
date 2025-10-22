@@ -342,6 +342,25 @@ async fn flush_task(persistence: Arc<Persistence>, service_ctx: Arc<ServiceCtx>,
 
 #[async_trait]
 impl PersistenceReader for Persistence {
+    /// Refresh cache by reloading venues, assets, and instruments from database
+    async fn refresh(&self) -> Result<(), PersistenceError> {
+        info!(target: "persistence", "refreshing cache...");
+
+        // Load all venues into cache (must be first as instruments depend on venues)
+        let venues_loaded = venue_store::load_venues(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} venues into cache", venues_loaded.len());
+
+        // Load all assets into cache (must be before instruments as instruments depend on assets)
+        let assets_loaded = asset_store::load_assets(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} assets into cache", assets_loaded.len());
+
+        // Load all instruments into cache
+        let instruments_loaded = instrument_store::load_instruments(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} instruments into cache", instruments_loaded.len());
+
+        Ok(())
+    }
+
     async fn get_instance_by_id(&self, id: &Uuid) -> Result<Arc<Instance>, PersistenceError> {
         instance_store::read_by_id(&self.ctx, id).await
     }
@@ -394,12 +413,20 @@ impl PersistenceReader for Persistence {
         instrument_store::list_by_venue_and_type(&self.ctx, venue, instrument_type).await
     }
 
+    async fn query_instruments(&self, query: &InstrumentQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        instrument_store::query(&self.ctx, query).await
+    }
+
     async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {
         asset_store::read_by_id(&self.ctx, id).await
     }
 
     async fn get_asset_by_symbol(&self, symbol: &str) -> Result<Arc<Asset>, PersistenceError> {
         asset_store::read_by_symbol(&self.ctx, symbol).await
+    }
+
+    async fn query_assets(&self, query: &AssetQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
+        asset_store::query(&self.ctx, query).await
     }
 
     async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError> {
@@ -483,14 +510,16 @@ impl Runnable for Persistence {
     async fn setup(&self, _service_ctx: Arc<ServiceCtx>, _core_ctx: Arc<CoreCtx>) {
         // TODO: NOT FOR PRODUCTION
         if self.ctx.instance.instance_type == InstanceType::Test
-            && let Err(e) = instance_store::delete_by_id(&self.ctx, self.ctx.instance.id).await {
-                warn!(target: "persistence", "could not delete instance: {}", e)
-            }
+            && let Err(e) = instance_store::delete_by_id(&self.ctx, self.ctx.instance.id).await
+        {
+            warn!(target: "persistence", "could not delete instance: {}", e)
+        }
 
         if self.ctx.instance.instance_type == InstanceType::Simulation
-            && let Err(e) = instance_store::delete_by_name(&self.ctx, &self.ctx.instance.name).await {
-                warn!(target: "persistence", "could not delete instance: {}", e)
-            }
+            && let Err(e) = instance_store::delete_by_name(&self.ctx, &self.ctx.instance.name).await
+        {
+            warn!(target: "persistence", "could not delete instance: {}", e)
+        }
 
         // Create the instance
         if let Err(e) = instance_store::insert(&self.ctx, self.ctx.instance.clone()).await {
@@ -510,6 +539,12 @@ impl Runnable for Persistence {
         if let Err(e) = metric_store::create_table(&self.ctx).await {
             error!(target: "persistence", "could not create metrics table: {}", e)
         }
+
+        // Populate cache with instruments and assets
+        if let Err(e) = self.refresh().await {
+            error!(target: "persistence", "could not populate cache: {}", e)
+        }
+
         info!(target: "persistence", "service setup complete");
     }
 

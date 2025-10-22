@@ -6,8 +6,8 @@ use time::UtcDateTime;
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, CoreCtx, Event, FeatureId, Instance, Instrument, InstrumentType, MetricType,
-    PersistenceError, Pipeline, ServiceCtx, Tick, Venue, VenueName,
+    utils::Frequency, AggTrade, Asset, AssetQuery, CoreCtx, Event, FeatureId, Instance, Instrument, InstrumentQuery,
+    InstrumentType, MetricType, PersistenceError, Pipeline, ServiceCtx, Tick, Venue, VenueName,
 };
 
 #[async_trait]
@@ -23,6 +23,8 @@ pub trait SystemTime: Send + Sync {
 
 #[async_trait]
 pub trait PersistenceReader: Send + Sync {
+    async fn refresh(&self) -> Result<(), PersistenceError>;
+
     async fn get_instance_by_id(&self, id: &Uuid) -> Result<Arc<Instance>, PersistenceError>;
     async fn get_instance_by_name(&self, name: &str) -> Result<Arc<Instance>, PersistenceError>;
 
@@ -49,9 +51,19 @@ pub trait PersistenceReader: Send + Sync {
         instrument_type: InstrumentType,
     ) -> Result<Vec<Arc<Instrument>>, PersistenceError>;
 
+    /// Query instruments with flexible filtering
+    /// Returns all instruments matching the query criteria
+    /// Supports filtering by venue, base/quote/margin assets (both Arc<Asset> and symbols),
+    /// instrument type, synthetic flag, and status
+    async fn query_instruments(&self, query: &InstrumentQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError>;
+
     // Assets
     async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError>;
     async fn get_asset_by_symbol(&self, symbol: &str) -> Result<Arc<Asset>, PersistenceError>;
+
+    /// Query assets with flexible filtering
+    /// Returns all assets matching the query criteria
+    async fn query_assets(&self, query: &AssetQuery) -> Result<Vec<Arc<Asset>>, PersistenceError>;
 
     async fn list_trades(
         &self,

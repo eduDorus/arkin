@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use rust_decimal::prelude::Decimal;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::Type;
 use strum::Display;
 use time::UtcDateTime;
@@ -12,8 +12,9 @@ use crate::{Maturity, Price};
 
 use super::{Asset, Venue};
 
-#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, clap::ValueEnum, Deserialize)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, clap::ValueEnum, Serialize, Deserialize)]
 #[sqlx(type_name = "instrument_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum InstrumentType {
     Spot,
     Perpetual,
@@ -22,15 +23,17 @@ pub enum InstrumentType {
     Index,
 }
 
-#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "instrument_option_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum InstrumentOptionType {
     Call,
     Put,
 }
 
-#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "instrument_status", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum InstrumentStatus {
     Trading,
     Halted,
