@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{math::*, Feature, FeatureState};
+use crate::{math::*, Feature, FeatureStore, FillStrategy};
 
 #[derive(Debug, Display, Clone, Deserialize)]
 #[strum(serialize_all = "snake_case")]
@@ -28,6 +28,7 @@ pub struct LagFeature {
     output: FeatureId,
     lag: usize,
     method: LagAlgo,
+    fill_strategy: FillStrategy,
     persist: bool,
 }
 
@@ -41,31 +42,35 @@ impl Feature for LagFeature {
         vec![self.output.clone()]
     }
 
+    fn fill_strategy(&self) -> FillStrategy {
+        self.fill_strategy
+    }
+
     fn calculate(
         &self,
-        state: &FeatureState,
+        state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
     ) -> Option<Vec<Arc<Insight>>> {
-        debug!("Calculating {} change...", self.method);
+        debug!(target: "feature-calc", "Calculating {} for {} at {}", self.output, instrument, event_time);
 
-        //  Get data
-        let prev_value = state.lag(instrument, &self.input, event_time, self.lag);
-        let value = state.last(instrument, &self.input, event_time);
+        //  Get data - now returns Result
+        let prev_value = match state.lag(instrument, &self.input, event_time, self.lag, Some(self.fill_strategy)) {
+            Ok(v) => v,
+            Err(e) => {
+                warn!("Failed to get lagged value: {}", e);
+                return None;
+            }
+        };
 
-        // Check if we have enough data
-        if prev_value.is_none() || value.is_none() {
-            warn!(
-                "Not enough data for Change calculation: value {:?}, lag value {:?}",
-                value, prev_value
-            );
-            return None;
-        }
-
-        // Unwrap values
-        let prev_value = prev_value.expect("Prev value should not be None");
-        let value = value.expect("Value should not be None");
+        let value = match state.last(instrument, &self.input, event_time) {
+            Some(v) => v,
+            None => {
+                warn!("No current value available");
+                return None;
+            }
+        };
 
         let mut change = match self.method {
             LagAlgo::AbsoluteChange => abs_change(value, prev_value),
@@ -85,6 +90,7 @@ impl Feature for LagFeature {
 
         // Set precision to 6 decimal places
         change = (change * 1_000_000.0).round() / 1_000_000.0;
+        debug!(target: "feature-calc", "Calculated value for {}: {}", self.output, change);
 
         // Return insight
         let insight = vec![Arc::new(

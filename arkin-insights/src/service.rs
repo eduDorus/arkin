@@ -46,7 +46,7 @@ impl InsightService {
 
         // Calculate features - during warmup this builds up derived features but returns empty vec
         // TODO: FIX INSTRUMENTS
-        let insights = self.pipeline.calculate(tick.event_time, &[]);
+        let insights = self.pipeline.calculate(tick.event_time, &[]).await;
 
         // Only publish if we have insights (warmup complete)
         if !insights.is_empty() {

@@ -2,6 +2,7 @@ use arkin_core::{InstrumentType, VenueName};
 use serde::Deserialize;
 
 use crate::features::{DualRangeAlgo, LagAlgo, NormalizeFeatureType, RangeAlgo, RangeData, TwoValueAlgo};
+use crate::FillStrategy;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct InsightsConfig {
@@ -18,7 +19,8 @@ pub struct PipelineConfig {
     pub version: String,
     pub warmup_steps: u16,
     pub state_ttl: u64,
-    pub frequency_secs: u64,
+    pub min_interval: u64,
+    pub parallel: bool,
     pub features: Vec<FeatureConfig>,
 }
 
@@ -121,6 +123,7 @@ pub struct LagConfig {
     pub output: Vec<String>,
     pub lag: Vec<usize>,
     pub method: LagAlgo,
+    pub fill_strategy: FillStrategy,
     #[serde(default)]
     pub persist: bool,
 }
@@ -137,6 +140,7 @@ pub struct RangeConfig {
     pub output: Vec<String>,
     pub data: Vec<RangeData>,
     pub method: RangeAlgo,
+    pub fill_strategy: FillStrategy,
     #[serde(default)]
     pub persist: bool,
 }
@@ -154,6 +158,7 @@ pub struct DualRangeConfig {
     pub output: Vec<String>,
     pub data: Vec<RangeData>,
     pub method: DualRangeAlgo,
+    pub fill_strategy: FillStrategy,
     #[serde(default)]
     pub persist: bool,
 }
@@ -169,8 +174,8 @@ pub struct TwoValueConfig {
     pub input_1: Vec<String>,
     pub input_2: Vec<String>,
     pub output: Vec<String>,
-    pub horizons: Vec<RangeData>,
     pub method: TwoValueAlgo,
+    pub fill_strategy: FillStrategy,
     #[serde(default)]
     pub persist: bool,
 }

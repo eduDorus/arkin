@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{math::*, Feature, FeatureState};
+use crate::{math::*, Feature, FeatureStore, FillStrategy};
 
 #[derive(Debug, Display, Clone, Deserialize, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
@@ -26,6 +26,7 @@ pub struct TwoValueFeature {
     input_2: FeatureId,
     output: FeatureId,
     method: TwoValueAlgo,
+    fill_strategy: FillStrategy,
     persist: bool,
 }
 
@@ -39,14 +40,18 @@ impl Feature for TwoValueFeature {
         vec![self.output.clone()]
     }
 
+    fn fill_strategy(&self) -> FillStrategy {
+        self.fill_strategy
+    }
+
     fn calculate(
         &self,
-        state: &FeatureState,
+        state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
     ) -> Option<Vec<Arc<Insight>>> {
-        debug!("Calculating {}...", self.method);
+        debug!(target: "feature-calc", "Calculating {} for {} at {}", self.output, instrument, event_time);
 
         //  Get data
         let value_1 = state.last(instrument, &self.input_1, event_time);
@@ -64,7 +69,7 @@ impl Feature for TwoValueFeature {
         let value_1 = value_1.expect("Value 1 should not be None");
         let value_2 = value_2.expect("Value 2 should not be None");
 
-        // If our method is imbalance we need to make sure the values are positve
+        // If our method is imbalance we need to make sure the values are positive
         if self.method == TwoValueAlgo::Imbalance && (value_1 < 0.0 || value_2 < 0.0) {
             warn!("Imbalance values must be positive");
             return None;
@@ -87,6 +92,7 @@ impl Feature for TwoValueFeature {
 
         // Set precision to 6 decimal places
         change = (change * 1_000_000.0).round() / 1_000_000.0;
+        debug!(target: "feature-calc", "Calculated value for {}: {}", self.output, change);
 
         // Return insight
         let insight = vec![Arc::new(

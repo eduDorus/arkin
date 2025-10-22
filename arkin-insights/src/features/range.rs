@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{math::*, Feature, FeatureState};
+use crate::{math::*, Feature, FeatureStore, FillStrategy};
 
 #[derive(Debug, Display, Clone, Deserialize)]
 #[strum(serialize_all = "snake_case")]
@@ -60,6 +60,7 @@ pub struct RangeFeature {
     output: FeatureId,
     method: RangeAlgo,
     data: RangeData,
+    fill_strategy: FillStrategy,
     persist: bool,
 }
 
@@ -73,24 +74,38 @@ impl Feature for RangeFeature {
         vec![self.output.clone()]
     }
 
+    fn fill_strategy(&self) -> FillStrategy {
+        self.fill_strategy
+    }
+
     fn calculate(
         &self,
-        state: &FeatureState,
+        state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
         instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
     ) -> Option<Vec<Arc<Insight>>> {
-        debug!("Calculating {}...", self.method);
+        debug!(target: "feature-calc", "Calculating {} for {} at {}", self.output, instrument, event_time);
 
-        // Get data
+        // Get data - handle Result from interval, wrap Vec from window in Ok
         let data = match self.data {
-            RangeData::Interval(i) => state.last_n(instrument, &self.input, event_time, i),
+            RangeData::Interval(i) => {
+                match state.interval(instrument, &self.input, event_time, i, Some(self.fill_strategy)) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        warn!(target: "feature-calc", "Failed to get interval data: {}", e);
+                        return None;
+                    }
+                }
+            }
             RangeData::Window(w) => state.window(instrument, &self.input, event_time, Duration::from_secs(w)),
         };
 
+        // info!(target: "feature-calc", "Data for instrument {}: {:?}", instrument, data);
+
         // Check if we have enough data
         if data.len() < 2 {
-            warn!("Not enough data for distribution calculation: {} entries", data.len());
+            warn!(target: "feature-calc", "Not enough data for distribution calculation: {} entries", data.len());
             return None;
         }
 
@@ -129,7 +144,7 @@ impl Feature for RangeFeature {
 
         // Check if we have a value
         if value.is_nan() {
-            warn!(
+            warn!(target: "feature-calc",
                 "NaN value for distribution calculation for feature {} with method {}",
                 self.output, self.method
             );
@@ -138,6 +153,7 @@ impl Feature for RangeFeature {
 
         // Set precision to 6 decimal places
         value = (value * 1_000_000.0).round() / 1_000_000.0;
+        debug!(target: "feature-calc", "Calculated value for {}: {}", self.output, value);
 
         let insight = vec![Arc::new(
             Insight::builder()

@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
-use parking_lot::Mutex;
-use parking_lot::RwLock;
 use petgraph::graph::NodeIndex;
 use petgraph::{
     algo::toposort,
@@ -11,29 +9,28 @@ use petgraph::{
     graph::DiGraph,
 };
 use rayon::prelude::*;
-use rayon::{ThreadPool, ThreadPoolBuilder};
 use time::UtcDateTime;
-use tracing::debug;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::Feature;
-use crate::FeatureState;
+use crate::FeatureStore;
 
 /// Computation Graph - represents the DAG of feature dependencies and execution order
 #[derive(Debug)]
 pub struct FeatureGraph {
     graph: DiGraph<Arc<dyn Feature>, ()>,
     order: Vec<NodeIndex>,
-    indegrees: Vec<i32>,
-    pool: ThreadPool,
+    layers: Vec<Vec<NodeIndex>>,
+    parallel: bool,
 }
 
 impl FeatureGraph {
-    pub fn new(features: Vec<Arc<dyn Feature>>) -> Self {
+    pub fn new(features: Vec<Arc<dyn Feature>>, parallel: bool) -> Self {
         let mut graph = DiGraph::new();
 
         // Create a mapping from Node IDs to Node Indices
         let mut id_to_index = HashMap::new();
+        let mut index_to_id = HashMap::new();
 
         // Add features as nodes and populate the mapping
         for feature in features {
@@ -41,6 +38,7 @@ impl FeatureGraph {
             let node_index = graph.add_node(feature);
             for id in output_ids {
                 id_to_index.insert(id.clone(), node_index);
+                index_to_id.insert(node_index, id.clone());
             }
         }
 
@@ -78,17 +76,33 @@ impl FeatureGraph {
 
         debug!("{:?}", Dot::with_config(&graph, &[Config::EdgeIndexLabel]));
 
-        let mut indegrees = vec![0; graph.node_count()];
-        for edge in graph.edge_indices() {
-            let target = graph.edge_endpoints(edge).unwrap().1;
-            indegrees[target.index()] += 1;
+        let mut layers: Vec<Vec<NodeIndex>> = Vec::new();
+        let mut depth_map = HashMap::new();
+
+        // Calculate depth for each node using topological order
+        for &node in &order {
+            let max_dep_depth = graph
+                .neighbors_directed(node, petgraph::Incoming)
+                .filter_map(|dep| depth_map.get(&dep))
+                .max()
+                .unwrap_or(&0);
+
+            let depth = max_dep_depth + 1;
+            depth_map.insert(node, depth);
+
+            // Ensure we have enough layers
+            while layers.len() < depth {
+                layers.push(Vec::new());
+            }
+
+            layers[depth - 1].push(node);
         }
 
         FeatureGraph {
             graph: graph.into(),
             order,
-            indegrees,
-            pool: ThreadPoolBuilder::default().build().expect("Failed to create thread pool"),
+            layers,
+            parallel,
         }
     }
 
@@ -101,7 +115,7 @@ impl FeatureGraph {
     }
 
     pub fn print_dot(&self) {
-        info!("{:?}", Dot::with_config(&self.graph, &[Config::EdgeIndexLabel]));
+        info!(target: "feature-graph", "{:?}", Dot::with_config(&self.graph, &[Config::EdgeIndexLabel]));
     }
 
     /// Export graph to DOT format for visualization with Graphviz
@@ -194,16 +208,16 @@ impl FeatureGraph {
 
     /// Print a tree-like ASCII view of the pipeline showing data flow
     pub fn print_tree(&self) {
-        info!("Pipeline Flow (Layer by Layer):");
-        info!("================================");
+        info!(target: "feature-graph", "Pipeline Flow (Layer by Layer):");
+        info!(target: "feature-graph", "================================");
 
         let raw_inputs = self.get_raw_inputs();
-        info!("RAW INPUTS: {}", raw_inputs.join(", "));
-        info!("");
+        info!(target: "feature-graph", "RAW INPUTS: {}", raw_inputs.join(", "));
+        info!(target: "feature-graph", "");
 
         let layers = self.get_layers();
         for (i, layer) in layers.iter().enumerate() {
-            info!("LAYER {} ({} features):", i + 1, layer.len());
+            info!(target: "feature-graph", "LAYER {} ({} features):", i + 1, layer.len());
             for feature in layer {
                 let outputs = feature.outputs();
                 let inputs = feature.inputs();
@@ -213,7 +227,7 @@ impl FeatureGraph {
                     inputs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
                 );
             }
-            info!("");
+            info!(target: "feature-graph", "");
         }
     }
 
@@ -259,15 +273,15 @@ impl FeatureGraph {
             .filter(|&node| self.graph.neighbors_directed(node, petgraph::Outgoing).count() == 0)
             .collect();
 
-        info!("DAG Validation:");
-        info!("  Raw inputs (not produced by any feature): {}", raw_inputs.len());
+        info!(target: "feature-graph", "DAG Validation:");
+        info!(target: "feature-graph", "  Raw inputs (not produced by any feature): {}", raw_inputs.len());
         for input in &raw_inputs {
-            info!("    - {}", input);
+            info!(target: "feature-graph", "    - {}", input);
         }
-        info!("  Source features (depend only on raw inputs): {}", sources.len());
-        info!("  Sink features (terminal outputs): {}", sinks.len());
-        info!("  Total nodes: {}", self.graph.node_count());
-        info!("  Total edges: {}", self.graph.edge_count());
+        info!(target: "feature-graph", "  Source features (depend only on raw inputs): {}", sources.len());
+        info!(target: "feature-graph", "  Sink features (terminal outputs): {}", sinks.len());
+        info!(target: "feature-graph", "  Total nodes: {}", self.graph.node_count());
+        info!(target: "feature-graph", "  Total edges: {}", self.graph.edge_count());
 
         Ok(())
     }
@@ -353,26 +367,26 @@ impl FeatureGraph {
 
     /// Print a summary of the pipeline structure
     pub fn print_summary(&self) {
-        info!("Pipeline Summary:");
-        info!("  Total Features: {}", self.graph.node_count());
-        info!("  Total Dependencies: {}", self.graph.edge_count());
+        info!(target: "feature-graph", "Pipeline Summary:");
+        info!(target: "feature-graph", "  Total Features: {}", self.graph.node_count());
+        info!(target: "feature-graph", "  Total Dependencies: {}", self.graph.edge_count());
 
         let raw_inputs = self.get_raw_inputs();
-        info!("  Raw Inputs: {}", raw_inputs.len());
+        info!(target: "feature-graph", "  Raw Inputs: {}", raw_inputs.len());
         for input in &raw_inputs {
-            info!("    - {}", input);
+            info!(target: "feature-graph", "    - {}", input);
         }
 
         let sources = self.get_sources();
-        info!("  Source Features (depend only on raw inputs): {}", sources.len());
+        info!(target: "feature-graph", "  Source Features (depend only on raw inputs): {}", sources.len());
         for source in &sources {
-            info!("    - outputs: {:?}", source.outputs());
+            info!(target: "feature-graph", "    - outputs: {:?}", source.outputs());
         }
 
         let sinks = self.get_sinks();
-        info!("  Terminal Features: {}", sinks.len());
+        info!(target: "feature-graph", "  Terminal Features: {}", sinks.len());
         for sink in &sinks {
-            info!("    - outputs: {:?}", sink.outputs());
+            info!(target: "feature-graph", "    - outputs: {:?}", sink.outputs());
         }
 
         // Find bottleneck features (those with many dependents)
@@ -386,82 +400,125 @@ impl FeatureGraph {
             .collect();
         dependents_count.sort_by(|a, b| b.1.cmp(&a.1));
 
-        info!("  Bottleneck Features (top 5 by number of dependents):");
+        info!(target: "feature-graph", "  Bottleneck Features (top 5 by number of dependents):");
         for (node, count) in dependents_count.iter().take(5) {
             if *count > 0 {
-                info!("    - {:?} ({} dependents)", self.graph[*node].outputs(), count);
+                info!(target: "feature-graph", "    - {:?} ({} dependents)", self.graph[*node].outputs(), count);
             }
         }
 
         let layers = self.get_layers();
-        info!("  Pipeline Depth: {} layers", layers.len());
+        info!(target: "feature-graph", "  Pipeline Depth: {} layers", layers.len());
         for (i, layer) in layers.iter().enumerate() {
-            info!("    Layer {}: {} features", i + 1, layer.len());
+            info!(target: "feature-graph", "    Layer {}: {} features", i + 1, layer.len());
         }
     }
 
     /// Execute the computation graph in topological order with parallel execution where possible
     pub fn calculate(
         &self,
-        state: &FeatureState,
+        state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
         event_time: UtcDateTime,
         instruments: &[Arc<Instrument>],
     ) -> Vec<Arc<Insight>> {
-        // Step 1: Calculate in-degrees
-        let in_degrees = Arc::new(RwLock::new(self.indegrees.clone()));
-
-        // Step 2: Enqueue nodes with zero in-degree
-        let (queue_tx, queue_rx) = kanal::unbounded();
-        for node in &self.order {
-            if in_degrees.read()[node.index()] == 0 {
-                debug!("Ready node: {}", node.index());
-                queue_tx.send(Some(*node)).expect("Failed to send ready node");
-            }
+        if self.parallel {
+            self
+            .layers
+            .iter()
+            .map(|layer| {
+                debug!(target: "feature-graph", "Calculating layer with {} features...", layer.len());
+                layer
+                    .par_iter()
+                    .flat_map_iter(|node| {
+                        debug!(target: "feature-graph", "Calculating feature with outputs: {:?}", self.graph[*node].outputs());
+                        let feature = &self.graph[*node];
+                        instruments
+                            .par_iter()
+                            .filter_map(|instrument| feature.calculate(state, pipeline, instrument, event_time))
+                            .flatten()
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .flatten()
+            .collect::<Vec<_>>()
+        } else {
+            self
+            .layers
+            .iter()
+            .map(|layer| {
+                debug!(target: "feature-graph", "Calculating layer with {} features...", layer.len());
+                layer
+                    .iter()
+                    .flat_map(|node| {
+                        debug!(target: "feature-graph", "Calculating feature with outputs: {:?}", self.graph[*node].outputs());
+                        let feature = &self.graph[*node];
+                        instruments
+                            .iter()
+                            .filter_map(|instrument| feature.calculate(state, pipeline, instrument, event_time))
+                            .flatten()
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .flatten()
+            .collect::<Vec<_>>()
         }
-
-        // Step 3: Parallel processing
-        let pipeline_result = Arc::new(Mutex::new(Vec::new()));
-        self.pool.scope(|s| {
-            while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
-                // let graph = Arc::clone(&self.graph);
-                let in_degrees = Arc::clone(&in_degrees);
-                let queue_tx = queue_tx.clone();
-                let pipeline_result = Arc::clone(&pipeline_result);
-                // let state_clone = Arc::clone(&state);
-
-                s.spawn(move |_| {
-                    // Process the node
-                    let feature = &self.graph[node];
-
-                    // Calculate the feature
-                    let insights = instruments
-                        .par_iter()
-                        .filter_map(|instrument| feature.calculate(state, pipeline, instrument, event_time))
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    pipeline_result.lock().extend(insights);
-
-                    // Update in-degrees of neighbors and enqueue new zero in-degree nodes
-                    for neighbor in self.graph.neighbors_directed(node, petgraph::Outgoing) {
-                        let mut in_degrees = in_degrees.write();
-                        in_degrees[neighbor.index()] -= 1;
-                        if in_degrees[neighbor.index()] == 0 {
-                            debug!("Ready node: {}", neighbor.index());
-                            queue_tx.send(Some(neighbor)).expect("Failed to send ready node");
-                        }
-                    }
-                    debug!("Dependency count: {:?}", in_degrees);
-                    if in_degrees.read().iter().all(|&x| x == 0) {
-                        debug!("All nodes processed");
-                        queue_tx.send(None).expect("Failed to send exit message");
-                    }
-                });
-            }
-        });
-        debug!("Finished graph calculation");
-        let mut lock = pipeline_result.lock();
-
-        std::mem::take(&mut *lock)
     }
 }
+
+// // Step 2: Enqueue nodes with zero in-degree
+// let (queue_tx, queue_rx) = kanal::unbounded();
+// for node in &self.order {
+//     if in_degrees.read()[node.index()] == 0 {
+//         info!("Ready node: {}", node.index());
+//         queue_tx.send(Some(*node)).expect("Failed to send ready node");
+//     }
+// }
+
+// // Step 3: Parallel processing
+// let pipeline_result = Arc::new(Mutex::new(Vec::new()));
+// self.pool.scope(|s| {
+//     while let Some(node) = queue_rx.recv().expect("Failed to receive data") {
+//         // let graph = Arc::clone(&self.graph);
+//         let in_degrees = Arc::clone(&in_degrees);
+//         let queue_tx = queue_tx.clone();
+//         let pipeline_result = Arc::clone(&pipeline_result);
+//         // let state_clone = Arc::clone(&state);
+
+//         s.spawn(move |_| {
+//             // Process the node
+//             let feature = &self.graph[node];
+
+//             // Calculate the feature
+//             let insights = instruments
+//                 .par_iter()
+//                 .filter_map(|instrument| feature.calculate(state, pipeline, instrument, event_time))
+//                 .flatten()
+//                 .collect::<Vec<_>>();
+//             pipeline_result.lock().extend(insights);
+
+//             // Update in-degrees of neighbors and enqueue new zero in-degree nodes
+//             for neighbor in self.graph.neighbors_directed(node, petgraph::Outgoing) {
+//                 let mut in_degrees = in_degrees.write();
+//                 in_degrees[neighbor.index()] -= 1;
+//                 if in_degrees[neighbor.index()] == 0 {
+//                     info!("Ready node: {}", neighbor.index());
+//                     queue_tx.send(Some(neighbor)).expect("Failed to send ready node");
+//                 }
+//             }
+//             info!("Dependency count: {:?}", in_degrees);
+//             if in_degrees.read().iter().all(|&x| x == 0) {
+//                 info!("All nodes processed");
+//                 queue_tx.send(None).expect("Failed to send exit message");
+//             }
+//         });
+//     }
+// });
+// info!("Finished graph calculation");
+// let mut lock = pipeline_result.lock();
+
+// std::mem::take(&mut *lock)
+//     }
+// }

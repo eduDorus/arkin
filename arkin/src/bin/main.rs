@@ -350,7 +350,7 @@ async fn main() {
 
             // Insights service
             let pipeline_config = load::<InsightsConfig>();
-            let pipeline_info = Pipeline::builder()
+            let pipeline_meat = Pipeline::builder()
                 .id(Uuid::new_v4())
                 .name(a.pipeline.to_owned())
                 .description("Pipeline used for test purpuse".to_owned())
@@ -359,9 +359,8 @@ async fn main() {
                 .build();
             let insights = InsightService::new(
                 persistence.clone(),
-                pipeline_info.into(),
+                pipeline_meat.into(),
                 &pipeline_config.insights_service.pipeline,
-                a.warmup,
             )
             .await;
 
@@ -673,7 +672,7 @@ async fn main() {
             let ingestor = Arc::new(BinanceIngestor::builder().instruments(instruments.clone()).venue(venue).build());
 
             let pipeline_config = load::<InsightsConfig>();
-            let pipeline_info = Pipeline::builder()
+            let pipeline_meta = Pipeline::builder()
                 .id(Uuid::new_v4())
                 .name(a.pipeline.to_owned())
                 .description("Pipeline used for agent".to_owned())
@@ -682,9 +681,8 @@ async fn main() {
                 .build();
             let insights = InsightService::new(
                 persistence.clone(),
-                pipeline_info.into(),
+                pipeline_meta.into(),
                 &pipeline_config.insights_service.pipeline,
-                a.warmup,
             )
             .await;
 

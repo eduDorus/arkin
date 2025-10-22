@@ -14,7 +14,8 @@ async fn load_config() {
                 version: "test_pipeline".to_string(),
                 warmup_steps: 10,
                 state_ttl: 3600,
-                frequency_secs: 60,
+                min_interval: 60,
+                parallel: false,
                 features: vec![FeatureConfig::Lag(LagConfig {
                     aggregation_type: AggregationType::Instrument,
                     filter: InstrumentFilter::default(),
@@ -32,6 +33,7 @@ async fn load_config() {
                     lag: vec![300, 14400, 86400],
                     method: LagAlgo::LogChange,
                     persist: true,
+                    fill_strategy: FillStrategy::ForwardFill, // Price-based, use forward fill
                 })],
             },
         },
@@ -58,7 +60,8 @@ async fn load_config_range() {
                 version: "test_pipeline".to_string(),
                 warmup_steps: 10,
                 state_ttl: 3600,
-                frequency_secs: 60,
+                min_interval: 60,
+                parallel: false,
                 features: vec![FeatureConfig::Range(RangeConfig {
                     aggregation_type: AggregationType::Instrument,
                     filter: InstrumentFilter::default(),
@@ -68,6 +71,7 @@ async fn load_config_range() {
                     data: vec![RangeData::Window(300), RangeData::Interval(10)],
                     method: RangeAlgo::Mean,
                     persist: true,
+                    fill_strategy: FillStrategy::ForwardFill, // Price mean, use forward fill
                 })],
             },
         },
@@ -92,7 +96,8 @@ async fn load_config_dual_range() {
                 version: "test_pipeline".to_string(),
                 warmup_steps: 10,
                 state_ttl: 3600,
-                frequency_secs: 60,
+                min_interval: 60,
+                parallel: false,
                 features: vec![FeatureConfig::DualRange(DualRangeConfig {
                     aggregation_type: AggregationType::Instrument,
                     filter: InstrumentFilter::default(),
@@ -103,6 +108,7 @@ async fn load_config_dual_range() {
                     data: vec![RangeData::Window(300)],
                     method: DualRangeAlgo::Correlation,
                     persist: true,
+                    fill_strategy: FillStrategy::ForwardFill, // Price/volume correlation, use forward fill
                 })],
             },
         },
@@ -127,7 +133,8 @@ async fn load_config_two_value() {
                 version: "test_pipeline".to_string(),
                 warmup_steps: 10,
                 state_ttl: 3600,
-                frequency_secs: 60,
+                min_interval: 60,
+                parallel: false,
                 features: vec![FeatureConfig::TwoValue(TwoValueConfig {
                     aggregation_type: AggregationType::Instrument,
                     filter: InstrumentFilter::default(),
@@ -135,9 +142,9 @@ async fn load_config_two_value() {
                     input_1: vec!["bid_volume".to_string()],
                     input_2: vec!["ask_volume".to_string()],
                     output: vec!["volume_imbalance".to_string()],
-                    horizons: vec![RangeData::Window(60)],
                     method: TwoValueAlgo::Imbalance,
                     persist: true,
+                    fill_strategy: FillStrategy::Zero, // Volume imbalance, use zero fill (no volume = 0)
                 })],
             },
         },
@@ -162,7 +169,8 @@ async fn load_config_with_filter_and_groupby() {
                 version: "test_pipeline".to_string(),
                 warmup_steps: 10,
                 state_ttl: 3600,
-                frequency_secs: 60,
+                min_interval: 60,
+                parallel: false,
                 features: vec![
                     // Example 1: Filter to specific instruments
                     FeatureConfig::Lag(LagConfig {
@@ -179,6 +187,7 @@ async fn load_config_with_filter_and_groupby() {
                         lag: vec![1],
                         method: LagAlgo::LogChange,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price returns, forward fill
                     }),
                     // Example 2: Grouped aggregation
                     FeatureConfig::Range(RangeConfig {
@@ -197,6 +206,7 @@ async fn load_config_with_filter_and_groupby() {
                         data: vec![RangeData::Window(300)],
                         method: RangeAlgo::Sum,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume, use zero (no volume = 0)
                     }),
                     // Example 3: Single index across all
                     FeatureConfig::Range(RangeConfig {
@@ -211,6 +221,7 @@ async fn load_config_with_filter_and_groupby() {
                         data: vec![RangeData::Window(3600)],
                         method: RangeAlgo::Mean,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Returns index, forward fill
                     }),
                 ],
             },
@@ -306,7 +317,8 @@ async fn crypto_market_index_construction() {
                 version: "test_pipeline".to_string(),
                 warmup_steps: 10,
                 state_ttl: 3600,
-                frequency_secs: 60,
+                min_interval: 60,
+                parallel: false,
                 features: vec![
                     // ========================================================================
                     // STAGE 1: Raw Trades → 1m Aggregates (per instrument)
@@ -322,6 +334,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Window(60)],
                         method: RangeAlgo::SumAbs,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume aggregation, zero if no data
                     }),
                     // 1m buy notional (positive values only)
                     FeatureConfig::Range(RangeConfig {
@@ -333,6 +346,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Window(60)],
                         method: RangeAlgo::SumAbsPositive,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume aggregation, zero if no data
                     }),
                     // 1m sell notional (negative values only, absolute value)
                     FeatureConfig::Range(RangeConfig {
@@ -344,6 +358,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Window(60)],
                         method: RangeAlgo::SumAbsNegative,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume aggregation, zero if no data
                     }),
                     // 1m mean price (mean over 60 second window)
                     FeatureConfig::Range(RangeConfig {
@@ -355,6 +370,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Window(60)],
                         method: RangeAlgo::Mean,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price aggregation, forward fill
                     }),
                     // 1m VWAP (volume-weighted average price over 60 second window)
                     FeatureConfig::DualRange(DualRangeConfig {
@@ -367,6 +383,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Window(60)],
                         method: DualRangeAlgo::WeightedMean,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price-based calculation, forward fill
                     }),
                     // ========================================================================
                     // STAGE 2: 1m → Multi-timeframe Aggregates (per instrument)
@@ -390,6 +407,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(5), RangeData::Interval(60), RangeData::Interval(240)],
                         method: RangeAlgo::Sum,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume aggregation, zero if no data
                     }),
                     // Buy/Sell notional for all timeframes
                     FeatureConfig::Range(RangeConfig {
@@ -428,6 +446,7 @@ async fn crypto_market_index_construction() {
                         ],
                         method: RangeAlgo::Sum,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume aggregation, zero if no data
                     }),
                     // Imbalance for all timeframes
                     FeatureConfig::TwoValue(TwoValueConfig {
@@ -449,9 +468,9 @@ async fn crypto_market_index_construction() {
                             "notional_imbalance_01h".to_string(),
                             "notional_imbalance_04h".to_string(),
                         ],
-                        horizons: vec![RangeData::Interval(1), RangeData::Interval(1), RangeData::Interval(1)],
                         method: TwoValueAlgo::Imbalance,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume imbalance, zero if no data
                     }),
                     // Price for all timeframes (only need 5m for now)
                     FeatureConfig::Range(RangeConfig {
@@ -463,6 +482,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(5)],
                         method: RangeAlgo::Mean,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price aggregation, forward fill
                     }),
                     // VWAP for all timeframes (5m, 01h, 04h)
                     FeatureConfig::DualRange(DualRangeConfig {
@@ -479,6 +499,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(5), RangeData::Interval(60), RangeData::Interval(240)],
                         method: DualRangeAlgo::WeightedMean,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price-based calculation, forward fill
                     }),
                     // ========================================================================
                     // STAGE 3: Create Synthetic USD Instruments (grouped by base asset)
@@ -503,6 +524,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(1)], // Already aggregated, just group
                         method: RangeAlgo::Sum,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume aggregation, zero if no data
                     }),
                     // Aggregate USDT/USDC price into synthetic USD price
                     FeatureConfig::Range(RangeConfig {
@@ -523,6 +545,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(1)],
                         method: RangeAlgo::Mean,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price aggregation, forward fill
                     }),
                     // ========================================================================
                     // STAGE 4: Calculate Returns (per synthetic instrument)
@@ -543,6 +566,7 @@ async fn crypto_market_index_construction() {
                         lag: vec![5], // 5 intervals = 5 mutes
                         method: LagAlgo::LogChange,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Returns calculation, forward fill
                     }),
                     // ========================================================================
                     // STAGE 5: Build Market Indices (market-wide aggregation)
@@ -562,6 +586,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(5)], // Mean over 5 x 5m bars
                         method: RangeAlgo::Mean,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price aggregation, forward fill
                     }),
                     // Market volatility index (realized volatility over 1 hour)
                     FeatureConfig::Range(RangeConfig {
@@ -577,6 +602,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(60)], // Std over 60 x 1m bars
                         method: RangeAlgo::StandardDeviation,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price aggregation, forward fill
                     }),
                     // Market volume index (total liquidity)
                     FeatureConfig::Range(RangeConfig {
@@ -592,6 +618,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(5)], // Sum over 5 x 5m bars
                         method: RangeAlgo::Sum,
                         persist: true,
+                        fill_strategy: FillStrategy::Zero, // Volume aggregation, zero if no data
                     }),
                     // ========================================================================
                     // STAGE 6: Calculate Betas (per synthetic instrument vs market)
@@ -615,6 +642,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(288)], // 288 x 5m bars = 24 hours
                         method: DualRangeAlgo::Correlation,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price-based calculation, forward fill
                     }),
                     // Beta vs market (proper beta calculation)
                     FeatureConfig::DualRange(DualRangeConfig {
@@ -634,6 +662,7 @@ async fn crypto_market_index_construction() {
                         data: vec![RangeData::Interval(288)],
                         method: DualRangeAlgo::Beta,
                         persist: true,
+                        fill_strategy: FillStrategy::ForwardFill, // Price-based calculation, forward fill
                     }),
                 ],
             },
@@ -652,7 +681,7 @@ async fn crypto_market_index_construction() {
     assert!(features.len() > 0, "Should create features from the crypto market index config");
 
     // Build the pipeline graph and validate it
-    let graph = FeatureGraph::new(features);
+    let graph = FeatureGraph::new(features, false);
 
     // Print comprehensive summary
     graph.print_summary();

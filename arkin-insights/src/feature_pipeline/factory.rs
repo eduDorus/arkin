@@ -37,6 +37,7 @@ impl FeatureFactory {
                                 .output(output_feature)
                                 .lag(c.lag[i])
                                 .method(c.method.clone())
+                                .fill_strategy(c.fill_strategy)
                                 .persist(c.persist)
                                 .build(),
                         ) as Arc<dyn Feature>);
@@ -57,6 +58,7 @@ impl FeatureFactory {
                                 .output(output_feature)
                                 .data(c.data[i].clone())
                                 .method(c.method.clone())
+                                .fill_strategy(c.fill_strategy)
                                 .persist(c.persist)
                                 .build(),
                         ) as Arc<dyn Feature>);
@@ -84,6 +86,7 @@ impl FeatureFactory {
                                 .output(output_feature)
                                 .data(c.data[i].clone())
                                 .method(c.method.clone())
+                                .fill_strategy(c.fill_strategy)
                                 .persist(c.persist)
                                 .build(),
                         ) as Arc<dyn Feature>);
@@ -97,11 +100,6 @@ impl FeatureFactory {
                         "input_1 and input_2 must have the same length"
                     );
                     assert_eq!(c.input_1.len(), c.output.len(), "input_1 and output must have the same length");
-                    assert_eq!(
-                        c.input_1.len(),
-                        c.horizons.len(),
-                        "input_1 and horizons must have the same length"
-                    );
 
                     for i in 0..c.input_1.len() {
                         let input_1_feature = persistence.get_feature_id(&c.input_1[i]).await;
@@ -114,6 +112,7 @@ impl FeatureFactory {
                                 .input_2(input_2_feature)
                                 .output(output_feature)
                                 .method(c.method.clone())
+                                .fill_strategy(c.fill_strategy)
                                 .persist(c.persist)
                                 .build(),
                         ) as Arc<dyn Feature>);

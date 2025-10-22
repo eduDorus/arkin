@@ -1,5 +1,5 @@
 use arkin_core::{prelude::test_inst_binance_btc_usdt_perp, *};
-use arkin_insights::FeatureState;
+use arkin_insights::FeatureStore;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 use std::{hint::black_box, sync::Arc, time::Duration};
@@ -39,7 +39,7 @@ fn bench_single_insert(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     // Setup: create fresh state and insights for each iteration
-                    let state = FeatureState::builder().build();
+                    let state = FeatureStore::builder().build();
                     let base_timestamp = UtcDateTime::now();
                     let insights: Vec<_> = (0..size)
                         .map(|i| {
@@ -80,7 +80,7 @@ fn bench_batch_insert(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     // Setup: create fresh state and insights for each iteration
-                    let state = FeatureState::builder().build();
+                    let state = FeatureStore::builder().build();
                     let base_timestamp = UtcDateTime::now();
                     let insights: Vec<_> = (0..size)
                         .map(|i| {
@@ -119,7 +119,7 @@ fn bench_insert_buffered(c: &mut Criterion) {
             b.to_async(tokio::runtime::Runtime::new().unwrap()).iter_batched(
                 || {
                     // Setup: create fresh state and insights for each iteration
-                    let state = Arc::new(FeatureState::builder().build());
+                    let state = Arc::new(FeatureStore::builder().build());
                     let base_timestamp = UtcDateTime::now();
                     let insights: Vec<_> = (0..size)
                         .map(|i| {
@@ -162,7 +162,7 @@ fn bench_insert_batch_buffered(c: &mut Criterion) {
             b.to_async(tokio::runtime::Runtime::new().unwrap()).iter_batched(
                 || {
                     // Setup: create fresh state and insights for each iteration
-                    let state = Arc::new(FeatureState::builder().build());
+                    let state = Arc::new(FeatureStore::builder().build());
                     let base_timestamp = UtcDateTime::now();
                     let insights: Vec<_> = (0..size)
                         .map(|i| {
@@ -194,7 +194,7 @@ fn bench_point_queries(c: &mut Criterion) {
     let mut group = c.benchmark_group("point_queries");
     group.throughput(Throughput::Elements(1));
 
-    let state = FeatureState::builder().build();
+    let state = FeatureStore::builder().build();
     let instrument = create_test_instrument();
     let feature_id = FeatureId::new("test_feature".into());
     let base_timestamp = UtcDateTime::now();
@@ -217,11 +217,11 @@ fn bench_point_queries(c: &mut Criterion) {
     });
 
     group.bench_function("lag_10", |b| {
-        b.iter(|| state.lag(&instrument, black_box(&feature_id), black_box(query_time), black_box(10)));
+        b.iter(|| state.lag(&instrument, black_box(&feature_id), black_box(query_time), black_box(10), None));
     });
 
     group.bench_function("lag_100", |b| {
-        b.iter(|| state.lag(&instrument, black_box(&feature_id), black_box(query_time), black_box(100)));
+        b.iter(|| state.lag(&instrument, black_box(&feature_id), black_box(query_time), black_box(100), None));
     });
 
     group.finish();
@@ -230,7 +230,7 @@ fn bench_point_queries(c: &mut Criterion) {
 fn bench_range_queries(c: &mut Criterion) {
     let mut group = c.benchmark_group("range_queries");
 
-    let state = FeatureState::builder().build();
+    let state = FeatureStore::builder().build();
     let instrument = create_test_instrument();
     let feature_id = FeatureId::new("test_feature".into());
     let base_timestamp = UtcDateTime::now();
@@ -270,7 +270,7 @@ fn bench_range_queries(c: &mut Criterion) {
 fn bench_last_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("last_n");
 
-    let state = FeatureState::builder().build();
+    let state = FeatureStore::builder().build();
     let instrument = create_test_instrument();
     let feature_id = FeatureId::new("test_feature".into());
     let base_timestamp = UtcDateTime::now();
@@ -292,7 +292,7 @@ fn bench_last_n(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*n as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, &n| {
-            b.iter(|| state.last_n(&instrument, black_box(&feature_id), black_box(query_time), black_box(n)));
+            b.iter(|| state.interval(&instrument, black_box(&feature_id), black_box(query_time), black_box(n), None));
         });
     }
 

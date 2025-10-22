@@ -1,8 +1,12 @@
+pub mod feature_validator;
+
 use std::sync::Arc;
 
 use arkin_core::prelude::*;
 use arkin_persistence::{Persistence, PersistenceConfig};
 use time::UtcDateTime;
+
+pub use feature_validator::FeatureValidator;
 
 /// Creates a Persistence instance for integration tests by loading configuration
 /// from the standard config files.
