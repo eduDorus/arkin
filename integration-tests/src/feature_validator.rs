@@ -21,7 +21,8 @@ pub struct FeatureValidator {
 pub struct ValidationRule {
     pub feature_name: String,
     pub validation_type: ValidationType,
-    pub tolerance: f64, // Percentage (0.01 = 1%)
+    pub tolerance: f64,                             // Percentage (0.01 = 1%)
+    pub target_instrument: Option<Arc<Instrument>>, // If set, only validate for this instrument
 }
 
 pub enum ValidationType {
@@ -37,6 +38,20 @@ pub enum ValidationType {
     /// Validate using a custom computation from accumulators
     Computed {
         compute: fn(&HashMap<String, f64>) -> Option<f64>,
+    },
+
+    /// Validate using a custom computation from interval sums
+    ComputedFromIntervals {
+        compute: fn(&[f64], &[f64]) -> Option<f64>,
+        accumulator1: String,
+        accumulator2: String,
+        num_intervals: usize,
+    },
+
+    /// Validate synthetic feature as sum of source features across multiple instruments
+    SyntheticSum {
+        source_feature: String,
+        source_instruments: Vec<Arc<Instrument>>,
     },
 
     /// Validate a property/invariant
@@ -57,6 +72,12 @@ impl FeatureValidator {
             validators: Vec::new(),
             feature_ids,
         }
+    }
+
+    /// Add additional instruments to track (e.g., synthetic instruments)
+    pub fn add_instruments(mut self, instruments: Vec<Arc<Instrument>>) -> Self {
+        self.instruments.extend(instruments);
+        self
     }
 
     /// Define a raw value accumulator (e.g., sum of trade_notional)
@@ -95,6 +116,7 @@ impl FeatureValidator {
                 accumulator: accumulator.into(),
             },
             tolerance,
+            target_instrument: None,
         });
         self
     }
@@ -114,6 +136,7 @@ impl FeatureValidator {
                 num_intervals,
             },
             tolerance,
+            target_instrument: None,
         });
         self
     }
@@ -129,6 +152,52 @@ impl FeatureValidator {
             feature_name: feature_name.into(),
             validation_type: ValidationType::Computed { compute },
             tolerance,
+            target_instrument: None,
+        });
+        self
+    }
+
+    /// Validate a feature using computation from interval sums
+    pub fn validate_computed_from_intervals(
+        mut self,
+        feature_name: impl Into<String>,
+        accumulator1: impl Into<String>,
+        accumulator2: impl Into<String>,
+        num_intervals: usize,
+        compute: fn(&[f64], &[f64]) -> Option<f64>,
+        tolerance: f64,
+    ) -> Self {
+        self.validators.push(ValidationRule {
+            feature_name: feature_name.into(),
+            validation_type: ValidationType::ComputedFromIntervals {
+                compute,
+                accumulator1: accumulator1.into(),
+                accumulator2: accumulator2.into(),
+                num_intervals,
+            },
+            tolerance,
+            target_instrument: None,
+        });
+        self
+    }
+
+    /// Validate synthetic feature as sum of source features across instruments
+    pub fn validate_synthetic_sum(
+        mut self,
+        synthetic_instrument: Arc<Instrument>,
+        feature_name: impl Into<String>,
+        source_feature: impl Into<String>,
+        source_instruments: Vec<Arc<Instrument>>,
+        tolerance: f64,
+    ) -> Self {
+        self.validators.push(ValidationRule {
+            feature_name: feature_name.into(),
+            validation_type: ValidationType::SyntheticSum {
+                source_feature: source_feature.into(),
+                source_instruments,
+            },
+            tolerance,
+            target_instrument: Some(synthetic_instrument),
         });
         self
     }
@@ -143,6 +212,7 @@ impl FeatureValidator {
             feature_name: feature_name.into(),
             validation_type: ValidationType::Property { check },
             tolerance: 0.0,
+            target_instrument: None,
         });
         self
     }
@@ -177,12 +247,19 @@ impl FeatureValidator {
 
         for rule in &self.validators {
             for inst in &self.instruments {
+                // Skip if rule has a target instrument and it doesn't match
+                if let Some(ref target) = rule.target_instrument {
+                    if target.id != inst.id {
+                        continue;
+                    }
+                }
+
                 let result = self.validate_rule(rule, inst, insights)?;
 
                 match result {
                     RuleResult::Pass { feature, value } => {
                         report.passed += 1;
-                        tracing::info!("✓ {} validated for {}: {:.2}", feature, inst.symbol, value);
+                        tracing::debug!("✓ {} validated for {}: {:.2}", feature, inst.symbol, value);
                     }
                     RuleResult::Fail {
                         feature,
@@ -277,6 +354,67 @@ impl FeatureValidator {
             ValidationType::Computed { compute } => {
                 let accumulators = self.current_window.get(inst).cloned().unwrap_or_default();
                 compute(&accumulators).unwrap_or(0.0)
+            }
+            ValidationType::ComputedFromIntervals {
+                compute,
+                accumulator1,
+                accumulator2,
+                num_intervals,
+            } => {
+                // Need at least num_intervals-1 in history + current window
+                if self.window_history.len() < num_intervals - 1 {
+                    return Ok(RuleResult::Skip);
+                }
+
+                // Collect values for accumulator1
+                let mut values1: Vec<f64> = self
+                    .window_history
+                    .iter()
+                    .rev()
+                    .take(num_intervals - 1)
+                    .filter_map(|window| window.get(inst).and_then(|w| w.get(accumulator1)))
+                    .copied()
+                    .collect();
+                if let Some(current_value) = self.current_window.get(inst).and_then(|w| w.get(accumulator1)) {
+                    values1.push(*current_value);
+                }
+
+                // Collect values for accumulator2
+                let mut values2: Vec<f64> = self
+                    .window_history
+                    .iter()
+                    .rev()
+                    .take(num_intervals - 1)
+                    .filter_map(|window| window.get(inst).and_then(|w| w.get(accumulator2)))
+                    .copied()
+                    .collect();
+                if let Some(current_value) = self.current_window.get(inst).and_then(|w| w.get(accumulator2)) {
+                    values2.push(*current_value);
+                }
+
+                compute(&values1, &values2).unwrap_or(0.0)
+            }
+            ValidationType::SyntheticSum {
+                source_feature,
+                source_instruments,
+            } => {
+                // Sum the source feature across all source instruments from insights
+                let source_feature_id = self
+                    .feature_ids
+                    .get(source_feature)
+                    .ok_or_else(|| format!("Source feature ID not found: {}", source_feature))?;
+
+                let sum: f64 = source_instruments
+                    .iter()
+                    .filter_map(|src_inst| {
+                        insights
+                            .iter()
+                            .find(|i| i.instrument.id == src_inst.id && i.feature_id == *source_feature_id)
+                            .map(|i| i.value)
+                    })
+                    .sum();
+
+                sum
             }
             ValidationType::Property { check: _ } => {
                 // Properties don't have expected values, just pass/fail

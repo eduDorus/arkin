@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use strum::Display;
 use time::UtcDateTime;
-use tracing::{debug, warn};
+use tracing::debug;
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{math::*, Feature, FeatureStore, FillStrategy};
+use crate::{math::*, Feature, FeatureStore, FillStrategy, InstrumentScope};
 
 #[derive(Debug, Display, Clone, Deserialize)]
 #[strum(serialize_all = "snake_case")]
@@ -28,7 +28,7 @@ pub enum RangeAlgo {
     Sum,
     SumPositive,
     SumNegative,
-    SumAbs,
+    AbsSum,
     SumAbsPositive,
     SumAbsNegative,
     Mean,
@@ -42,6 +42,7 @@ pub enum RangeAlgo {
     // Distribution
     Variance,
     StandardDeviation,
+    AnnualizedVolatility,
     Skew,
     Kurtosis,
     Quantile(f64),
@@ -61,7 +62,7 @@ pub struct RangeFeature {
     method: RangeAlgo,
     data: RangeData,
     fill_strategy: FillStrategy,
-    persist: bool,
+    scopes: Vec<InstrumentScope>,
 }
 
 #[async_trait]
@@ -78,99 +79,129 @@ impl Feature for RangeFeature {
         self.fill_strategy
     }
 
+    fn scopes(&self) -> &[InstrumentScope] {
+        &self.scopes
+    }
+
     fn calculate(
         &self,
         state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
-        instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
     ) -> Option<Vec<Arc<Insight>>> {
-        debug!(target: "feature-calc", "Calculating {} for {} at {}", self.output, instrument, event_time);
+        // Iterate over all scopes and compute for each
+        let insights: Vec<Arc<Insight>> = self
+            .scopes
+            .iter()
+            .filter_map(|scope| {
+                // Collect input values from all input instruments in this scope
+                let input_values: Vec<f64> = scope
+                    .inputs
+                    .iter()
+                    .flat_map(|instrument| {
+                        let values = match &self.data {
+                            RangeData::Window(window_secs) => {
+                                // Get values within time window
+                                let window = Duration::from_secs(*window_secs);
+                                state.window(instrument, &self.input, event_time, window)
+                            }
+                            RangeData::Interval(intervals) => {
+                                // Get last N interval values
+                                state
+                                    .interval(instrument, &self.input, event_time, *intervals, Some(self.fill_strategy))
+                                    .unwrap_or_default()
+                            }
+                        };
 
-        // Get data - handle Result from interval, wrap Vec from window in Ok
-        let data = match self.data {
-            RangeData::Interval(i) => {
-                match state.interval(instrument, &self.input, event_time, i, Some(self.fill_strategy)) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        warn!(target: "feature-calc", "Failed to get interval data: {}", e);
-                        return None;
-                    }
+                        debug!(
+                            "Feature {} reading {} from {}: got {} values",
+                            self.output,
+                            self.input,
+                            instrument.symbol,
+                            values.len()
+                        );
+
+                        values
+                    })
+                    .collect();
+
+                // If no data available, apply fill strategy
+                if input_values.is_empty() {
+                    let value = match self.fill_strategy {
+                        FillStrategy::Zero => 0.0,
+                        FillStrategy::ForwardFill => {
+                            // Try to get last value for output instrument
+                            state.last(&scope.output, &self.output, event_time).unwrap_or(0.0)
+                        }
+                        FillStrategy::Drop => return None, // Skip this scope
+                    };
+
+                    return Some(Arc::new(
+                        Insight::builder()
+                            .event_time(event_time)
+                            .pipeline(Some(pipeline.clone()))
+                            .instrument(scope.output.clone())
+                            .feature_id(self.output.clone())
+                            .value(value)
+                            .insight_type(InsightType::Continuous)
+                            .build(),
+                    ));
                 }
-            }
-            RangeData::Window(w) => state.window(instrument, &self.input, event_time, Duration::from_secs(w)),
-        };
 
-        // info!(target: "feature-calc", "Data for instrument {}: {:?}", instrument, data);
+                // Apply the range method to compute the output value
+                let value = match &self.method {
+                    RangeAlgo::Count => input_values.len() as f64,
+                    RangeAlgo::Sum => input_values.iter().sum(),
+                    RangeAlgo::SumPositive => input_values.iter().filter(|&&x| x > 0.0).sum(),
+                    RangeAlgo::SumNegative => input_values.iter().filter(|&&x| x < 0.0).sum(),
+                    RangeAlgo::AbsSum => input_values.iter().map(|x| x.abs()).sum(),
+                    RangeAlgo::SumAbsPositive => input_values.iter().filter(|&&x| x > 0.0).map(|x| x.abs()).sum(),
+                    RangeAlgo::SumAbsNegative => input_values.iter().filter(|&&x| x < 0.0).map(|x| x.abs()).sum(),
+                    RangeAlgo::Mean => mean(&input_values),
+                    RangeAlgo::Median => median(&input_values),
+                    RangeAlgo::Min => min(&input_values),
+                    RangeAlgo::Max => max(&input_values),
+                    RangeAlgo::AbsolutRange => absolut_range(&input_values),
+                    RangeAlgo::RelativeRange => relative_range(&input_values),
+                    RangeAlgo::RelativePosition => relative_position(&input_values),
+                    RangeAlgo::Variance => variance(&input_values),
+                    RangeAlgo::StandardDeviation => std_dev(&input_values),
+                    RangeAlgo::AnnualizedVolatility => annualized_volatility(&input_values),
+                    RangeAlgo::Skew => skew(&input_values),
+                    RangeAlgo::Kurtosis => kurtosis(&input_values),
+                    RangeAlgo::Quantile(q) => quantile(&input_values, *q),
+                    RangeAlgo::Iqr => iqr(&input_values),
+                    RangeAlgo::Autocorrelation(lag) => autocorrelation(&input_values, *lag),
+                    RangeAlgo::CoefOfVariation => coefficient_of_variation(&input_values),
+                };
 
-        // Check if we have enough data
-        if data.len() < 2 {
-            warn!(target: "feature-calc", "Not enough data for distribution calculation: {} entries", data.len());
-            return None;
+                debug!(
+                    "Feature {} for {}: computed {} from {} input values",
+                    self.output,
+                    scope.output.symbol,
+                    value,
+                    input_values.len()
+                );
+
+                // Create insight for the output instrument
+                Some(Arc::new(
+                    Insight::builder()
+                        .event_time(event_time)
+                        .pipeline(Some(pipeline.clone()))
+                        .instrument(scope.output.clone())
+                        .feature_id(self.output.clone())
+                        .value(value)
+                        .insight_type(InsightType::Continuous)
+                        .build(),
+                ))
+            })
+            .collect();
+
+        if insights.is_empty() {
+            None
+        } else {
+            Some(insights)
         }
-
-        // Calculate distribution
-        let mut value = match self.method {
-            // Basic
-            RangeAlgo::Count => data.len() as f64,
-            RangeAlgo::Sum => sum(&data),
-            RangeAlgo::SumAbs => sum_abs(&data),
-            RangeAlgo::SumPositive => sum_positive(&data),
-            RangeAlgo::SumNegative => sum_negative(&data),
-            RangeAlgo::SumAbsPositive => sum_abs_positive(&data),
-            RangeAlgo::SumAbsNegative => sum_abs_negative(&data),
-            RangeAlgo::Mean => mean(&data),
-            RangeAlgo::Median => median(&data),
-            RangeAlgo::Min => min(&data),
-            RangeAlgo::Max => max(&data),
-            RangeAlgo::AbsolutRange => absolut_range(&data),
-            RangeAlgo::RelativeRange => relative_range(&data),
-            RangeAlgo::RelativePosition => relative_position(&data),
-
-            // Distribution
-            RangeAlgo::Variance => variance(&data),
-            RangeAlgo::StandardDeviation => std_dev(&data),
-            RangeAlgo::Skew => skew(&data),
-            RangeAlgo::Kurtosis => kurtosis(&data),
-            RangeAlgo::Quantile(q) => quantile(&data, q),
-            RangeAlgo::Iqr => iqr(&data),
-
-            // Relationship
-            RangeAlgo::Autocorrelation(lag) => autocorrelation(&data, lag),
-
-            // Other
-            RangeAlgo::CoefOfVariation => coefficient_of_variation(&data),
-        };
-
-        // Check if we have a value
-        if value.is_nan() {
-            warn!(target: "feature-calc",
-                "NaN value for distribution calculation for feature {} with method {}",
-                self.output, self.method
-            );
-            return None;
-        }
-
-        // Set precision to 6 decimal places
-        value = (value * 1_000_000.0).round() / 1_000_000.0;
-        debug!(target: "feature-calc", "Calculated value for {}: {}", self.output, value);
-
-        let insight = vec![Arc::new(
-            Insight::builder()
-                .event_time(event_time)
-                .pipeline(Some(pipeline.clone()))
-                .instrument(instrument.clone())
-                .feature_id(self.output.clone())
-                .value(value)
-                .insight_type(InsightType::Continuous)
-                .persist(self.persist)
-                .build(),
-        )];
-
-        // Save insight to state
-        state.insert_batch(insight.as_slice());
-
-        Some(insight)
     }
 
     // async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {

@@ -6,7 +6,7 @@ use time::UtcDateTime;
 
 use arkin_core::prelude::*;
 
-use crate::FeatureStore;
+use crate::{FeatureStore, InstrumentScope};
 
 /// Strategy for handling missing data in time-series queries
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
@@ -15,6 +15,8 @@ pub enum FillStrategy {
     /// Forward fill - use last valid value (default, best for prices)
     #[default]
     ForwardFill,
+    /// Forward fill with mean of lookback window
+    // ForwardFillWithMean(u64),
     /// Fill with zero (good for volume, counts, deltas)
     Zero,
     /// Skip missing values (current behavior, may cause shorter windows)
@@ -29,7 +31,6 @@ pub trait Feature: std::fmt::Debug + Send + Sync {
         &self,
         state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
-        instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
     ) -> Option<Vec<Arc<Insight>>>;
 
@@ -37,5 +38,11 @@ pub trait Feature: std::fmt::Debug + Send + Sync {
     /// Default is ForwardFill, which is suitable for most price-based features
     fn fill_strategy(&self) -> FillStrategy {
         FillStrategy::ForwardFill
+    }
+
+    /// Get the instrument scopes that this feature operates on
+    /// Returns a reference to the scopes if the feature has them
+    fn scopes(&self) -> &[InstrumentScope] {
+        &[] // Default implementation returns empty slice
     }
 }

@@ -414,57 +414,114 @@ impl FeatureGraph {
         }
     }
 
+    /// Get all real instruments used by features in the graph
+    /// Collects unique real instruments from all feature scopes
+    pub fn real_instruments(&self) -> Vec<Arc<Instrument>> {
+        use std::collections::HashSet;
+        let mut instruments = HashSet::new();
+
+        for node in self.graph.node_indices() {
+            for scope in self.graph[node].scopes() {
+                // Collect real instruments from inputs
+                for input in &scope.inputs {
+                    if !input.synthetic {
+                        instruments.insert(Arc::clone(input));
+                    }
+                }
+                // Check if output is a real instrument
+                if !scope.output.synthetic {
+                    instruments.insert(Arc::clone(&scope.output));
+                }
+            }
+        }
+
+        instruments.into_iter().collect()
+    }
+
+    /// Get all synthetic instruments used by features in the graph
+    /// Collects unique synthetic instruments from all feature scopes
+    pub fn synthetic_instruments(&self) -> Vec<Arc<Instrument>> {
+        use std::collections::HashSet;
+        let mut instruments = HashSet::new();
+
+        for node in self.graph.node_indices() {
+            for scope in self.graph[node].scopes() {
+                // Collect synthetic instruments from inputs
+                for input in &scope.inputs {
+                    if input.synthetic {
+                        instruments.insert(Arc::clone(input));
+                    }
+                }
+                // Check if output is a synthetic instrument
+                if scope.output.synthetic {
+                    instruments.insert(Arc::clone(&scope.output));
+                }
+            }
+        }
+
+        instruments.into_iter().collect()
+    }
+
+    /// Get all instruments (both real and synthetic) used by features in the graph
+    pub fn all_instruments(&self) -> Vec<Arc<Instrument>> {
+        use std::collections::HashSet;
+        let mut instruments = HashSet::new();
+
+        for node in self.graph.node_indices() {
+            for scope in self.graph[node].scopes() {
+                // Collect all inputs
+                for input in &scope.inputs {
+                    instruments.insert(Arc::clone(input));
+                }
+                // Collect output
+                instruments.insert(Arc::clone(&scope.output));
+            }
+        }
+
+        instruments.into_iter().collect()
+    }
+
     /// Execute the computation graph in topological order with parallel execution where possible
     pub fn calculate(
         &self,
         state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
         event_time: UtcDateTime,
-        instruments: &[Arc<Instrument>],
     ) -> Vec<Arc<Insight>> {
-        if self.parallel {
-            self
-            .layers
-            .iter()
-            .map(|layer| {
-                debug!(target: "feature-graph", "Calculating layer with {} features...", layer.len());
+        let mut all_insights = Vec::new();
+
+        // Process layers sequentially to ensure dependencies are met
+        for layer in &self.layers {
+            debug!(target: "feature-graph", "Calculating layer with {} features...", layer.len());
+
+            let layer_insights: Vec<Arc<Insight>> = if self.parallel {
                 layer
                     .par_iter()
-                    .flat_map_iter(|node| {
+                    .flat_map(|node| {
                         debug!(target: "feature-graph", "Calculating feature with outputs: {:?}", self.graph[*node].outputs());
                         let feature = &self.graph[*node];
-                        instruments
-                            .par_iter()
-                            .filter_map(|instrument| feature.calculate(state, pipeline, instrument, event_time))
-                            .flatten()
-                            .collect::<Vec<_>>()
+                        feature.calculate(state, pipeline, event_time).unwrap_or_default()
                     })
-                    .collect::<Vec<_>>()
-            })
-            .flatten()
-            .collect::<Vec<_>>()
-        } else {
-            self
-            .layers
-            .iter()
-            .map(|layer| {
-                debug!(target: "feature-graph", "Calculating layer with {} features...", layer.len());
+                    .collect()
+            } else {
                 layer
                     .iter()
                     .flat_map(|node| {
                         debug!(target: "feature-graph", "Calculating feature with outputs: {:?}", self.graph[*node].outputs());
                         let feature = &self.graph[*node];
-                        instruments
-                            .iter()
-                            .filter_map(|instrument| feature.calculate(state, pipeline, instrument, event_time))
-                            .flatten()
-                            .collect::<Vec<_>>()
+                        feature.calculate(state, pipeline, event_time).unwrap_or_default()
                     })
-                    .collect::<Vec<_>>()
-            })
-            .flatten()
-            .collect::<Vec<_>>()
+                    .collect()
+            };
+
+            // Write this layer's insights to state so next layer can read them
+            state.insert_batch(&layer_insights);
+
+            // Collect for final return
+            all_insights.extend(layer_insights);
         }
+
+        all_insights
     }
 }
 

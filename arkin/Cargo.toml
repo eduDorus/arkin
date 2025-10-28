@@ -18,6 +18,7 @@ arkin-audit = { path = "../arkin-audit" }
 arkin-cli = { path = "../arkin-cli" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-insights = { path = "../arkin-insights" }
+arkin-ingestor = { path = "../arkin-ingestor" }
 arkin-ingestor-historical = { path = "../arkin-ingestor-historical" }
 arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 arkin-strat-agent = { path = "../arkin-strat-agent" }
@@ -45,3 +46,6 @@ clap = { workspace = true }
 rust_decimal = { workspace = true }
 mimalloc = { version = "0.1.48", features = [ "v3" ] }
 tonic = { workspace = true }
+
+tokio-tungstenite = { workspace = true }
+url = { workspace = true }

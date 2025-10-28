@@ -1,18 +1,15 @@
 use std::collections::HashMap;
 
-use rayon::prelude::*;
 use tracing::{error, warn};
 
 /// Basic statistical functions
 pub fn min(data: &[f64]) -> f64 {
-    data.par_iter()
-        .fold(|| f64::MAX, |a, &b| a.min(b))
-        .reduce(|| f64::MAX, f64::min)
+    // data.iter().fold(|| f64::MAX, |a, &b| a.min(b)).reduce(|| f64::MAX, f64::min)
+    data.iter().cloned().fold(f64::INFINITY, f64::min)
 }
 pub fn max(data: &[f64]) -> f64 {
-    data.par_iter()
-        .fold(|| f64::MIN, |a, &b| a.max(b))
-        .reduce(|| f64::MIN, f64::max)
+    // data.iter().fold(|| f64::MIN, |a, &b| a.max(b)).reduce(|| f64::MIN, f64::max)
+    data.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
 }
 
 pub fn absolut_range(data: &[f64]) -> f64 {
@@ -35,27 +32,27 @@ pub fn relative_position(data: &[f64]) -> f64 {
 }
 
 pub fn sum(data: &[f64]) -> f64 {
-    data.par_iter().sum()
+    data.iter().sum()
 }
 
 pub fn sum_positive(data: &[f64]) -> f64 {
-    data.par_iter().filter(|&&x| x > 0.0).sum()
+    data.iter().filter(|&&x| x > 0.0).sum()
 }
 
 pub fn sum_negative(data: &[f64]) -> f64 {
-    data.par_iter().filter(|&&x| x < 0.0).sum()
+    data.iter().filter(|&&x| x < 0.0).sum()
 }
 
 pub fn sum_abs(data: &[f64]) -> f64 {
-    data.par_iter().map(|x| x.abs()).sum()
+    data.iter().map(|x| x.abs()).sum()
 }
 
 pub fn sum_abs_positive(data: &[f64]) -> f64 {
-    data.par_iter().filter(|&&x| x > 0.0).map(|x| x.abs()).sum()
+    data.iter().filter(|&&x| x > 0.0).map(|x| x.abs()).sum()
 }
 
 pub fn sum_abs_negative(data: &[f64]) -> f64 {
-    data.par_iter().filter(|&&x| x < 0.0).map(|x| x.abs()).sum()
+    data.iter().filter(|&&x| x < 0.0).map(|x| x.abs()).sum()
 }
 
 pub fn mean(data: &[f64]) -> f64 {
@@ -78,11 +75,15 @@ pub fn weighted_mean(values: &[f64], weights: &[f64]) -> f64 {
     }
 
     // Calculate sum of (value * weight) and sum of weights
-    let (weighted_sum, total_weight): (f64, f64) = values
-        .par_iter()
-        .zip(weights.par_iter())
-        .map(|(&v, &w)| (v * w.abs(), w.abs())) // Use absolute value of weights
-        .reduce(|| (0.0, 0.0), |a, b| (a.0 + b.0, a.1 + b.1));
+    // let (weighted_sum, total_weight): (f64, f64) = values
+    //     .iter()
+    //     .zip(weights.iter())
+    //     .map(|(&v, &w)| (v * w.abs(), w.abs())) // Use absolute value of weights
+    //     .reduce(|| (0.0, 0.0), |a, b| (a.0 + b.0, a.1 + b.1));
+    let (weighted_sum, total_weight) = values
+        .iter()
+        .zip(weights.iter())
+        .fold((0.0, 0.0), |(sum, total), (&v, &w)| (sum + v * w.abs(), total + w.abs()));
 
     if total_weight == 0.0 {
         warn!("weighted_mean: total weight is zero");
@@ -120,7 +121,7 @@ pub fn mode(data: &[f64]) -> Vec<f64> {
 /// Distribution Metrics
 pub fn variance(data: &[f64]) -> f64 {
     let mean = mean(data);
-    let sum_sq_diff: f64 = data.par_iter().map(|x| (x - mean).powi(2)).sum();
+    let sum_sq_diff: f64 = data.iter().map(|x| (x - mean).powi(2)).sum();
     let n = data.len() as f64 - 1.0;
     sum_sq_diff / n
 }
@@ -129,11 +130,19 @@ pub fn std_dev(data: &[f64]) -> f64 {
     variance(data).sqrt()
 }
 
+/// Annualize volatility based on the interval of the data
+/// For crypto 1-minute data: 365 days × 24 hours × 60 minutes = 525,600 periods/year
+pub fn annualized_volatility(data: &[f64]) -> f64 {
+    let period_std_dev = std_dev(data);
+    // Crypto trades 24/7: 365 days × 24 hours × 60 minutes per year
+    period_std_dev * (525_600.0f64).sqrt()
+}
+
 pub fn skew(data: &[f64]) -> f64 {
     let n = data.len() as f64;
     let mean = mean(data);
     let std_dev = std_dev(data);
-    let sum_cube_diff: f64 = data.par_iter().map(|x| ((x - mean) / std_dev).powi(3)).sum();
+    let sum_cube_diff: f64 = data.iter().map(|x| ((x - mean) / std_dev).powi(3)).sum();
     (n / ((n - 1.0) * (n - 2.0))) * sum_cube_diff
 }
 
@@ -141,7 +150,7 @@ pub fn kurtosis(data: &[f64]) -> f64 {
     let n = data.len() as f64;
     let mean = mean(data);
     let std_dev = std_dev(data);
-    let sum_fourth_diff: f64 = data.par_iter().map(|x| ((x - mean) / std_dev).powi(4)).sum();
+    let sum_fourth_diff: f64 = data.iter().map(|x| ((x - mean) / std_dev).powi(4)).sum();
     (n * (n + 1.0) / ((n - 1.0) * (n - 2.0) * (n - 3.0))) * sum_fourth_diff
         - (3.0 * (n - 1.0).powi(2)) / ((n - 2.0) * (n - 3.0))
 }
@@ -187,11 +196,7 @@ pub fn difference(value: f64, prev_value: f64) -> f64 {
 pub fn covariance(data1: &[f64], data2: &[f64]) -> f64 {
     let mean1 = mean(data1);
     let mean2 = mean(data2);
-    let sum = data1
-        .par_iter()
-        .zip(data2)
-        .map(|(&x, &y)| (x - mean1) * (y - mean2))
-        .sum::<f64>();
+    let sum = data1.iter().zip(data2).map(|(&x, &y)| (x - mean1) * (y - mean2)).sum::<f64>();
     sum / (data1.len() as f64 - 1.0)
 }
 
@@ -200,9 +205,9 @@ pub fn correlation(data1: &[f64], data2: &[f64]) -> f64 {
 }
 
 pub fn cosine_similarity(data1: &[f64], data2: &[f64]) -> f64 {
-    let dot_product: f64 = data1.par_iter().zip(data2).map(|(&x, &y)| x * y).sum();
-    let norm1: f64 = data1.par_iter().map(|&x| x.powi(2)).sum::<f64>().sqrt();
-    let norm2: f64 = data2.par_iter().map(|&x| x.powi(2)).sum::<f64>().sqrt();
+    let dot_product: f64 = data1.iter().zip(data2).map(|(&x, &y)| x * y).sum();
+    let norm1: f64 = data1.iter().map(|&x| x.powi(2)).sum::<f64>().sqrt();
+    let norm2: f64 = data2.iter().map(|&x| x.powi(2)).sum::<f64>().sqrt();
     dot_product / (norm1 * norm2)
 }
 
@@ -226,7 +231,7 @@ pub fn elasticity(data1: f64, data2: f64) -> f64 {
 
 pub fn autocorrelation(data: &[f64], k: usize) -> f64 {
     let mean = mean(data);
-    let sum_sq_diff: f64 = data.par_iter().map(|x| (x - mean).powi(2)).sum(); // Correct denominator
+    let sum_sq_diff: f64 = data.iter().map(|x| (x - mean).powi(2)).sum(); // Correct denominator
     let n = data.len();
     let sum: f64 = (0..n - k).map(|i| (data[i] - mean) * (data[i + k] - mean)).sum();
     sum / sum_sq_diff

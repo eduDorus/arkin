@@ -1,0 +1,344 @@
+use arkin_core::prelude::init_tracing;
+use arkin_ingestor::{
+    BinanceSubscription, BybitSubscription, CoinbaseSubscription, OkxSubscription, OkxSubscriptionArg,
+};
+use arkin_ingestor::{MarketRegistry, WsClient, WsConfig};
+use std::collections::HashMap;
+use tokio::time::{sleep, Duration};
+use tracing::error;
+
+#[derive(Clone, Debug, Default)]
+struct StreamStats {
+    message_count: u64,
+}
+
+#[derive(Clone, Debug, Default)]
+struct EventStats {
+    by_exchange: HashMap<String, StreamStats>,
+    by_stream_type: HashMap<String, StreamStats>,
+    by_market_type: HashMap<String, StreamStats>,
+    total_messages: u64,
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    init_tracing();
+
+    let registry = MarketRegistry::new();
+    let all_streams = registry.list_all();
+
+    println!("\n╔══════════════════════════════════════════════════════════════════════════════╗");
+    println!("║           Multi-Exchange WebSocket Aggregator with Live Statistics          ║");
+    println!("╚══════════════════════════════════════════════════════════════════════════════╝\n");
+
+    // Filter to only ticker, trade, and aggtrade streams
+    let filtered_streams: Vec<_> = all_streams
+        .into_iter()
+        .filter(|s| {
+            let stream_type_str = s.stream_type.to_string();
+            stream_type_str == "aggregate_trades" || stream_type_str == "trades" || stream_type_str == "ticker_realtime"
+        })
+        .collect();
+
+    // Group streams by URL (combine streams that share the same endpoint)
+    let mut url_to_streams: HashMap<String, Vec<_>> = HashMap::new();
+    for stream in &filtered_streams {
+        url_to_streams
+            .entry(stream.url.clone())
+            .or_insert_with(Vec::new)
+            .push(stream.clone());
+    }
+
+    println!(
+        "📊 Discovered {} unique endpoints with {} filtered streams (ticker/trade/aggtrade only)\n",
+        url_to_streams.len(),
+        filtered_streams.len()
+    );
+
+    // Test symbols (BTC, ETH, SOL)
+    let test_symbols = vec!["btc", "eth", "sol"];
+    println!("🎯 Testing with symbols: {:?}\n", test_symbols);
+
+    // Create one WebSocket client per unique URL
+    let mut receivers = Vec::new();
+    for (url, streams) in url_to_streams.iter() {
+        // Determine exchange from first stream
+        let exchange = streams.first().map(|s| s.exchange).unwrap_or(arkin_ingestor::Exchange::Binance);
+
+        // Build subscription messages based on exchange
+        let subscription_messages = build_subscriptions(&exchange, streams, &test_symbols);
+
+        println!("📡 Endpoint: {}", url);
+        println!("   Exchange: {}", exchange);
+        println!("   Total subscription messages: {}", subscription_messages.len());
+        for (i, (msg, stream_id)) in subscription_messages.iter().take(3).enumerate() {
+            println!("     [{}] {} -> {}", i + 1, stream_id, msg);
+        }
+        if subscription_messages.len() > 3 {
+            println!("     ... and {} more", subscription_messages.len() - 3);
+        }
+        println!();
+
+        // Determine ping interval based on exchange
+        let send_ping_interval_secs = match exchange {
+            arkin_ingestor::Exchange::Coinbase => 20, // Coinbase requires ping every 15-30 seconds
+            _ => 0,                                   // Other exchanges don't require us to send pings
+        };
+
+        let config = WsConfig {
+            url: url.clone(),
+            streams: subscription_messages,
+            reconnect_backoff_ms: 1000,
+            max_reconnect_attempts: 10,
+            ping_interval_secs: 180,
+            pong_timeout_secs: 600,
+            stale_connection_timeout_secs: 30,
+            send_ping_interval_secs,
+        };
+
+        let (client, rx) = WsClient::new(config);
+        let url_clone = url.clone();
+        let streams_clone = streams.clone();
+
+        tokio::spawn(async move {
+            let mut c = client;
+            if let Err(e) = c.run().await {
+                error!("Client error for {}: {}", url_clone, e);
+            }
+        });
+
+        receivers.push((rx, streams_clone));
+    }
+
+    println!("✅ Started {} WebSocket connections...\n", receivers.len());
+    println!("Listening for market data... (Press Ctrl+C to stop)\n");
+
+    // Statistics tracking
+    let mut stats = EventStats::default();
+    let mut messages_processed = 0u64;
+    let mut last_print = tokio::time::Instant::now();
+
+    loop {
+        // Try to receive from any of the channels
+        for (rx, streams) in &mut receivers {
+            loop {
+                match rx.try_recv() {
+                    Ok(_msg) => {
+                        messages_processed += 1;
+                        stats.total_messages += 1;
+
+                        // Use first stream config from this URL for stats
+                        if let Some(stream) = streams.first() {
+                            let exchange = stream.exchange.to_string();
+                            let stream_type = stream.stream_type.to_string();
+                            let market_type = stream.market_type.to_string();
+
+                            stats
+                                .by_exchange
+                                .entry(exchange)
+                                .or_insert_with(StreamStats::default)
+                                .message_count += 1;
+                            stats
+                                .by_stream_type
+                                .entry(stream_type)
+                                .or_insert_with(StreamStats::default)
+                                .message_count += 1;
+                            stats
+                                .by_market_type
+                                .entry(market_type)
+                                .or_insert_with(StreamStats::default)
+                                .message_count += 1;
+                        }
+                    }
+                    Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
+                    Err(_) => break,
+                }
+            }
+        }
+
+        // Check if we should print statistics (every 10 seconds)
+        if last_print.elapsed() >= Duration::from_secs(10) {
+            print_statistics(&stats, messages_processed);
+            stats = EventStats::default();
+            messages_processed = 0;
+            last_print = tokio::time::Instant::now();
+        }
+
+        sleep(Duration::from_millis(100)).await;
+    }
+}
+
+fn build_subscriptions(
+    exchange: &arkin_ingestor::Exchange,
+    streams: &[arkin_ingestor::StreamConfig],
+    test_symbols: &[&str],
+) -> Vec<(String, String)> {
+    match exchange {
+        arkin_ingestor::Exchange::Binance => build_binance_subscriptions(streams, test_symbols),
+        arkin_ingestor::Exchange::Okx => build_okx_subscriptions(streams, test_symbols),
+        arkin_ingestor::Exchange::Bybit => build_bybit_subscriptions(streams, test_symbols),
+        arkin_ingestor::Exchange::Coinbase => build_coinbase_subscriptions(streams, test_symbols),
+    }
+}
+
+fn stream_id_from_config(stream: &arkin_ingestor::StreamConfig) -> String {
+    format!("{} {} {}", stream.exchange, stream.market_type, stream.stream_type)
+}
+
+fn build_binance_subscriptions(
+    streams: &[arkin_ingestor::StreamConfig],
+    test_symbols: &[&str],
+) -> Vec<(String, String)> {
+    let mut stream_names = Vec::new();
+
+    for stream in streams {
+        let stream_type = stream.stream_type.to_string();
+        let stream_suffix = match stream_type.as_str() {
+            "aggregate_trades" => "@aggTrade",
+            "trades" => "@trade",
+            "ticker_realtime" => "@ticker",
+            _ => continue,
+        };
+
+        for symbol in test_symbols {
+            let stream_name = format!("{}usdt{}", symbol, stream_suffix);
+            stream_names.push(stream_name);
+        }
+    }
+
+    // Create single subscription with all streams
+    if !stream_names.is_empty() {
+        let sub = BinanceSubscription::new(stream_names);
+        let msg = serde_json::to_string(&sub).unwrap();
+        let stream_id = streams.first().map(|s| stream_id_from_config(s)).unwrap_or_default();
+        return vec![(msg, stream_id)];
+    }
+    Vec::new()
+}
+
+fn build_okx_subscriptions(streams: &[arkin_ingestor::StreamConfig], test_symbols: &[&str]) -> Vec<(String, String)> {
+    let mut args = Vec::new();
+
+    for stream in streams {
+        let stream_type = stream.stream_type.to_string();
+        let channel = match stream_type.as_str() {
+            "aggregate_trades" => "trades",
+            "trades" => "trades",
+            "ticker_realtime" => "tickers",
+            _ => continue,
+        };
+
+        for symbol in test_symbols {
+            let inst_id = format!("{}-USDT", symbol.to_uppercase());
+            args.push(OkxSubscriptionArg {
+                channel: channel.to_string(),
+                inst_id,
+            });
+        }
+    }
+
+    // Create single subscription with all args
+    if !args.is_empty() {
+        let sub = OkxSubscription::new(args);
+        let msg = serde_json::to_string(&sub).unwrap();
+        let stream_id = streams.first().map(|s| stream_id_from_config(s)).unwrap_or_default();
+        return vec![(msg, stream_id)];
+    }
+    Vec::new()
+}
+
+fn build_bybit_subscriptions(streams: &[arkin_ingestor::StreamConfig], test_symbols: &[&str]) -> Vec<(String, String)> {
+    let mut stream_names = Vec::new();
+
+    for stream in streams {
+        let stream_type = stream.stream_type.to_string();
+        let stream_prefix = match stream_type.as_str() {
+            "aggregate_trades" => "publicTrade.",
+            "trades" => "publicTrade.",
+            "ticker_realtime" => "tickers.",
+            _ => continue,
+        };
+
+        for symbol in test_symbols {
+            let stream_name = format!("{}{}USDT", stream_prefix, symbol.to_uppercase());
+            stream_names.push(stream_name);
+        }
+    }
+
+    // Create single subscription with all streams
+    if !stream_names.is_empty() {
+        let sub = BybitSubscription::new(stream_names);
+        let msg = serde_json::to_string(&sub).unwrap();
+        let stream_id = streams.first().map(|s| stream_id_from_config(s)).unwrap_or_default();
+        return vec![(msg, stream_id)];
+    }
+    Vec::new()
+}
+
+fn build_coinbase_subscriptions(
+    streams: &[arkin_ingestor::StreamConfig],
+    test_symbols: &[&str],
+) -> Vec<(String, String)> {
+    let mut subscriptions = Vec::new();
+
+    // Coinbase requires separate subscriptions per channel
+    for stream in streams {
+        let stream_type = stream.stream_type.to_string();
+        let channel = match stream_type.as_str() {
+            "aggregate_trades" => "market_trades",
+            "trades" => "market_trades",
+            "ticker_realtime" => "ticker",
+            _ => continue,
+        };
+
+        let mut product_ids = Vec::new();
+        for symbol in test_symbols {
+            let product_id = format!("{}-USD", symbol.to_uppercase());
+            product_ids.push(product_id);
+        }
+
+        let sub = CoinbaseSubscription::new(product_ids, channel.to_string());
+        let msg = serde_json::to_string(&sub).unwrap();
+        let stream_id = stream_id_from_config(stream);
+        subscriptions.push((msg, stream_id));
+    }
+
+    subscriptions
+}
+
+fn print_statistics(stats: &EventStats, messages_processed: u64) {
+    println!("\n\n╔══════════════════════════════════════════════════════════════════════════════╗");
+    println!("║                    📊 Statistics (Last 10 seconds)                           ║");
+    println!("╚══════════════════════════════════════════════════════════════════════════════╝");
+
+    println!("\n📈 Total Messages Processed: {}\n", messages_processed);
+
+    if !stats.by_exchange.is_empty() {
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        println!("🔹 By Exchange:");
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        for (exchange, s) in &stats.by_exchange {
+            println!("  {:<15} │ Messages: {:>8}", exchange, s.message_count);
+        }
+    }
+
+    if !stats.by_stream_type.is_empty() {
+        println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        println!("📍 By Stream Type:");
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        for (stream_type, s) in &stats.by_stream_type {
+            println!("  {:<25} │ Messages: {:>8}", stream_type, s.message_count);
+        }
+    }
+
+    if !stats.by_market_type.is_empty() {
+        println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        println!("🎯 By Market Type:");
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        for (market_type, s) in &stats.by_market_type {
+            println!("  {:<25} │ Messages: {:>8}", market_type, s.message_count);
+        }
+    }
+
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+}

@@ -4,12 +4,11 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use strum::Display;
 use time::UtcDateTime;
-use tracing::{debug, warn};
 use typed_builder::TypedBuilder;
 
 use arkin_core::prelude::*;
 
-use crate::{math::*, Feature, FeatureStore, FillStrategy};
+use crate::{Feature, FeatureStore, FillStrategy, InstrumentScope};
 
 #[derive(Debug, Display, Clone, Deserialize)]
 #[strum(serialize_all = "snake_case")]
@@ -29,7 +28,7 @@ pub struct LagFeature {
     lag: usize,
     method: LagAlgo,
     fill_strategy: FillStrategy,
-    persist: bool,
+    scopes: Vec<InstrumentScope>,
 }
 
 #[async_trait]
@@ -46,69 +45,74 @@ impl Feature for LagFeature {
         self.fill_strategy
     }
 
+    fn scopes(&self) -> &[InstrumentScope] {
+        &self.scopes
+    }
+
     fn calculate(
         &self,
         state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
-        instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
     ) -> Option<Vec<Arc<Insight>>> {
-        debug!(target: "feature-calc", "Calculating {} for {} at {}", self.output, instrument, event_time);
+        // Iterate over all scopes and compute for each
+        let insights: Vec<Arc<Insight>> = self
+            .scopes
+            .iter()
+            .filter_map(|scope| {
+                // For lag features, we need current value and lagged value
+                // Get current value from any of the input instruments
+                let current_value = scope
+                    .inputs
+                    .iter()
+                    .find_map(|instrument| state.last(instrument, &self.input, event_time))?;
 
-        //  Get data - now returns Result
-        let prev_value = match state.lag(instrument, &self.input, event_time, self.lag, Some(self.fill_strategy)) {
-            Ok(v) => v,
-            Err(e) => {
-                warn!("Failed to get lagged value: {}", e);
-                return None;
-            }
-        };
+                // Get lagged value
+                let lagged_value = scope.inputs.iter().find_map(|instrument| {
+                    state
+                        .lag(instrument, &self.input, event_time, self.lag, Some(self.fill_strategy))
+                        .ok()
+                })?;
 
-        let value = match state.last(instrument, &self.input, event_time) {
-            Some(v) => v,
-            None => {
-                warn!("No current value available");
-                return None;
-            }
-        };
+                // Apply the lag method to compute the change
+                let value = match &self.method {
+                    LagAlgo::AbsoluteChange => current_value - lagged_value,
+                    LagAlgo::PercentChange => {
+                        if lagged_value == 0.0 {
+                            0.0
+                        } else {
+                            (current_value - lagged_value) / lagged_value.abs() * 100.0
+                        }
+                    }
+                    LagAlgo::LogChange => {
+                        if lagged_value <= 0.0 || current_value <= 0.0 {
+                            0.0
+                        } else {
+                            (current_value / lagged_value).ln()
+                        }
+                    }
+                    LagAlgo::Difference => current_value - lagged_value,
+                };
 
-        let mut change = match self.method {
-            LagAlgo::AbsoluteChange => abs_change(value, prev_value),
-            LagAlgo::PercentChange => pct_change(value, prev_value),
-            LagAlgo::LogChange => log_change(value, prev_value),
-            LagAlgo::Difference => difference(value, prev_value),
-        };
+                // Create insight for the output instrument
+                Some(Arc::new(
+                    Insight::builder()
+                        .event_time(event_time)
+                        .pipeline(Some(pipeline.clone()))
+                        .instrument(scope.output.clone())
+                        .feature_id(self.output.clone())
+                        .value(value)
+                        .insight_type(InsightType::Continuous)
+                        .build(),
+                ))
+            })
+            .collect();
 
-        // Check if we have a value
-        if change.is_nan() {
-            warn!(
-                "NaN value for distribution calculation for feature {} with method {}",
-                self.output, self.method
-            );
-            return None;
+        if insights.is_empty() {
+            None
+        } else {
+            Some(insights)
         }
-
-        // Set precision to 6 decimal places
-        change = (change * 1_000_000.0).round() / 1_000_000.0;
-        debug!(target: "feature-calc", "Calculated value for {}: {}", self.output, change);
-
-        // Return insight
-        let insight = vec![Arc::new(
-            Insight::builder()
-                .event_time(event_time)
-                .pipeline(Some(pipeline.clone()))
-                .instrument(instrument.clone())
-                .feature_id(self.output.clone())
-                .value(change)
-                .insight_type(InsightType::Continuous)
-                .persist(self.persist)
-                .build(),
-        )];
-
-        // Save insight to state
-        state.insert_batch(insight.as_slice());
-
-        Some(insight)
     }
 
     // async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {

@@ -79,19 +79,18 @@ impl FeaturePipeline {
         self.state.commit(event_time).await;
     }
 
-    /// Calculate all features for given instruments
+    /// Calculate all features
     ///
     /// During warmup period, features are still calculated to build up derived features,
     /// but an empty vector is returned. Once warmup is complete, calculated insights are returned.
-    pub async fn calculate(&self, event_time: UtcDateTime, instruments: &[Arc<Instrument>]) -> Vec<Arc<Insight>> {
+    pub async fn calculate(&self, event_time: UtcDateTime) -> Vec<Arc<Insight>> {
         // Always calculate to build up feature dependencies, even during warmup
         let insights = tokio::task::spawn_blocking({
             let graph = Arc::clone(&self.graph);
-            let state = Arc::clone(&self.state); // If FeatureState needs Arc
+            let state = Arc::clone(&self.state);
             let meta = Arc::clone(&self.meta);
-            let instruments = instruments.to_vec(); // Clone slice
             let event_time = event_time;
-            move || graph.calculate(&state, &meta, event_time, &instruments)
+            move || graph.calculate(&state, &meta, event_time)
         })
         .await
         .expect("Failed to calculate pipeline");
@@ -128,10 +127,26 @@ impl FeaturePipeline {
     pub fn pipeline_meta(&self) -> &Arc<Pipeline> {
         &self.meta
     }
+
+    /// Get all real instruments used by features in the pipeline
+    pub fn real_instruments(&self) -> Vec<Arc<Instrument>> {
+        self.graph.real_instruments()
+    }
+
+    /// Get all synthetic instruments used by features in the pipeline
+    pub fn synthetic_instruments(&self) -> Vec<Arc<Instrument>> {
+        self.graph.synthetic_instruments()
+    }
+
+    /// Get all instruments (both real and synthetic) used by features
+    pub fn all_instruments(&self) -> Vec<Arc<Instrument>> {
+        self.graph.all_instruments()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::config::InstrumentFilter;
     use crate::FillStrategy;
 
     use super::*;
@@ -161,11 +176,13 @@ mod tests {
     fn create_test_config(warmup_steps: u16) -> PipelineConfig {
         PipelineConfig {
             version: "test".to_string(),
+            reference_currency: "USD".to_string(),
             warmup_steps,
             state_ttl: Duration::hours(24).whole_seconds() as u64,
             min_interval: 60,
             features: Vec::new(),
             parallel: false,
+            instrument_filter: InstrumentFilter::default(),
         }
     }
 
@@ -182,37 +199,36 @@ mod tests {
         assert!(!pipeline.is_ready());
 
         let now = UtcDateTime::now();
-        let instruments = vec![test_inst_binance_btc_usdt_perp()];
 
         // First calculate - warmup should decrement to 4
-        let results = pipeline.calculate(now, &instruments).await;
+        let results = pipeline.calculate(now).await;
         assert_eq!(results.len(), 0); // Should return empty during warmup
         assert_eq!(pipeline.warmup_remaining(), 4);
         assert!(!pipeline.is_ready());
 
         // Second calculate - warmup should decrement to 3
-        let results = pipeline.calculate(now + Duration::seconds(1), &instruments).await;
+        let results = pipeline.calculate(now + Duration::seconds(1)).await;
         assert_eq!(results.len(), 0);
         assert_eq!(pipeline.warmup_remaining(), 3);
 
         // Third calculate - warmup should decrement to 2
-        let results = pipeline.calculate(now + Duration::seconds(2), &instruments).await;
+        let results = pipeline.calculate(now + Duration::seconds(2)).await;
         assert_eq!(results.len(), 0);
         assert_eq!(pipeline.warmup_remaining(), 2);
 
         // Fourth calculate - warmup should decrement to 1
-        let results = pipeline.calculate(now + Duration::seconds(3), &instruments).await;
+        let results = pipeline.calculate(now + Duration::seconds(3)).await;
         assert_eq!(results.len(), 0);
         assert_eq!(pipeline.warmup_remaining(), 1);
 
         // Fifth calculate - warmup should decrement to 0
-        let results = pipeline.calculate(now + Duration::seconds(4), &instruments).await;
+        let results = pipeline.calculate(now + Duration::seconds(4)).await;
         assert_eq!(results.len(), 0);
         assert_eq!(pipeline.warmup_remaining(), 0);
         assert!(pipeline.is_ready());
 
         // Sixth calculate - warmup complete, should return results (empty because no features)
-        let results = pipeline.calculate(now + Duration::seconds(5), &instruments).await;
+        let results = pipeline.calculate(now + Duration::seconds(5)).await;
         assert_eq!(pipeline.warmup_remaining(), 0);
         assert!(pipeline.is_ready());
         // Results are empty because we have no features configured
@@ -238,13 +254,12 @@ mod tests {
 
         // After one calculate, still not ready
         let now = UtcDateTime::now();
-        let instruments = vec![test_inst_binance_btc_usdt_perp()];
-        pipeline_warmup.calculate(now, &instruments).await;
+        pipeline_warmup.calculate(now).await;
         assert!(!pipeline_warmup.is_ready());
 
         // After three calculates, should be ready
-        pipeline_warmup.calculate(now + Duration::seconds(1), &instruments).await;
-        pipeline_warmup.calculate(now + Duration::seconds(2), &instruments).await;
+        pipeline_warmup.calculate(now + Duration::seconds(1)).await;
+        pipeline_warmup.calculate(now + Duration::seconds(2)).await;
         assert!(pipeline_warmup.is_ready());
     }
 
@@ -264,7 +279,7 @@ mod tests {
             .lag(1)
             .method(LagAlgo::LogChange)
             .fill_strategy(FillStrategy::ForwardFill)
-            .persist(false)
+            .scopes(vec![]) // TODO: Add proper scopes
             .build();
         let features: Vec<Arc<dyn Feature>> = vec![Arc::new(lag_feature)];
 
@@ -310,7 +325,7 @@ mod tests {
             .lag(1)
             .method(LagAlgo::LogChange)
             .fill_strategy(FillStrategy::ForwardFill)
-            .persist(false)
+            .scopes(vec![]) // TODO: Add proper scopes
             .build();
         let features: Vec<Arc<dyn Feature>> = vec![Arc::new(lag_feature)];
 
@@ -380,7 +395,7 @@ mod tests {
             .lag(1)
             .method(LagAlgo::LogChange)
             .fill_strategy(FillStrategy::ForwardFill)
-            .persist(false)
+            .scopes(vec![]) // TODO: Add proper scopes
             .build();
         let features: Vec<Arc<dyn Feature>> = vec![Arc::new(lag_feature)];
         let config = create_test_config(0);

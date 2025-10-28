@@ -8,7 +8,7 @@ use serde::Deserialize;
 use statrs::distribution::{ContinuousCDF, Normal};
 use strum::Display;
 use time::UtcDateTime;
-use tracing::{debug, warn};
+use tracing::warn;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -190,7 +190,7 @@ pub struct NormalizeFeature {
     input: Vec<FeatureId>,
     output: FeatureId,
     method: NormalizeFeatureType,
-    persist: bool,
+    scopes: Vec<crate::InstrumentScope>,
 }
 
 #[async_trait]
@@ -203,58 +203,81 @@ impl Feature for NormalizeFeature {
         vec![self.output.clone()]
     }
 
+    fn scopes(&self) -> &[crate::InstrumentScope] {
+        &self.scopes
+    }
+
     fn calculate(
         &self,
         state: &FeatureStore,
         pipeline: &Arc<Pipeline>,
-        instrument: &Arc<Instrument>,
         event_time: UtcDateTime,
     ) -> Option<Vec<Arc<Insight>>> {
-        debug!("Robust scaling...");
-
-        //  Get data
-        let insights = self
-            .input
+        // Iterate over all scopes and compute for each
+        let insights: Vec<Arc<Insight>> = self
+            .scopes
             .iter()
-            .filter_map(|id| {
-                // Get the value
-                let value = state.last(instrument, id, event_time)?;
+            .filter_map(|scope| {
+                // For normalization, we typically read the last value from each input feature
+                // Collect values from all input features
+                let mut values = Vec::new();
+                for (idx, input_feature) in self.input.iter().enumerate() {
+                    // Get last value from any of the input instruments for this feature
+                    let value = scope
+                        .inputs
+                        .iter()
+                        .find_map(|instrument| state.last(instrument, input_feature, event_time))?;
+                    values.push((idx, value));
+                }
 
-                // Check if value is nan
-                if value.is_nan() {
-                    warn!("NaN value detected in normalization");
+                // If we don't have all input values, skip this scope
+                if values.len() != self.input.len() {
                     return None;
                 }
 
-                let altered_value = match self.method {
-                    NormalizeFeatureType::Quantile => self.transformer.transform(instrument.id, id, value),
-                    NormalizeFeatureType::Robust => self.scaler.transform(instrument.id, id, value),
+                // Apply normalization based on method
+                // For multi-input normalization, we typically transform each input separately
+                // and then combine them (e.g., as a vector or single aggregated value)
+                // For now, we'll assume single input or we take the first value
+                let (idx, raw_value) = values.first()?;
+                let input_feature = &self.input[*idx];
+
+                let normalized_value = match &self.method {
+                    NormalizeFeatureType::Quantile => {
+                        // Apply quantile transformation
+                        self.transformer.transform(scope.output.id, input_feature, *raw_value)
+                    }
+                    NormalizeFeatureType::Robust => {
+                        // Apply robust scaling
+                        self.scaler.transform(scope.output.id, input_feature, *raw_value)
+                    }
                     NormalizeFeatureType::QuantileRobust => {
-                        let transformed_value = self.transformer.transform(instrument.id, id, value);
-                        self.scaler.transform_normal(transformed_value)
+                        // Apply quantile transformation then robust scaling
+                        let quantile_transformed =
+                            self.transformer.transform(scope.output.id, input_feature, *raw_value);
+                        self.scaler.transform_normal(quantile_transformed)
                     }
                 };
 
-                // Create Insight
-                Some(
+                // Create insight for the output instrument
+                Some(Arc::new(
                     Insight::builder()
                         .event_time(event_time)
                         .pipeline(Some(pipeline.clone()))
-                        .instrument(instrument.clone())
-                        .feature_id(id.clone())
-                        .value(altered_value)
+                        .instrument(scope.output.clone())
+                        .feature_id(self.output.clone())
+                        .value(normalized_value)
                         .insight_type(InsightType::Normalized)
-                        .persist(self.persist)
                         .build(),
-                )
+                ))
             })
-            .map(Arc::new)
-            .collect::<Vec<_>>();
+            .collect();
 
-        // Save insights to state
-        state.insert_batch(insights.as_slice());
-
-        Some(insights)
+        if insights.is_empty() {
+            None
+        } else {
+            Some(insights)
+        }
     }
 
     // async fn async_calculate(&self, instrument: &Arc<Instrument>, timestamp: UtcDateTime) -> Option<Vec<Insight>> {

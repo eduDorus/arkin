@@ -16,6 +16,7 @@ pub enum VenueType {
     Dex,
     Otc,
     UserFunds,
+    Virtual,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]
@@ -39,6 +40,7 @@ impl fmt::Display for Venue {
 #[serde(rename_all = "snake_case")]
 pub enum VenueName {
     Personal,
+    Index,
     BinanceSpot,
     BinanceUsdmFutures,
     BinanceCoinmFutures,
@@ -51,6 +53,27 @@ pub enum VenueName {
     BybitDerivatives,
     BybitOptions,
     Deribit,
+}
+
+impl VenueName {
+    /// Get the parent exchange name for grouping across venue variants.
+    ///
+    /// For example, BinanceSpot and BinanceUsdmFutures both return "binance".
+    /// This is useful for creating exchange-level synthetic instruments that
+    /// aggregate data across spot and derivatives markets.
+    pub fn exchange_name(&self) -> &'static str {
+        match self {
+            VenueName::Personal => "personal",
+            VenueName::Index => "index",
+            VenueName::BinanceSpot
+            | VenueName::BinanceUsdmFutures
+            | VenueName::BinanceCoinmFutures
+            | VenueName::BinanceOptions => "binance",
+            VenueName::OkxSpot | VenueName::OkxSwap | VenueName::OkxFutures | VenueName::OkxOptions => "okx",
+            VenueName::BybitSpot | VenueName::BybitDerivatives | VenueName::BybitOptions => "bybit",
+            VenueName::Deribit => "deribit",
+        }
+    }
 }
 
 // Similarly for Channel

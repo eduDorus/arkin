@@ -332,7 +332,7 @@ async fn crypto_market_index_construction() {
                         input: vec!["trade_notional".to_string()],
                         output: vec!["notional_01m".to_string()],
                         data: vec![RangeData::Window(60)],
-                        method: RangeAlgo::SumAbs,
+                        method: RangeAlgo::AbsSum,
                         persist: true,
                         fill_strategy: FillStrategy::Zero, // Volume aggregation, zero if no data
                     }),

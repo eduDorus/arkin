@@ -21,13 +21,33 @@ impl InsightService {
         pipeline_meta: Arc<Pipeline>,
         config: &PipelineConfig,
     ) -> Arc<Self> {
-        let features = FeatureFactory::from_config(&persistence, &config.features).await;
+        info!(target: "insights", "Initializing InsightService pipeline");
+
+        // FeatureFactory handles everything: querying real instruments,
+        // generating synthetics, building scopes, and creating features
+        let features = FeatureFactory::from_config(&persistence, config).await;
+
+        info!(target: "insights", "Created {} features", features.len());
+
         let pipeline = FeaturePipeline::new(pipeline_meta, features, config);
+
+        // Log synthetic instrument count from pipeline
+        let synthetic_count = pipeline.synthetic_instruments().len();
+        info!(
+            target: "insights",
+            "Pipeline initialized with {} synthetic instruments",
+            synthetic_count
+        );
+
         let service = Self {
             persistence,
             pipeline,
         };
         Arc::new(service)
+    }
+
+    pub fn synthetic_instruments(&self) -> Vec<Arc<Instrument>> {
+        self.pipeline.synthetic_instruments()
     }
 
     pub async fn insert(&self, insight: Arc<Insight>) {
@@ -45,8 +65,7 @@ impl InsightService {
         self.pipeline.commit(tick.event_time).await;
 
         // Calculate features - during warmup this builds up derived features but returns empty vec
-        // TODO: FIX INSTRUMENTS
-        let insights = self.pipeline.calculate(tick.event_time, &[]).await;
+        let insights = self.pipeline.calculate(tick.event_time).await;
 
         // Only publish if we have insights (warmup complete)
         if !insights.is_empty() {
