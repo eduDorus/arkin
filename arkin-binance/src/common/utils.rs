@@ -190,13 +190,14 @@ impl SignatureGenerator {
         let params = build_query_string(query_params)?;
 
         if let Some(secret) = self.api_secret.as_ref()
-            && self.private_key.is_none() {
-                let mut mac =
-                    Hmac::<Sha256>::new_from_slice(secret.as_bytes()).context("HMAC key initialization failed")?;
-                mac.update(params.as_bytes());
-                let result = mac.finalize().into_bytes();
-                return Ok(hex::encode(result));
-            }
+            && self.private_key.is_none()
+        {
+            let mut mac =
+                Hmac::<Sha256>::new_from_slice(secret.as_bytes()).context("HMAC key initialization failed")?;
+            mac.update(params.as_bytes());
+            let result = mac.finalize().into_bytes();
+            return Ok(hex::encode(result));
+        }
 
         if self.private_key.is_some() {
             let key_obj = self.get_key_object()?;
@@ -505,30 +506,31 @@ where
     for (key, value) in headers {
         let normalized_key = key.to_lowercase();
         if (normalized_key.starts_with("x-mbx-used-weight-") || normalized_key.starts_with("x-mbx-order-count-"))
-            && let Some(caps) = re.captures(&normalized_key) {
-                let interval_num: u32 = caps.get(2).unwrap().as_str().parse().unwrap_or(0);
-                let interval_letter = caps.get(3).unwrap().as_str().to_uppercase();
-                let interval = match interval_letter.as_str() {
-                    "S" => Interval::Second,
-                    "M" => Interval::Minute,
-                    "H" => Interval::Hour,
-                    "D" => Interval::Day,
-                    _ => continue,
-                };
-                let count: u32 = value.parse().unwrap_or(0);
-                let rate_limit_type = if normalized_key.starts_with("x-mbx-used-weight-") {
-                    RateLimitType::RequestWeight
-                } else {
-                    RateLimitType::Orders
-                };
-                rate_limits.push(RestApiRateLimit {
-                    rate_limit_type,
-                    interval,
-                    interval_num,
-                    count,
-                    retry_after: headers.get("retry-after").and_then(|v| v.parse().ok()),
-                });
-            }
+            && let Some(caps) = re.captures(&normalized_key)
+        {
+            let interval_num: u32 = caps.get(2).unwrap().as_str().parse().unwrap_or(0);
+            let interval_letter = caps.get(3).unwrap().as_str().to_uppercase();
+            let interval = match interval_letter.as_str() {
+                "S" => Interval::Second,
+                "M" => Interval::Minute,
+                "H" => Interval::Hour,
+                "D" => Interval::Day,
+                _ => continue,
+            };
+            let count: u32 = value.parse().unwrap_or(0);
+            let rate_limit_type = if normalized_key.starts_with("x-mbx-used-weight-") {
+                RateLimitType::RequestWeight
+            } else {
+                RateLimitType::Orders
+            };
+            rate_limits.push(RestApiRateLimit {
+                rate_limit_type,
+                interval,
+                interval_num,
+                count,
+                retry_after: headers.get("retry-after").and_then(|v| v.parse().ok()),
+            });
+        }
     }
     rate_limits
 }
@@ -924,7 +926,6 @@ where
     let should_lower_head = original.starts_with('/') && PLACEHOLDER_RE.find(body).is_some_and(|m| m.start() == 0);
 
     // Lowercase only that first placeholder's value
-    
 
     if should_lower_head {
         if let Some(caps) = PLACEHOLDER_RE.captures(body) {

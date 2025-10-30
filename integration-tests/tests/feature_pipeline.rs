@@ -22,7 +22,7 @@ pub fn build_simple_pipeline_config() -> InsightsConfig {
                 parallel: true,
                 // Global filter applied to all features
                 instrument_filter: InstrumentFilter {
-                    base_asset: vec!["BTC".to_string(), "ETH".to_string(), "SOL".to_string()],
+                    base_asset: vec!["BTC".to_string(), "ETH".to_string(), "SOL".to_string(), "XRP".to_string()],
                     quote_asset: vec!["USDT".to_string(), "USDC".to_string()],
                     venue: vec![VenueName::BinanceUsdmFutures, VenueName::BinanceSpot],
                     instrument_type: vec![InstrumentType::Perpetual, InstrumentType::Spot],
@@ -287,6 +287,10 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
             .build(),
     );
     let pipeline = FeaturePipeline::new(pipeline_meta.clone(), features, &config.insights_service.pipeline);
+    pipeline
+        .graph()
+        .export_svg("./pipeline_v2.0.0.svg")
+        .expect("Failed to export pipeline graph");
 
     // Get synthetic instruments from the pipeline
     let instruments = pipeline.real_instruments();
@@ -377,7 +381,7 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
 
     // Add validation for synthetic instruments
     // Group instruments by base asset for grouped synthetic validation
-    for base_asset in ["BTC", "ETH", "SOL", "BNB", "XRP"] {
+    for base_asset in ["BTC", "ETH", "SOL", "XRP"] {
         // Find the synthetic instrument for this base asset
         let synthetic = synthetic_instruments
             .iter()
@@ -536,12 +540,10 @@ async fn test_crypto_index_with_real_data() -> Result<()> {
                 .build()
                 .into(),
         ];
-        pipeline.insert_batch(&insights).await;
+        pipeline.insert_batch(insights);
 
         // Check if we should calculate
         if trade.event_time > next_insights_tick {
-            // Commit state and calculate insights
-            pipeline.commit(next_insights_tick).await;
             let calculated_insights = pipeline.calculate(next_insights_tick).await;
 
             if !calculated_insights.is_empty() {
@@ -634,124 +636,6 @@ async fn test_synthetic_instrument_generation() -> Result<()> {
         pipeline.graph().node_count(),
         22,
         "Expected 22 features from main pipeline (10 configs, some create multiple features due to multiple outputs)"
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-#[test_log::test]
-async fn test_crypto_index_with_real_data_no_validation() -> Result<()> {
-    let start = utc_datetime!(2025-01-01 00:00:00);
-    let end = utc_datetime!(2025-01-01 03:00:00); // Extended to 3 hours to see calculations after warmup
-
-    let persistence = integration_tests::init_test_persistence().await;
-    persistence.refresh().await?;
-
-    // Build pipeline
-    let config = build_simple_pipeline_config();
-    let features = FeatureFactory::from_config(&persistence, &config.insights_service.pipeline).await;
-    let pipeline_meta = Arc::new(
-        Pipeline::builder()
-            .name("test_pipeline".to_string())
-            .description("test_pipeline".to_string())
-            .created(start)
-            .updated(start)
-            .build(),
-    );
-    let pipeline = FeaturePipeline::new(pipeline_meta.clone(), features, &config.insights_service.pipeline);
-    pipeline
-        .graph()
-        .export_svg("./pipeline_v2.0.0.svg")
-        .expect("Failed to export pipeline graph");
-
-    // Print the features in the pipeline
-    pipeline.graph().print_summary();
-    pipeline.graph().print_tree();
-
-    // Get synthetic instruments from the pipeline
-    let instruments = pipeline.real_instruments();
-    let synthetic_instruments = pipeline.synthetic_instruments();
-
-    info!("Found {} real instruments from pipeline", instruments.len());
-    info!("Found {} synthetic instruments from pipeline", synthetic_instruments.len());
-
-    let stream = persistence
-        .agg_trade_stream_range_buffered(instruments.as_slice(), start, end, 3, arkin_core::prelude::Frequency::Daily)
-        .await?;
-
-    tokio::pin!(stream);
-
-    let interval = Duration::from_secs(60);
-    let mut next_insights_tick = start + interval;
-
-    // Pre-fetch feature IDs
-    let trade_price_feature = persistence.get_feature_id("trade_price").await;
-    let trade_quantity_feature = persistence.get_feature_id("trade_quantity").await;
-    let trade_notional_feature = persistence.get_feature_id("trade_notional").await;
-
-    let mut total_trades = 0;
-    let mut total_calculated_insights = 0;
-
-    while let Some(event) = stream.next().await {
-        let trade = match event {
-            Event::AggTradeUpdate(t) => t,
-            _ => continue,
-        };
-
-        total_trades += 1;
-
-        // Insert trade data
-        let insights = vec![
-            Insight::builder()
-                .event_time(trade.event_time)
-                .instrument(trade.instrument.clone())
-                .feature_id(trade_price_feature.clone())
-                .value(trade.price.to_f64().unwrap_or(f64::NAN))
-                .insight_type(InsightType::Raw)
-                .build()
-                .into(),
-            Insight::builder()
-                .event_time(trade.event_time)
-                .instrument(trade.instrument.clone())
-                .feature_id(trade_quantity_feature.clone())
-                .value(trade.quantity.to_f64().unwrap_or(f64::NAN) * f64::from(trade.side))
-                .insight_type(InsightType::Raw)
-                .build()
-                .into(),
-            Insight::builder()
-                .event_time(trade.event_time)
-                .instrument(trade.instrument.clone())
-                .feature_id(trade_notional_feature.clone())
-                .value((trade.price * trade.quantity).to_f64().unwrap_or(f64::NAN) * f64::from(trade.side))
-                .insight_type(InsightType::Raw)
-                .build()
-                .into(),
-        ];
-        pipeline.insert_batch(&insights).await;
-
-        // Check if we should calculate
-        if trade.event_time > next_insights_tick {
-            // Commit state and calculate insights
-            pipeline.commit(next_insights_tick).await;
-            let calculated_insights = pipeline.calculate(next_insights_tick).await;
-
-            if !calculated_insights.is_empty() {
-                total_calculated_insights += calculated_insights.len();
-                info!(
-                    "After warmup: calculated {} insights at {}",
-                    calculated_insights.len(),
-                    next_insights_tick
-                );
-            }
-
-            next_insights_tick += interval;
-        }
-    }
-
-    info!(
-        "✅ Pipeline execution complete - processed {} trades and calculated {} insights total",
-        total_trades, total_calculated_insights
     );
 
     Ok(())

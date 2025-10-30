@@ -321,9 +321,6 @@ impl FeatureFactory {
                         if inst.symbol.starts_with("syn-") {
                             return false;
                         }
-
-                    
-
                         true
                     })
                     .map(|index_synthetic| {

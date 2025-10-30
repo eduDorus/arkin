@@ -399,28 +399,29 @@ impl Ledger {
 
                 // Only check positions if TransferType::Transfer (qty only)
                 if t.transfer_type == TransferType::Transfer
-                    && let Some(inst) = t.instrument.clone() {
-                        let key = (t.debit_account.to_owned(), inst.to_owned());
-                        if self.positions.get(&key).is_none() {
-                            let computed_qty = tx_log_lock
-                                .iter()
-                                .filter(|tx| {
-                                    tx.has_instrument(&inst)
-                                        && tx.transfer_type == TransferType::Transfer
-                                        && (tx.debit_account.id == t.debit_account.id
-                                            || tx.credit_account.id == t.debit_account.id)
-                                })
-                                .fold(dec!(0), |acc, tx| {
-                                    if tx.credit_account.id == t.debit_account.id {
-                                        acc + tx.amount
-                                    } else {
-                                        acc - tx.amount
-                                    }
-                                });
-                            self.positions.insert(key, (dec!(0), computed_qty));
-                            // Init entry=0
-                        };
-                    }
+                    && let Some(inst) = t.instrument.clone()
+                {
+                    let key = (t.debit_account.to_owned(), inst.to_owned());
+                    if self.positions.get(&key).is_none() {
+                        let computed_qty = tx_log_lock
+                            .iter()
+                            .filter(|tx| {
+                                tx.has_instrument(&inst)
+                                    && tx.transfer_type == TransferType::Transfer
+                                    && (tx.debit_account.id == t.debit_account.id
+                                        || tx.credit_account.id == t.debit_account.id)
+                            })
+                            .fold(dec!(0), |acc, tx| {
+                                if tx.credit_account.id == t.debit_account.id {
+                                    acc + tx.amount
+                                } else {
+                                    acc - tx.amount
+                                }
+                            });
+                        self.positions.insert(key, (dec!(0), computed_qty));
+                        // Init entry=0
+                    };
+                }
             }
         }
 
@@ -441,45 +442,45 @@ impl Ledger {
 
             // Only update positions if TransferType::Transfer
             if t.transfer_type == TransferType::Transfer
-                && let Some(inst) = t.instrument.clone() {
-                    // Determine direction (user receives positive qty on buy/credit)
-                    let is_credit_user = t.credit_account.is_user_account();
-                    let qty_sign = if is_credit_user { dec!(1) } else { dec!(-1) };
-                    let qty_delta = t.amount * qty_sign;
+                && let Some(inst) = t.instrument.clone()
+            {
+                // Determine direction (user receives positive qty on buy/credit)
+                let is_credit_user = t.credit_account.is_user_account();
+                let qty_sign = if is_credit_user { dec!(1) } else { dec!(-1) };
+                let qty_delta = t.amount * qty_sign;
 
-                    // Overall user position
-                    let user_key = if is_credit_user {
-                        t.credit_account.clone()
-                    } else {
-                        t.debit_account.clone()
-                    };
-                    let (current_entry, current_qty) = *self
-                        .positions
-                        .entry((user_key.clone(), inst.clone()))
-                        .or_insert((dec!(0), dec!(0)));
-                    let (new_entry, new_qty) =
-                        self.update_position(current_entry, current_qty, qty_delta, t.unit_price);
-                    self.positions.insert((user_key.clone(), inst.clone()), (new_entry, new_qty));
+                // Overall user position
+                let user_key = if is_credit_user {
+                    t.credit_account.clone()
+                } else {
+                    t.debit_account.clone()
+                };
+                let (current_entry, current_qty) = *self
+                    .positions
+                    .entry((user_key.clone(), inst.clone()))
+                    .or_insert((dec!(0), dec!(0)));
+                let (new_entry, new_qty) = self.update_position(current_entry, current_qty, qty_delta, t.unit_price);
+                self.positions.insert((user_key.clone(), inst.clone()), (new_entry, new_qty));
 
-                    // Strategy if present
-                    if let Some(strat) = t.strategy.clone() {
-                        let strat_key = (user_key.clone(), strat, inst.clone());
-                        let (current_strat_entry, current_strat_qty) =
-                            *self.strategy_positions.entry(strat_key.clone()).or_insert((dec!(0), dec!(0)));
-                        let (new_strat_entry, new_strat_qty) =
-                            self.update_position(current_strat_entry, current_strat_qty, qty_delta, t.unit_price);
-                        self.strategy_positions.insert(strat_key, (new_strat_entry, new_strat_qty));
-                    }
-
-                    // Venue mirror
-                    let venue_key = if is_credit_user {
-                        t.debit_account.clone()
-                    } else {
-                        t.credit_account.clone()
-                    };
-                    self.positions.insert((venue_key, inst), (new_entry, -new_qty));
-                    // Entry positive, qty negative
+                // Strategy if present
+                if let Some(strat) = t.strategy.clone() {
+                    let strat_key = (user_key.clone(), strat, inst.clone());
+                    let (current_strat_entry, current_strat_qty) =
+                        *self.strategy_positions.entry(strat_key.clone()).or_insert((dec!(0), dec!(0)));
+                    let (new_strat_entry, new_strat_qty) =
+                        self.update_position(current_strat_entry, current_strat_qty, qty_delta, t.unit_price);
+                    self.strategy_positions.insert(strat_key, (new_strat_entry, new_strat_qty));
                 }
+
+                // Venue mirror
+                let venue_key = if is_credit_user {
+                    t.debit_account.clone()
+                } else {
+                    t.credit_account.clone()
+                };
+                self.positions.insert((venue_key, inst), (new_entry, -new_qty));
+                // Entry positive, qty negative
+            }
         }
 
         self.publisher.publish(Event::NewTransferBatch(transfer_batch)).await;

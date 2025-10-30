@@ -38,8 +38,7 @@ impl ModifyMultipleOrdersBatchOrdersParameterInner {
     }
 }
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum SideEnum {
     #[serde(rename = "BUY")]
     #[default]
@@ -49,8 +48,7 @@ pub enum SideEnum {
 }
 
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum PriceMatchEnum {
     #[serde(rename = "NONE")]
     #[default]
@@ -72,4 +70,3 @@ pub enum PriceMatchEnum {
     #[serde(rename = "QUEUE_20")]
     Queue20,
 }
-

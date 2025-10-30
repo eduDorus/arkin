@@ -222,4 +222,3 @@ pub async fn example_production_config() -> Result<(), String> {
 
     Ok(())
 }
-

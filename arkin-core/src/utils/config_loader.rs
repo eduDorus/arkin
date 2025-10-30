@@ -15,7 +15,7 @@ pub fn load<T: DeserializeOwned>() -> T {
         .build()
         .expect("Failed to build configuration");
 
-    debug!("Loading configuration from: {}", config_dir);
+    debug!("Loading configuration from: {} in run mode: {}", config_dir, run_mode);
 
     match config.try_deserialize::<T>() {
         Ok(c) => c,

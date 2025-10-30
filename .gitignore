@@ -15,3 +15,6 @@
 # Pipeline Graph
 pipeline_graph.svg
 pipeline_graph.dot
+
+# Rust config
+.cargo/config.toml

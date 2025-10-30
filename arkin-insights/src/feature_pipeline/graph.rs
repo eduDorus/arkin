@@ -19,6 +19,7 @@ use crate::FeatureStore;
 #[derive(Debug)]
 pub struct FeatureGraph {
     graph: DiGraph<Arc<dyn Feature>, ()>,
+    input_feature_ids: Vec<String>,
     order: Vec<NodeIndex>,
     layers: Vec<Vec<NodeIndex>>,
     parallel: bool,
@@ -98,8 +99,25 @@ impl FeatureGraph {
             layers[depth - 1].push(node);
         }
 
+        // Calculate inputs
+        let mut all_outputs: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut all_inputs: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        for node in graph.node_indices() {
+            for output in graph[node].outputs() {
+                all_outputs.insert(output.to_string());
+            }
+            for input in graph[node].inputs() {
+                all_inputs.insert(input.to_string());
+            }
+        }
+
+        // Raw inputs are those that are used as inputs but never produced as outputs
+        let input_features = all_inputs.difference(&all_outputs).cloned().collect::<Vec<_>>();
+
         FeatureGraph {
             graph: graph.into(),
+            input_feature_ids: input_features,
             order,
             layers,
             parallel,
@@ -130,7 +148,7 @@ impl FeatureGraph {
         dot.push_str("  node [shape=box, style=rounded];\n\n");
 
         // Get raw inputs
-        let raw_inputs = self.get_raw_inputs();
+        let raw_inputs = self.get_input_feature_ids();
 
         // Add raw input nodes with special styling
         dot.push_str("  // Raw inputs\n");
@@ -211,7 +229,7 @@ impl FeatureGraph {
         info!(target: "feature-graph", "Pipeline Flow (Layer by Layer):");
         info!(target: "feature-graph", "================================");
 
-        let raw_inputs = self.get_raw_inputs();
+        let raw_inputs = self.get_input_feature_ids();
         info!(target: "feature-graph", "RAW INPUTS: {}", raw_inputs.join(", "));
         info!(target: "feature-graph", "");
 
@@ -232,21 +250,8 @@ impl FeatureGraph {
     }
 
     /// Get all raw input IDs (inputs that no feature produces)
-    pub fn get_raw_inputs(&self) -> Vec<String> {
-        let mut all_outputs: std::collections::HashSet<String> = std::collections::HashSet::new();
-        let mut all_inputs: std::collections::HashSet<String> = std::collections::HashSet::new();
-
-        for node in self.graph.node_indices() {
-            for output in self.graph[node].outputs() {
-                all_outputs.insert(output.to_string());
-            }
-            for input in self.graph[node].inputs() {
-                all_inputs.insert(input.to_string());
-            }
-        }
-
-        // Raw inputs are those that are used as inputs but never produced as outputs
-        all_inputs.difference(&all_outputs).cloned().collect::<Vec<_>>()
+    pub fn get_input_feature_ids(&self) -> &[String] {
+        &self.input_feature_ids
     }
 
     /// Validate the DAG structure - checks for cycles and unreachable nodes
@@ -257,7 +262,7 @@ impl FeatureGraph {
         }
 
         // Get raw inputs
-        let raw_inputs = self.get_raw_inputs();
+        let raw_inputs = self.get_input_feature_ids();
 
         // Check for nodes with no incoming edges from other features (sources)
         let sources: Vec<_> = self
@@ -275,7 +280,7 @@ impl FeatureGraph {
 
         info!(target: "feature-graph", "DAG Validation:");
         info!(target: "feature-graph", "  Raw inputs (not produced by any feature): {}", raw_inputs.len());
-        for input in &raw_inputs {
+        for input in raw_inputs {
             info!(target: "feature-graph", "    - {}", input);
         }
         info!(target: "feature-graph", "  Source features (depend only on raw inputs): {}", sources.len());
@@ -371,9 +376,9 @@ impl FeatureGraph {
         info!(target: "feature-graph", "  Total Features: {}", self.graph.node_count());
         info!(target: "feature-graph", "  Total Dependencies: {}", self.graph.edge_count());
 
-        let raw_inputs = self.get_raw_inputs();
+        let raw_inputs = self.get_input_feature_ids();
         info!(target: "feature-graph", "  Raw Inputs: {}", raw_inputs.len());
-        for input in &raw_inputs {
+        for input in raw_inputs {
             info!(target: "feature-graph", "    - {}", input);
         }
 
@@ -515,7 +520,7 @@ impl FeatureGraph {
             };
 
             // Write this layer's insights to state so next layer can read them
-            state.insert_batch(&layer_insights);
+            state.insert_batch(layer_insights.clone());
 
             // Collect for final return
             all_insights.extend(layer_insights);

@@ -1,19 +1,12 @@
 #![allow(dead_code)]
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 
 use dashmap::DashMap;
-use rayon::prelude::*;
 use thiserror::Error;
 use time::UtcDateTime;
 
 use arkin_core::prelude::*;
-use tokio::sync::Mutex;
 use tracing::debug;
-use typed_builder::TypedBuilder;
 
 use crate::FillStrategy;
 
@@ -92,7 +85,8 @@ impl BoundedBuffer {
 
         // Fast path: buffer is empty, just extend
         if self.data.is_empty() {
-            self.data.extend(values.iter().copied());
+            debug!("Using fast path: buffer empty, bulk extending {} values", values.len());
+            self.data.extend(values.iter());
             return;
         }
 
@@ -100,7 +94,11 @@ impl BoundedBuffer {
         if let Some(last_existing) = self.data.back()
             && values[0].0 >= last_existing.0
         {
-            self.data.extend(values.iter().copied());
+            debug!(
+                "Using fast path: all new values after existing data, bulk extending {} values",
+                values.len()
+            );
+            self.data.extend(values.iter());
             return;
         }
 
@@ -124,18 +122,24 @@ impl BoundedBuffer {
 
         // Bulk-append remaining values (fast path for the tail)
         if split_idx < values.len() {
-            self.data.extend(values[split_idx..].iter().copied());
+            debug!(
+                "Bulk appending {} remaining values after individual inserts",
+                values.len() - split_idx
+            );
+            self.data.extend(values[split_idx..].iter());
         }
     }
 
     fn remove_before(&mut self, cutoff: UtcDateTime) {
-        while let Some(front) = self.data.front() {
-            if front.0 < cutoff {
-                self.data.pop_front();
-            } else {
-                break;
-            }
-        }
+        self.data.retain(|v| v.0 < cutoff);
+
+        // while let Some(front) = self.data.front() {
+        //     if front.0 < cutoff {
+        //         self.data.pop_front();
+        //     } else {
+        //         break;
+        //     }
+        // }
     }
 
     fn last(&self, timestamp: UtcDateTime) -> Option<f64> {
@@ -202,20 +206,14 @@ impl BoundedBuffer {
     }
 }
 
-#[derive(Debug, TypedBuilder)]
+#[derive(Debug)]
 pub struct FeatureStore {
     /// In-memory feature store: (instrument, feature_id) -> BoundedBuffer of (timestamp, value)
-    #[builder(default)]
     features: DashMap<(Arc<Instrument>, FeatureId), BoundedBuffer>,
     /// Time-to-live for insights in the buffer (how long to keep them)
-    #[builder(default = Duration::from_secs(3600))] // 1 hour default
     ttl: Duration,
-    /// Write-ahead log buffer for batched inserts (async-friendly)
-    #[builder(default = Mutex::new(Vec::new()))]
-    wal_buffer: Mutex<Vec<Arc<Insight>>>,
     /// Frequency of the pipeline in seconds (smallest time unit for aggregates)
-    #[builder(default = 60)]
-    min_interval: u64,
+    pub min_interval: u64,
 }
 
 impl FeatureStore {
@@ -223,99 +221,25 @@ impl FeatureStore {
         Self {
             features: DashMap::new(),
             ttl: Duration::from_secs(ttl),
-            wal_buffer: Mutex::new(Vec::new()),
             min_interval: 60, // Default 1 minute
         }
     }
 
-    /// Insert an insight immediately into the feature store (bypasses WAL buffer)
     pub fn insert(&self, event: Arc<Insight>) {
         debug!(target: "feature-store", "Inserting insight {} into feature store", event.feature_id);
         let key = (event.instrument.clone(), event.feature_id.clone());
         let mut entry = self.features.entry(key).or_insert_with(BoundedBuffer::new);
         entry.push(event.event_time, event.value);
+
+        // Clean up old values
+        let cutoff_time = event.event_time - self.ttl;
+        entry.remove_before(cutoff_time);
     }
 
-    pub fn insert_batch(&self, events: &[Arc<Insight>]) {
-        if events.is_empty() {
-            return;
-        }
-
+    pub fn insert_batch(&self, events: Vec<Arc<Insight>>) {
         for event in events {
-            debug!(target: "feature-store", "Inserting insight {} into feature store", event.feature_id);
+            self.insert(event);
         }
-
-        // Last timestamp for TTL cleanup
-        let last_time = events.iter().map(|e| e.event_time).max().unwrap_or(UtcDateTime::now());
-
-        // Group by (instrument, feature_id)
-        let grouped = events.iter().fold(HashMap::new(), |mut acc, event| {
-            let key = (event.instrument.clone(), event.feature_id.clone());
-            acc.entry(key).or_insert_with(Vec::new).push((event.event_time, event.value));
-            acc
-        });
-
-        // Parallel sort and insert
-        grouped.into_par_iter().for_each(|(key, mut values)| {
-            // Sort this group's values by timestamp
-            values.par_sort_unstable_by_key(|(time, _)| *time);
-
-            // Insert the sorted values into the feature store
-            let mut entry = self.features.entry(key).or_insert_with(BoundedBuffer::new);
-            entry.extend_sorted(&values);
-
-            // Clean up old values for this feature (while we have the lock)
-            let cutoff_time = last_time - self.ttl;
-            entry.remove_before(cutoff_time);
-        });
-    }
-
-    /// Insert an insight into the WAL buffer (batched, will be committed later)
-    pub async fn insert_buffered(&self, event: Arc<Insight>) {
-        let mut buffer = self.wal_buffer.lock().await;
-        buffer.push(event);
-    }
-
-    /// Batch insert into WAL buffer (async version)
-    pub async fn insert_batch_buffered(&self, events: &[Arc<Insight>]) {
-        let mut buffer = self.wal_buffer.lock().await;
-        buffer.extend_from_slice(events);
-    }
-
-    /// Commit all buffered insights to the feature store
-    /// This groups by (instrument, feature_id), sorts each group by timestamp,
-    /// and bulk inserts with minimal lock contention
-    pub async fn commit(&self, current_time: UtcDateTime) {
-        // println!("Committing buffered insights");
-        let mut buffer = self.wal_buffer.lock().await;
-
-        if buffer.is_empty() {
-            return;
-        }
-
-        // Stream: drain -> group -> sort in one go without extra allocations
-        let grouped = buffer.drain(..).fold(HashMap::new(), |mut acc, event| {
-            let key = (event.instrument.clone(), event.feature_id.clone());
-            acc.entry(key).or_insert_with(Vec::new).push((event.event_time, event.value));
-            acc
-        });
-
-        // Release the WAL buffer lock early since we've drained it
-        drop(buffer);
-
-        // Parallel sort and insert in one pass
-        let cutoff_time = current_time - self.ttl;
-        grouped.into_par_iter().for_each(|(key, mut values)| {
-            // Sort this group's values by timestamp
-            values.par_sort_unstable_by_key(|(time, _)| *time);
-
-            // Insert the sorted values into the feature store
-            let mut entry = self.features.entry(key).or_insert_with(BoundedBuffer::new);
-            entry.extend_sorted(&values);
-
-            // Clean up old values for this feature (while we have the lock)
-            entry.remove_before(cutoff_time);
-        });
     }
 
     /// Return the last value <= timestamp.
@@ -430,7 +354,7 @@ mod tests {
 
         let pipeline = test_pipeline();
         // TTL needs to cover 1000 * 60 seconds = 60000 seconds = ~17 hours
-        let state = FeatureStore::builder().ttl(Duration::from_secs(70000)).build();
+        let state = FeatureStore::new(70000);
         let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -458,11 +382,8 @@ mod tests {
 
         // Insert all shuffled insights
         for (insight, _, _) in &insights {
-            state.insert_buffered(insight.clone()).await;
+            state.insert(insight.clone());
         }
-
-        // Commit should sort them
-        state.commit(now).await;
 
         // Verify they are sorted by checking interval returns sequential values
         let all_values = state.interval(&instrument, &feature_id, now, 1000, None).unwrap();
@@ -519,7 +440,7 @@ mod tests {
 
         let pipeline = test_pipeline();
         // TTL needs to cover 250 * 60 seconds = 15000 seconds = ~4 hours
-        let state = FeatureStore::builder().ttl(Duration::from_secs(20000)).build();
+        let state = FeatureStore::new(20000);
         let now = UtcDateTime::now();
         let instrument1 = test_inst_binance_btc_usdt_perp();
         let instrument2 = test_inst_binance_eth_usdt_perp();
@@ -556,11 +477,8 @@ mod tests {
 
         // Insert all shuffled insights
         for insight in &all_insights {
-            state.insert_buffered(insight.clone()).await;
+            state.insert(insight.clone());
         }
-
-        // Commit should group by (instrument, feature) and sort each group
-        state.commit(now).await;
 
         // Verify each feature has 250 sorted values
         for (inst, feat, offset) in [
@@ -692,7 +610,7 @@ mod tests {
     #[test_log::test]
     async fn test_insert_and_last() {
         let pipeline = test_pipeline();
-        let state = FeatureStore::builder().build();
+        let state = FeatureStore::new(86400);
         let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -725,10 +643,9 @@ mod tests {
             .insight_type(InsightType::Raw)
             .value(1.2)
             .build();
-        state.insert_buffered(insight1.into()).await;
-        state.insert_buffered(insight3.into()).await;
-        state.insert_buffered(insight2.into()).await;
-        state.commit(now).await;
+        state.insert(insight1.into());
+        state.insert(insight3.into());
+        state.insert(insight2.into());
 
         // "last" at time=now should find the inserted value
         let last = state.last(&instrument, &feature_id, now);
@@ -748,7 +665,7 @@ mod tests {
     #[test_log::test]
     async fn test_window_wal() {
         let pipeline = test_pipeline();
-        let state = FeatureStore::builder().build();
+        let state = FeatureStore::new(86400);
         let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -781,10 +698,9 @@ mod tests {
             .insight_type(InsightType::Raw)
             .build();
 
-        state.insert_buffered(insight1.into()).await;
-        state.insert_buffered(insight2.into()).await;
-        state.insert_buffered(insight3.into()).await;
-        state.commit(now).await;
+        state.insert(insight1.into());
+        state.insert(insight2.into());
+        state.insert(insight3.into());
 
         let duration = Duration::from_secs(10);
         let results = state.window(&instrument, &feature_id, t3, duration);
@@ -796,7 +712,7 @@ mod tests {
     #[test_log::test]
     fn test_periods() {
         let pipeline = test_pipeline();
-        let state = FeatureStore::builder().build();
+        let state = FeatureStore::new(86400);
         let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -833,7 +749,7 @@ mod tests {
     async fn test_wal_buffer_and_commit() {
         let pipeline = test_pipeline();
         // TTL needs to cover 240 seconds
-        let state = FeatureStore::builder().ttl(Duration::from_secs(300)).build();
+        let state = FeatureStore::new(300);
         let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -857,7 +773,7 @@ mod tests {
                 .value(num)
                 .insight_type(InsightType::Raw)
                 .build();
-            state.insert_buffered(i.into()).await;
+            state.insert(i.into());
         }
 
         // Before commit, should not find values
@@ -865,7 +781,6 @@ mod tests {
         assert_eq!(last, None);
 
         // Commit the buffer
-        state.commit(now).await;
 
         // After commit, should find the values
         let last = state.last(&instrument, &feature_id, now);
@@ -880,7 +795,7 @@ mod tests {
     #[tokio::test]
     async fn test_ttl_expiration() {
         let pipeline = test_pipeline();
-        let state = FeatureStore::builder().ttl(Duration::from_secs(5)).build();
+        let state = FeatureStore::new(5);
         let now = UtcDateTime::now();
         let instrument = test_inst_binance_btc_usdt_perp();
         let feature_id = FeatureId::new("test_feature".to_string());
@@ -894,7 +809,7 @@ mod tests {
             .value(1.0)
             .insight_type(InsightType::Raw)
             .build();
-        state.insert_buffered(old_insight.into()).await;
+        state.insert(old_insight.into());
 
         // Insert recent value (within TTL=5s) - use grid-aligned timestamp
         let recent_insight = Insight::builder()
@@ -905,10 +820,9 @@ mod tests {
             .value(2.0)
             .insight_type(InsightType::Raw)
             .build();
-        state.insert_buffered(recent_insight.into()).await;
+        state.insert(recent_insight.into());
 
         // Commit with current time - old value should be filtered out
-        state.commit(now).await;
 
         // Should only have the recent value
         let last = state.last(&instrument, &feature_id, now);
@@ -925,7 +839,7 @@ mod tests {
     async fn test_commit_with_multiple_instruments_and_features() {
         let pipeline = test_pipeline();
         // TTL needs to cover 360 seconds
-        let state = FeatureStore::builder().ttl(Duration::from_secs(500)).build();
+        let state = FeatureStore::new(500);
         let now = UtcDateTime::now();
         let instrument1 = test_inst_binance_btc_usdt_perp();
         let instrument2 = test_inst_binance_eth_usdt_perp();
@@ -953,11 +867,10 @@ mod tests {
                 .value(val)
                 .insight_type(InsightType::Raw)
                 .build();
-            state.insert_buffered(insight.into()).await;
+            state.insert(insight.into());
         }
 
         // Commit should group by (instrument, feature) and sort each group
-        state.commit(now).await;
 
         // Verify instrument1, feature1 has values [4.0, 1.0, 6.0] sorted by time at [T-360, T-240, T]
         // Query last 5 intervals [T-240, T-180, T-120, T-60, T]

@@ -1,7 +1,7 @@
 [env]
 RUST_LOG = "info"
 RUST_BACKTRACE = "0"
-CONFIG_DIR = "/Users/dj/repos/arkin/configs"
+CONFIG_DIR = "/home/dj/repos/arkin/configs"
 RUN_MODE = "dev"
 
 [build]

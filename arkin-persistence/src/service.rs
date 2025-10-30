@@ -60,7 +60,7 @@ impl Persistence {
             .with_database(ch_config.database)
             .with_user(ch_config.user)
             .with_password(ch_config.password)
-            .with_option("buffer_size", "1048576")
+            .with_option("buffer_size", "16777216")
             .with_validation(false)
             .with_option("wait_end_of_query", "0");
 

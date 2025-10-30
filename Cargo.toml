@@ -33,7 +33,7 @@ parking_lot = { version = "0.12", features = [  ], default-features = false }
 rayon = "1.11"
 
 # Async
-tokio = { version = "1.48", features = [ "full" ] }
+tokio = { version = "1.48", features = ["full", "tracing"] }
 kanal = { version = "0.1.1", features = [ "std-mutex" ] }
 async-trait = "0.1"
 async-stream = "0.3"
@@ -69,6 +69,7 @@ chrono = { version = "0.4", features = [ "serde" ] }
 tracing = { version = "0.1", features = [  ] }
 tracing-futures = { version = "0.2", features = [ "tokio" ] }
 tracing-subscriber = { version = "0.3", features = [ "local-time", "parking_lot", "env-filter" ] }
+console-subscriber = { version = "0.4.1", features = ["parking_lot"] }
 
 # Error handling
 anyhow = { version = "1.0", features = [ "std" ], default-features = false }

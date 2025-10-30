@@ -71,8 +71,7 @@ impl PlaceMultipleOrdersBatchOrdersParameterInner {
     }
 }
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum SideEnum {
     #[serde(rename = "BUY")]
     #[default]
@@ -82,8 +81,7 @@ pub enum SideEnum {
 }
 
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum PositionSideEnum {
     #[serde(rename = "BOTH")]
     #[default]
@@ -95,8 +93,7 @@ pub enum PositionSideEnum {
 }
 
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum TimeInForceEnum {
     #[serde(rename = "GTC")]
     #[default]
@@ -112,8 +109,7 @@ pub enum TimeInForceEnum {
 }
 
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum WorkingTypeEnum {
     #[serde(rename = "MARK_PRICE")]
     #[default]
@@ -123,8 +119,7 @@ pub enum WorkingTypeEnum {
 }
 
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum NewOrderRespTypeEnum {
     #[serde(rename = "ACK")]
     #[default]
@@ -134,8 +129,7 @@ pub enum NewOrderRespTypeEnum {
 }
 
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum PriceMatchEnum {
     #[serde(rename = "NONE")]
     #[default]
@@ -159,8 +153,7 @@ pub enum PriceMatchEnum {
 }
 
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Default)]
 pub enum SelfTradePreventionModeEnum {
     #[serde(rename = "EXPIRE_TAKER")]
     #[default]
@@ -170,4 +163,3 @@ pub enum SelfTradePreventionModeEnum {
     #[serde(rename = "EXPIRE_MAKER")]
     ExpireMaker,
 }
-

@@ -64,9 +64,10 @@ impl Subscriber for PubSubSubscriber {
 
     async fn send_ack(&self) {
         if self.ack
-            && let Err(e) = self.ack_tx.send(()).await {
-                error!("Failed to acknowledge event: {}", e);
-            }
+            && let Err(e) = self.ack_tx.send(()).await
+        {
+            error!("Failed to acknowledge event: {}", e);
+        }
     }
 }
 

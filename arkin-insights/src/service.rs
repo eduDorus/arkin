@@ -50,20 +50,17 @@ impl InsightService {
         self.pipeline.synthetic_instruments()
     }
 
-    pub async fn insert(&self, insight: Arc<Insight>) {
+    pub fn insert(&self, insight: Arc<Insight>) {
         debug!(target: "insights", "insert to state");
-        self.pipeline.insert(insight).await;
+        self.pipeline.insert(insight);
     }
 
-    pub async fn insert_batch(&self, insights: &[Arc<Insight>]) {
+    pub fn insert_batch(&self, insights: Vec<Arc<Insight>>) {
         debug!(target: "insights", "insert to state {} insights", insights.len());
-        self.pipeline.insert_batch(insights).await;
+        self.pipeline.insert_batch(insights);
     }
 
     pub async fn process_tick(&self, ctx: Arc<CoreCtx>, tick: &InsightsTick) {
-        // Commit buffered insights
-        self.pipeline.commit(tick.event_time).await;
-
         // Calculate features - during warmup this builds up derived features but returns empty vec
         let insights = self.pipeline.calculate(tick.event_time).await;
 
@@ -156,7 +153,7 @@ impl Runnable for InsightService {
                         .build()
                         .into(),
                 ];
-                self.insert_batch(&insights).await;
+                self.insert_batch(insights);
             }
             Event::TickUpdate(tick) => {
                 debug!(target: "insights", "received tick update" );
@@ -199,7 +196,7 @@ impl Runnable for InsightService {
                         .build()
                         .into(),
                 ];
-                self.insert_batch(&insights).await;
+                self.insert_batch(insights);
             }
             Event::MetricUpdate(metric) => {
                 debug!(target: "insights", "received metric update" );
@@ -213,7 +210,7 @@ impl Runnable for InsightService {
                     .persist(false)
                     .build()
                     .into();
-                self.insert(insight).await;
+                self.insert(insight);
             }
             e => {
                 warn!(target: "insights", "received unused event: {}", e.event_type());

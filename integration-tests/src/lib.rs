@@ -1,3 +1,4 @@
+pub mod feature_graph;
 pub mod feature_validator;
 
 use std::sync::Arc;
