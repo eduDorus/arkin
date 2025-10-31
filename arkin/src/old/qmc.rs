@@ -52,7 +52,7 @@ fn main() {
     // Expected Returns
     let mut mu = u.iter().map(|u| u.mean()).collect::<Vec<_>>(); // expected returns
     mu.iter_mut().for_each(|r| *r = *r * TIME_STEPS);
-    println!("Expected Returns: {:?}", mu);
+    info!("Expected Returns: {:?}", mu);
 
     // Volatility (Standard Deviation)
     let mut sigma = [inst_ret_1().std_dev(), inst_ret_2().std_dev(), inst_ret_3().std_dev()]; // standard deviations
@@ -86,19 +86,19 @@ fn main() {
     let avg_return = metrics.iter().map(|(r, _s, _sharpe)| *r).mean();
     let avg_risk = metrics.iter().map(|(_r, s, _sharpe)| *s).mean();
     let avg_sharpe = metrics.iter().map(|(_r, _s, sharpe)| *sharpe).mean();
-    println!(
+    info!(
         "Average Return: {:.8}, Average Risk: {:.8}, Average Sharpe: {:.8}",
         avg_return, avg_risk, avg_sharpe
     );
 
     // Step 5: Print the top 10 scenarios
-    println!("Top 5 Scenarios:");
+    info!("Top 5 Scenarios:");
     for (i, (r, s, sharpe)) in metrics.iter().take(5).enumerate() {
-        println!("Scenario {}: Return: {:.8}, Risk: {:.8}, Sharpe: {:.8}", i, r, s, sharpe);
+        info!("Scenario {}: Return: {:.8}, Risk: {:.8}, Sharpe: {:.8}", i, r, s, sharpe);
     }
-    println!("worst 5 Scenarios:");
+    info!("worst 5 Scenarios:");
     for (i, (r, s, sharpe)) in metrics.iter().rev().take(5).enumerate() {
-        println!("Scenario {}: Return: {:.8}, Risk: {:.8}, Sharpe: {:.8}", i, r, s, sharpe);
+        info!("Scenario {}: Return: {:.8}, Risk: {:.8}, Sharpe: {:.8}", i, r, s, sharpe);
     }
 }
 
@@ -123,7 +123,7 @@ impl MeanVarianceOptimization {
         //     for val in row {
         //         print!("{:.5} ", val);
         //     }
-        //     println!();
+        //     info!();
         // }
 
         // Problem definition
@@ -152,10 +152,10 @@ impl MeanVarianceOptimization {
 
         let weights = solver.solution.x;
         for (i, w) in weights.iter().enumerate() {
-            println!("Asset {}: {}%", i, (w * 100.).round());
+            info!("Asset {}: {}%", i, (w * 100.).round());
         }
-        println!("Sum of weights: {:.5}", weights.iter().sum::<f64>());
-        println!(
+        info!("Sum of weights: {:.5}", weights.iter().sum::<f64>());
+        info!(
             "Solution Status: {:?} with {:?} iterations",
             solver.solution.status, solver.solution.iterations
         );
@@ -164,10 +164,10 @@ impl MeanVarianceOptimization {
         let portfolio_variance = compute_portfolio_variance(&weights, &covariance_matrix);
         let risk = portfolio_variance.sqrt();
         let sharpe = compute_sharpe_ratio(expected_return, portfolio_variance);
-        println!("Expected Return: {:.5}", expected_return);
-        println!("Portfolio Variance: {:.5}", portfolio_variance);
-        println!("Risk: {:.5}", risk);
-        println!("Sharpe Ratio: {:.5}", sharpe);
+        info!("Expected Return: {:.5}", expected_return);
+        info!("Portfolio Variance: {:.5}", portfolio_variance);
+        info!("Risk: {:.5}", risk);
+        info!("Sharpe Ratio: {:.5}", sharpe);
         weights
     }
 

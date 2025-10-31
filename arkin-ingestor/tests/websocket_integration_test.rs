@@ -14,6 +14,7 @@ use arkin_core::prelude::init_tracing;
 use serde_json::Value;
 use std::time::Duration;
 use tokio::time::timeout;
+use tracing::{error, info};
 
 // Mock structures for testing (in real scenario, these would be imported from the binary)
 // For now, we'll create a simplified test that verifies the configuration
@@ -28,11 +29,11 @@ async fn test_binance_ws_connection_real() {
 
     let url = "wss://fstream.binance.com/ws";
 
-    println!("Attempting to connect to {}", url);
+    info!("Attempting to connect to {}", url);
 
     match tokio_tungstenite::connect_async(url).await {
         Ok((ws_stream, _)) => {
-            println!("Connected to Binance WebSocket");
+            info!("Connected to Binance WebSocket");
 
             let (mut sink, mut stream) = ws_stream.split();
 
@@ -48,11 +49,11 @@ async fn test_binance_ws_connection_real() {
                 .send(tokio_tungstenite::tungstenite::Message::text(subscribe_msg.to_string()))
                 .await
             {
-                eprintln!("Failed to send subscription: {}", e);
+                error!("Failed to send subscription: {}", e);
                 return;
             }
 
-            println!("Subscription sent");
+            info!("Subscription sent");
 
             // Receive a few messages
             let mut message_count = 0;
@@ -65,34 +66,34 @@ async fn test_binance_ws_connection_real() {
                             match serde_json::from_str::<Value>(&text) {
                                 Ok(json) => {
                                     message_count += 1;
-                                    println!("Message #{}: {:?}", message_count, json);
+                                    info!("Message #{}: {:?}", message_count, json);
 
                                     // Verify the message has expected fields for aggTrade
                                     if let (Some(e), Some(s)) = (json.get("e"), json.get("s")) {
                                         assert_eq!(e.as_str(), Some("aggTrade"));
-                                        println!("  Event: aggTrade, Symbol: {}", s);
+                                        info!("  Event: aggTrade, Symbol: {}", s);
                                     }
 
                                     if message_count >= 5 {
                                         break;
                                     }
                                 }
-                                Err(e) => eprintln!("Failed to parse: {}", e),
+                                Err(e) => error!("Failed to parse: {}", e),
                             }
                         }
                         Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
-                            println!("Received PING from server, sending PONG");
+                            info!("Received PING from server, sending PONG");
                             let _ = sink.send(tokio_tungstenite::tungstenite::Message::Pong(data)).await;
                         }
                         Ok(tokio_tungstenite::tungstenite::Message::Pong(_)) => {
-                            println!("Received PONG from server");
+                            info!("Received PONG from server");
                         }
                         Ok(tokio_tungstenite::tungstenite::Message::Close(frame)) => {
-                            println!("Received CLOSE: {:?}", frame);
+                            info!("Received CLOSE: {:?}", frame);
                             break;
                         }
                         Err(e) => {
-                            eprintln!("WebSocket error: {}", e);
+                            error!("WebSocket error: {}", e);
                             break;
                         }
                         _ => {}
@@ -102,16 +103,16 @@ async fn test_binance_ws_connection_real() {
             .await
             {
                 Ok(_) => {
-                    println!("Successfully received {} trade messages", message_count);
+                    info!("Successfully received {} trade messages", message_count);
                     assert!(message_count > 0, "Should have received at least one message");
                 }
                 Err(_) => {
-                    println!("Timeout waiting for messages (expected after 10s)");
+                    info!("Timeout waiting for messages (expected after 10s)");
                 }
             }
         }
         Err(e) => {
-            eprintln!("Failed to connect to Binance: {}", e);
+            error!("Failed to connect to Binance: {}", e);
             panic!("Connection test failed");
         }
     }
@@ -153,7 +154,7 @@ fn test_subscription_message_format() {
     assert_eq!(subscribe_msg.get("id").and_then(|v| v.as_i64()), Some(1));
     assert_eq!(subscribe_msg.get("params").and_then(|v| v.as_array()).map(|a| a.len()), Some(3));
 
-    println!("Subscription message: {}", subscribe_msg.to_string());
+    info!("Subscription message: {}", subscribe_msg.to_string());
 }
 
 #[test]
@@ -181,7 +182,7 @@ fn test_aggtradestream_response_parsing() {
     assert_eq!(json.get("q").and_then(|v| v.as_str()), Some("100"));
     assert_eq!(json.get("m").and_then(|v| v.as_bool()), Some(true));
 
-    println!("Successfully parsed aggTrade response: {:?}", json);
+    info!("Successfully parsed aggTrade response: {:?}", json);
 }
 
 #[test]
@@ -199,7 +200,7 @@ fn test_ping_pong_message_handling() {
             match pong_msg {
                 Message::Pong(pong_data) => {
                     assert_eq!(pong_data, ping_data);
-                    println!("Ping/Pong test passed");
+                    info!("Ping/Pong test passed");
                 }
                 _ => panic!("Expected Pong message"),
             }

@@ -1,5 +1,6 @@
 use futures::{SinkExt, StreamExt};
 use serde_json::Value;
+use std::cmp;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,32 +9,188 @@ use tokio::time::{interval, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{error, info, warn};
 
+/// Error types categorized for statistics tracking
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ErrorCategory {
+    /// Connection failed to establish
+    ConnectionFailed,
+    /// WebSocket protocol error
+    WebSocketError,
+    /// Failed to parse JSON message
+    ParseError,
+    /// Failed to send pong response
+    PongSendFailed,
+    /// Failed to send ping
+    PingSendFailed,
+    /// Failed to send subscription
+    SubscriptionFailed,
+    /// Stale connection detected
+    StaleConnection,
+    /// Unexpected binary message received
+    UnexpectedBinary,
+    /// Generic/Other error
+    Other,
+}
+
+impl std::fmt::Display for ErrorCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ConnectionFailed => write!(f, "connection_failed"),
+            Self::WebSocketError => write!(f, "websocket_error"),
+            Self::ParseError => write!(f, "parse_error"),
+            Self::PongSendFailed => write!(f, "pong_send_failed"),
+            Self::PingSendFailed => write!(f, "ping_send_failed"),
+            Self::SubscriptionFailed => write!(f, "subscription_failed"),
+            Self::StaleConnection => write!(f, "stale_connection"),
+            Self::UnexpectedBinary => write!(f, "unexpected_binary"),
+            Self::Other => write!(f, "other"),
+        }
+    }
+}
+
+/// Error statistics for WebSocket connection
+#[derive(Debug, Clone)]
+pub struct ErrorStats {
+    /// Total number of errors
+    pub total_errors: u64,
+    /// Error counts by category
+    pub errors_by_type: Vec<(String, u64)>,
+    /// Last error message details (type, message)
+    pub last_error: Option<(String, String)>,
+}
+
+impl std::fmt::Display for ErrorStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Total Errors: {} | Breakdown: {}",
+            self.total_errors,
+            self.errors_by_type
+                .iter()
+                .map(|(category, count)| format!("{}: {}", category, count))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+/// Tracks error statistics for the WebSocket client
+#[allow(dead_code)]
+struct ErrorTracker {
+    total_errors: Arc<AtomicU64>,
+    connection_failed: Arc<AtomicU64>,
+    websocket_error: Arc<AtomicU64>,
+    parse_error: Arc<AtomicU64>,
+    pong_send_failed: Arc<AtomicU64>,
+    ping_send_failed: Arc<AtomicU64>,
+    subscription_failed: Arc<AtomicU64>,
+    stale_connection: Arc<AtomicU64>,
+    unexpected_binary: Arc<AtomicU64>,
+    other_error: Arc<AtomicU64>,
+    last_error_category: Arc<tokio::sync::Mutex<Option<String>>>,
+    last_error_message: Arc<tokio::sync::Mutex<Option<String>>>,
+}
+
+impl ErrorTracker {
+    fn new() -> Self {
+        Self {
+            total_errors: Arc::new(AtomicU64::new(0)),
+            connection_failed: Arc::new(AtomicU64::new(0)),
+            websocket_error: Arc::new(AtomicU64::new(0)),
+            parse_error: Arc::new(AtomicU64::new(0)),
+            pong_send_failed: Arc::new(AtomicU64::new(0)),
+            ping_send_failed: Arc::new(AtomicU64::new(0)),
+            subscription_failed: Arc::new(AtomicU64::new(0)),
+            stale_connection: Arc::new(AtomicU64::new(0)),
+            unexpected_binary: Arc::new(AtomicU64::new(0)),
+            other_error: Arc::new(AtomicU64::new(0)),
+            last_error_category: Arc::new(tokio::sync::Mutex::new(None)),
+            last_error_message: Arc::new(tokio::sync::Mutex::new(None)),
+        }
+    }
+
+    fn record_error(&self, category: ErrorCategory) {
+        self.total_errors.fetch_add(1, Ordering::SeqCst);
+        match category {
+            ErrorCategory::ConnectionFailed => self.connection_failed.fetch_add(1, Ordering::SeqCst),
+            ErrorCategory::WebSocketError => self.websocket_error.fetch_add(1, Ordering::SeqCst),
+            ErrorCategory::ParseError => self.parse_error.fetch_add(1, Ordering::SeqCst),
+            ErrorCategory::PongSendFailed => self.pong_send_failed.fetch_add(1, Ordering::SeqCst),
+            ErrorCategory::PingSendFailed => self.ping_send_failed.fetch_add(1, Ordering::SeqCst),
+            ErrorCategory::SubscriptionFailed => self.subscription_failed.fetch_add(1, Ordering::SeqCst),
+            ErrorCategory::StaleConnection => self.stale_connection.fetch_add(1, Ordering::SeqCst),
+            ErrorCategory::UnexpectedBinary => self.unexpected_binary.fetch_add(1, Ordering::SeqCst),
+            ErrorCategory::Other => self.other_error.fetch_add(1, Ordering::SeqCst),
+        };
+    }
+
+    fn record_error_with_message(&self, category: ErrorCategory, message: String) {
+        self.record_error(category);
+
+        let category_str = category.to_string();
+        let last_category = self.last_error_category.clone();
+        let last_message = self.last_error_message.clone();
+
+        // Spawn a task to update the error details (non-blocking)
+        tokio::spawn(async move {
+            let mut cat = last_category.lock().await;
+            *cat = Some(category_str);
+
+            let mut msg = last_message.lock().await;
+            *msg = Some(message);
+        });
+    }
+
+    fn get_stats(&self) -> ErrorStats {
+        let mut errors_by_type = vec![
+            ("connection_failed".to_string(), self.connection_failed.load(Ordering::SeqCst)),
+            ("websocket_error".to_string(), self.websocket_error.load(Ordering::SeqCst)),
+            ("parse_error".to_string(), self.parse_error.load(Ordering::SeqCst)),
+            ("pong_send_failed".to_string(), self.pong_send_failed.load(Ordering::SeqCst)),
+            ("ping_send_failed".to_string(), self.ping_send_failed.load(Ordering::SeqCst)),
+            (
+                "subscription_failed".to_string(),
+                self.subscription_failed.load(Ordering::SeqCst),
+            ),
+            ("stale_connection".to_string(), self.stale_connection.load(Ordering::SeqCst)),
+            ("unexpected_binary".to_string(), self.unexpected_binary.load(Ordering::SeqCst)),
+            ("other".to_string(), self.other_error.load(Ordering::SeqCst)),
+        ];
+
+        // Filter out zero counts for cleaner output
+        errors_by_type.retain(|(_, count)| *count > 0);
+
+        // Get last error details (non-blocking read attempt)
+        let last_error = if let Ok(cat) = self.last_error_category.try_lock() {
+            if let Ok(msg) = self.last_error_message.try_lock() {
+                match (cat.clone(), msg.clone()) {
+                    (Some(c), Some(m)) => Some((c, m)),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        ErrorStats {
+            total_errors: self.total_errors.load(Ordering::SeqCst),
+            errors_by_type,
+            last_error,
+        }
+    }
+}
+
 /// Configuration for WebSocket connection
 #[derive(Clone)]
 pub struct WsConfig {
     pub url: String,
     pub streams: Vec<(String, String)>, // (message, stream_id)
     pub reconnect_backoff_ms: u64,
-    pub max_reconnect_attempts: u32,
-    pub ping_interval_secs: u64, // Interval to send pings to server
-    pub pong_timeout_secs: u64,
+    pub max_reconnect_backoff_ms: u64,
+    pub ping_interval_secs: u64,            // Interval to send pings to server
     pub stale_connection_timeout_secs: u64, // Detect stale connections (no messages received)
-    pub send_ping_interval_secs: u64,       // How often to send pings (e.g., 20s for Coinbase)
-}
-
-impl WsConfig {
-    pub fn binance_usds_futures(streams: Vec<(String, String)>) -> Self {
-        Self {
-            url: "wss://fstream.binance.com/ws".to_string(),
-            streams,
-            reconnect_backoff_ms: 1000,
-            max_reconnect_attempts: 10,
-            ping_interval_secs: 180,           // 3 minutes (Binance sends ping every 3 min)
-            pong_timeout_secs: 600,            // 10 minutes (Binance disconnects after 10 min no pong)
-            stale_connection_timeout_secs: 30, // Reconnect if no messages for 30 seconds
-            send_ping_interval_secs: 0,        // Don't send pings (Binance sends them to us)
-        }
-    }
 }
 
 /// Robust WebSocket client for Binance market data streams
@@ -44,6 +201,7 @@ pub struct WsClient {
     is_connected: Arc<AtomicBool>,
     last_message_timestamp: Arc<AtomicU64>, // Track last message time for stale detection
     stream_ids: Vec<String>,                // Store stream IDs for logging
+    error_tracker: ErrorTracker,            // Track error statistics
 }
 
 impl WsClient {
@@ -57,6 +215,7 @@ impl WsClient {
             is_connected: Arc::new(AtomicBool::new(false)),
             last_message_timestamp: Arc::new(AtomicU64::new(0)),
             stream_ids,
+            error_tracker: ErrorTracker::new(),
         };
         (client, rx)
     }
@@ -72,27 +231,23 @@ impl WsClient {
                 }
                 Err(e) => {
                     self.reconnect_attempts += 1;
+                    self.error_tracker
+                        .record_error_with_message(ErrorCategory::ConnectionFailed, e.clone());
                     self.is_connected.store(false, Ordering::SeqCst);
-
-                    if self.reconnect_attempts >= self.config.max_reconnect_attempts {
-                        error!(
-                            "Max reconnection attempts ({}) exceeded: {}",
-                            self.config.max_reconnect_attempts, e
-                        );
-                        return Err(e);
-                    }
 
                     // Calculate backoff: first attempt no wait (0ms), then 1s, then exponential
                     let backoff = if self.reconnect_attempts == 1 {
                         Duration::from_millis(0)
                     } else {
-                        Duration::from_millis(
+                        let backoff = cmp::min(
                             self.config.reconnect_backoff_ms * (2u64.pow(self.reconnect_attempts - 2)),
-                        )
+                            self.config.max_reconnect_backoff_ms,
+                        );
+                        Duration::from_millis(backoff)
                     };
                     warn!(
-                        "Connection failed (attempt {}/{}), retrying in {:?}: {}",
-                        self.reconnect_attempts, self.config.max_reconnect_attempts, backoff, e
+                        "Connection failed (attempt {}), retrying in {:?}: {}",
+                        self.reconnect_attempts, backoff, e
                     );
                     sleep(backoff).await;
                 }
@@ -160,20 +315,32 @@ impl WsClient {
                                         }
                                         Err(e) => {
                                             warn!("Failed to parse message: {}", e);
+                                            self.error_tracker.record_error_with_message(
+                                                ErrorCategory::ParseError,
+                                                e.to_string(),
+                                            );
                                         }
                                     }
                                 }
                                 Message::Binary(_data) => {
                                     warn!("Received unexpected binary message");
+                                    self.error_tracker.record_error(ErrorCategory::UnexpectedBinary);
                                 }
                                 Message::Ping(data) => {
                                     info!(
                                         "Received ping from server [{}], responding with pong",
                                         self.stream_ids.join(", ")
                                     );
-                                    sink.send(Message::Pong(data))
+                                    if sink.send(Message::Pong(data))
                                         .await
-                                        .map_err(|e| format!("Failed to send pong: {}", e))?;
+                                        .is_err() {
+                                        error!("Failed to send pong");
+                                        self.error_tracker.record_error_with_message(
+                                            ErrorCategory::PongSendFailed,
+                                            "Failed to send pong response".to_string(),
+                                        );
+                                        return Err("Failed to send pong".to_string());
+                                    }
                                 }
                                 Message::Pong(_data) => {
                                     info!("Received pong from server [{}]", self.stream_ids.join(", "));
@@ -189,6 +356,10 @@ impl WsClient {
                         }
                         Ok(Some(Err(e))) => {
                             error!("WebSocket error: {}", e);
+                            self.error_tracker.record_error_with_message(
+                                ErrorCategory::WebSocketError,
+                                e.to_string(),
+                            );
                             return Err(format!("WebSocket error: {}", e));
                         }
                         Ok(None) => {
@@ -201,6 +372,10 @@ impl WsClient {
                                 "Stale connection detected - no messages received within {:?}. Reconnecting...",
                                 stale_timeout
                             );
+                            self.error_tracker.record_error_with_message(
+                                ErrorCategory::StaleConnection,
+                                format!("No messages for {:?}", stale_timeout),
+                            );
                             return Err("Stale connection - no messages received".to_string());
                         }
                     }
@@ -211,6 +386,10 @@ impl WsClient {
                     use tokio_tungstenite::tungstenite::Bytes;
                     if sink.send(Message::Ping(Bytes::new())).await.is_err() {
                         warn!("Failed to send ping to [{}]", self.stream_ids.join(", "));
+                        self.error_tracker.record_error_with_message(
+                            ErrorCategory::PingSendFailed,
+                            "Failed to send ping".to_string(),
+                        );
                         return Err("Failed to send ping".to_string());
                     }
                 }
@@ -219,7 +398,7 @@ impl WsClient {
     }
 
     async fn subscribe_to_streams(
-        &self,
+        &mut self,
         sink: &mut futures::stream::SplitSink<
             tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
             Message,
@@ -230,11 +409,19 @@ impl WsClient {
             info!("Subscribing to [{}]: {}", stream_id, msg_text);
 
             // Send each subscription message directly
-            sink.send(Message::text(msg_text.clone()))
-                .await
-                .map_err(|e| format!("Failed to send subscription for [{}]: {}", stream_id, e))?;
-
-            info!("Subscription sent for [{}]", stream_id);
+            match sink.send(Message::text(msg_text.clone())).await {
+                Ok(_) => {
+                    info!("Subscription sent for [{}]", stream_id);
+                }
+                Err(e) => {
+                    error!("Failed to send subscription for [{}]: {}", stream_id, e);
+                    self.error_tracker.record_error_with_message(
+                        ErrorCategory::SubscriptionFailed,
+                        format!("Failed to subscribe to [{}]: {}", stream_id, e),
+                    );
+                    return Err(format!("Failed to send subscription for [{}]: {}", stream_id, e));
+                }
+            }
         }
         Ok(())
     }
@@ -246,8 +433,8 @@ impl WsClient {
         stream_ids: Vec<String>,
         ping_tx: tokio::sync::mpsc::UnboundedSender<()>,
     ) {
-        // If send_ping_interval_secs is 0, don't send pings - just keep the task alive to prevent channel closure
-        if config.send_ping_interval_secs == 0 {
+        // If ping_interval_secs is 0, don't send pings - just keep the task alive to prevent channel closure
+        if config.ping_interval_secs == 0 {
             // Keep the task alive indefinitely
             loop {
                 if !is_connected.load(Ordering::SeqCst) {
@@ -258,7 +445,7 @@ impl WsClient {
             return;
         }
 
-        let mut ping_interval = interval(Duration::from_secs(config.send_ping_interval_secs));
+        let mut ping_interval = interval(Duration::from_secs(config.ping_interval_secs));
         let stream_id_str = stream_ids.join(", ");
 
         loop {
@@ -319,5 +506,10 @@ impl WsClient {
 
     pub fn is_connected(&self) -> bool {
         self.is_connected.load(Ordering::SeqCst)
+    }
+
+    /// Get the current error statistics
+    pub fn error_stats(&self) -> ErrorStats {
+        self.error_tracker.get_stats()
     }
 }

@@ -51,7 +51,7 @@
 //! // Access unified data regardless of exchange
 //! match event.data {
 //!     ExchangeEventData::AggTrade(trade) => {
-//!         println!("Trade: {}@{}", trade.quantity, trade.price);
+//!         info!("Trade: {}@{}", trade.quantity, trade.price);
 //!     }
 //!     _ => {}
 //! }
@@ -298,7 +298,7 @@ impl ExchangeStreamEvent {
     /// let data = event.into_inner();
     /// match data {
     ///     ExchangeEventData::Trade(trade) => {
-    ///         println!("Trade price: {}", trade.price);
+    ///         info!("Trade price: {}", trade.price);
     ///     }
     ///     _ => {}
     /// }

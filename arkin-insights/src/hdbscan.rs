@@ -208,9 +208,9 @@ mod tests {
         // );
 
         // Print results for manual inspection
-        println!("Number of clusters: {}", num_clusters);
-        println!("Cluster Labels: {:?}", clusters.labels);
-        println!("Centroids: {:?}", clusters.centroids);
-        println!("Ranges: {:?}", clusters.ranges);
+        info!("Number of clusters: {}", num_clusters);
+        info!("Cluster Labels: {:?}", clusters.labels);
+        info!("Centroids: {:?}", clusters.centroids);
+        info!("Ranges: {:?}", clusters.ranges);
     }
 }

@@ -1,11 +1,11 @@
 use arkin_core::prelude::init_tracing;
 use arkin_ingestor::{
-    BinanceSubscription, BybitSubscription, CoinbaseSubscription, OkxSubscription, OkxSubscriptionArg,
+    BinanceSubscription, BybitSubscription, CoinbaseSubscription, OkxSubscription, OkxSubscriptionArg, StreamType,
 };
 use arkin_ingestor::{MarketRegistry, WsClient, WsConfig};
 use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
-use tracing::error;
+use tracing::{error, info};
 
 #[derive(Clone, Debug, Default)]
 struct StreamStats {
@@ -27,16 +27,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let registry = MarketRegistry::new();
     let all_streams = registry.list_all();
 
-    println!("\n╔══════════════════════════════════════════════════════════════════════════════╗");
-    println!("║           Multi-Exchange WebSocket Aggregator with Live Statistics          ║");
-    println!("╚══════════════════════════════════════════════════════════════════════════════╝\n");
+    info!("\n╔══════════════════════════════════════════════════════════════════════════════╗");
+    info!("║           Multi-Exchange WebSocket Aggregator with Live Statistics          ║");
+    info!("╚══════════════════════════════════════════════════════════════════════════════╝\n");
 
     // Filter to only ticker, trade, and aggtrade streams
     let filtered_streams: Vec<_> = all_streams
         .into_iter()
         .filter(|s| {
-            let stream_type_str = s.stream_type.to_string();
-            stream_type_str == "aggregate_trades" || stream_type_str == "trades" || stream_type_str == "ticker_realtime"
+            matches!(
+                s.stream_type,
+                StreamType::AggregateTrades | StreamType::Trades | StreamType::TickerRealtime
+            )
         })
         .collect();
 
@@ -49,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .push(stream.clone());
     }
 
-    println!(
+    info!(
         "📊 Discovered {} unique endpoints with {} filtered streams (ticker/trade/aggtrade only)\n",
         url_to_streams.len(),
         filtered_streams.len()
@@ -57,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test symbols (BTC, ETH, SOL)
     let test_symbols = vec!["btc", "eth", "sol"];
-    println!("🎯 Testing with symbols: {:?}\n", test_symbols);
+    info!("🎯 Testing with symbols: {:?}\n", test_symbols);
 
     // Create one WebSocket client per unique URL
     let mut receivers = Vec::new();
@@ -68,16 +70,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Build subscription messages based on exchange
         let subscription_messages = build_subscriptions(&exchange, streams, &test_symbols);
 
-        println!("📡 Endpoint: {}", url);
-        println!("   Exchange: {}", exchange);
-        println!("   Total subscription messages: {}", subscription_messages.len());
+        info!("📡 Endpoint: {}", url);
+        info!("   Exchange: {}", exchange);
+        info!("   Total subscription messages: {}", subscription_messages.len());
         for (i, (msg, stream_id)) in subscription_messages.iter().take(3).enumerate() {
-            println!("     [{}] {} -> {}", i + 1, stream_id, msg);
+            info!("     [{}] {} -> {}", i + 1, stream_id, msg);
         }
         if subscription_messages.len() > 3 {
-            println!("     ... and {} more", subscription_messages.len() - 3);
+            info!("     ... and {} more", subscription_messages.len() - 3);
         }
-        println!();
+        info!("/n");
 
         // Determine ping interval based on exchange
         let send_ping_interval_secs = match exchange {
@@ -110,8 +112,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         receivers.push((rx, streams_clone));
     }
 
-    println!("✅ Started {} WebSocket connections...\n", receivers.len());
-    println!("Listening for market data... (Press Ctrl+C to stop)\n");
+    info!("✅ Started {} WebSocket connections...\n", receivers.len());
+    info!("Listening for market data... (Press Ctrl+C to stop)\n");
 
     // Statistics tracking
     let mut stats = EventStats::default();
@@ -156,8 +158,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        // Check if we should print statistics (every 10 seconds)
-        if last_print.elapsed() >= Duration::from_secs(10) {
+        // Check if we should print statistics (every 60 seconds)
+        if last_print.elapsed() >= Duration::from_secs(60) {
             print_statistics(&stats, messages_processed);
             stats = EventStats::default();
             messages_processed = 0;
@@ -307,38 +309,38 @@ fn build_coinbase_subscriptions(
 }
 
 fn print_statistics(stats: &EventStats, messages_processed: u64) {
-    println!("\n\n╔══════════════════════════════════════════════════════════════════════════════╗");
-    println!("║                    📊 Statistics (Last 10 seconds)                           ║");
-    println!("╚══════════════════════════════════════════════════════════════════════════════╝");
+    info!("\n\n╔══════════════════════════════════════════════════════════════════════════════╗");
+    info!("║                    📊 Statistics (Last 60 seconds)                           ║");
+    info!("╚══════════════════════════════════════════════════════════════════════════════╝");
 
-    println!("\n📈 Total Messages Processed: {}\n", messages_processed);
+    info!("\n📈 Total Messages Processed: {}\n", messages_processed);
 
     if !stats.by_exchange.is_empty() {
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        println!("🔹 By Exchange:");
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("🔹 By Exchange:");
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         for (exchange, s) in &stats.by_exchange {
-            println!("  {:<15} │ Messages: {:>8}", exchange, s.message_count);
+            info!("  {:<15} │ Messages: {:>8}", exchange, s.message_count);
         }
     }
 
     if !stats.by_stream_type.is_empty() {
-        println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        println!("📍 By Stream Type:");
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("📍 By Stream Type:");
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         for (stream_type, s) in &stats.by_stream_type {
-            println!("  {:<25} │ Messages: {:>8}", stream_type, s.message_count);
+            info!("  {:<25} │ Messages: {:>8}", stream_type, s.message_count);
         }
     }
 
     if !stats.by_market_type.is_empty() {
-        println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        println!("🎯 By Market Type:");
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        info!("🎯 By Market Type:");
+        info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         for (market_type, s) in &stats.by_market_type {
-            println!("  {:<25} │ Messages: {:>8}", market_type, s.message_count);
+            info!("  {:<25} │ Messages: {:>8}", market_type, s.message_count);
         }
     }
 
-    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    info!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 }

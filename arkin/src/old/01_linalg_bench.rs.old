@@ -26,7 +26,7 @@ fn benchmark_ndarray_matrix_multiplication(size: usize) {
 
     // Stop the timer
     let duration = start.elapsed();
-    println!("ndarray matrix multiplication ({}x{}): {:?}", size, size, duration);
+    info!("ndarray matrix multiplication ({}x{}): {:?}", size, size, duration);
 }
 
 fn benchmark_ndarray_correlation_coefficient(size: usize) {
@@ -59,7 +59,7 @@ fn benchmark_ndarray_correlation_coefficient(size: usize) {
 
     // Stop the timer
     let duration = start.elapsed();
-    println!("ndarray correlation coefficient ({}): {:?}", size, duration);
+    info!("ndarray correlation coefficient ({}): {:?}", size, duration);
 }
 
 fn benchmark_tch_matrix_mul(size: i64, device: Device) {
@@ -77,7 +77,7 @@ fn benchmark_tch_matrix_mul(size: i64, device: Device) {
 
     // Stop the timer
     let duration = start.elapsed();
-    println!(
+    info!(
         "tch matrix multiplication on device {:?} ({}x{}): {:?}",
         device, size, size, duration
     );
@@ -113,7 +113,7 @@ fn benchmark_tch_correlation_coefficient(size: i64, device: Device) {
 
     // Stop the timer
     let duration = start.elapsed();
-    println!("tch correlation coefficient on device {:?} ({}): {:?}", device, size, duration);
+    info!("tch correlation coefficient on device {:?} ({}): {:?}", device, size, duration);
 }
 
 fn benchmark_correlation_coefficient(size: i64) {
@@ -144,7 +144,7 @@ fn benchmark_correlation_coefficient(size: i64) {
 
     // Stop the timer
     let duration = start.elapsed();
-    println!("native correlation coefficient calculation ({}): {:?}", size, duration);
+    info!("native correlation coefficient calculation ({}): {:?}", size, duration);
 }
 
 fn main() {
@@ -152,7 +152,7 @@ fn main() {
     let matrix_size = 1000; // Set matrix size for benchmark
     let sum_size = 100000; // Set matrix size for benchmark
 
-    println!("Benchmarking sum operation");
+    info!("Benchmarking sum operation");
     let mut rng = rand::thread_rng();
     let a = (0..sum_size).map(|_| rng.gen::<f64>()).collect::<Vec<f64>>();
     let ax = Tensor::from(a.as_slice()).to_device(Device::Cpu);
@@ -160,30 +160,30 @@ fn main() {
         let timer = Instant::now();
         let sum = ax.sum(Kind::Double);
         print!("Sum: {:?} ", sum.double_value(&[]));
-        println!("Tch Duration: {:?}", timer.elapsed());
+        info!("Tch Duration: {:?}", timer.elapsed());
 
         let timer = Instant::now();
         let sum = a.iter().sum::<f64>();
         print!("Sum: {:?} ", sum);
-        println!("Native Duration: {:?}", timer.elapsed());
-        println!("----------------------------------------");
+        info!("Native Duration: {:?}", timer.elapsed());
+        info!("----------------------------------------");
     }
 
-    println!("Benchmarking matrix multiplication");
+    info!("Benchmarking matrix multiplication");
     for _ in 0..iterations {
         benchmark_tch_matrix_mul(matrix_size, Device::Cpu);
         benchmark_tch_matrix_mul(matrix_size, Device::Mps);
         benchmark_ndarray_matrix_multiplication(matrix_size as usize);
-        println!("----------------------------------------");
+        info!("----------------------------------------");
     }
 
-    println!("Benchmarking correlation coefficient calculation");
+    info!("Benchmarking correlation coefficient calculation");
     for _ in 0..iterations {
         benchmark_tch_correlation_coefficient(sum_size, Device::Cpu);
         benchmark_tch_correlation_coefficient(sum_size, Device::Mps);
         benchmark_ndarray_correlation_coefficient(sum_size as usize);
         benchmark_correlation_coefficient(sum_size);
-        println!("----------------------------------------");
+        info!("----------------------------------------");
     }
 }
 
@@ -226,7 +226,7 @@ fn main() {
 //             .pow(&Tensor::from(2.0))
 //             .sum(Kind::Float);
 //         opt.backward_step(&square_loss);
-//         println!("{}", &square_loss.double_value(&[]));
+//         info!("{}", &square_loss.double_value(&[]));
 //         if square_loss.double_value(&[]) < 0.0001 {
 //             break;
 //         }
@@ -243,11 +243,11 @@ fn main() {
 //     let vanna = &vega_grad[0]; // 0.1953
 //     let volga = &vega_grad[1]; // -2.9292
 
-//     println!("Price: {}", price.double_value(&[]));
-//     println!("Sigma: {}", sigma.double_value(&[]));
-//     println!("Delta: {}", delta.double_value(&[]));
-//     println!("Gamma: {}", gamma.double_value(&[]));
-//     println!("Vega: {}", vega.double_value(&[]));
-//     println!("Vanna: {}", vanna.double_value(&[]));
-//     println!("Volga: {}", volga.double_value(&[]));
+//     info!("Price: {}", price.double_value(&[]));
+//     info!("Sigma: {}", sigma.double_value(&[]));
+//     info!("Delta: {}", delta.double_value(&[]));
+//     info!("Gamma: {}", gamma.double_value(&[]));
+//     info!("Vega: {}", vega.double_value(&[]));
+//     info!("Vanna: {}", vanna.double_value(&[]));
+//     info!("Volga: {}", volga.double_value(&[]));
 // }

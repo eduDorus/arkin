@@ -152,11 +152,11 @@ pub fn dema(data: &[Decimal], period: usize) -> Option<Vec<Decimal>> {
 
     // Compute EMA1 over the data
     let ema1_values = ema(data, period)?;
-    println!("EMA 1: {:?}", ema1_values);
+    info!("EMA 1: {:?}", ema1_values);
 
     // Compute EMA2 over EMA1
     let ema2_values = ema(&ema1_values, period)?;
-    println!("EMA 2: {:?}", ema2_values);
+    info!("EMA 2: {:?}", ema2_values);
 
     // DEMA = 2 * EMA1 - EMA2
     let dema_values = izip!(ema1_values, ema2_values)
@@ -592,7 +592,7 @@ mod tests {
             dec!(15.0),
         ];
         let result = dema(&data, 3).unwrap();
-        println!("Result: {:?}", result);
+        info!("Result: {:?}", result);
         let last_dema = result.last().unwrap();
         assert_eq!(last_dema.round_dp(2), dec!(14.00));
     }
@@ -657,7 +657,7 @@ mod tests {
             dec!(15.0),
         ];
         let result = tema(&data, 3).unwrap();
-        println!("Result: {:?}", result);
+        info!("Result: {:?}", result);
         let last_dema = result.last().unwrap();
         assert_eq!(last_dema.round_dp(2), dec!(14.51));
     }

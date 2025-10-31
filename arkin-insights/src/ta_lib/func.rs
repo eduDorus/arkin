@@ -89,19 +89,19 @@ pub fn bollinger_bands(
     let mut oscillator = Vec::with_capacity(middle_band.len() - 1);
     let mut width = Vec::with_capacity(middle_band.len() - 1);
 
-    println!("middle_band: {:?}", middle_band);
-    println!("data: {:?}", data);
+    info!("middle_band: {:?}", middle_band);
+    info!("data: {:?}", data);
     let offset = data.len() - middle_band.len();
     let data = &data[offset..];
-    println!("data after: {:?}", data);
+    info!("data after: {:?}", data);
 
     for i in 1..middle_band.len() {
         let idx = if period < i { i - period } else { 0 };
         let slice = &data[idx..=i];
-        println!("Slice: {:?}", slice);
+        info!("Slice: {:?}", slice);
         let p = data[i];
         let mb = middle_band[i];
-        println!("mb: {:?}", mb);
+        info!("mb: {:?}", mb);
         let std_dev = std_dev(slice)?;
         let ub = mb + std_dev_multiplier * std_dev;
         let lb = mb - std_dev_multiplier * std_dev;
@@ -127,11 +127,11 @@ pub fn bollinger_bands(
     // remove first element from middle band
     middle_band.remove(0);
 
-    println!("upper_band: {:?}", upper_band);
-    println!("middle_band: {:?}", middle_band);
-    println!("lower_band: {:?}", lower_band);
-    println!("oscillator: {:?}", oscillator);
-    println!("width: {:?}", width);
+    info!("upper_band: {:?}", upper_band);
+    info!("middle_band: {:?}", middle_band);
+    info!("lower_band: {:?}", lower_band);
+    info!("oscillator: {:?}", oscillator);
+    info!("width: {:?}", width);
 
     Some((middle_band, upper_band, lower_band, oscillator, width))
 }
@@ -160,18 +160,18 @@ pub fn rsi(data: &[Decimal], smoothing_method: SmoothingMethod) -> Option<Vec<De
         return None;
     }
 
-    println!("data: {:?}", data);
+    info!("data: {:?}", data);
     let pct_changes = pct_change(data)?;
-    println!("pct_changes: {:?}", pct_changes.len());
+    info!("pct_changes: {:?}", pct_changes.len());
 
     // Separate gains and losses
     let mut rsi = Vec::with_capacity(pct_changes.len());
     for i in 0..pct_changes.len() - period {
-        println!("i: {:?}", i);
-        println!("upper bound: {:?}", i + period);
+        info!("i: {:?}", i);
+        info!("upper bound: {:?}", i + period);
         let slice = &pct_changes[i..i + period];
         assert!(slice.len() == period);
-        println!("slice: {:?}", slice);
+        info!("slice: {:?}", slice);
 
         let mut gains = Vec::with_capacity(period);
         let mut losses = Vec::with_capacity(period);
@@ -192,8 +192,8 @@ pub fn rsi(data: &[Decimal], smoothing_method: SmoothingMethod) -> Option<Vec<De
         // Calculate the RSI
         let rsi_gain = prev_avg_gain * Decimal::from(period - 1) + last_gain;
         let rsi_loss = prev_avg_loss * Decimal::from(period - 1) + last_loss;
-        println!("rsi_gain: {:?}", rsi_gain);
-        println!("rsi_loss: {:?}", rsi_loss);
+        info!("rsi_gain: {:?}", rsi_gain);
+        info!("rsi_loss: {:?}", rsi_loss);
 
         // Zero loss edge case
         let rsi_value = match (rsi_gain.is_zero(), rsi_loss.is_zero()) {
@@ -204,13 +204,13 @@ pub fn rsi(data: &[Decimal], smoothing_method: SmoothingMethod) -> Option<Vec<De
                 Decimal::from(100) - (Decimal::from(100) / (Decimal::from(1) + ratio))
             }
         };
-        println!("rsi_value: {:?}", rsi_value);
+        info!("rsi_value: {:?}", rsi_value);
 
         rsi.push(rsi_value);
     }
-    println!("rsi: {:?}", rsi.len());
+    info!("rsi: {:?}", rsi.len());
     let rsi_smoothing = smoothing_method.calc(&rsi)?;
-    println!("rsi: {:?}", rsi_smoothing);
+    info!("rsi: {:?}", rsi_smoothing);
     Some(rsi_smoothing)
 }
 
@@ -258,8 +258,8 @@ pub fn macd(
     let offset = fast_values.len() - slow_values.len();
     let fast_aligned = &fast_values[offset..];
     let slow_aligned = &slow_values;
-    println!("fast_aligned: {:?}", fast_aligned);
-    println!("slow_aligned: {:?}", slow_aligned);
+    info!("fast_aligned: {:?}", fast_aligned);
+    info!("slow_aligned: {:?}", slow_aligned);
 
     // Calculate MACD line
     let macd_line: Vec<Decimal> = izip!(fast_aligned, slow_aligned)
@@ -267,9 +267,9 @@ pub fn macd(
         .collect();
 
     // Calculate Signal line
-    println!("MACD line: {:?}", macd_line);
+    info!("MACD line: {:?}", macd_line);
     let signal_line = signal.calc(&macd_line)?;
-    println!("signal_line: {:?}", signal_line);
+    info!("signal_line: {:?}", signal_line);
 
     // Align the MACD line and Signal line
     let diff = macd_line.len() - signal_line.len();

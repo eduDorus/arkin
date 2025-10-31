@@ -3,12 +3,12 @@ use catboost_rs as catboost;
 
 fn main() {
     // Log our current directory
-    println!("Current directory: {:?}", std::env::current_dir().unwrap());
+    info!("Current directory: {:?}", std::env::current_dir().unwrap());
     // Load the trained model
     let model = catboost::Model::load("./models/f5dd7db6-89da-4c68-b62e-6f80b763bef6_log_return_vwap_v6.cbm").unwrap();
 
-    println!("Number of cat features {}", model.get_cat_features_count());
-    println!("Number of float features {}", model.get_float_features_count());
+    info!("Number of cat features {}", model.get_cat_features_count());
+    info!("Number of float features {}", model.get_float_features_count());
 
     // Data
     // let data = vec![
@@ -65,8 +65,8 @@ fn main() {
     // ];
 
     // // Print the shape of the data
-    // println!("Data shape: {:?}", data.len());
-    // println!("Data columns: {:?}", data[0].len());
+    // info!("Data shape: {:?}", data.len());
+    // info!("Data columns: {:?}", data[0].len());
 
     // let cat_data = vec![
     //     vec![1, 2, 120, 0],
@@ -85,5 +85,5 @@ fn main() {
     // let cat_data: Vec<Vec<String>> = cat_data.iter().map(|x| x.iter().map(|y| y.to_string()).collect()).collect();
     // // Apply the model
     // let prediction = model.calc_model_prediction(data, cat_data).unwrap();
-    // println!("Prediction {:?}", prediction);
+    // info!("Prediction {:?}", prediction);
 }

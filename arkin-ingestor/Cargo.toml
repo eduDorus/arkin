@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 kanal = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 rand = { workspace = true }
 time = { workspace = true }
 reqwest = { workspace = true }
@@ -26,6 +27,11 @@ statrs = { workspace = true }
 clap = { workspace = true }
 rust_decimal = { workspace = true }
 tonic = { workspace = true }
-
 tokio-tungstenite = { workspace = true }
 url = { workspace = true }
+strum = { workspace = true }
+sqlx = { workspace = true }
+
+
+[dev-dependencies]
+test-log = {workspace = true}

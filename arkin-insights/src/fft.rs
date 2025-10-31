@@ -36,8 +36,8 @@ pub struct FftFeatures {
 /// ```rust
 /// let prices = vec![100.0, 101.0, 102.0, 100.5, 103.0];
 /// let features = compute_fft_features(&prices);
-/// println!("Dominant Frequency: {}", features.dominant_frequency);
-/// println!("Spectral Entropy: {}", features.spectral_entropy);
+/// info!("Dominant Frequency: {}", features.dominant_frequency);
+/// info!("Spectral Entropy: {}", features.spectral_entropy);
 /// ```
 pub fn compute_fft_features(data: &[f64]) -> FftFeatures {
     // Convert data to complex numbers (imaginary part = 0.0)

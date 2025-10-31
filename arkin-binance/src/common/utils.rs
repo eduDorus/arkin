@@ -356,7 +356,7 @@ pub fn validate_time_unit(time_unit: &str) -> Result<Option<&str>, anyhow::Error
 ///
 ///
 /// let timestamp = `get_timestamp()`;
-/// println!("Current timestamp: {}", timestamp);
+/// info!("Current timestamp: {}", timestamp);
 ///
 #[must_use]
 pub fn get_timestamp() -> u128 {

@@ -88,19 +88,19 @@ pub async fn read_range(
     from: UtcDateTime,
     till: UtcDateTime,
 ) -> Result<Vec<TradeClickhouseDTO>, PersistenceError> {
-    let cursor = ctx
+    let rows = ctx
         .ch_client
         .query(
             r#"
                 SELECT 
                   ?fields 
                 FROM 
-                  ? FINAL
+                  ? 
                 WHERE 
                   event_time BETWEEN ? AND ? 
                   AND instrument_id IN (?)
                 ORDER BY 
-                  event_time ASC"#,
+                  event_time, trade_id ASC"#,
         )
         .bind(Identifier(TABLE_NAME))
         .bind(from.unix_timestamp())
@@ -108,7 +108,7 @@ pub async fn read_range(
         .bind(instrument_ids)
         .fetch_all::<TradeClickhouseDTO>()
         .await?;
-    Ok(cursor)
+    Ok(rows)
 }
 
 pub async fn stream_range(
@@ -124,7 +124,7 @@ pub async fn stream_range(
                 SELECT 
                   ?fields 
                 FROM 
-                  ? FINAL
+                  ? 
                 WHERE 
                   event_time BETWEEN ? AND ? 
                   AND instrument_id IN (?)
@@ -137,34 +137,4 @@ pub async fn stream_range(
         .bind(instrument_ids)
         .fetch::<TradeClickhouseDTO>()?;
     Ok(cursor)
-}
-
-pub async fn fetch_batch(
-    ctx: &PersistenceContext,
-    instrument_ids: &[Uuid],
-    day_start: UtcDateTime,
-    day_end: UtcDateTime,
-) -> Result<Vec<TradeClickhouseDTO>, PersistenceError> {
-    let rows = ctx
-        .ch_client
-        .query(
-            r#"
-            SELECT 
-                ?fields 
-            FROM 
-                ? FINAL
-            WHERE 
-                event_time BETWEEN ? AND ? 
-                AND instrument_id IN (?)
-            ORDER BY 
-                event_time, trade_id ASC
-            "#,
-        )
-        .bind(Identifier(TABLE_NAME))
-        .bind(day_start.unix_timestamp())
-        .bind(day_end.unix_timestamp())
-        .bind(instrument_ids)
-        .fetch_all::<TradeClickhouseDTO>()
-        .await?;
-    Ok(rows)
 }

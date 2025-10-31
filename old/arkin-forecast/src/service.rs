@@ -55,7 +55,7 @@ impl Forecast {
             Ok(resp) => resp,
             Err(e) => {
                 warn!("Failed to send inference request: {}", e);
-                println!("Total time: {:?}", start.elapsed());
+                info!("Total time: {:?}", start.elapsed());
                 return;
             }
         };
@@ -67,7 +67,7 @@ impl Forecast {
                 Err(e) => format!("Failed to read error body: {}", e),
             };
             warn!("Inference request failed with status {}: {}", status, body);
-            println!("Total time: {:?}", start.elapsed());
+            info!("Total time: {:?}", start.elapsed());
             return;
         }
 
@@ -75,14 +75,14 @@ impl Forecast {
             Ok(json) => json,
             Err(e) => {
                 warn!("Failed to parse inference response as JSON: {}", e);
-                println!("Total time: {:?}", start.elapsed());
+                info!("Total time: {:?}", start.elapsed());
                 return;
             }
         };
 
         let Some(outputs) = response_json["outputs"].as_array() else {
             warn!("Inference response 'outputs' is not an array");
-            println!("Total time: {:?}", start.elapsed());
+            info!("Total time: {:?}", start.elapsed());
             return;
         };
 
@@ -90,7 +90,7 @@ impl Forecast {
         let output_order = [0, 1, 2];
         let output_names = ["OUTPUT0", "OUTPUT1", "OUTPUT2"];
 
-        println!("Inference successful!");
+        info!("Inference successful!");
         for (idx, &output_idx) in output_order.iter().enumerate() {
             if output_idx >= outputs.len() {
                 warn!("Output index {} out of bounds in response array", output_idx);
@@ -111,13 +111,13 @@ impl Forecast {
                 continue;
             };
 
-            println!("{}: shape: {:?}, data length: {}", output_names[idx], shape, data.len());
+            info!("{}: shape: {:?}, data length: {}", output_names[idx], shape, data.len());
             if !data.is_empty() {
-                println!("  First element: {}", data[0]);
+                info!("  First element: {}", data[0]);
             }
         }
 
-        println!("Total time: {:?}", start.elapsed());
+        info!("Total time: {:?}", start.elapsed());
     }
 }
 

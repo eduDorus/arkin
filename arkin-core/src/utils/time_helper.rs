@@ -155,6 +155,7 @@ pub fn round_to_minute(datetime: UtcDateTime) -> Result<UtcDateTime> {
 mod tests {
     use super::*;
     use time::macros::datetime;
+    use tracing::info;
 
     #[test]
     fn test_datetime_range_minute() {
@@ -216,7 +217,7 @@ mod tests {
         let dates = datetime_range_weekly(start, end).unwrap();
 
         assert_eq!(dates.len(), 8);
-        println!("{:?}", dates);
+        info!("{:?}", dates);
     }
 
     #[test]

@@ -15,14 +15,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_password("test1234")
         .with_database("arkin");
 
-    println!("✅ ClickHouse client created!");
+    info!("✅ ClickHouse client created!");
 
     // Performance test: Load last 3 hours in 1-minute batches
     let now = OffsetDateTime::now_utc();
     let three_hours_ago = now - Duration::hours(3);
 
-    println!("\n🎯 Performance Test: Loading 3 hours of data in 1-minute batches");
-    println!(
+    info!("\n🎯 Performance Test: Loading 3 hours of data in 1-minute batches");
+    info!(
         "📅 Time range: {} to {}",
         three_hours_ago.format(&format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")?)?,
         now.format(&format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")?)?
@@ -41,12 +41,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This will hold our aggregated features (1-minute bars with rolling features)
     let mut feature_frames: Vec<DataFrame> = Vec::new();
 
-    println!("\n⏳ Iterative Feature Engineering Workflow...\n");
-    println!("📋 Steps per batch:");
-    println!("  1. Load 1min of trades");
-    println!("  2. Aggregate to notional volume (buy/sell split)");
-    println!("  3. Calculate 15min rolling average over aggregations");
-    println!("  4. Append to feature DataFrame\n");
+    info!("\n⏳ Iterative Feature Engineering Workflow...\n");
+    info!("📋 Steps per batch:");
+    info!("  1. Load 1min of trades");
+    info!("  2. Aggregate to notional volume (buy/sell split)");
+    info!("  3. Calculate 15min rolling average over aggregations");
+    info!("  4. Append to feature DataFrame\n");
 
     // Iterative feature engineering: Load 1min -> Aggregate -> Calculate rolling features
     for i in 0..total_minutes {
@@ -171,7 +171,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let batch_elapsed = batch_start_time.elapsed();
             if i % 30 == 0 || i == total_minutes - 1 {
-                println!(
+                info!(
                     "  Batch {}/{}: {} trades -> {} instruments in {:?}",
                     i + 1,
                     total_minutes,
@@ -183,7 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!(
+    info!(
         "\n✅ Loaded {} batches with {} total trades in {:?}",
         batch_count,
         total_rows,
@@ -193,7 +193,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ============================================================
     // STEP 3: Concatenate all 1-minute feature bars
     // ============================================================
-    println!("\n🔗 Concatenating {} 1-minute feature bars...", feature_frames.len());
+    info!("\n🔗 Concatenating {} 1-minute feature bars...", feature_frames.len());
     let concat_start = Instant::now();
 
     let features_df = if !feature_frames.is_empty() {
@@ -207,13 +207,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("No data found in the time range".into());
     };
 
-    println!("✅ Concatenation completed in {:?}", concat_start.elapsed());
-    println!("📊 Features DataFrame shape: {:?}", features_df.shape());
+    info!("✅ Concatenation completed in {:?}", concat_start.elapsed());
+    info!("📊 Features DataFrame shape: {:?}", features_df.shape());
 
     // ============================================================
     // STEP 4: Calculate 15-minute rolling average of notional volume
     // ============================================================
-    println!("\n📊 Calculating 15-minute rolling features...");
+    info!("\n📊 Calculating 15-minute rolling features...");
     let rolling_start = Instant::now();
 
     // Add buy/sell ratio and prepare for rolling calculations
@@ -280,17 +280,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .collect()?;
 
-    println!("✅ Rolling features calculated in {:?}", rolling_start.elapsed());
+    info!("✅ Rolling features calculated in {:?}", rolling_start.elapsed());
 
-    println!("\n🎉 Feature DataFrame created!");
-    println!("{}", df_with_rolling.head(Some(20)));
+    info!("\n🎉 Feature DataFrame created!");
+    info!("{}", df_with_rolling.head(Some(20)));
 
-    println!("\n📈 Final DataFrame shape: {:?}", df_with_rolling.shape());
-    println!("📋 Schema:\n{:?}", df_with_rolling.schema());
+    info!("\n📈 Final DataFrame shape: {:?}", df_with_rolling.shape());
+    info!("📋 Schema:\n{:?}", df_with_rolling.schema());
 
     // Feature Analysis & Statistics
     if df_with_rolling.height() > 0 {
-        println!("\n📊 Feature Analysis...");
+        info!("\n📊 Feature Analysis...");
         let analysis_start = Instant::now();
 
         // Analyze features by instrument
@@ -312,9 +312,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .collect()?;
 
-        println!("✅ Feature analysis computed in {:?}", analysis_start.elapsed());
-        println!("\n🔢 Feature Summary by Instrument (sorted by avg notional):");
-        println!("{}", feature_summary.head(Some(10)));
+        info!("✅ Feature analysis computed in {:?}", analysis_start.elapsed());
+        info!("\n🔢 Feature Summary by Instrument (sorted by avg notional):");
+        info!("{}", feature_summary.head(Some(10)));
 
         // Show sample of most recent features with rolling values
         let recent_features = df_with_rolling
@@ -336,26 +336,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .limit(15)
             .collect()?;
 
-        println!("\n📈 Most Recent Features (with 15min rolling avg):");
-        println!("{}", recent_features);
+        info!("\n📈 Most Recent Features (with 15min rolling avg):");
+        info!("{}", recent_features);
 
         // Validate rolling window calculation
-        println!("\n✅ Feature Engineering Summary:");
-        println!("  • Total 1-minute bars: {}", df_with_rolling.height());
-        println!(
+        info!("\n✅ Feature Engineering Summary:");
+        info!("  • Total 1-minute bars: {}", df_with_rolling.height());
+        info!(
             "  • Unique instruments: {}",
             df_with_rolling.column("instrument_id")?.n_unique()?
         );
-        println!("  • Time range covered: {} minutes", feature_frames.len());
-        println!("  • Features per bar: {}", df_with_rolling.width());
+        info!("  • Time range covered: {} minutes", feature_frames.len());
+        info!("  • Features per bar: {}", df_with_rolling.width());
 
         // Show sample of final feature DataFrame
-        println!("\n📋 Sample of feature DataFrame (last 20 rows):");
+        info!("\n📋 Sample of feature DataFrame (last 20 rows):");
         let tail = df_with_rolling.tail(Some(20));
-        println!("{}", tail);
+        info!("{}", tail);
 
         // Show rolling feature stats
-        println!("\n📊 Rolling Feature Statistics:");
+        info!("\n📊 Rolling Feature Statistics:");
         let rolling_stats = df_with_rolling
             .clone()
             .lazy()
@@ -366,12 +366,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 col("buy_sell_ratio").std(1).alias("std_buy_sell_ratio"),
             ])
             .collect()?;
-        println!("{}", rolling_stats);
+        info!("{}", rolling_stats);
     } else {
-        println!("⚠️  No data found in the time range");
+        info!("⚠️  No data found in the time range");
     }
 
-    println!("\n🎉 Total elapsed time: {:?}", total_start.elapsed());
+    info!("\n🎉 Total elapsed time: {:?}", total_start.elapsed());
 
     Ok(())
 }

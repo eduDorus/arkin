@@ -116,7 +116,7 @@ impl WebsocketEventEmitter {
     /// let emitter = `WebsocketEventEmitter::new()`;
     /// let subscription = emitter.subscribe(|event| {
     ///     // Handle WebSocket event
-    ///     println!("Received event: {:?}", event);
+    ///     info!("Received event: {:?}", event);
     /// });
     ///
     /// // Later, when no longer needed

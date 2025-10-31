@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
 
     // // Convert the Decimal to a FixedPoint<i128, U12>
     // // let value = Decimal128::from_decimal(value.mantissa(), -(value.scale() as i32))?;
-    // // println!("Decimal128: {:?}", value);
+    // // info!("Decimal128: {:?}", value);
 
     // let table_name = "insights";
     let client = Client::default()
@@ -94,7 +94,7 @@ async fn main() -> Result<()> {
     //     .bind(Identifier(table_name))
     //     .execute()
     //     .await?;
-    // println!("Table '{}' is ready.", table_name);
+    // info!("Table '{}' is ready.", table_name);
 
     // Create an instance of InsightClickhouseDTO
     // let dto = InsightClickhouseDTO {
@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
     // let mut insert = client.insert(table_name)?;
     // insert.write(&dto).await?;
     // insert.end().await?;
-    // println!("Data inserted successfully.");
+    // info!("Data inserted successfully.");
 
     // let tick_dto = TickClickhouseDTO {
     //     event_time: UtcDateTime::now(),
@@ -125,7 +125,7 @@ async fn main() -> Result<()> {
     // let mut insert = client.insert(table_name)?;
     // insert.write(&tick_dto).await?;
     // insert.end().await?;
-    // println!("Data inserted successfully.");
+    // info!("Data inserted successfully.");
 
     // let trade_dto = TradeClickhouseDTO {
     //     event_time: UtcDateTime::now(),
@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
     // let mut insert = client.insert(table_name)?;
     // insert.write(&trade_dto).await?;
     // insert.end().await?;
-    // println!("Data inserted successfully.");
+    // info!("Data inserted successfully.");
 
     // Let's read data from the trades table
     let timer = Instant::now();
@@ -170,12 +170,12 @@ async fn main() -> Result<()> {
         .fetch_all::<TradeClickhouseDTO>()
         .await?;
 
-    println!("Total rows: {}", cursor.len());
+    info!("Total rows: {}", cursor.len());
     // let mut count = 0;
     // while let Some(_row) = cursor.next().await? {
     //     count += 1;
     // }
-    // println!("Total rows: {}", count);
-    println!("Time elapsed: {:?}", timer.elapsed());
+    // info!("Total rows: {}", count);
+    info!("Time elapsed: {:?}", timer.elapsed());
     Ok(())
 }

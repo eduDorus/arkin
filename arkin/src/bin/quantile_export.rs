@@ -2,7 +2,10 @@ use anyhow::Result;
 use clickhouse::{Client, Row};
 use serde::{Deserialize, Serialize};
 use statrs::distribution::{ContinuousCDF, Normal};
+use tracing::info;
 use uuid::Uuid;
+
+use arkin_core::prelude::*;
 
 const VERSION: &str = "v1.5.0";
 const START: &str = "2021-01-07 00:00:00";
@@ -12,6 +15,7 @@ const INSTRUMENT_ID: &str = "f5dd7db6-89da-4c68-b62e-6f80b763bef6";
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    init_tracing();
     let client = Client::default()
         .with_url("http://192.168.100.100:8123")
         .with_compression(clickhouse::Compression::Lz4)
@@ -42,7 +46,7 @@ async fn main() -> Result<()> {
     );
     let feature_ids: Vec<String> = client.query(&feature_query).fetch_all::<String>().await?;
     for feature in &feature_ids {
-        println!(" - {feature}");
+        info!(" - {feature}");
     }
 
     // Create a query for each feature_id:

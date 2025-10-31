@@ -70,9 +70,9 @@ impl TimeSeriesDataset {
 
         let mean_targets = data.iter().map(|point| point.targets[0]).sum::<f32>() / size as f32;
         let std_targets = data.iter().map(|point| point.targets[0]).sum::<f32>() / size as f32;
-        println!("Mean 0: {} Std 0: {}", mean_0, std_0);
-        println!("Mean 1: {} Std 1: {}", mean_1, std_1);
-        println!("Mean Targets: {} Std Targets: {}", mean_targets, std_targets);
+        info!("Mean 0: {} Std 0: {}", mean_0, std_0);
+        info!("Mean 1: {} Std 1: {}", mean_1, std_1);
+        info!("Mean Targets: {} Std Targets: {}", mean_targets, std_targets);
 
         let data = data
             .into_iter()
@@ -137,8 +137,8 @@ impl<B: Backend> Batcher<DataPoint, TimeSeriesBatch<B>> for TimeSeriesBatcher<B>
         // Reshape the targets tensor to [batch_size, num_targets]
         let targets_tensor = targets_tensor.reshape([batch_size, num_targets]);
 
-        // println!("Features: {}", features_tensor.to_string());
-        // println!("Targets: {}", targets_tensor.to_string());
+        // info!("Features: {}", features_tensor.to_string());
+        // info!("Targets: {}", targets_tensor.to_string());
 
         TimeSeriesBatch {
             features: features_tensor,
@@ -336,7 +336,7 @@ fn infer<B: Backend>(artifact_dir: &str, device: B::Device, item: DataPoint) {
     let output = model.forward(batch.features);
     let predicted = output.into_scalar();
 
-    println!("Predicted {} Expected {}", predicted, item.targets[0]);
+    info!("Predicted {} Expected {}", predicted, item.targets[0]);
 }
 
 fn main() {
@@ -373,7 +373,7 @@ fn main() {
     // let model = TimeSeriesModelConfig::new(FEATURE_SIZE, TARGET_SIZE)
     //     .with_dropout(0.25)
     //     .init::<MyBackend>(&device);
-    // println!("{}", model);
+    // info!("{}", model);
 
     // // TEST DATALOADER
     // // Create the dataset and dataloader
@@ -386,7 +386,7 @@ fn main() {
     // // Iterate over the dataloader
     // let mut iter = dataloader_train.iter();
     // while let Some(data) = iter.next() {
-    //     println!("Features: {}", data.features.to_string());
-    //     println!("Targets: {}", data.targets.to_string());
+    //     info!("Features: {}", data.features.to_string());
+    //     info!("Targets: {}", data.targets.to_string());
     // }
 }

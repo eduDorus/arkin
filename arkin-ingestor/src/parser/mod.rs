@@ -1,19 +1,20 @@
-mod binance;
-mod bybit;
-mod coinbase;
-mod okx;
+mod binance_spot;
+mod bybit_spot;
+mod coinbase_spot;
+mod okx_spot;
 
-use crate::events::MarketEvent;
-use crate::market_config::StreamConfig;
+use arkin_core::Event;
+
+use crate::{market_config::StreamConfig, registry::VenueName, MarketType};
 use std::fmt;
 
 /// Core parser trait - each exchange implements this
-pub trait ExchangeParser: Send + Sync {
+pub trait VenueParser: Send + Sync {
     /// Parse a single message from the exchange
     /// Returns Ok(Some(event)) if parsing succeeded and produced an event
     /// Returns Ok(None) if the message is not the expected type (e.g., a control message)
     /// Returns Err if parsing failed
-    fn parse(&self, msg: &str, config: &StreamConfig) -> Result<Option<MarketEvent>, ParseError>;
+    fn parse(&self, msg: &str, config: &StreamConfig) -> Result<Event, ParseError>;
 }
 
 /// Parser error types
@@ -45,40 +46,16 @@ pub struct ParserFactory;
 
 impl ParserFactory {
     /// Get the appropriate parser for an exchange
-    pub fn get_parser(exchange: &str) -> Result<Box<dyn ExchangeParser>, ParseError> {
-        match exchange.to_lowercase().as_str() {
-            "binance" => Ok(Box::new(binance::BinanceParser)),
-            "okx" => Ok(Box::new(okx::OkxParser)),
-            "bybit" => Ok(Box::new(bybit::BybitParser)),
-            "coinbase" => Ok(Box::new(coinbase::CoinbaseParser)),
-            _ => Err(ParseError::UnknownExchange(exchange.to_string())),
+    pub fn get_parser(venue: VenueName, market_type: MarketType) -> Result<Box<dyn VenueParser>, ParseError> {
+        match (venue, market_type) {
+            (VenueName::Binance, MarketType::Spot) => Ok(Box::new(binance_spot::BinanceSpotParser)),
+            (VenueName::Bybit, MarketType::Spot) => Ok(Box::new(bybit_spot::BybitSpotParser)),
+            (VenueName::Coinbase, MarketType::Spot) => Ok(Box::new(coinbase_spot::CoinbaseSpotParser)),
+            (VenueName::Okx, MarketType::Spot) => Ok(Box::new(okx_spot::OkxSpotParser)),
+            _ => Err(ParseError::UnknownExchange(format!(
+                "No parser for venue {:?} and market type {:?}",
+                venue, market_type
+            ))),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parser_factory_known_exchanges() {
-        assert!(ParserFactory::get_parser("binance").is_ok());
-        assert!(ParserFactory::get_parser("okx").is_ok());
-        assert!(ParserFactory::get_parser("bybit").is_ok());
-        assert!(ParserFactory::get_parser("coinbase").is_ok());
-    }
-
-    #[test]
-    fn test_parser_factory_unknown_exchange() {
-        match ParserFactory::get_parser("unknown") {
-            Err(ParseError::UnknownExchange(e)) => assert_eq!(e, "unknown"),
-            _ => panic!("Expected UnknownExchange error"),
-        }
-    }
-
-    #[test]
-    fn test_parse_error_display() {
-        let err = ParseError::MissingField("price".to_string());
-        assert_eq!(err.to_string(), "Missing field: price");
     }
 }

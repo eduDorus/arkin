@@ -289,6 +289,8 @@ pub fn interp(x: f64, xp: &[f64], fp: &[f64]) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use tracing::info;
+
     use super::*;
 
     #[test]
@@ -363,7 +365,7 @@ mod tests {
 
         // Test autocorrelation (lag 1, should be positive and high)
         let autocorr = autocorrelation(&data, 1);
-        println!("autocorr: {}", autocorr);
+        info!("autocorr: {}", autocorr);
         assert_eq!(autocorr, 0.4, "autocorrelation failed");
 
         // Test ema

@@ -494,9 +494,9 @@ impl Ledger {
         accts.sort_by_key(|(id, _)| *id); // Deterministic order
 
         // User Accounts section with multi-asset balances and positions
-        println!("=== User Balances ===");
+        info!("=== User Balances ===");
         for (id, acct) in accts.iter().filter(|(_, a)| a.is_user_account()) {
-            println!("Account: {}", acct);
+            info!("Account: {}", acct);
 
             // Collect and log asset balances
             let mut asset_bals: Vec<(Arc<Asset>, Decimal)> = self
@@ -512,7 +512,7 @@ impl Ledger {
                 .collect();
             asset_bals.sort_by_key(|(a, _)| a.symbol.clone());
             for (asset, bal) in asset_bals {
-                println!("  Asset {}: {}", asset.symbol, bal);
+                info!("  Asset {}: {}", asset.symbol, bal);
             }
 
             // Collect and log instrument positions (qty @ entry)
@@ -529,26 +529,26 @@ impl Ledger {
                 .collect();
             instr_pos.sort_by_key(|(i, _)| i.symbol.clone());
             for (instr, (entry, qty)) in instr_pos {
-                println!("  Position {}: {} @ {}", instr.symbol, qty, entry);
+                info!("  Position {}: {} @ {}", instr.symbol, qty, entry);
             }
         }
 
         // Strategy Positions section
-        println!("=== Strategy Positions ===");
+        info!("=== Strategy Positions ===");
         let mut strat_pos: Vec<((Arc<Account>, Arc<Strategy>, Arc<Instrument>), (Decimal, Decimal))> =
             self.strategy_positions.iter().map(|e| (e.key().clone(), *e.value())).collect();
         strat_pos.sort_by_key(|(k, _)| (k.0.id, k.1.id, k.2.symbol.clone()));
         for ((acct, strat, instr), (entry, qty)) in strat_pos {
-            println!(
+            info!(
                 "  Account: {}, Strategy: {}, Position {}: {} @ {}",
                 acct, strat.id, instr.symbol, qty, entry
             );
         }
 
         // Venue Accounts section similar (qty @ entry)
-        println!("=== Venue Balances ===");
+        info!("=== Venue Balances ===");
         for (id, acct) in accts.iter().filter(|(_, a)| a.is_venue_account()) {
-            println!("Account: {}", acct);
+            info!("Account: {}", acct);
 
             let mut asset_bals: Vec<(Arc<Asset>, Decimal)> = self
                 .balances
@@ -563,7 +563,7 @@ impl Ledger {
                 .collect();
             asset_bals.sort_by_key(|(a, _)| a.symbol.clone());
             for (asset, bal) in asset_bals {
-                println!("  Asset {}: {}", asset.symbol, bal);
+                info!("  Asset {}: {}", asset.symbol, bal);
             }
 
             let mut instr_pos: Vec<(Arc<Instrument>, (Decimal, Decimal))> = self
@@ -579,21 +579,21 @@ impl Ledger {
                 .collect();
             instr_pos.sort_by_key(|(i, _)| i.symbol.clone());
             for (instr, (entry, qty)) in instr_pos {
-                println!("  Position {}: {} @ {}", instr.symbol, qty, entry);
+                info!("  Position {}: {} @ {}", instr.symbol, qty, entry);
             }
         }
 
         // Transfers section (last max_transfers, oldest first)
-        println!("=== Recent Transfers (Oldest First) ===");
+        info!("=== Recent Transfers (Oldest First) ===");
         let tx_lock = self.transfers.read().await;
         let mut all_tx: Vec<_> = tx_lock.iter().cloned().collect();
         all_tx.sort_by_key(|t| t.created);
         let recent: Vec<_> = all_tx.iter().take(max_transfers).cloned().collect();
         for tx in recent {
-            println!("{}", tx);
+            info!("{}", tx);
         }
         if all_tx.len() > max_transfers {
-            println!("... ({} more transfers omitted)", all_tx.len() - max_transfers);
+            info!("... ({} more transfers omitted)", all_tx.len() - max_transfers);
         }
     }
 }

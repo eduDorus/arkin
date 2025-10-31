@@ -462,6 +462,7 @@ impl PersistenceReader for Persistence {
         frequency: Frequency,
     ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError> {
         trade_store::stream_range_buffered(&self.ctx, instruments, start, end, buffer_size, frequency).await
+        // trade_store::stream_range_full(&self.ctx, instruments, start, end, buffer_size, frequency).await
     }
 
     async fn metric_stream_range_buffered(

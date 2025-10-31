@@ -13,8 +13,8 @@ use arkin_insights::prelude::*;
 #[tokio::test(flavor = "multi_thread", worker_threads = 16)]
 #[test_log::test]
 async fn test_crypto_index_with_real_data_no_validation() -> Result<()> {
-    let start = utc_datetime!(2025-01-01 00:00:00);
-    let end = utc_datetime!(2025-01-14 00:00:00); // Extended to 3 hours to see calculations after warmup
+    let start = utc_datetime!(2024-01-01 00:00:00);
+    let end = utc_datetime!(2025-06-01 00:00:00); // Extended to 3 hours to see calculations after warmup
 
     let persistence = integration_tests::init_test_persistence().await;
     persistence.refresh().await?;
@@ -48,7 +48,7 @@ async fn test_crypto_index_with_real_data_no_validation() -> Result<()> {
     info!("Found {} synthetic instruments from pipeline", synthetic_instruments.len());
 
     let stream = persistence
-        .agg_trade_stream_range_buffered(instruments.as_slice(), start, end, 3, arkin_core::prelude::Frequency::Daily)
+        .agg_trade_stream_range_buffered(instruments.as_slice(), start, end, 3, Frequency::Daily)
         .await?;
 
     tokio::pin!(stream);
@@ -61,8 +61,8 @@ async fn test_crypto_index_with_real_data_no_validation() -> Result<()> {
     let trade_quantity_feature = persistence.get_feature_id("trade_quantity").await;
     let trade_notional_feature = persistence.get_feature_id("trade_notional").await;
 
-    let mut total_trades = 0;
-    let mut total_calculated_insights = 0;
+    let mut total_trades: u64 = 0;
+    let mut total_calculated_insights: u64 = 0;
 
     let mut total_batch_insert_duration = std::time::Duration::from_secs(0);
     let mut total_compute_duration = std::time::Duration::from_secs(0);
@@ -113,7 +113,7 @@ async fn test_crypto_index_with_real_data_no_validation() -> Result<()> {
             let commit_start = std::time::Instant::now();
             let calculated_insights = pipeline.calculate(next_insights_tick).await;
             total_compute_duration += commit_start.elapsed();
-            total_calculated_insights += calculated_insights.len();
+            total_calculated_insights += calculated_insights.len() as u64;
 
             info!(
                 "Processing tick at {} - total trades so far: {} batch insert duration: {:?} total commit duration: {:?}",

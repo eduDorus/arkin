@@ -29,10 +29,10 @@ fn run_ort() -> Result<()> {
         let input = ort::value::Tensor::from_array(input_array.clone().into_dyn())?;
         let outputs = model.run(ort::inputs!["input" => input].unwrap())?;
         let predictions = outputs["output"].try_extract_tensor::<f32>()?;
-        println!("ORT Predictions: {:?}", predictions.as_slice());
+        info!("ORT Predictions: {:?}", predictions.as_slice());
         counter += 1;
     }
-    println!("ORT time: {:?}", timer.elapsed() / counter);
+    info!("ORT time: {:?}", timer.elapsed() / counter);
 
     Ok(())
 }

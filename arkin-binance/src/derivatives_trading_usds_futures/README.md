@@ -68,7 +68,7 @@ let client = derivatives_trading_usds_futures::DerivativesTradingUsdsFuturesRest
 let response = client.exchange_information().await?;
 
 let data = response.data().await?;
-println!("{:#?}", data);
+info!("{:#?}", data);
 ```
 
 #### Configuration Options
@@ -176,7 +176,7 @@ let params = derivatives_trading_usds_futures::websocket_api::AccountInformation
 let response = connection.account_information(params).await?;
 
 let data = response.data().await?;
-println!("{:#?}", data);
+info!("{:#?}", data);
 ```
 
 #### Configuration Options
@@ -250,7 +250,7 @@ let params = derivatives_trading_usds_futures::websocket_streams::AllBookTickers
 let stream = connection.all_book_tickers_stream(params).await?;
 
 stream.on_message(|data| {
-  println!("{:#?}", data);
+  info!("{:#?}", data);
 });
 ```
 
@@ -331,7 +331,7 @@ let params = derivatives_trading_usds_futures::websocket_streams::AllBookTickers
 let stream = connection.all_book_tickers_stream(params).await?;
 
 stream.on_message(|data| {
-  println!("{:#?}", data);
+  info!("{:#?}", data);
 });
 
 sleep(Duration::from_secs(10)).await;

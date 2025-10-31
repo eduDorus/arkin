@@ -18,6 +18,7 @@ use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::sleep;
 use tokio_tungstenite::{accept_async, connect_async, tungstenite::Message, WebSocketStream};
+use tracing::info;
 
 // ============================================================================
 // Mock Chaos Server
@@ -176,8 +177,7 @@ impl ChaosBinanceServer {
             sleep(Duration::from_millis(100)).await;
         }
 
-        // Simulate ResetWithoutClosingHandshake by dropping connection
-        drop(sink);
+        // Simulate ResetWithoutClosingHandshake by closing connection
         Ok(())
     }
 
@@ -250,8 +250,7 @@ impl ChaosBinanceServer {
                 sleep(Duration::from_millis(100)).await;
             }
 
-            // Reset connection
-            drop(sink);
+            // Reset connection by returning and letting it close
             return Ok(());
         }
     }
@@ -308,15 +307,15 @@ pub struct ResilienceMetrics {
 
 impl ResilienceMetrics {
     pub fn print_summary(&self) {
-        println!("\n╔═══════════════════════════════════════════╗");
-        println!("║       Resilience Test Summary            ║");
-        println!("╠═══════════════════════════════════════════╣");
-        println!("║ Messages received:     {:3} msgs         ║", self.messages_received);
-        println!("║ Reconnects triggered:  {:3} times        ║", self.reconnects);
-        println!("║ Errors recovered:      {:3} errors       ║", self.errors_recovered);
-        println!("║ Final success:         {:<15} ║", format!("{:?}", self.final_success));
-        println!("║ Uptime:                {:5.1}%          ║", self.uptime_percentage);
-        println!("╚═══════════════════════════════════════════╝\n");
+        info!("\n╔═══════════════════════════════════════════╗");
+        info!("║       Resilience Test Summary            ║");
+        info!("╠═══════════════════════════════════════════╣");
+        info!("║ Messages received:     {:3} msgs         ║", self.messages_received);
+        info!("║ Reconnects triggered:  {:3} times        ║", self.reconnects);
+        info!("║ Errors recovered:      {:3} errors       ║", self.errors_recovered);
+        info!("║ Final success:         {:<15} ║", format!("{:?}", self.final_success));
+        info!("║ Uptime:                {:5.1}%          ║", self.uptime_percentage);
+        info!("╚═══════════════════════════════════════════╝\n");
     }
 }
 
@@ -326,7 +325,7 @@ impl ResilienceMetrics {
 
 #[tokio::test]
 async fn test_chaos_reset_without_closing_handshake() {
-    println!("\n=== Test: ResetWithoutClosingHandshake ===");
+    info!("\n=== Test: ResetWithoutClosingHandshake ===");
 
     let server = ChaosBinanceServer::new(FailureMode::ResetAfterMessages(5))
         .await
@@ -379,14 +378,14 @@ async fn test_chaos_reset_without_closing_handshake() {
     metrics.uptime_percentage = (metrics.messages_received as f64 / 5.0) * 100.0;
     metrics.print_summary();
 
-    println!("✓ Successfully handled ResetWithoutClosingHandshake");
+    info!("✓ Successfully handled ResetWithoutClosingHandshake");
     assert!(metrics.messages_received > 0, "Should receive at least some messages");
     assert!(metrics.reconnects > 0, "Should have reconnected at least once");
 }
 
 #[tokio::test]
 async fn test_chaos_silent_stream() {
-    println!("\n=== Test: Silent Stream (No Messages) ===");
+    info!("\n=== Test: Silent Stream (No Messages) ===");
 
     let server = ChaosBinanceServer::new(FailureMode::SilentAfterMessages(3))
         .await
@@ -438,14 +437,14 @@ async fn test_chaos_silent_stream() {
     metrics.final_success = metrics.errors_recovered > 0;
     metrics.print_summary();
 
-    println!("✓ Successfully detected and handled silent stream");
+    info!("✓ Successfully detected and handled silent stream");
     assert!(metrics.messages_received > 0, "Should receive initial messages");
     assert!(metrics.errors_recovered > 0, "Should detect stale connection");
 }
 
 #[tokio::test]
 async fn test_chaos_high_latency() {
-    println!("\n=== Test: High Latency (1 second between messages) ===");
+    info!("\n=== Test: High Latency (1 second between messages) ===");
 
     let server = ChaosBinanceServer::new(FailureMode::HighLatency(Duration::from_secs(1)))
         .await
@@ -494,13 +493,13 @@ async fn test_chaos_high_latency() {
     metrics.final_success = metrics.messages_received >= 2;
     metrics.print_summary();
 
-    println!("✓ Successfully handled high latency scenarios");
+    info!("✓ Successfully handled high latency scenarios");
     assert!(metrics.messages_received > 0, "Should handle high latency");
 }
 
 #[tokio::test]
 async fn test_chaos_corrupted_json() {
-    println!("\n=== Test: Corrupted JSON Responses ===");
+    info!("\n=== Test: Corrupted JSON Responses ===");
 
     let server = ChaosBinanceServer::new(FailureMode::CorruptedJson(3))
         .await
@@ -557,9 +556,9 @@ async fn test_chaos_corrupted_json() {
     metrics.final_success = valid_parsed > 0;
     metrics.print_summary();
 
-    println!("Valid messages parsed: {}", valid_parsed);
-    println!("Invalid messages handled: {}", invalid_received);
-    println!("✓ Successfully handled corrupted JSON gracefully");
+    info!("Valid messages parsed: {}", valid_parsed);
+    info!("Invalid messages handled: {}", invalid_received);
+    info!("✓ Successfully handled corrupted JSON gracefully");
 
     assert!(valid_parsed > 0, "Should parse some valid messages");
     assert!(invalid_received > 0, "Should encounter corrupted messages");
@@ -567,7 +566,7 @@ async fn test_chaos_corrupted_json() {
 
 #[tokio::test]
 async fn test_chaos_intermittent_reset() {
-    println!("\n=== Test: Intermittent Connection Resets ===");
+    info!("\n=== Test: Intermittent Connection Resets ===");
 
     let server = ChaosBinanceServer::new(FailureMode::IntermittentReset(2))
         .await
@@ -619,14 +618,14 @@ async fn test_chaos_intermittent_reset() {
     metrics.final_success = metrics.reconnects > 1;
     metrics.print_summary();
 
-    println!("Successfully reconnected {} times", metrics.reconnects);
-    println!("✓ Rapid reconnection handled correctly");
+    info!("Successfully reconnected {} times", metrics.reconnects);
+    info!("✓ Rapid reconnection handled correctly");
     assert!(metrics.reconnects > 1, "Should handle multiple reconnections");
 }
 
 #[tokio::test]
 async fn test_chaos_ping_flood() {
-    println!("\n=== Test: Ping Flood from Server ===");
+    info!("\n=== Test: Ping Flood from Server ===");
 
     let server = ChaosBinanceServer::new(FailureMode::PingFlood)
         .await
@@ -668,20 +667,20 @@ async fn test_chaos_ping_flood() {
             }
 
             metrics.final_success = metrics.messages_received > 0 && pong_sent > 0;
-            println!("Pongs sent in response to flood: {}", pong_sent);
+            info!("Pongs sent in response to flood: {}", pong_sent);
         }
         Err(e) => panic!("Connection failed: {}", e),
     }
 
     metrics.print_summary();
 
-    println!("✓ Successfully handled ping flood");
+    info!("✓ Successfully handled ping flood");
     assert!(metrics.messages_received > 0, "Should still receive messages");
 }
 
 #[tokio::test]
 async fn test_chaos_slow_subscription() {
-    println!("\n=== Test: Slow Subscription Response ===");
+    info!("\n=== Test: Slow Subscription Response ===");
 
     let server = ChaosBinanceServer::new(FailureMode::SlowSubscription)
         .await
@@ -711,10 +710,10 @@ async fn test_chaos_slow_subscription() {
             match tokio::time::timeout(Duration::from_secs(5), stream.next()).await {
                 Ok(Some(Ok(Message::Text(text)))) => {
                     let elapsed = start.elapsed();
-                    println!("Subscription response received in {:?}", elapsed);
+                    info!("Subscription response received in {:?}", elapsed);
 
                     if text.contains("result") {
-                        println!("✓ Got subscription response: {}", text);
+                        info!("✓ Got subscription response: {}", text);
                     }
                 }
                 Err(_) => panic!("Subscription timeout"),

@@ -24,14 +24,14 @@ fn main() {
         })
         .collect::<Vec<Vec<_>>>();
 
-    println!("Covariance Matrix:");
+    info!("Covariance Matrix:");
     for row in &covariance_matrix {
         for val in row {
             print!("{:.5} ", val);
         }
-        println!();
+        info!();
     }
-    println!("Covariance Matrix: {:?}", covariance_matrix);
+    info!("Covariance Matrix: {:?}", covariance_matrix);
 
     // Example covariance matrix (Σ)
     // let sigma = [[0.1, 0.02, 0.01], [0.02, 0.15, 0.03], [0.01, 0.03, 0.15]];
@@ -39,10 +39,10 @@ fn main() {
     let w_prev = [-0.05, 0.02, 0.03]; // Example previous holdings
     let lambda = 0.5; // risk aversion
     let gamma = 0.1; // penalty on deviation from previous portfolio
-    println!("Expected Returns: {:?}", mu);
-    println!("Previous Portfolio Weights: {:?}", w_prev);
-    println!("Risk Aversion: {:?}", lambda);
-    println!("Penalty on Deviation from Previous Portfolio: {:?}", gamma);
+    info!("Expected Returns: {:?}", mu);
+    info!("Previous Portfolio Weights: {:?}", w_prev);
+    info!("Risk Aversion: {:?}", lambda);
+    info!("Penalty on Deviation from Previous Portfolio: {:?}", gamma);
 
     // Construct P and q:
     // P = 2 * Σ
@@ -120,9 +120,9 @@ fn main() {
 
     solver.solve();
 
-    println!("Optimisation status: {:?}", solver.solution.status);
-    println!("Optimal portfolio weights: {:?}", solver.solution.x);
-    println!("Sum of weights: {:?}", solver.solution.x.iter().sum::<f64>());
+    info!("Optimisation status: {:?}", solver.solution.status);
+    info!("Optimal portfolio weights: {:?}", solver.solution.x);
+    info!("Sum of weights: {:?}", solver.solution.x.iter().sum::<f64>());
 }
 
 // fn mean(series: &Vec<f64>) -> f64 {
