@@ -4,11 +4,11 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use arkin_core::{Insight, Instrument, Pipeline};
+use arkin_core::{Insight, Instrument, PersistenceReader, Pipeline};
 use time::UtcDateTime;
 use tracing::info;
 
-use crate::{config::PipelineConfig, Feature, FeatureGraph, FeatureStore};
+use crate::{config::PipelineConfig, FeatureFactory, FeatureGraph, FeatureStore};
 
 /// Unified Pipeline combining state management and computation graph
 ///
@@ -25,11 +25,20 @@ pub struct FeaturePipeline {
 }
 
 impl FeaturePipeline {
-    pub fn new(pipeline_meta: Arc<Pipeline>, features: Vec<Arc<dyn Feature>>, config: &PipelineConfig) -> Self {
+    pub async fn new(persistence: &Arc<dyn PersistenceReader>, config: &PipelineConfig) -> Self {
+        let pipeline_meta = Arc::new(
+            Pipeline::builder()
+                .name(config.name.clone())
+                .description(config.description.clone())
+                .created(UtcDateTime::now())
+                .updated(UtcDateTime::now())
+                .build(),
+        );
+        let features = FeatureFactory::from_config(&persistence, &config).await;
         Self {
             meta: pipeline_meta,
             warmup_steps: AtomicU16::new(config.warmup_steps),
-            state: Arc::new(FeatureStore::new(86400)),
+            state: Arc::new(FeatureStore::new(config.state_ttl)),
             graph: Arc::new(FeatureGraph::new(features, config.parallel)),
         }
     }

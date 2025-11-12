@@ -55,7 +55,7 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Venue
 }
 
 pub async fn read_by_name(ctx: &PersistenceContext, name: &VenueName) -> Result<Arc<Venue>, PersistenceError> {
-    match read_venue_name_cache(ctx, name).await {
+    match read_venue_name_cache(ctx, &name).await {
         Some(venue) => Ok(venue),
         None => {
             let venue = venues_repo::read_by_name(ctx, name).await?;

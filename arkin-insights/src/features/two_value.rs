@@ -10,7 +10,7 @@ use arkin_core::prelude::*;
 
 use crate::{Feature, FeatureStore, FillStrategy, InstrumentScope};
 
-#[derive(Debug, Display, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum TwoValueAlgo {

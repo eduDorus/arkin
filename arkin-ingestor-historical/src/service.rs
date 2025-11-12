@@ -20,18 +20,22 @@ use crate::mapping;
 
 use super::http::TardisHttpClient;
 
-pub fn parse_stream_event(json: &str, venue: &VenueName, channel: &Channel) -> Result<ExchangeStreamEvent> {
-    match venue {
-        VenueName::BinanceSpot => parse_binance_spot_event(json, venue, channel),
-        VenueName::BinanceUsdmFutures | VenueName::BinanceCoinmFutures | VenueName::BinanceOptions => {
-            parse_binance_futures_event(json, venue, channel)
-        }
-        VenueName::BybitSpot | VenueName::BybitDerivatives | VenueName::BybitOptions => {
-            parse_bybit_event(json, venue, channel)
-        }
-        VenueName::OkxSpot | VenueName::OkxSwap | VenueName::OkxFutures | VenueName::OkxOptions => {
-            parse_okx_event(json, venue, channel)
-        }
+pub fn parse_stream_event(
+    json: &str,
+    venue: &VenueName,
+    instrument_type: &InstrumentType,
+    channel: &Channel,
+) -> Result<ExchangeStreamEvent> {
+    match (venue, instrument_type) {
+        (VenueName::Binance, InstrumentType::Spot) => parse_binance_spot_event(json, venue, channel),
+        (VenueName::Binance, InstrumentType::Perpetual) => parse_binance_futures_event(json, venue, channel),
+        (VenueName::Binance, InstrumentType::InversePerpetual) => parse_binance_futures_event(json, venue, channel),
+        (VenueName::Bybit, InstrumentType::Spot) => parse_bybit_event(json, venue, channel),
+        (VenueName::Bybit, InstrumentType::Perpetual) => parse_bybit_event(json, venue, channel),
+        (VenueName::Bybit, InstrumentType::InversePerpetual) => parse_bybit_event(json, venue, channel),
+        (VenueName::Okx, InstrumentType::Spot) => parse_okx_event(json, venue, channel),
+        (VenueName::Okx, InstrumentType::Perpetual) => parse_okx_event(json, venue, channel),
+        (VenueName::Okx, InstrumentType::Future) => parse_okx_event(json, venue, channel),
         _ => Err(anyhow!("Exchange {:?} not yet implemented", venue)),
     }
 }
@@ -444,6 +448,7 @@ impl TardisRequest {
 pub struct TardisIngestor {
     pub max_concurrent_requests: usize,
     pub venue: VenueName,
+    pub instrument_type: InstrumentType,
     pub channel: Channel,
     pub instruments: Vec<String>,
     pub start: UtcDateTime,
@@ -574,7 +579,7 @@ async fn download_task(ingestor: Arc<TardisIngestor>, service_ctx: Arc<ServiceCt
                   }
                 };
                 // Dynamic parsing based on venue (bulletproof with error handling)
-                let stream_event = match parse_stream_event(&json, &ingestor.venue, &ingestor.channel) {
+                let stream_event = match parse_stream_event(&json, &ingestor.venue, &ingestor.instrument_type, &ingestor.channel) {
                     Ok(e) => e,
                     Err(e) => {
                         error!(target: "ingestor::tardis", "Failed to parse stream event for venue {}: {}", ingestor.venue, e);

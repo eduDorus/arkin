@@ -1,89 +1,15 @@
-use std::{fmt, sync::LazyLock};
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
-use sqlx::prelude::Type;
-use strum::{Display, EnumString};
-use time::UtcDateTime;
+use strum::Display;
 use url::Url;
-use uuid::Uuid;
+
+use arkin_core::prelude::*;
 
 use crate::subscriptions::{
     BinanceSubscription, BybitSubscription, CoinbaseSubscription, DeribitSubscription, HyperliquidSubscription,
     OkxSubscription, SubscriptionError, SubscriptionRequest,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, clap::ValueEnum, Serialize, Deserialize)] // For Clap auto-parsing
-#[strum(serialize_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum VenueName {
-    Personal,
-    Index,
-    Binance,
-    Okx,
-    Bybit,
-    Coinbase,
-    Deribit,
-    Hyperliquid,
-}
-
-impl VenueName {
-    /// Get the parent exchange name for grouping across venue variants.
-    ///
-    /// For example, BinanceSpot and BinanceUsdmFutures both return "binance".
-    /// This is useful for creating exchange-level synthetic instruments that
-    /// aggregate data across spot and derivatives markets.
-    pub fn exchange_name(&self) -> &'static str {
-        match self {
-            VenueName::Personal => "personal",
-            VenueName::Index => "index",
-            VenueName::Binance => "binance",
-            VenueName::Okx => "okx",
-            VenueName::Bybit => "bybit",
-            VenueName::Deribit => "deribit",
-            VenueName::Coinbase => "coinbase",
-            VenueName::Hyperliquid => "hyperliquid",
-        }
-    }
-}
-
-#[derive(Debug, Display, Copy, Clone, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
-#[strum(serialize_all = "snake_case")]
-#[sqlx(type_name = "venue_type", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum MarketType {
-    Spot,
-    Perpetual,
-    InversePerpetual,
-    Futures,
-    Options,
-}
-
-#[derive(Debug, Display, Copy, Clone, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
-#[strum(serialize_all = "snake_case")]
-#[sqlx(type_name = "venue_type", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum VenueType {
-    Cex,
-    Dex,
-    Otc,
-    UserFunds,
-    Virtual,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Venue {
-    pub id: Uuid,
-    pub name: VenueName,
-    pub venue_type: VenueType,
-    pub created: UtcDateTime,
-    pub updated: UtcDateTime,
-}
-
-impl fmt::Display for Venue {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.name.to_string().to_lowercase())
-    }
-}
 
 // Similarly for Channel
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, clap::ValueEnum, Serialize, Deserialize)]
@@ -126,7 +52,7 @@ pub struct RegistryLookup {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MappingEntry {
     pub venue: VenueName,
-    pub market_type: MarketType,
+    pub market_type: InstrumentType,
     pub ws_url: Url,
     pub ws_channels: Vec<WsChannelInfo>,
     pub http_url: Url,
@@ -155,7 +81,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Binance Spot
         MappingEntry {
             venue: VenueName::Binance,
-            market_type: MarketType::Spot,
+            market_type: InstrumentType::Spot,
             ws_url: Url::parse("wss://stream.binance.com:9443/ws")
                 .expect("Invalid WS URL for Binance Spot: wss://stream.binance.com:9443/ws"),
             http_url: Url::parse("https://api.binance.com")
@@ -184,7 +110,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Binance Perpetual (USDM)
         MappingEntry {
             venue: VenueName::Binance,
-            market_type: MarketType::Perpetual,
+            market_type: InstrumentType::Perpetual,
             ws_url: Url::parse("wss://fstream.binance.com/ws")
                 .expect("Invalid WS URL for Binance Perpetual: wss://fstream.binance.com/ws"),
             http_url: Url::parse("https://fapi.binance.com")
@@ -237,7 +163,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Binance Inverse Perpetual (CoinM)
         MappingEntry {
             venue: VenueName::Binance,
-            market_type: MarketType::InversePerpetual,
+            market_type: InstrumentType::InversePerpetual,
             ws_url: Url::parse("wss://dstream.binance.com/ws")
                 .expect("Invalid WS URL for Binance Inverse Perpetual: wss://dstream.binance.com/ws"),
             http_url: Url::parse("https://dapi.binance.com")
@@ -290,7 +216,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // OKX Spot
         MappingEntry {
             venue: VenueName::Okx,
-            market_type: MarketType::Spot,
+            market_type: InstrumentType::Spot,
             ws_url: Url::parse("wss://ws.okx.com:8443/ws/v5/public")
                 .expect("Invalid WS URL for OKX Spot: wss://ws.okx.com:8443/ws/v5/public"),
             http_url: Url::parse("https://www.okx.com/api/v5")
@@ -325,7 +251,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // OKX Perpetual
         MappingEntry {
             venue: VenueName::Okx,
-            market_type: MarketType::Perpetual,
+            market_type: InstrumentType::Perpetual,
             ws_url: Url::parse("wss://ws.okx.com:8443/ws/v5/public").expect("Invalid URL"),
             http_url: Url::parse("https://www.okx.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -382,7 +308,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // OKX Futures
         MappingEntry {
             venue: VenueName::Okx,
-            market_type: MarketType::Futures,
+            market_type: InstrumentType::Future,
             ws_url: Url::parse("wss://ws.okx.com:8443/ws/v5/public").expect("Invalid URL"),
             http_url: Url::parse("https://www.okx.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -433,7 +359,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // OKX Options
         MappingEntry {
             venue: VenueName::Okx,
-            market_type: MarketType::Options,
+            market_type: InstrumentType::Option,
             ws_url: Url::parse("wss://ws.okx.com:8443/ws/v5/public").expect("Invalid URL"),
             http_url: Url::parse("https://www.okx.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -484,7 +410,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Bybit Spot
         MappingEntry {
             venue: VenueName::Bybit,
-            market_type: MarketType::Spot,
+            market_type: InstrumentType::Spot,
             ws_url: Url::parse("wss://stream.bybit.com/v5/public/spot").expect("Invalid URL"),
             http_url: Url::parse("https://api.bybit.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -523,7 +449,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Bybit Perpetual (linear/USDT)
         MappingEntry {
             venue: VenueName::Bybit,
-            market_type: MarketType::Perpetual,
+            market_type: InstrumentType::Perpetual,
             ws_url: Url::parse("wss://stream.bybit.com/v5/public/linear").expect("Invalid URL"),
             http_url: Url::parse("https://api.bybit.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -574,7 +500,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Bybit Inverse Perpetual
         MappingEntry {
             venue: VenueName::Bybit,
-            market_type: MarketType::InversePerpetual,
+            market_type: InstrumentType::InversePerpetual,
             ws_url: Url::parse("wss://stream.bybit.com/v5/public/inverse").expect("Invalid URL"),
             http_url: Url::parse("https://api.bybit.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -625,7 +551,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Bybit Options
         MappingEntry {
             venue: VenueName::Bybit,
-            market_type: MarketType::Options,
+            market_type: InstrumentType::Option,
             ws_url: Url::parse("wss://stream.bybit.com/v5/public/option").expect("Invalid URL"),
             http_url: Url::parse("https://api.bybit.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -664,7 +590,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Coinbase Spot
         MappingEntry {
             venue: VenueName::Coinbase,
-            market_type: MarketType::Spot,
+            market_type: InstrumentType::Spot,
             ws_url: Url::parse("wss://advanced-trade-ws.coinbase.com").expect("Invalid URL"),
             http_url: Url::parse("https://api.coinbase.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -697,7 +623,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Deribit Perpetual
         MappingEntry {
             venue: VenueName::Deribit,
-            market_type: MarketType::Perpetual,
+            market_type: InstrumentType::Perpetual,
             ws_url: Url::parse("wss://www.deribit.com/ws/api/v2").expect("Invalid URL"),
             http_url: Url::parse("https://www.deribit.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -754,7 +680,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Deribit Inverse Perpetual (treat as future)
         MappingEntry {
             venue: VenueName::Deribit,
-            market_type: MarketType::InversePerpetual,
+            market_type: InstrumentType::InversePerpetual,
             ws_url: Url::parse("wss://www.deribit.com/ws/api/v2").expect("Invalid URL"),
             http_url: Url::parse("https://www.deribit.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -811,7 +737,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Deribit Futures
         MappingEntry {
             venue: VenueName::Deribit,
-            market_type: MarketType::Futures,
+            market_type: InstrumentType::Future,
             ws_url: Url::parse("wss://www.deribit.com/ws/api/v2").expect("Invalid URL"),
             http_url: Url::parse("https://www.deribit.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -862,7 +788,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Deribit Options
         MappingEntry {
             venue: VenueName::Deribit,
-            market_type: MarketType::Options,
+            market_type: InstrumentType::Option,
             ws_url: Url::parse("wss://www.deribit.com/ws/api/v2").expect("Invalid URL"),
             http_url: Url::parse("https://www.deribit.com").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {
@@ -913,7 +839,7 @@ pub static MAPPINGS: LazyLock<Vec<MappingEntry>> = LazyLock::new(|| {
         // Hyperliquid Perpetual
         MappingEntry {
             venue: VenueName::Hyperliquid,
-            market_type: MarketType::Perpetual,
+            market_type: InstrumentType::Perpetual,
             ws_url: Url::parse("wss://api.hyperliquid.xyz/ws").expect("Invalid URL"),
             http_url: Url::parse("https://api.hyperliquid.xyz").expect("Invalid URL"),
             http_channels: vec![HttpChannelInfo {

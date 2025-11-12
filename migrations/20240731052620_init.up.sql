@@ -31,6 +31,15 @@ INSERT INTO public.strategies (id,"name",description,created,updated) VALUES
 
 
 -- VENUES
+CREATE TYPE venue_name AS ENUM (
+  'personal',
+  'index',
+  'binance',
+  'okx',
+  'bybit',
+  'deribit',
+  'coinbase'
+);
 CREATE TYPE venue_type AS ENUM (
   'cex', 
   'dex', 
@@ -39,14 +48,14 @@ CREATE TYPE venue_type AS ENUM (
 );
 CREATE TABLE IF NOT EXISTS venues (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    name TEXT NOT NULL UNIQUE,
+    name venue_name NOT NULL UNIQUE,
     venue_type venue_type NOT NULL,
     created TIMESTAMP(3) WITH TIME ZONE NOT NULL,
     updated TIMESTAMP(3) WITH TIME ZONE NOT NULL
 );
 INSERT INTO public.venues (id,"name","venue_type",created,updated) VALUES
-	 ('48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'binance','cex'::public."venue_type",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00'),
-	 ('b8b9dcf2-77ea-4d24-964e-8243bb7298ea'::uuid,'personal','user_funds'::public."venue_type",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00');
+	 ('48adfe42-29fb-4402-888a-0204bf417e32'::uuid,'binance'::public,'cex'::public."venue_type",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00'),
+	 ('b8b9dcf2-77ea-4d24-964e-8243bb7298ea'::uuid,'personal'::public,'user_funds'::public."venue_type",'2025-01-01 00:00:00+00','2025-01-01 00:00:00+00');
 
 
 

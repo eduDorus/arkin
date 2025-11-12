@@ -1,16 +1,5 @@
-use crate::{market_config::StreamConfig, ParseError, VenueParser};
-use arkin_core::Event;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-
-pub struct OkxSpotParser;
-
-impl VenueParser for OkxSpotParser {
-    fn parse(&self, msg: &str, config: &StreamConfig) -> Result<Event, ParseError> {
-        // Implementation goes here
-        unimplemented!()
-    }
-}
 
 #[derive(Deserialize)]
 struct OkxTrade {

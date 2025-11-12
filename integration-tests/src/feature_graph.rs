@@ -1,255 +1,257 @@
 use arkin_core::prelude::*;
 use arkin_insights::prelude::*;
 
-pub fn build_simple_pipeline_config() -> InsightsConfig {
+pub fn build_pipeline_v2() -> InsightsConfig {
     InsightsConfig {
         insights_service: InsightsServiceConfig {
             pipeline: PipelineConfig {
-                version: "test_pipeline".to_string(),
+                version: "v2.0.0".to_string(),
+                name: "test_pipeline".to_string(),
+                description: "test_pipeline".to_string(),
                 reference_currency: "USD".to_string(),
-                warmup_steps: 60,
+                warmup_steps: 180,
                 state_ttl: 86400,
                 min_interval: 60,
                 parallel: true,
-                // Global filter applied to all features
-                instrument_filter: InstrumentFilter {
-                    base_asset: vec!["BTC".to_string(), "ETH".to_string(), "SOL".to_string(), "XRP".to_string()],
+                global_instrument_selector: InstrumentSelector {
+                    base_asset: vec!["BTC".to_string(), "ETH".to_string()],
                     quote_asset: vec!["USDT".to_string(), "USDC".to_string()],
-                    venue: vec![VenueName::BinanceUsdmFutures, VenueName::BinanceSpot],
+                    venue: vec![VenueName::Binance],
                     instrument_type: vec![InstrumentType::Perpetual, InstrumentType::Spot],
                     ..Default::default()
                 },
                 features: vec![
-                    // ========================================================================
-                    // STAGE 1: Raw Trades → 1m Aggregates (per instrument)
-                    // ========================================================================
-
-                    // 1m notional volume (sum over 60 second window)
+                    // =======================================================================
+                    // STAGE 1: Raw Trades → 1m Aggregates (per synthetic instrument)
+                    // =======================================================================
                     FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Instrument {
-                            filter: InstrumentFilter::default(), // Uses global filter
+                        instrument_selector: InstrumentSelector {
+                            synthetic: Some(false),
+                            ..Default::default()
                         },
-                        input: vec!["trade_notional".to_string()],
-                        output: vec!["notional_01m".to_string()],
-                        data: vec![RangeData::Window(60)],
-                        method: RangeAlgo::AbsSum,
-                        fill_strategy: FillStrategy::Zero, // Volume, zero if no data
-                    }),
-                    // 1m buy notional (positive values only)
-                    FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Instrument {
-                            filter: InstrumentFilter::default(), // Uses global filter
-                        },
-                        input: vec!["trade_notional".to_string()],
-                        output: vec!["notional_buy_01m".to_string()],
-                        data: vec![RangeData::Window(60)],
-                        method: RangeAlgo::SumAbsPositive,
-                        fill_strategy: FillStrategy::Zero, // Volume, zero if no data
-                    }),
-                    // 1m sell notional (negative values only, absolute value)
-                    FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Instrument {
-                            filter: InstrumentFilter::default(), // Uses global filter
-                        },
-                        input: vec!["trade_notional".to_string()],
-                        output: vec!["notional_sell_01m".to_string()],
-                        data: vec![RangeData::Window(60)],
-                        method: RangeAlgo::SumAbsNegative,
-                        fill_strategy: FillStrategy::Zero, // Volume, zero if no data
-                    }),
-                    // 1m trade count
-                    FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Instrument {
-                            filter: InstrumentFilter::default(), // Uses global filter
-                        },
-                        input: vec!["trade_notional".to_string()],
-                        output: vec!["trade_count_01m".to_string()],
-                        data: vec![RangeData::Window(60)],
-                        method: RangeAlgo::Count,
-                        fill_strategy: FillStrategy::Zero, // Count, zero if no data
-                    }),
-                    // // 1m mean price (mean over 60 second window)
-                    // FeatureConfig::Range(RangeConfig {
-                    //     aggregation_type: AggregationType::Instrument,
-                    //     filter: InstrumentFilter::default(),
-                    //     group_by: GroupBy::default(),
-                    //     input: vec!["trade_price".to_string()],
-                    //     output: vec!["price_01m".to_string()],
-                    //     data: vec![RangeData::Window(60)],
-                    //     method: RangeAlgo::Mean,
-                    //     fill_strategy: FillStrategy::ForwardFill, // Price, forward fill
-                    // }),
-                    // // 1m VWAP (volume-weighted average price over 60 second window)
-                    // FeatureConfig::DualRange(DualRangeConfig {
-                    //     aggregation_type: AggregationType::Instrument,
-                    //     filter: InstrumentFilter::default(),
-                    //     group_by: GroupBy::default(),
-                    //     input_1: vec!["trade_price".to_string()],
-                    //     input_2: vec!["trade_notional".to_string()], // Use notional as weight
-                    //     output: vec!["vwap_01m".to_string()],
-                    //     data: vec![RangeData::Window(60)],
-                    //     method: DualRangeAlgo::WeightedMean,
-                    //     fill_strategy: FillStrategy::ForwardFill, // Price-based, forward fill
-                    // }),
-                    // ========================================================================
-                    // STAGE 2: 1m → Multi-timeframe Aggregates (per instrument)
-                    // ========================================================================
-
-                    // Notional for 5m, 60min (single config for all timeframes)
-                    FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Instrument {
-                            filter: InstrumentFilter::default(), // Uses global filter
+                        group_by: GroupBy {
+                            base_asset: false,
+                            quote_asset: vec!["USDT".to_string(), "USDC".to_string()],
+                            instrument_type: true, // Group by type
+                            venue: false,          // Global synthetics
                         },
                         input: vec![
-                            "notional_01m".to_string(),
-                            "notional_buy_01m".to_string(),
-                            "notional_sell_01m".to_string(),
-                            "notional_01m".to_string(),
-                            "notional_buy_01m".to_string(),
-                            "notional_sell_01m".to_string(),
+                            "trade_price".to_string(),
+                            "trade_price".to_string(),
+                            "trade_price".to_string(),
+                            "trade_notional".to_string(),
+                            "trade_notional".to_string(),
+                            "trade_notional".to_string(),
+                            "trade_notional".to_string(),
                         ],
                         output: vec![
-                            "notional_05m".to_string(),
-                            "notional_buy_05m".to_string(),
-                            "notional_sell_05m".to_string(),
-                            "notional_60min".to_string(),
-                            "notional_buy_60min".to_string(),
-                            "notional_sell_60min".to_string(),
+                            "high_01m".to_string(),
+                            "low_01m".to_string(),
+                            "close_01m".to_string(),
+                            "total_notional_01m".to_string(),
+                            "buy_notional_01m".to_string(),
+                            "sell_notional_01m".to_string(),
+                            "diff_notional_01m".to_string(),
+                        ],
+                        data: vec![
+                            RangeData::Window(60),
+                            RangeData::Window(60),
+                            RangeData::Window(60),
+                            RangeData::Window(60),
+                            RangeData::Window(60),
+                            RangeData::Window(60),
+                            RangeData::Window(60),
+                        ],
+                        method: vec![
+                            RangeAlgo::Max,
+                            RangeAlgo::Min,
+                            RangeAlgo::Last,
+                            RangeAlgo::AbsSum,
+                            RangeAlgo::AbsSumPositive,
+                            RangeAlgo::AbsSumNegative,
+                            RangeAlgo::Sum,
+                        ],
+                        fill_strategy: FillStrategy::ForwardFill, // Volume, zero if no data
+                    }),
+                    // 1m vwap (volume-weighted average price over 60 second window)
+                    FeatureConfig::DualRange(DualRangeConfig {
+                        instrument_selector: InstrumentSelector {
+                            synthetic: Some(false),
+                            ..Default::default()
+                        },
+                        group_by: GroupBy {
+                            base_asset: false,
+                            quote_asset: vec!["USDT".to_string(), "USDC".to_string()],
+                            instrument_type: true, // Group by type
+                            venue: false,          // Global synthetics
+                        },
+                        input_1: vec!["trade_price".to_string()],
+                        input_2: vec!["trade_quantity".to_string()], // Use notional
+                        output: vec!["vwap_01m".to_string()],
+                        data: vec![RangeData::Window(60)],
+                        method: vec![DualRangeAlgo::WeightedMean],
+                        fill_strategy: FillStrategy::ForwardFill, // VWAP, zero if no data
+                    }),
+                    // =======================================================================
+                    // STAGE 2: 1m → Multi-timeframe Aggregates (per synthetic instrument)
+                    // =======================================================================
+                    FeatureConfig::Range(RangeConfig {
+                        instrument_selector: InstrumentSelector {
+                            synthetic: Some(true),
+                            ..Default::default()
+                        },
+                        group_by: GroupBy {
+                            base_asset: false,
+                            instrument_type: true, // Group by type
+                            venue: false,          // Global synthetics
+                            ..Default::default()
+                        },
+                        input: vec![
+                            "total_notional_01m".to_string(),
+                            "buy_notional_01m".to_string(),
+                            "sell_notional_01m".to_string(),
+                            "diff_notional_01m".to_string(),
+                            "total_notional_01m".to_string(),
+                            "buy_notional_01m".to_string(),
+                            "sell_notional_01m".to_string(),
+                            "diff_notional_01m".to_string(),
+                            "total_notional_01m".to_string(),
+                            "buy_notional_01m".to_string(),
+                            "sell_notional_01m".to_string(),
+                            "diff_notional_01m".to_string(),
+                        ],
+                        output: vec![
+                            "total_notional_05m".to_string(),
+                            "buy_notional_05m".to_string(),
+                            "sell_notional_05m".to_string(),
+                            "diff_notional_05m".to_string(),
+                            "total_notional_15m".to_string(),
+                            "buy_notional_15m".to_string(),
+                            "sell_notional_15m".to_string(),
+                            "diff_notional_15m".to_string(),
+                            "total_notional_60m".to_string(),
+                            "buy_notional_60m".to_string(),
+                            "sell_notional_60m".to_string(),
+                            "diff_notional_60m".to_string(),
                         ],
                         data: vec![
                             RangeData::Interval(5),
                             RangeData::Interval(5),
                             RangeData::Interval(5),
+                            RangeData::Interval(5),
+                            RangeData::Interval(15),
+                            RangeData::Interval(15),
+                            RangeData::Interval(15),
+                            RangeData::Interval(15),
+                            RangeData::Interval(60),
                             RangeData::Interval(60),
                             RangeData::Interval(60),
                             RangeData::Interval(60),
                         ],
-                        method: RangeAlgo::Sum,
-                        fill_strategy: FillStrategy::Zero, // Volume, zero if no data
+                        method: vec![
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                            RangeAlgo::Sum,
+                        ],
+                        fill_strategy: FillStrategy::ForwardFill,
                     }),
-                    // Imbalance for all timeframes
                     FeatureConfig::TwoValue(TwoValueConfig {
-                        aggregation_type: AggregationType::Instrument {
-                            filter: InstrumentFilter::default(), // Uses global filter
+                        instrument_selector_1: InstrumentSelector {
+                            synthetic: Some(true),
+                            instrument_type: vec![InstrumentType::Spot],
+                            venue: vec![VenueName::Index],
+                            ..Default::default()
                         },
-                        input_filter_1: None,
-                        input_filter_2: None,
-                        input_1: vec!["notional_buy_05m".to_string(), "notional_buy_60min".to_string()],
-                        input_2: vec!["notional_sell_05m".to_string(), "notional_sell_60min".to_string()],
-                        output: vec!["notional_imbalance_05m".to_string(), "notional_imbalance_60min".to_string()],
-                        method: TwoValueAlgo::Imbalance,
-                        fill_strategy: FillStrategy::Zero, // Volume imbalance, zero if no data
-                    }),
-                    // // Price for all timeframes (only need 5m for now)
-                    // FeatureConfig::Range(RangeConfig {
-                    //     aggregation_type: AggregationType::Instrument,
-                    //     filter: InstrumentFilter::default(),
-                    //     group_by: GroupBy::default(),
-                    //     input: vec!["price_01m".to_string()],
-                    //     output: vec!["price_05m".to_string()],
-                    //     data: vec![RangeData::Interval(5)],
-                    //     method: RangeAlgo::Mean,
-                    //     fill_strategy: FillStrategy::ForwardFill, // Price, forward fill
-                    // }),
-                    // // VWAP for all timeframes (5m, 60min)
-                    // FeatureConfig::DualRange(DualRangeConfig {
-                    //     aggregation_type: AggregationType::Instrument,
-                    //     filter: InstrumentFilter::default(),
-                    //     group_by: GroupBy::default(),
-                    //     input_1: vec!["vwap_01m".to_string(), "vwap_01m".to_string()],
-                    //     input_2: vec!["notional_01m".to_string(), "notional_01m".to_string()],
-                    //     output: vec!["vwap_05m".to_string(), "vwap_60min".to_string()],
-                    //     data: vec![RangeData::Interval(5), RangeData::Interval(60)],
-                    //     method: DualRangeAlgo::WeightedMean,
-                    //     fill_strategy: FillStrategy::ForwardFill, // Price-based, forward fill
-                    // }),
-                    // ========================================================================
-                    // STAGE 3: 1m Aggregates to combined synthetic index
-                    // ========================================================================
-
-                    // Grouped synthetics: Create syn-btc-usd@index, syn-eth-usd@index, etc.
-                    FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Grouped {
-                            filter: InstrumentFilter::default(), // Uses global filter
-                            group_by: GroupBy {
-                                quote_asset: vec!["USDT".to_string(), "USDC".to_string()],
-                                instrument_type: false, // Don't group by type
-                                venue: None,            // Global synthetics
-                            },
+                        instrument_selector_2: InstrumentSelector {
+                            synthetic: Some(true),
+                            instrument_type: vec![InstrumentType::Perpetual],
+                            venue: vec![VenueName::Index],
+                            ..Default::default()
                         },
-                        input: vec![
-                            "notional_01m".to_string(),
-                            "notional_05m".to_string(),
-                            "notional_60min".to_string(),
+                        group_by: GroupBy {
+                            base_asset: false,
+                            instrument_type: false, // Group by type
+                            venue: false,           // Global synthetics
+                            ..Default::default()
+                        },
+                        input_1: vec![
+                            "total_notional_05m".to_string(),
+                            "total_notional_15m".to_string(),
+                            "total_notional_60m".to_string(),
+                        ],
+                        input_2: vec![
+                            "total_notional_05m".to_string(),
+                            "total_notional_15m".to_string(),
+                            "total_notional_60m".to_string(),
                         ],
                         output: vec![
-                            "grouped_notional_01m".to_string(),
-                            "grouped_notional_05m".to_string(),
-                            "grouped_notional_60min".to_string(),
+                            "notional_imbalance_05m".to_string(),
+                            "notional_imbalance_15m".to_string(),
+                            "notional_imbalance_60m".to_string(),
                         ],
-                        data: vec![RangeData::Interval(1), RangeData::Interval(1), RangeData::Interval(1)],
-                        method: RangeAlgo::Sum,
-                        fill_strategy: FillStrategy::Zero,
+                        method: vec![TwoValueAlgo::Imbalance, TwoValueAlgo::Imbalance, TwoValueAlgo::Imbalance],
+                        fill_strategy: FillStrategy::ForwardFill,
                     }),
-                    // // Grouped by instrument type: Create syn-perpetual-btc-usd@index, syn-spot-btc-usd@index, etc.
-                    FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Grouped {
-                            filter: InstrumentFilter::default(), // Uses global filter
-                            group_by: GroupBy {
-                                quote_asset: vec!["USDT".to_string(), "USDC".to_string()],
-                                instrument_type: true, // Group by instrument type too
-                                venue: None,           // Global synthetics
-                            },
+                    FeatureConfig::Lag(LagConfig {
+                        instrument_selector: InstrumentSelector {
+                            synthetic: Some(true),
+                            venue: vec![VenueName::Index],
+                            ..Default::default()
                         },
-                        input: vec!["notional_01m".to_string()],
-                        output: vec!["grouped_type_notional_01m".to_string()],
-                        data: vec![RangeData::Interval(1)],
-                        method: RangeAlgo::Sum,
-                        fill_strategy: FillStrategy::Zero,
-                    }),
-                    // // Market index: Create index-global-usd from all base synthetics
-                    FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Index {
-                            filter: InstrumentFilter {
-                                synthetic: Some(true),
-                                ..Default::default()
-                            },
+                        group_by: GroupBy {
+                            base_asset: false,
+                            instrument_type: false, // Group by type
+                            venue: false,           // Global synthetics
+                            ..Default::default()
                         },
                         input: vec![
-                            "grouped_notional_01m".to_string(),
-                            "grouped_notional_05m".to_string(),
-                            "grouped_notional_60min".to_string(),
+                            "notional_imbalance_05m".to_string(),
+                            "notional_imbalance_15m".to_string(),
+                            "notional_imbalance_60m".to_string(),
                         ],
                         output: vec![
-                            "index_notional_01m".to_string(),
-                            "index_notional_05m".to_string(),
-                            "index_notional_60min".to_string(),
+                            "notional_imbalance_05m_pct_change".to_string(),
+                            "notional_imbalance_15m_pct_change".to_string(),
+                            "notional_imbalance_60m_pct_change".to_string(),
                         ],
-                        data: vec![RangeData::Interval(1), RangeData::Interval(1), RangeData::Interval(1)],
-                        method: RangeAlgo::Sum,
-                        fill_strategy: FillStrategy::Zero,
+                        lag: vec![1, 1, 1],
+                        method: vec![LagAlgo::PercentChange, LagAlgo::PercentChange, LagAlgo::PercentChange],
+                        fill_strategy: FillStrategy::ForwardFill,
                     }),
-                    // Market index: Create index-global-usd from all base synthetics
-                    FeatureConfig::Range(RangeConfig {
-                        aggregation_type: AggregationType::Index {
-                            filter: InstrumentFilter {
-                                synthetic: Some(true),
-                                ..Default::default()
-                            },
+                    FeatureConfig::Lag(LagConfig {
+                        instrument_selector: InstrumentSelector {
+                            synthetic: Some(true),
+                            venue: vec![VenueName::Index],
+                            ..Default::default()
+                        },
+                        group_by: GroupBy {
+                            base_asset: false,
+                            instrument_type: false, // Group by type
+                            venue: false,           // Global synthetics
+                            ..Default::default()
                         },
                         input: vec![
-                            "grouped_notional_01m".to_string(),
-                            "grouped_notional_05m".to_string(),
-                            "grouped_notional_60min".to_string(),
+                            "notional_imbalance_05m_pct_change".to_string(),
+                            "notional_imbalance_15m_pct_change".to_string(),
+                            "notional_imbalance_60m_pct_change".to_string(),
                         ],
                         output: vec![
-                            "index_notional_01m".to_string(),
-                            "index_notional_05m".to_string(),
-                            "index_notional_60min".to_string(),
+                            "notional_imbalance_05m_acceleration".to_string(),
+                            "notional_imbalance_15m_acceleration".to_string(),
+                            "notional_imbalance_60m_acceleration".to_string(),
                         ],
-                        data: vec![RangeData::Interval(1), RangeData::Interval(1), RangeData::Interval(1)],
-                        method: RangeAlgo::Sum,
-                        fill_strategy: FillStrategy::Zero,
+                        lag: vec![1, 1, 1],
+                        method: vec![LagAlgo::PercentChange, LagAlgo::PercentChange, LagAlgo::PercentChange],
+                        fill_strategy: FillStrategy::ForwardFill,
                     }),
                 ],
             },

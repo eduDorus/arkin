@@ -1,7 +1,7 @@
 [workspace]
 # members = [ "arkin-persistence", "arkin-ingestors", "arkin-strategies", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
 
-members = [ "arkin", "arkin-accounting", "arkin-audit", "arkin-binance", "arkin-cli", "arkin-core", "arkin-cron", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-ingestor", "arkin-ingestor-historical", "arkin-insights", "arkin-persistence", "arkin-sim-ingestor", "arkin-strat-agent", "arkin-strat-crossover", "integration-tests" ]
+members = [ "arkin", "arkin-accounting", "arkin-audit", "arkin-binance", "arkin-cli", "arkin-core", "arkin-cron", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-ingestor", "arkin-insights", "arkin-persistence", "arkin-sim-ingestor", "arkin-strat-agent", "arkin-strat-crossover", "integration-tests" ]
 
 default-members = [ "arkin" ]
 
@@ -70,7 +70,7 @@ chrono = { version = "0.4", features = [ "serde" ] }
 tracing = { version = "0.1", features = [  ] }
 tracing-futures = { version = "0.2", features = [ "tokio" ] }
 tracing-subscriber = { version = "0.3", features = [ "local-time", "parking_lot", "env-filter" ] }
-console-subscriber = { version = "0.4.1", features = ["parking_lot"] }
+console-subscriber = { version = "0.5.0", features = ["parking_lot"] }
 
 # Error handling
 anyhow = { version = "1.0", features = [ "std" ], default-features = false }

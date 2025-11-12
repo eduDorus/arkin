@@ -11,7 +11,7 @@ mod state;
 mod system_time;
 mod traits;
 mod types;
-mod utils;
+pub mod utils;
 
 pub use barrier::*;
 pub use engine::*;

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Deserializer, Serializer};
 use time::Duration;
 
-pub fn serialize<S>(duration: Duration, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {

@@ -10,13 +10,13 @@ use arkin_core::prelude::*;
 
 use crate::{Feature, FeatureStore, FillStrategy, InstrumentScope};
 
-#[derive(Debug, Display, Clone, Deserialize)]
+#[derive(Debug, Display, Clone, Copy, Deserialize)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum LagAlgo {
     // Change
     AbsoluteChange,
-    PercentChange,
+    PercentChange, // first derivative of value
     LogChange,
     Difference,
 }
@@ -81,7 +81,7 @@ impl Feature for LagFeature {
                         if lagged_value == 0.0 {
                             0.0
                         } else {
-                            (current_value - lagged_value) / lagged_value.abs() * 100.0
+                            (current_value - lagged_value) / lagged_value.abs()
                         }
                     }
                     LagAlgo::LogChange => {

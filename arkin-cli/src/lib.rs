@@ -136,8 +136,8 @@ pub struct IngestorsArgs {
     // pub ingestor: IngestorType,
 
     /// Instruments to subscribe to (comma-separated, e.g., "BTCUSDT,ETHUSDT").
-    #[arg(long, short, value_delimiter = ',')]
-    pub instruments: Vec<String>,
+    // #[arg(long, short, value_delimiter = ',')]
+    // pub instruments: Vec<String>,
 
     /// Perform a dry run: simulate ingestion without processing data.
     #[arg(long)]

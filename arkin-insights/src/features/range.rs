@@ -11,7 +11,7 @@ use arkin_core::prelude::*;
 
 use crate::{math::*, Feature, FeatureStore, FillStrategy, InstrumentScope};
 
-#[derive(Debug, Display, Clone, Deserialize)]
+#[derive(Debug, Display, Clone, Copy, Deserialize)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RangeData {
@@ -19,22 +19,25 @@ pub enum RangeData {
     Interval(usize),
 }
 
-#[derive(Debug, Display, Clone, Deserialize)]
+#[derive(Debug, Display, Clone, Copy, Deserialize)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RangeAlgo {
     // Basic
     Count,
+    CountPositive,
+    CountNegative,
     Sum,
     SumPositive,
     SumNegative,
     AbsSum,
-    SumAbsPositive,
-    SumAbsNegative,
+    AbsSumPositive,
+    AbsSumNegative,
     Mean,
     Median,
     Min,
     Max,
+    Last,
     AbsolutRange,
     RelativeRange,
     RelativePosition,
@@ -151,16 +154,19 @@ impl Feature for RangeFeature {
                 // Apply the range method to compute the output value
                 let value = match &self.method {
                     RangeAlgo::Count => input_values.len() as f64,
+                    RangeAlgo::CountPositive => input_values.iter().filter(|&&x| x > 0.0).count() as f64,
+                    RangeAlgo::CountNegative => input_values.iter().filter(|&&x| x < 0.0).count() as f64,
                     RangeAlgo::Sum => input_values.iter().sum(),
                     RangeAlgo::SumPositive => input_values.iter().filter(|&&x| x > 0.0).sum(),
                     RangeAlgo::SumNegative => input_values.iter().filter(|&&x| x < 0.0).sum(),
                     RangeAlgo::AbsSum => input_values.iter().map(|x| x.abs()).sum(),
-                    RangeAlgo::SumAbsPositive => input_values.iter().filter(|&&x| x > 0.0).map(|x| x.abs()).sum(),
-                    RangeAlgo::SumAbsNegative => input_values.iter().filter(|&&x| x < 0.0).map(|x| x.abs()).sum(),
+                    RangeAlgo::AbsSumPositive => input_values.iter().filter(|&&x| x > 0.0).map(|x| x.abs()).sum(),
+                    RangeAlgo::AbsSumNegative => input_values.iter().filter(|&&x| x < 0.0).map(|x| x.abs()).sum(),
                     RangeAlgo::Mean => mean(&input_values),
                     RangeAlgo::Median => median(&input_values),
                     RangeAlgo::Min => min(&input_values),
                     RangeAlgo::Max => max(&input_values),
+                    RangeAlgo::Last => input_values.last().cloned().unwrap_or(0.0),
                     RangeAlgo::AbsolutRange => absolut_range(&input_values),
                     RangeAlgo::RelativeRange => relative_range(&input_values),
                     RangeAlgo::RelativePosition => relative_position(&input_values),

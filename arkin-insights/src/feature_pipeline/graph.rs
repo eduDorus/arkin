@@ -141,7 +141,7 @@ impl FeatureGraph {
         format!("{:?}", Dot::with_config(&self.graph, &[Config::EdgeNoLabel]))
     }
 
-    /// Export graph to DOT format with custom node labels (simplified output names only)
+    /// Export graph to DOT format with custom node labels showing input instruments as a list
     pub fn to_dot_string_simple(&self) -> String {
         let mut dot = String::from("digraph {\n");
         dot.push_str("  rankdir=LR;\n");
@@ -151,19 +151,45 @@ impl FeatureGraph {
         let raw_inputs = self.get_input_feature_ids();
 
         // Add raw input nodes with special styling
-        dot.push_str("  // Raw inputs\n");
-        dot.push_str("  node [shape=ellipse, style=filled, fillcolor=lightblue];\n");
-        for (i, input) in raw_inputs.iter().enumerate() {
-            dot.push_str(&format!("  raw_{} [label=\"{}\"];\n", i, input));
+        if !raw_inputs.is_empty() {
+            dot.push_str("  // Raw inputs\n");
+            dot.push_str("  node [shape=ellipse, style=filled, fillcolor=lightblue];\n");
+            for (i, input) in raw_inputs.iter().enumerate() {
+                dot.push_str(&format!("  raw_{} [label=\"{}\"];\n", i, input));
+            }
+            dot.push('\n');
         }
-        dot.push('\n');
 
-        // Add feature nodes
+        // Add feature nodes with input instruments listed inside
         dot.push_str("  // Features\n");
         dot.push_str("  node [shape=box, style=rounded, fillcolor=white];\n");
         for node in self.graph.node_indices() {
             let outputs = self.graph[node].outputs();
-            let label = outputs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+            let output_label = outputs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+
+            // Get input instruments from scopes
+            let scopes = self.graph[node].scopes();
+            let mut input_instruments = Vec::new();
+
+            // Collect input instruments from all scopes
+            for scope in scopes {
+                for input in &scope.inputs {
+                    let symbol = &input.symbol;
+                    if !input_instruments.contains(&symbol.as_str()) {
+                        input_instruments.push(symbol.as_str());
+                    }
+                }
+            }
+
+            let input_label = input_instruments.join("\\n");
+
+            // Format: Output: ... \n Instruments: ...
+            let label = if !input_label.is_empty() {
+                format!("{output_label}\\n---\\n{input_label}")
+            } else {
+                output_label
+            };
+
             dot.push_str(&format!("  {} [label=\"{}\"];\n", node.index(), label));
         }
         dot.push('\n');
@@ -175,21 +201,25 @@ impl FeatureGraph {
         }
 
         // Add edges from raw inputs to features
-        dot.push_str("  // Edges from raw inputs\n");
-        for node in self.graph.node_indices() {
-            for input in self.graph[node].inputs() {
-                if let Some(raw_id) = raw_input_map.get(input.as_str()) {
-                    dot.push_str(&format!("  {} -> {};\n", raw_id, node.index()));
+        if !raw_input_map.is_empty() {
+            dot.push_str("  // Edges from raw inputs\n");
+            for node in self.graph.node_indices() {
+                for input in self.graph[node].inputs() {
+                    if let Some(raw_id) = raw_input_map.get(input.as_str()) {
+                        dot.push_str(&format!("  {} -> {};\n", raw_id, node.index()));
+                    }
                 }
             }
+            dot.push('\n');
         }
-        dot.push('\n');
 
         // Add edges between features
-        dot.push_str("  // Edges between features\n");
-        for edge in self.graph.edge_indices() {
-            if let Some((source, target)) = self.graph.edge_endpoints(edge) {
-                dot.push_str(&format!("  {} -> {};\n", source.index(), target.index()));
+        if self.graph.edge_count() > 0 {
+            dot.push_str("  // Edges between features\n");
+            for edge in self.graph.edge_indices() {
+                if let Some((source, target)) = self.graph.edge_endpoints(edge) {
+                    dot.push_str(&format!("  {} -> {};\n", source.index(), target.index()));
+                }
             }
         }
 
@@ -231,6 +261,8 @@ impl FeatureGraph {
 
         let raw_inputs = self.get_input_feature_ids();
         info!(target: "feature-graph", "RAW INPUTS: {}", raw_inputs.join(", "));
+        info!(target: "feature-graph", "Total nodes: {}", self.graph.node_count());
+        info!(target: "feature-graph", "Total edges: {}", self.graph.edge_count());
         info!(target: "feature-graph", "");
 
         let layers = self.get_layers();
@@ -239,11 +271,33 @@ impl FeatureGraph {
             for feature in layer {
                 let outputs = feature.outputs();
                 let inputs = feature.inputs();
-                info!(
-                    "  {} <- [{}]",
-                    outputs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
-                    inputs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
-                );
+                let scopes = feature.scopes();
+
+                let input_instruments: Vec<&str> = scopes
+                    .iter()
+                    .flat_map(|scope| scope.inputs.iter().map(|i| i.symbol.as_str()))
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .collect();
+
+                let output_instruments: Vec<&str> = scopes
+                    .iter()
+                    .map(|scope| scope.output.symbol.as_str())
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .collect();
+
+                info!(target: "feature-graph", "");
+                info!(target: "feature-graph", "  Output Features: {}", 
+                    outputs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+                info!(target: "feature-graph", "  Input Features: {}", 
+                    inputs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+                if !input_instruments.is_empty() {
+                    info!(target: "feature-graph", "  Input Instruments: {}", input_instruments.join(", "));
+                }
+                if !output_instruments.is_empty() {
+                    info!(target: "feature-graph", "  Output Instruments: {}", output_instruments.join(", "));
+                }
             }
             info!(target: "feature-graph", "");
         }
@@ -371,6 +425,55 @@ impl FeatureGraph {
     }
 
     /// Print a summary of the pipeline structure
+    /// Helper function to recursively find all instruments produced by a feature or its dependencies
+    fn get_output_instruments_for_feature(&self, feature_outputs: &[Arc<String>]) -> Vec<String> {
+        let mut instruments = std::collections::HashSet::new();
+        let mut visited_features = std::collections::HashSet::new();
+
+        // Recursively trace through dependencies
+        fn trace_instruments(
+            graph: &petgraph::Graph<Arc<dyn Feature>, ()>,
+            feature_outputs: &[Arc<String>],
+            instruments: &mut std::collections::HashSet<String>,
+            visited: &mut std::collections::HashSet<Vec<Arc<String>>>,
+        ) {
+            if visited.contains(feature_outputs) {
+                return;
+            }
+            visited.insert(feature_outputs.to_vec());
+
+            for node in graph.node_indices() {
+                let feature = &graph[node];
+                if feature
+                    .outputs()
+                    .iter()
+                    .any(|o| feature_outputs.iter().any(|fo| o.as_ref() == fo.as_ref()))
+                {
+                    let scopes = feature.scopes();
+                    // If this feature has scopes with instruments, collect them
+                    if !scopes.is_empty() {
+                        for scope in scopes {
+                            instruments.insert(scope.output.symbol.clone());
+                        }
+                    } else {
+                        // Otherwise, recurse into the feature's inputs
+                        let inputs = feature.inputs();
+                        if !inputs.is_empty() {
+                            trace_instruments(graph, &inputs, instruments, visited);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        trace_instruments(&self.graph, feature_outputs, &mut instruments, &mut visited_features);
+
+        let mut result: Vec<String> = instruments.into_iter().collect();
+        result.sort();
+        result
+    }
+
     pub fn print_summary(&self) {
         info!(target: "feature-graph", "Pipeline Summary:");
         info!(target: "feature-graph", "  Total Features: {}", self.graph.node_count());
@@ -385,30 +488,70 @@ impl FeatureGraph {
         let sources = self.get_sources();
         info!(target: "feature-graph", "  Source Features (depend only on raw inputs): {}", sources.len());
         for source in &sources {
-            info!(target: "feature-graph", "    - outputs: {:?}", source.outputs());
+            let scopes = source.scopes();
+            let input_instruments: Vec<&str> = scopes
+                .iter()
+                .flat_map(|scope| scope.inputs.iter().map(|i| i.symbol.as_str()))
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+            let output_instruments: Vec<&str> = scopes
+                .iter()
+                .map(|scope| scope.output.symbol.as_str())
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+
+            info!(target: "feature-graph", "  Feature: {:?}", source.outputs());
+            info!(target: "feature-graph", "    Input Features: {:?}", source.inputs());
+            info!(target: "feature-graph", "    Input Instruments:");
+            for instrument in &input_instruments {
+                info!(target: "feature-graph", "      - {}", instrument);
+            }
+            info!(target: "feature-graph", "    Output Instruments:");
+            for instrument in &output_instruments {
+                info!(target: "feature-graph", "      - {}", instrument);
+            }
         }
 
         let sinks = self.get_sinks();
         info!(target: "feature-graph", "  Terminal Features: {}", sinks.len());
         for sink in &sinks {
-            info!(target: "feature-graph", "    - outputs: {:?}", sink.outputs());
-        }
+            let output_instruments_strings = self.get_output_instruments_for_feature(&sink.outputs());
+            let output_instruments: Vec<&str> = output_instruments_strings.iter().map(|s| s.as_str()).collect();
 
-        // Find bottleneck features (those with many dependents)
-        let mut dependents_count: Vec<(NodeIndex, usize)> = self
-            .graph
-            .node_indices()
-            .map(|node| {
-                let count = self.graph.neighbors_directed(node, petgraph::Outgoing).count();
-                (node, count)
-            })
-            .collect();
-        dependents_count.sort_by(|a, b| b.1.cmp(&a.1));
+            // For input instruments, trace through dependencies to find actual instruments
+            let mut input_instruments_strings = std::collections::HashSet::new();
+            if sink.inputs().is_empty() {
+                // Raw input - get instruments from sink's own scopes
+                for scope in sink.scopes() {
+                    for input in &scope.inputs {
+                        input_instruments_strings.insert(input.symbol.clone());
+                    }
+                }
+            } else {
+                // Depends on other features - trace dependencies to find instruments
+                for input_name in sink.inputs() {
+                    let instruments = self.get_output_instruments_for_feature(&[input_name.clone()]);
+                    for instr in instruments {
+                        input_instruments_strings.insert(instr);
+                    }
+                }
+            }
 
-        info!(target: "feature-graph", "  Bottleneck Features (top 5 by number of dependents):");
-        for (node, count) in dependents_count.iter().take(5) {
-            if *count > 0 {
-                info!(target: "feature-graph", "    - {:?} ({} dependents)", self.graph[*node].outputs(), count);
+            let mut input_instruments: Vec<&str> = input_instruments_strings.iter().map(|s| s.as_str()).collect();
+            input_instruments.sort();
+            input_instruments.dedup();
+
+            info!(target: "feature-graph", "  Feature: {:?}", sink.outputs());
+            info!(target: "feature-graph", "    Input Features: {:?}", sink.inputs());
+            info!(target: "feature-graph", "    Input Instruments:");
+            for instrument in &input_instruments {
+                info!(target: "feature-graph", "      - {}", instrument);
+            }
+            info!(target: "feature-graph", "    Output Instruments:");
+            for instrument in &output_instruments {
+                info!(target: "feature-graph", "      - {}", instrument);
             }
         }
 

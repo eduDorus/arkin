@@ -13,7 +13,7 @@ use crate::context::PersistenceContext;
 #[derive(FromRow)]
 pub struct VenueDTO {
     pub id: Uuid,
-    pub name: String,
+    pub name: VenueName,
     pub venue_type: VenueType,
     pub created: OffsetDateTime,
     pub updated: OffsetDateTime,
@@ -23,7 +23,7 @@ impl From<Arc<Venue>> for VenueDTO {
     fn from(venue: Arc<Venue>) -> Self {
         Self {
             id: venue.id,
-            name: venue.name.to_string(),
+            name: venue.name.clone(),
             venue_type: venue.venue_type.clone(),
             created: venue.created.into(),
             updated: venue.updated.into(),
@@ -35,7 +35,7 @@ impl From<VenueDTO> for Venue {
     fn from(venue: VenueDTO) -> Self {
         Self {
             id: venue.id,
-            name: venue.name.parse().expect("Invalid VenueName"),
+            name: venue.name,
             venue_type: venue.venue_type,
             created: venue.created.into(),
             updated: venue.updated.into(),
@@ -56,7 +56,7 @@ pub async fn insert(ctx: &PersistenceContext, venue: VenueDTO) -> Result<(), Per
             ) VALUES ($1, $2, $3, $4, $5)
             "#,
         venue.id,
-        venue.name,
+        venue.name as VenueName,
         venue.venue_type as VenueType,
         venue.created,
         venue.updated
@@ -72,7 +72,7 @@ pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<VenueDTO,
         r#"
             SELECT 
                 id,
-                name,
+                name AS "name:VenueName",
                 venue_type AS "venue_type:VenueType",
                 created,
                 updated
@@ -96,14 +96,14 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &VenueName) -> Result<
         r#"
             SELECT 
                 id,
-                name,
+                name AS "name:VenueName",
                 venue_type AS "venue_type:VenueType",
                 created,
                 updated
             FROM venues
             WHERE name = $1
             "#,
-        name.to_string(),
+        *name as VenueName,
     )
     .fetch_optional(&ctx.pg_pool)
     .await?;
@@ -120,7 +120,7 @@ pub async fn list_all(ctx: &PersistenceContext) -> Result<Vec<VenueDTO>, Persist
         r#"
             SELECT 
                 id,
-                name,
+                name AS "name:VenueName",
                 venue_type AS "venue_type:VenueType",
                 created,
                 updated

@@ -7,29 +7,16 @@ use tracing::{debug, info, warn};
 use arkin_core::prelude::*;
 
 use crate::config::PipelineConfig;
-use crate::FeatureFactory;
 use crate::FeaturePipeline;
 
 pub struct InsightService {
-    persistence: Arc<dyn PersistenceReader>,
     pipeline: FeaturePipeline,
 }
 
 impl InsightService {
-    pub async fn new(
-        persistence: Arc<dyn PersistenceReader>,
-        pipeline_meta: Arc<Pipeline>,
-        config: &PipelineConfig,
-    ) -> Arc<Self> {
+    pub async fn new(persistence: Arc<dyn PersistenceReader>, config: &PipelineConfig) -> Arc<Self> {
         info!(target: "insights", "Initializing InsightService pipeline");
-
-        // FeatureFactory handles everything: querying real instruments,
-        // generating synthetics, building scopes, and creating features
-        let features = FeatureFactory::from_config(&persistence, config).await;
-
-        info!(target: "insights", "Created {} features", features.len());
-
-        let pipeline = FeaturePipeline::new(pipeline_meta, features, config);
+        let pipeline = FeaturePipeline::new(&persistence, config).await;
 
         // Log synthetic instrument count from pipeline
         let synthetic_count = pipeline.synthetic_instruments().len();
@@ -39,10 +26,7 @@ impl InsightService {
             synthetic_count
         );
 
-        let service = Self {
-            persistence,
-            pipeline,
-        };
+        let service = Self { pipeline };
         Arc::new(service)
     }
 
@@ -124,9 +108,9 @@ impl Runnable for InsightService {
             }
             Event::AggTradeUpdate(trade) => {
                 debug!(target: "insights", "received trade update" );
-                let trade_price_feature = self.persistence.get_feature_id("trade_price").await;
-                let trade_quantity_feature = self.persistence.get_feature_id("trade_quantity").await;
-                let trade_notional_feature = self.persistence.get_feature_id("trade_notional").await;
+                let trade_price_feature = ctx.persistence.get_feature_id("trade_price").await;
+                let trade_quantity_feature = ctx.persistence.get_feature_id("trade_quantity").await;
+                let trade_notional_feature = ctx.persistence.get_feature_id("trade_notional").await;
                 let insights = vec![
                     Insight::builder()
                         .event_time(trade.event_time)
@@ -158,10 +142,10 @@ impl Runnable for InsightService {
             Event::TickUpdate(tick) => {
                 debug!(target: "insights", "received tick update" );
                 // pub fn to_insights(&self) -> Vec<Arc<Insight>> {
-                let tick_bid_price_feature = self.persistence.get_feature_id("tick_bid_price").await;
-                let tick_bid_quantity_feature = self.persistence.get_feature_id("tick_bid_quantity").await;
-                let tick_ask_price_feature = self.persistence.get_feature_id("tick_ask_price").await;
-                let tick_ask_quantity_feature = self.persistence.get_feature_id("tick_ask_quantity").await;
+                let tick_bid_price_feature = ctx.persistence.get_feature_id("tick_bid_price").await;
+                let tick_bid_quantity_feature = ctx.persistence.get_feature_id("tick_bid_quantity").await;
+                let tick_ask_price_feature = ctx.persistence.get_feature_id("tick_ask_price").await;
+                let tick_ask_quantity_feature = ctx.persistence.get_feature_id("tick_ask_quantity").await;
                 let insights = vec![
                     Insight::builder()
                         .event_time(tick.event_time)
@@ -200,7 +184,7 @@ impl Runnable for InsightService {
             }
             Event::MetricUpdate(metric) => {
                 debug!(target: "insights", "received metric update" );
-                let metric_feature = self.persistence.get_feature_id(&metric.metric_type.to_string()).await;
+                let metric_feature = ctx.persistence.get_feature_id(&metric.metric_type.to_string()).await;
                 let insight = Insight::builder()
                     .event_time(metric.event_time)
                     .instrument(metric.instrument.clone())

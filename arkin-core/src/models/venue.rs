@@ -2,22 +2,10 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::Type;
-use strum::{Display, EnumString};
+use strum::{Display, EnumIter, EnumString};
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
-
-#[derive(Debug, Display, Clone, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
-#[strum(serialize_all = "snake_case")]
-#[sqlx(type_name = "venue_type", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum VenueType {
-    Cex,
-    Dex,
-    Otc,
-    UserFunds,
-    Virtual,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, TypedBuilder)]
 pub struct Venue {
@@ -35,45 +23,45 @@ impl fmt::Display for Venue {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, clap::ValueEnum, Serialize, Deserialize)] // For Clap auto-parsing
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Type,
+    Display,
+    EnumString,
+    EnumIter,
+    clap::ValueEnum,
+    Serialize,
+    Deserialize,
+)]
 #[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "venue_name", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum VenueName {
     Personal,
     Index,
-    BinanceSpot,
-    BinanceUsdmFutures,
-    BinanceCoinmFutures,
-    BinanceOptions,
-    OkxSpot,
-    OkxSwap,
-    OkxFutures,
-    OkxOptions,
-    BybitSpot,
-    BybitDerivatives,
-    BybitOptions,
+    Binance,
+    Okx,
+    Bybit,
     Deribit,
+    Coinbase,
+    Hyperliquid,
 }
 
-impl VenueName {
-    /// Get the parent exchange name for grouping across venue variants.
-    ///
-    /// For example, BinanceSpot and BinanceUsdmFutures both return "binance".
-    /// This is useful for creating exchange-level synthetic instruments that
-    /// aggregate data across spot and derivatives markets.
-    pub fn exchange_name(&self) -> &'static str {
-        match self {
-            VenueName::Personal => "personal",
-            VenueName::Index => "index",
-            VenueName::BinanceSpot
-            | VenueName::BinanceUsdmFutures
-            | VenueName::BinanceCoinmFutures
-            | VenueName::BinanceOptions => "binance",
-            VenueName::OkxSpot | VenueName::OkxSwap | VenueName::OkxFutures | VenueName::OkxOptions => "okx",
-            VenueName::BybitSpot | VenueName::BybitDerivatives | VenueName::BybitOptions => "bybit",
-            VenueName::Deribit => "deribit",
-        }
-    }
+#[derive(Debug, Display, Clone, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
+#[strum(serialize_all = "snake_case")]
+#[sqlx(type_name = "venue_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum VenueType {
+    Cex,
+    Dex,
+    Otc,
+    UserFunds,
+    Virtual,
 }
 
 // Similarly for Channel
@@ -92,33 +80,33 @@ pub enum Channel {
     IndexPriceKlines,
 }
 
-impl Channel {
-    pub fn channel_name_by_venue(&self, venue: VenueName) -> String {
-        match (venue, self) {
-            (VenueName::BinanceSpot, Channel::AggTrades) => "aggTrades".to_string(),
-            (VenueName::BinanceSpot, Channel::Trades) => "trade".to_string(),
-            (VenueName::BinanceUsdmFutures, Channel::AggTrades) => "aggTrades".to_string(),
-            (VenueName::BinanceUsdmFutures, Channel::Trades) => "trade".to_string(),
-            (VenueName::BinanceUsdmFutures, Channel::Metrics) => "metrics".to_string(),
-            (VenueName::BinanceUsdmFutures, Channel::MarkPriceKlines) => "markPriceKlines".to_string(),
-            (VenueName::BinanceUsdmFutures, Channel::IndexPriceKlines) => "indexPriceKlines".to_string(),
-            (VenueName::BinanceCoinmFutures, Channel::AggTrades) => "aggTrades".to_string(),
-            (VenueName::BinanceCoinmFutures, Channel::Trades) => "trade".to_string(),
-            (VenueName::BinanceCoinmFutures, Channel::Metrics) => "metrics".to_string(),
-            (VenueName::BinanceCoinmFutures, Channel::MarkPriceKlines) => "markPriceKlines".to_string(),
-            (VenueName::BinanceCoinmFutures, Channel::IndexPriceKlines) => "indexPriceKlines".to_string(),
-            // Default to lowercase channel name
-            (_, channel) => channel.to_string().to_lowercase(),
-        }
-    }
-    pub fn is_kline(&self) -> bool {
-        matches!(self, Channel::MarkPriceKlines | Channel::IndexPriceKlines)
-    }
+// impl Channel {
+//     pub fn channel_name_by_venue(&self, venue: VenueName) -> String {
+//         match (venue, self) {
+//             (VenueName::BinanceSpot, Channel::AggTrades) => "aggTrades".to_string(),
+//             (VenueName::BinanceSpot, Channel::Trades) => "trade".to_string(),
+//             (VenueName::BinanceUsdmFutures, Channel::AggTrades) => "aggTrades".to_string(),
+//             (VenueName::BinanceUsdmFutures, Channel::Trades) => "trade".to_string(),
+//             (VenueName::BinanceUsdmFutures, Channel::Metrics) => "metrics".to_string(),
+//             (VenueName::BinanceUsdmFutures, Channel::MarkPriceKlines) => "markPriceKlines".to_string(),
+//             (VenueName::BinanceUsdmFutures, Channel::IndexPriceKlines) => "indexPriceKlines".to_string(),
+//             (VenueName::BinanceCoinmFutures, Channel::AggTrades) => "aggTrades".to_string(),
+//             (VenueName::BinanceCoinmFutures, Channel::Trades) => "trade".to_string(),
+//             (VenueName::BinanceCoinmFutures, Channel::Metrics) => "metrics".to_string(),
+//             (VenueName::BinanceCoinmFutures, Channel::MarkPriceKlines) => "markPriceKlines".to_string(),
+//             (VenueName::BinanceCoinmFutures, Channel::IndexPriceKlines) => "indexPriceKlines".to_string(),
+//             // Default to lowercase channel name
+//             (_, channel) => channel.to_string().to_lowercase(),
+//         }
+//     }
+//     pub fn is_kline(&self) -> bool {
+//         matches!(self, Channel::MarkPriceKlines | Channel::IndexPriceKlines)
+//     }
 
-    pub fn has_headers(&self, venue: VenueName) -> bool {
-        match self {
-            Self::AggTrades => !matches!(venue, VenueName::BinanceSpot),
-            _ => true, // Metrics, klines default true
-        }
-    }
-}
+//     pub fn has_headers(&self, venue: VenueName) -> bool {
+//         match self {
+//             Self::AggTrades => !matches!(venue, VenueName::BinanceSpot),
+//             _ => true, // Metrics, klines default true
+//         }
+//     }
+// }

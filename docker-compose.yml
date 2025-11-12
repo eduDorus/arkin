@@ -1,7 +1,7 @@
 services:
   postgres:
     container_name: arkin-postgres
-    image: postgres:17
+    image: postgres:18
     hostname: postgres
     environment:
       POSTGRES_DB: arkin
@@ -10,20 +10,19 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - /mnt/data/postgres/data:/var/lib/postgresql/data
+      - /mnt/data/postgres/data:/var/lib/postgresql
       - /mnt/data/postgres/logs:/var/logs
     networks:
       - network
     restart: unless-stopped
 
-
   clickhouse:
     container_name: arkin-clickhouse
-    image: clickhouse/clickhouse-server:25.7
+    image: clickhouse/clickhouse-server:25.10
     hostname: clickhouse
     ports:
-      - "8123:8123"   # HTTP interface
-      - "9000:9000"   # Native client interface
+      - "8123:8123" # HTTP interface
+      - "9000:9000" # Native client interface
     volumes:
       - /mnt/data/clickhouse/data:/var/lib/clickhouse
       - /mnt/data/clickhouse/config:/etc/clickhouse-server
@@ -32,7 +31,7 @@ services:
       CLICKHOUSE_DB: arkin
       CLICKHOUSE_USER: arkin_admin
       CLICKHOUSE_PASSWORD: test1234
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"  # Enable default access management
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1" # Enable default access management
     ulimits:
       nofile:
         soft: 262144
@@ -40,7 +39,16 @@ services:
     networks:
       - network
     restart: unless-stopped
-  
+
+  redis:
+    container_name: arkin-redis
+    image: redis:8
+    hostname: redis
+    ports:
+      - "6379:6379" # Expose for dev; restrict in prod
+    networks:
+      - network
+    restart: unless-stopped
 
   grafana:
     container_name: arkin-grafana
@@ -56,15 +64,15 @@ services:
       - clickhouse
       - postgres
     restart: unless-stopped
-  
+
   triton:
     container_name: arkin-triton
-    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    image: nvcr.io/nvidia/tritonserver:25.10-py3
     hostname: triton
     ports:
-      - "8000:8000"  # HTTP endpoint
-      - "8001:8001"  # gRPC endpoint
-      - "8002:8002"  # Metrics endpoint
+      - "8000:8000" # HTTP endpoint
+      - "8001:8001" # gRPC endpoint
+      - "8002:8002" # Metrics endpoint
     volumes:
       - /home/dj/repos/arkin-inference/triton:/models
     command: tritonserver --model-repository=/models --model-control-mode=poll --repository-poll-secs=60
@@ -79,46 +87,43 @@ services:
       - network
     restart: unless-stopped
 
-        
-  arkin-binance-ingestor-1:
-    container_name: arkin-binance-ingestor-1
-    image: arkin:v1.0.0  
-    hostname: arkin-binance-ingestor-1
-    command: ["./main", "ingestor",  "-i", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,TRXUSDT,DOGEUSDT,ADAUSDT,LINKUSDT,XLMUSDT,HBARUSDT,AVAXUSDT,LTCUSDT"]
-    environment:
-      - RUST_LOG=info,persistence=warn
-      - CONFIG_DIR=/app/configs
-      - RUN_MODE=prod 
-    volumes:
-      - /home/dj/repos/arkin/configs:/app/configs:ro  
-    networks:
-      - network
-    depends_on:
-      - triton
-      - clickhouse
-      - postgres
-    restart: unless-stopped
+  # arkin-binance-ingestor-1:
+  #   container_name: arkin-binance-ingestor-1
+  #   image: arkin:v1.0.0
+  #   hostname: arkin-binance-ingestor-1
+  #   command: ["./main", "ingestor",  "-i", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,TRXUSDT,DOGEUSDT,ADAUSDT,LINKUSDT,XLMUSDT,HBARUSDT,AVAXUSDT,LTCUSDT"]
+  #   environment:
+  #     - RUST_LOG=info,persistence=warn
+  #     - CONFIG_DIR=/app/configs
+  #     - RUN_MODE=prod
+  #   volumes:
+  #     - /home/dj/repos/arkin/configs:/app/configs:ro
+  #   networks:
+  #     - network
+  #   depends_on:
+  #     - triton
+  #     - clickhouse
+  #     - postgres
+  #   restart: unless-stopped
 
-
-  arkin-binance-ingestor-2:
-    container_name: arkin-binance-ingestor-2
-    image: arkin:v1.0.0
-    hostname: arkin-binance-ingestor-2
-    command: ["./main", "ingestor",  "-i", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,TRXUSDT,DOGEUSDT,ADAUSDT,LINKUSDT,XLMUSDT,HBARUSDT,AVAXUSDT,LTCUSDT"]
-    environment:
-      - RUST_LOG=info,persistence=warn
-      - CONFIG_DIR=/app/configs
-      - RUN_MODE=prod  
-    volumes:
-      - /home/dj/repos/arkin/configs:/app/configs:ro  
-    networks:
-      - network
-    depends_on:
-      - triton
-      - clickhouse
-      - postgres
-    restart: unless-stopped
-
+  # arkin-binance-ingestor-2:
+  #   container_name: arkin-binance-ingestor-2
+  #   image: arkin:v1.0.0
+  #   hostname: arkin-binance-ingestor-2
+  #   command: ["./main", "ingestor",  "-i", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,TRXUSDT,DOGEUSDT,ADAUSDT,LINKUSDT,XLMUSDT,HBARUSDT,AVAXUSDT,LTCUSDT"]
+  #   environment:
+  #     - RUST_LOG=info,persistence=warn
+  #     - CONFIG_DIR=/app/configs
+  #     - RUN_MODE=prod
+  #   volumes:
+  #     - /home/dj/repos/arkin/configs:/app/configs:ro
+  #   networks:
+  #     - network
+  #   depends_on:
+  #     - triton
+  #     - clickhouse
+  #     - postgres
+  #   restart: unless-stopped
 
   # arkin-agent:
   #   container_name: arkin-agent

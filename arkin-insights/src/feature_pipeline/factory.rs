@@ -4,7 +4,7 @@ use arkin_core::{Instrument, PersistenceReader};
 use tracing::info;
 
 use crate::{
-    config::{AggregationType, FeatureConfig, PipelineConfig},
+    config::{FeatureConfig, GroupBy, InstrumentSelector, PipelineConfig},
     features::{
         DistributionType, DualRangeFeature, LagFeature, NormalizeFeature, QuantileTransformer, RangeFeature,
         RobustScaler, TwoValueFeature,
@@ -30,7 +30,8 @@ impl FeatureFactory {
         info!("FeatureFactory: Creating features from config");
 
         // Step 1: Query real instruments using global filter - this is our universe
-        let mut instrument_query = SyntheticGenerator::build_instrument_query(&pipeline_config.instrument_filter);
+        let mut instrument_query =
+            SyntheticGenerator::build_instrument_query(&pipeline_config.global_instrument_selector);
         // Ensure we only get real instruments (not synthetics)
         instrument_query.synthetic = Some(false);
 
@@ -76,9 +77,20 @@ impl FeatureFactory {
                     // Validate that input, output, and lag have the same length
                     assert_eq!(c.input.len(), c.output.len(), "input and output must have the same length");
                     assert_eq!(c.input.len(), c.lag.len(), "input and lag must have the same length");
+                    assert_eq!(c.input.len(), c.method.len(), "input and method must have the same length");
 
-                    // Build scopes - feature filters the universe with its own filter
-                    let scopes = Self::build_scopes(&c.aggregation_type, real_instruments, synthetic_instruments);
+                    // Build scopes using the new two-step approach
+                    let filtered = Self::filter_instruments_by_selector(
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.instrument_selector,
+                    );
+                    let scopes = Self::build_scopes_from_filtered(
+                        &filtered,
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.group_by,
+                    );
 
                     for i in 0..c.input.len() {
                         let input_feature = persistence.get_feature_id(&c.input[i]).await;
@@ -89,7 +101,7 @@ impl FeatureFactory {
                                 .input(input_feature)
                                 .output(output_feature)
                                 .lag(c.lag[i])
-                                .method(c.method.clone())
+                                .method(c.method[i])
                                 .fill_strategy(c.fill_strategy)
                                 .scopes(scopes.clone())
                                 .build(),
@@ -100,12 +112,24 @@ impl FeatureFactory {
                     // Validate that input, output, and data have the same length
                     assert_eq!(c.input.len(), c.output.len(), "input and output must have the same length");
                     assert_eq!(c.input.len(), c.data.len(), "input and data must have the same length");
+                    assert_eq!(c.input.len(), c.method.len(), "input and method must have the same length");
 
-                    // Build scopes once for all range features with the same aggregation type
-                    let scopes = Self::build_scopes(&c.aggregation_type, real_instruments, synthetic_instruments);
+                    // Build scopes using the new two-step approach: filter + group by
+                    let filtered = Self::filter_instruments_by_selector(
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.instrument_selector,
+                    );
+                    let scopes = Self::build_scopes_from_filtered(
+                        &filtered,
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.group_by,
+                    );
                     tracing::info!(
-                        "Range feature with aggregation_type {:?} has {} scopes",
-                        c.aggregation_type,
+                        "Range feature with selector {:?} and group_by {:?} has {} scopes",
+                        c.instrument_selector,
+                        c.group_by,
                         scopes.len()
                     );
 
@@ -117,8 +141,8 @@ impl FeatureFactory {
                             RangeFeature::builder()
                                 .input(input_feature)
                                 .output(output_feature)
-                                .data(c.data[i].clone())
-                                .method(c.method.clone())
+                                .data(c.data[i])
+                                .method(c.method[i])
                                 .fill_strategy(c.fill_strategy)
                                 .scopes(scopes.clone())
                                 .build(),
@@ -135,8 +159,18 @@ impl FeatureFactory {
                     assert_eq!(c.input_1.len(), c.output.len(), "input_1 and output must have the same length");
                     assert_eq!(c.input_1.len(), c.data.len(), "input_1 and data must have the same length");
 
-                    // Build scopes once for all dual range features with the same aggregation type
-                    let scopes = Self::build_scopes(&c.aggregation_type, real_instruments, synthetic_instruments);
+                    // Build scopes using the new two-step approach
+                    let filtered = Self::filter_instruments_by_selector(
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.instrument_selector,
+                    );
+                    let scopes = Self::build_scopes_from_filtered(
+                        &filtered,
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.group_by,
+                    );
 
                     for i in 0..c.input_1.len() {
                         let input_1_feature = persistence.get_feature_id(&c.input_1[i]).await;
@@ -148,8 +182,8 @@ impl FeatureFactory {
                                 .input_1(input_1_feature)
                                 .input_2(input_2_feature)
                                 .output(output_feature)
-                                .data(c.data[i].clone())
-                                .method(c.method.clone())
+                                .data(c.data[i])
+                                .method(c.method[i])
                                 .fill_strategy(c.fill_strategy)
                                 .scopes(scopes.clone())
                                 .build(),
@@ -165,8 +199,24 @@ impl FeatureFactory {
                     );
                     assert_eq!(c.input_1.len(), c.output.len(), "input_1 and output must have the same length");
 
-                    // Build scopes once for all two value features with the same aggregation type
-                    let scopes = Self::build_scopes(&c.aggregation_type, real_instruments, synthetic_instruments);
+                    // Build scopes using the new two-step approach for both selectors
+                    let filtered_1 = Self::filter_instruments_by_selector(
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.instrument_selector_1,
+                    );
+                    let filtered_2 = Self::filter_instruments_by_selector(
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.instrument_selector_2,
+                    );
+
+                    // Merge the two filtered sets for scopes
+                    let mut merged = filtered_1;
+                    merged.extend(filtered_2);
+
+                    let scopes =
+                        Self::build_scopes_from_filtered(&merged, real_instruments, synthetic_instruments, &c.group_by);
 
                     for i in 0..c.input_1.len() {
                         let input_1_feature = persistence.get_feature_id(&c.input_1[i]).await;
@@ -178,7 +228,7 @@ impl FeatureFactory {
                                 .input_1(input_1_feature)
                                 .input_2(input_2_feature)
                                 .output(output_feature)
-                                .method(c.method.clone())
+                                .method(c.method[i])
                                 .fill_strategy(c.fill_strategy)
                                 .scopes(scopes.clone())
                                 .build(),
@@ -198,8 +248,18 @@ impl FeatureFactory {
                     // Register output feature
                     let output_feature = persistence.get_feature_id(&c.output).await;
 
-                    // Build scopes for normalize feature
-                    let scopes = Self::build_scopes(&c.aggregation_type, real_instruments, synthetic_instruments);
+                    // Build scopes using the new two-step approach
+                    let filtered = Self::filter_instruments_by_selector(
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.instrument_selector,
+                    );
+                    let scopes = Self::build_scopes_from_filtered(
+                        &filtered,
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.group_by,
+                    );
 
                     features.push(Arc::new(
                         NormalizeFeature::builder()
@@ -218,140 +278,90 @@ impl FeatureFactory {
         features
     }
 
-    /// Build instrument scopes based on aggregation type
-    /// Each scope represents a collection of instruments that should be processed together
-    /// The feature's filter is applied to the universe (real + synthetic instruments)
-    fn build_scopes(
-        aggregation_type: &AggregationType,
+    /// Filter instruments based on the selector
+    /// Returns the filtered set of instruments that match the selector criteria
+    fn filter_instruments_by_selector(
         real_instruments: &[Arc<Instrument>],
         synthetic_instruments: &[Arc<Instrument>],
+        selector: &InstrumentSelector,
+    ) -> Vec<Arc<Instrument>> {
+        let mut result = Vec::new();
+
+        // Check synthetic flag to determine which set to use
+        if selector.synthetic == Some(true) {
+            result.extend(
+                synthetic_instruments
+                    .iter()
+                    .filter(|inst| Self::matches_filter(inst, selector))
+                    .cloned(),
+            );
+        } else if selector.synthetic == Some(false) {
+            result.extend(
+                real_instruments
+                    .iter()
+                    .filter(|inst| Self::matches_filter(inst, selector))
+                    .cloned(),
+            );
+        } else {
+            // No synthetic filter - include both real and synthetic
+            result.extend(
+                real_instruments
+                    .iter()
+                    .filter(|inst| Self::matches_filter(inst, selector))
+                    .cloned(),
+            );
+            result.extend(
+                synthetic_instruments
+                    .iter()
+                    .filter(|inst| Self::matches_filter(inst, selector))
+                    .cloned(),
+            );
+        }
+
+        result
+    }
+
+    /// Build scopes from filtered instruments based on GroupBy configuration
+    /// Each scope represents a collection of instruments that should be processed together
+    fn build_scopes_from_filtered(
+        filtered_instruments: &[Arc<Instrument>],
+        _real_instruments: &[Arc<Instrument>],
+        _synthetic_instruments: &[Arc<Instrument>],
+        group_by: &GroupBy,
     ) -> Vec<InstrumentScope> {
-        match aggregation_type {
-            // Instrument-level: each real instrument gets a 1:1 scope (read from itself, write to itself)
-            AggregationType::Instrument { filter } => real_instruments
+        if filtered_instruments.is_empty() {
+            return vec![];
+        }
+
+        // If GroupBy is empty (all flags false/empty), create 1:1 scopes
+        if !group_by.base_asset && group_by.quote_asset.is_empty() && !group_by.instrument_type && !group_by.venue {
+            return filtered_instruments
                 .iter()
-                .filter(|inst| Self::matches_filter(inst, filter))
                 .map(|inst| InstrumentScope::single(Arc::clone(inst)))
-                .collect(),
+                .collect();
+        }
 
-            // Grouped: each synthetic reads from multiple real instruments
-            AggregationType::Grouped { filter, group_by } => {
-                synthetic_instruments
-                    .iter()
-                    .filter(|inst| {
-                        // Must be synthetic
-                        if !inst.synthetic {
-                            return false;
-                        }
+        // Otherwise, group instruments according to GroupBy config
+        // For real instruments being grouped, create synthetic outputs
+        // For synthetic instruments, create 1:1 scopes
+        let mut result = Vec::new();
 
-                        // Filter out index synthetics (don't start with syn-)
-                        // Index synthetics have names like: index_notional_01m@index
-                        // Base synthetics have names like: syn-btc-usd@index
-                        if !inst.symbol.starts_with("syn-") {
-                            return false;
-                        }
-
-                        // If feature specifies a venue, synthetic symbol must match that venue
-                        // e.g., venue=Some(BinanceUsdmFutures) means symbol must contain "@binance"
-                        if let Some(feature_venue) = group_by.venue {
-                            let venue_suffix = format!("@{}", feature_venue.exchange_name().to_lowercase());
-                            if !inst.symbol.to_lowercase().contains(&venue_suffix) {
-                                return false;
-                            }
-                        } else {
-                            // If no venue specified (global aggregation), accept @index synthetics
-                            // but NOT @binance or other exchange-specific synthetics
-                            if inst.symbol.contains("@binance") || inst.symbol.contains("@okx") {
-                                return false;
-                            }
-                        }
-
-                        // If group_by specifies instrument_type, synthetic symbol must include the type prefix
-                        if group_by.instrument_type {
-                            // Synthetics WITH type grouping look like: syn-spot-btc-usd@ or syn-perpetual-btc-usd@
-                            let has_type_prefix = inst.symbol.contains("-spot-")
-                                || inst.symbol.contains("-perpetual-")
-                                || inst.symbol.contains("-future-");
-                            if !has_type_prefix {
-                                return false;
-                            }
-                        } else {
-                            // If NOT grouping by type, synthetic should NOT have a type prefix
-                            // Synthetics without type grouping look like: syn-btc-usd@index
-                            let has_type_prefix = inst.symbol.contains("-spot-")
-                                || inst.symbol.contains("-perpetual-")
-                                || inst.symbol.contains("-future-");
-                            if has_type_prefix {
-                                return false;
-                            }
-                        }
-
-                        true
-                    })
-                    .map(|synthetic| {
-                        // Find all real instruments that should aggregate into this synthetic
-                        let inputs: Vec<Arc<Instrument>> = real_instruments
-                            .iter()
-                            .filter(|real_inst| {
-                                // Check if this real instrument should be included
-                                Self::matches_filter(real_inst, filter)
-                                    && Self::should_aggregate_into(real_inst, synthetic, group_by)
-                            })
-                            .cloned()
-                            .collect();
-
-                        InstrumentScope::new(inputs, Arc::clone(synthetic))
-                    })
-                    .collect()
-            }
-
-            // Index: one or more index synthetics, each reads from grouped synthetics
-            AggregationType::Index { filter } => {
-                synthetic_instruments
-                    .iter()
-                    .filter(|inst| {
-                        // Must be synthetic
-                        if !inst.synthetic {
-                            return false;
-                        }
-
-                        // Must be an index synthetic (not base asset synthetics)
-                        // Index synthetics: index_notional_01m@index
-                        // Base synthetics: syn-btc-usd@index, syn-spot-btc-usd@index
-                        if inst.symbol.starts_with("syn-") {
-                            return false;
-                        }
-                        true
-                    })
-                    .map(|index_synthetic| {
-                        // Index reads from grouped synthetics (syn-*)
-                        // Grouped synthetics have venue=Index and instrument_type=Index,
-                        // so we only filter on base_asset, quote_asset, and synthetic flag
-                        let inputs: Vec<_> = synthetic_instruments
-                            .iter()
-                            .filter(|syn| {
-                                // Must be a grouped synthetic (not an index synthetic)
-                                syn.symbol.starts_with("syn-") &&
-                                !syn.symbol.starts_with("index") &&
-                                // Match base_asset if specified
-                                (filter.base_asset.is_empty() || filter.base_asset.contains(&syn.base_asset.symbol)) &&
-                                // Match quote_asset if specified
-                                (filter.quote_asset.is_empty() || filter.quote_asset.contains(&syn.quote_asset.symbol)) &&
-                                // Match synthetic flag if specified
-                                filter.synthetic.map_or(true, |s| syn.synthetic == s)
-                            })
-                            .cloned()
-                            .collect();
-
-                        InstrumentScope::new(inputs, Arc::clone(index_synthetic))
-                    })
-                    .collect()
+        for inst in filtered_instruments {
+            if inst.synthetic {
+                // Synthetic instruments get 1:1 scopes
+                result.push(InstrumentScope::single(Arc::clone(inst)));
+            } else {
+                // Real instruments would be grouped by the group_by config
+                // For now, keep as 1:1 until we implement grouping logic
+                result.push(InstrumentScope::single(Arc::clone(inst)));
             }
         }
+
+        result
     }
 
     /// Check if an instrument matches the filter
-    fn matches_filter(inst: &Instrument, filter: &crate::config::InstrumentFilter) -> bool {
+    fn matches_filter(inst: &Instrument, filter: &InstrumentSelector) -> bool {
         // Empty filter means match all
         if filter.base_asset.is_empty()
             && filter.quote_asset.is_empty()
@@ -399,11 +409,7 @@ impl FeatureFactory {
     }
 
     /// Determine if a real instrument should aggregate into a synthetic based on grouping rules
-    fn should_aggregate_into(
-        real_inst: &Instrument,
-        synthetic: &Instrument,
-        group_by: &crate::config::GroupBy,
-    ) -> bool {
+    fn should_aggregate_into(real_inst: &Instrument, synthetic: &Instrument, group_by: &GroupBy) -> bool {
         // Match by base asset (BTC, ETH, etc.)
         if real_inst.base_asset.symbol != synthetic.base_asset.symbol {
             return false;
@@ -412,6 +418,11 @@ impl FeatureFactory {
         // Match by quote asset - real instrument's quote must be in the group_by list
         // Note: The synthetic has the reference currency (USD), but real instruments have USDT, USDC, etc.
         if !group_by.quote_asset.is_empty() && !group_by.quote_asset.contains(&real_inst.quote_asset.symbol) {
+            return false;
+        }
+
+        // Match by venue if group_by.venue is true
+        if group_by.venue && real_inst.venue.name != synthetic.venue.name {
             return false;
         }
 

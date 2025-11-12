@@ -315,7 +315,7 @@ pub fn test_bnb_asset() -> Arc<Asset> {
 pub fn test_binance_venue() -> Arc<Venue> {
     let venue = Venue::builder()
         .id(Uuid::parse_str("48adfe42-29fb-4402-888a-0204bf417e32").expect("Invalid UUID"))
-        .name(VenueName::BinanceUsdmFutures)
+        .name(VenueName::Binance)
         .venue_type(VenueType::Cex)
         .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
