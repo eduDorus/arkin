@@ -7,7 +7,7 @@ use tokio::{self, pin};
 use tracing::info;
 
 use arkin_core::prelude::*;
-use arkin_ingestors::prelude::*;
+use arkin_data_providers::prelude::*;
 
 /// CLI application for X
 #[derive(Parser)]

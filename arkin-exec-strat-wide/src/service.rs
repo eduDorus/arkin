@@ -268,6 +268,21 @@ impl WideQuoterExecutionStrategy {
 
 #[async_trait]
 impl Runnable for WideQuoterExecutionStrategy {
+    fn event_filter(&self, _instance_type: InstanceType) -> EventFilter {
+        EventFilter::Events(vec![
+            EventType::NewWideQuoterExecutionOrder,
+            EventType::CancelWideQuoterExecutionOrder,
+            EventType::CancelAllWideQuoterExecutionOrders,
+            EventType::VenueOrderInflight,
+            EventType::VenueOrderPlaced,
+            EventType::VenueOrderRejected,
+            EventType::VenueOrderFill,
+            EventType::VenueOrderCancelled,
+            EventType::VenueOrderExpired,
+            EventType::TickUpdate,
+        ])
+    }
+
     async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
         match &event {
             Event::NewWideQuoterExecutionOrder(eo) => self.new_execution_order(ctx, eo).await,

@@ -9,7 +9,7 @@ pub enum TradingEngineError {
     AccountingError(#[from] arkin_accounting::AccountingError),
 
     #[error(transparent)]
-    IngestorError(#[from] arkin_ingestors::IngestorError),
+    IngestorError(#[from] arkin_data_providers::IngestorError),
 
     #[error(transparent)]
     InsightsError(#[from] arkin_insights::InsightsError),

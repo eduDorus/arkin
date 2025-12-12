@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
-use arkin_ingestors::prelude::*;
+use arkin_data_providers::prelude::*;
 use arkin_persistence::prelude::*;
 use tracing::error;
 

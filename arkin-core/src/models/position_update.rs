@@ -1,18 +1,22 @@
 use std::{fmt, sync::Arc};
 
+use anyhow::{Context, Result};
+use async_trait::async_trait;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use sqlx::prelude::Type;
 use strum::Display;
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{AccountType, Price, Quantity};
+use crate::{AccountType, EventPayload, InstrumentQuery, PersistenceReader, Price, Quantity};
 
 use super::{Instrument, MarketSide};
 
-#[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type)]
+#[derive(Clone, Display, Copy, PartialEq, Eq, Debug, Type, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "position_side", rename_all = "snake_case")]
 pub enum PositionSide {
     Long,
@@ -54,6 +58,34 @@ impl PositionUpdate {
     }
 }
 
+#[async_trait]
+impl EventPayload for PositionUpdate {
+    type Dto = PositionUpdateDto;
+
+    fn to_dto(&self) -> Self::Dto {
+        self.clone().into()
+    }
+
+    async fn from_dto(dto: Self::Dto, persistence: Arc<dyn PersistenceReader>) -> Result<Self> {
+        let instrument = persistence
+            .get_instrument(&InstrumentQuery::builder().id(dto.instrument_id).build())
+            .await
+            .context(format!("Failed to get instrument with id {}", dto.instrument_id))?;
+
+        Ok(PositionUpdate::builder()
+            .id(dto.id)
+            .event_time(dto.event_time)
+            .instrument(instrument)
+            .account_type(dto.account_type)
+            .entry_price(dto.entry_price)
+            .quantity(dto.quantity)
+            .realized_pnl(dto.realized_pnl)
+            .unrealized_pnl(dto.unrealized_pnl)
+            .position_side(dto.position_side)
+            .build())
+    }
+}
+
 impl PartialEq for PositionUpdate {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
@@ -74,5 +106,34 @@ impl fmt::Display for PositionUpdate {
             self.realized_pnl,
             self.unrealized_pnl,
         )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PositionUpdateDto {
+    pub id: Uuid,
+    pub event_time: UtcDateTime,
+    pub instrument_id: Uuid,
+    pub account_type: AccountType,
+    pub entry_price: Price,
+    pub quantity: Quantity,
+    pub realized_pnl: Decimal,
+    pub unrealized_pnl: Decimal,
+    pub position_side: PositionSide,
+}
+
+impl From<PositionUpdate> for PositionUpdateDto {
+    fn from(update: PositionUpdate) -> Self {
+        Self {
+            id: update.id,
+            event_time: update.event_time,
+            instrument_id: update.instrument.id,
+            account_type: update.account_type,
+            entry_price: update.entry_price,
+            quantity: update.quantity,
+            realized_pnl: update.realized_pnl,
+            unrealized_pnl: update.unrealized_pnl,
+            position_side: update.position_side,
+        }
     }
 }

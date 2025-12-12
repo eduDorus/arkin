@@ -2,13 +2,19 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use arkin_core::{Asset, AssetQuery};
+use arkin_core::{Asset, AssetListQuery, AssetQuery};
 
 use arkin_core::PersistenceError;
 
 use crate::{context::PersistenceContext, repos::pg::asset_repo};
 
 async fn update_cache(ctx: &PersistenceContext, asset: Arc<Asset>) {
+    // First we check if we have an existing asset with the same ID or symbol
+    // if we do we skip updating the cache to avoid duplicates
+    if let Some(existing) = ctx.cache.asset_id.get(&asset.id).await {
+        return;
+    }
+
     ctx.cache.asset_id.insert(asset.id, asset.clone()).await;
     ctx.cache.asset_symbol.insert(asset.name.clone(), asset).await;
 }
@@ -36,9 +42,41 @@ pub async fn load_assets(ctx: &PersistenceContext) -> Result<Vec<Arc<Asset>>, Pe
     Ok(assets)
 }
 
-/// Query assets with in-memory filtering from cache
-/// Assumes cache is already populated via load_assets()
-pub async fn query(ctx: &PersistenceContext, query: &AssetQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
+pub async fn query(ctx: &PersistenceContext, query: &AssetQuery) -> Result<Arc<Asset>, PersistenceError> {
+    // Try to read from cache first
+    let asset = if let Some(id) = query.id {
+        read_cache_by_id(ctx, &id).await
+    } else if let Some(ref symbol) = query.symbol {
+        read_cache_by_symbol(ctx, symbol).await
+    } else {
+        None
+    };
+
+    if let Some(asset) = asset {
+        if query.matches(&asset) {
+            return Ok(asset);
+        }
+    }
+
+    // Fallback to database
+    let asset_dto = if let Some(id) = query.id {
+        asset_repo::read_by_id(ctx, &id).await?
+    } else if let Some(ref symbol) = query.symbol {
+        asset_repo::read_by_symbol(ctx, symbol).await?
+    } else {
+        return Err(PersistenceError::NotFound);
+    };
+
+    let asset: Arc<Asset> = asset_dto.into();
+    if query.matches(&asset) {
+        update_cache(ctx, asset.clone()).await;
+        Ok(asset)
+    } else {
+        Err(PersistenceError::NotFound)
+    }
+}
+
+pub async fn query_list(ctx: &PersistenceContext, query: &AssetListQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
     // Get all cached assets by iterating over the cache
     let all_assets: Vec<Arc<Asset>> = ctx.cache.asset_id.iter().map(|(_, asset)| asset).collect();
 

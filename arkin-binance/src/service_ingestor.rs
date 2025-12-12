@@ -63,7 +63,7 @@ pub async fn start_md_task(ingestor: Arc<BinanceIngestor>, core_ctx: Arc<CoreCtx
                       Ok(e) => {
                           match e.data {
                               BinanceUSDMMarketEvent::AggTrade(trade) => {
-                                  let instrument = match core_ctx.persistence.get_instrument_by_venue_symbol(&trade.instrument, &ingestor.venue).await {
+                                  let instrument = match core_ctx.persistence.get_instrument(&InstrumentQuery::builder().venue_symbol(trade.instrument).venue(ingestor.venue.name).build()).await {
                                       Ok(i) => i,
                                       Err(e) => {
                                           error!("Failed to get instrument: {}", e);
@@ -93,7 +93,7 @@ pub async fn start_md_task(ingestor: Arc<BinanceIngestor>, core_ctx: Arc<CoreCtx
                                   core_ctx.publish(Event::AggTradeUpdate(trade)).await;
                               }
                               BinanceUSDMMarketEvent::Tick(tick) => {
-                                  let instrument = match core_ctx.persistence.get_instrument_by_venue_symbol(&tick.instrument, &ingestor.venue).await {
+                                  let instrument = match core_ctx.persistence.get_instrument(&InstrumentQuery::builder().venue_symbol(tick.instrument).venue(ingestor.venue.name).build()).await {
                                       Ok(i) => i,
                                       Err(e) => {
                                           error!("Failed to get instrument: {}", e);

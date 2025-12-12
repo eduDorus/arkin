@@ -35,7 +35,7 @@ pub enum Commands {
     /// Run data ingestors to process and store incoming data streams.
     ///
     /// Ingestors subscribe to live or historical feeds. Currently supports Binance; extend `IngestorType` for more.
-    Ingestor(IngestorsArgs),
+    DataProvider(IngestorsArgs),
 
     /// Generate and manage insights from processed data.
     ///
@@ -61,6 +61,34 @@ pub enum Commands {
     ///
     /// Connects to live ingestors for ongoing data handling.
     Agent(AgentArgs),
+
+    /// Execution Strategy
+    ///
+    /// Handles strategy execution and management.
+    ExecutionStrategy(ExecutionStrategyArgs),
+
+    /// Execution
+    ///
+    /// Handles order execution and trade management.
+    Execution(ExecutionArgs),
+
+    /// Persistence Service
+    ///
+    /// Manages data persistence operations.
+    Persistence(PersistenceArgs),
+
+    /// Log Events
+    ///
+    /// Connects to PubSub to log events.
+    Audit(Audit),
+
+    /// Send Order
+    ///
+    /// Sends a test order via PubSub.
+    SendOrder,
+
+    /// Cancel All Orders
+    CancelAllOrders,
 }
 
 /// Arguments for the `download` subcommand.
@@ -289,4 +317,36 @@ pub struct AgentArgs {
     /// Pipeline warmup ticks
     #[arg(short, long, default_value_t = 1440)]
     pub warmup: u16,
+}
+
+/// Arguments for the `execution-strategy` subcommand.
+#[derive(Args, Debug)]
+pub struct ExecutionStrategyArgs {
+    /// Unique name for this execution strategy instance.
+    #[arg(long, short = 'n')]
+    pub strategy: ExecutionStrategyType,
+}
+
+/// Arguments for the `execution` subcommand.
+#[derive(Args, Debug)]
+pub struct ExecutionArgs {
+    /// Venue Name to spin up execution for.
+    #[arg(long, short)]
+    pub venue: VenueName,
+}
+
+/// Arguments for the `persistence` subcommand.
+#[derive(Args, Debug)]
+pub struct PersistenceArgs {
+    /// Unique name for this persistence instance.
+    #[arg(long, short = 'n', default_value = "arkin-persistence")]
+    pub persistence_name: String,
+}
+
+/// Arguments for the `logger` subcommand.
+#[derive(Args, Debug)]
+pub struct Audit {
+    /// Unique name for this logger instance.
+    #[arg(long, short = 'n', default_value = "arkin-audit")]
+    logger_name: String,
 }

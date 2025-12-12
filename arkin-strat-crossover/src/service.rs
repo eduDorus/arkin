@@ -27,7 +27,8 @@ impl CrossoverStrategy {
 
         // Calculate the crossover signals for each instrument in the tick
         let mut new_weights = HashMap::new();
-        for i in &tick.instruments {
+        let instruments = tick.instruments();
+        for i in &instruments {
             let fast_ma = tick
                 .insights
                 .iter()

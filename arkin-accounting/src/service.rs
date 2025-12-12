@@ -158,13 +158,13 @@ impl Accounting {
         self.process_account_update(ctx, update, UpdateMode::Recon).await;
     }
 
-    async fn handle_trade_update(&self, ctx: Arc<CoreCtx>, update: &VenueTradeUpdate) {
-        info!(target: "accounting", "processing trade update for order {}", update.order.id);
+    async fn handle_fill_update(&self, ctx: Arc<CoreCtx>, update: &VenueOrder) {
+        info!(target: "accounting", "processing trade update for order {}", update.id);
         let time = ctx.now().await;
 
         let transfer_group_id = Uuid::new_v4();
         let transfer_group_type = TransferGroupType::Trade;
-        let venue = update.order.instrument.venue.clone();
+        let venue = update.instrument.venue.clone();
         let mut transfers = Vec::new();
 
         let user_account = self
@@ -175,15 +175,15 @@ impl Accounting {
             .ledger
             .find_or_create_account(&venue, AccountOwner::Venue, AccountType::Margin, time)
             .await;
-        let instrument = update.order.instrument.clone();
+        let instrument = update.instrument.clone();
         let margin_asset = instrument.margin_asset.clone();
-        let side_sign: Decimal = update.order.side.into();
-        let quantity = update.fill_quantity;
-        let price = update.fill_price;
+        let side_sign: Decimal = update.side.into();
+        let quantity = update.last_fill_quantity;
+        let price = update.last_fill_price;
         let commission = update.commission;
 
         // Query current (strat-specific if available)
-        let (entry, current_qty) = if let Some(strat) = update.order.strategy.clone() {
+        let (entry, current_qty) = if let Some(strat) = update.strategy.clone() {
             self.ledger.get_strategy_position(&user_account, strat, &instrument).await
         } else {
             self.ledger.get_position(&user_account, &instrument).await
@@ -238,7 +238,7 @@ impl Accounting {
                     .credit_account(credit)
                     .amount(amount)
                     .unit_price(Decimal::ONE)
-                    .strategy(update.order.strategy.clone())
+                    .strategy(update.strategy.clone())
                     .instrument(Some(instrument.clone()))
                     .asset(Some(margin_asset.clone()))
                     .created(time)
@@ -263,7 +263,7 @@ impl Accounting {
                     .credit_account(credit)
                     .amount(amount.abs())
                     .unit_price(price) // Fill price for new
-                    .strategy(update.order.strategy.clone())
+                    .strategy(update.strategy.clone())
                     .instrument(Some(instrument.clone()))
                     .asset(Some(margin_asset.clone()))
                     .created(time)
@@ -283,7 +283,7 @@ impl Accounting {
                     .credit_account(venue_account.clone())
                     .amount(commission.abs())
                     .unit_price(Decimal::ONE)
-                    .strategy(update.order.strategy.clone())
+                    .strategy(update.strategy.clone())
                     .instrument(Some(instrument.clone()))
                     .asset(Some(margin_asset.clone()))
                     .created(time)
@@ -308,7 +308,7 @@ impl Accounting {
                     .credit_account(credit)
                     .amount(amount)
                     .unit_price(Decimal::ONE)
-                    .strategy(update.order.strategy.clone())
+                    .strategy(update.strategy.clone())
                     .instrument(Some(instrument))
                     .asset(Some(margin_asset))
                     .created(time)
@@ -338,7 +338,7 @@ impl Runnable for Accounting {
             // Account
             Event::InitialAccountUpdate(au) => self.handle_initial_account_update(core_ctx, au).await,
             Event::ReconcileAccountUpdate(au) => self.handle_reconcile_account_update(core_ctx, au).await,
-            Event::VenueTradeUpdate(tu) => self.handle_trade_update(core_ctx, tu).await,
+            Event::VenueOrderFill(tu) => self.handle_fill_update(core_ctx, tu).await,
             e => warn!(target: "accounting", "received unused event {}", e),
         }
     }

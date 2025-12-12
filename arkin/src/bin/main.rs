@@ -1,20 +1,28 @@
+use std::{cmp::max, str::FromStr, sync::Arc};
 
-use arkin_ingestor::registry::MAPPINGS;
+use anyhow::Result;
+use arkin_binance::BinanceExecution;
+use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
 use clap::Parser;
+use rust_decimal::dec;
+use tokio::select;
 use tokio_rustls::rustls::crypto::{ring, CryptoProvider};
 use tracing::info;
 
 use arkin_cli::{Cli, Commands};
 use arkin_core::prelude::*;
+use arkin_data_provider::DataProviderService;
+use arkin_persistence::Persistence;
 
 use mimalloc::MiMalloc;
+use uuid::Uuid;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
 // #[tokio::main(flavor = "current_thread")]
 #[tokio::main(flavor = "multi_thread")]
-async fn main() {
+async fn main() -> Result<()> {
     init_tracing();
 
     // Install the default CryptoProvider
@@ -24,11 +32,233 @@ async fn main() {
     info!("args: {:?}", args);
 
     match args.command {
-        Commands::Ingestor(a) => {
-            info!("Starting arkin ingestor 🚀");
-            info!("Ingestor args: {:?}", a);
-            let _mappings = MAPPINGS.clone();
+        Commands::DataProvider(a) => {
+            info!("Starting arkin data provider 🚀");
+            info!("DataProvider args: {:?}", a);
 
+            // Init Persistence
+            let persistence = Persistence::from_config_test();
+            persistence.refresh().await?;
+
+            // Init Redis PubSub
+            let pubsub = RedisPubSub::new(persistence.clone())?;
+
+            let mut engine =
+                Engine::new(LiveSystemTime::new(), pubsub.clone(), persistence.clone(), InstanceType::Live);
+            engine.register("pubsub", pubsub.clone(), 0, 10);
+
+            let data_provider_service = DataProviderService::load_config();
+            engine.register("data_provider", Arc::new(data_provider_service), 1, 1);
+
+            engine.start().await;
+            engine.wait_for_shutdown().await;
+            engine.stop().await;
+        }
+        Commands::ExecutionStrategy(a) => {
+            info!("Starting arkin execution strategy 🚀");
+            info!("Execution Strategy args: {:?}", a);
+
+            // Init Persistence
+            let persistence = Persistence::from_config_test();
+            persistence.refresh().await?;
+
+            // Init Redis PubSub
+            let pubsub = RedisPubSub::new(persistence.clone())?;
+
+            // Init Execution Strategy
+            let execution_orderbook = Arc::new(
+                ExecutionOrderBook::builder()
+                    .publisher(pubsub.publisher())
+                    .autoclean(true)
+                    .build(),
+            );
+            let venue_orderbook =
+                Arc::new(VenueOrderBook::builder().publisher(pubsub.publisher()).autoclean(true).build());
+            let strategy = match a.strategy {
+                ExecutionStrategyType::WideQuoter => WideQuoterExecutionStrategy::builder()
+                    .exec_order_book(execution_orderbook)
+                    .venue_order_book(venue_orderbook)
+                    .pct_from_mid(dec!(0.0050))
+                    .requote_pct_change(dec!(0.0025))
+                    .build(),
+                _ => unimplemented!("Execution strategy {} is not implemented yet", a.strategy),
+            };
+
+            // Init Engine
+            let mut engine =
+                Engine::new(LiveSystemTime::new(), pubsub.clone(), persistence.clone(), InstanceType::Live);
+            engine.register("pubsub", pubsub.clone(), 0, 10);
+            engine.register("execution_strategy", Arc::new(strategy), 1, 1);
+
+            engine.start().await;
+            engine.wait_for_shutdown().await;
+            engine.stop().await;
+        }
+        Commands::Execution(a) => {
+            info!("Starting arkin execution service 🚀");
+            info!("Execution args: {:?}", a);
+
+            // Init Persistence
+            let persistence = Persistence::from_config_test();
+            persistence.refresh().await?;
+
+            // Init Redis PubSub
+            let pubsub = RedisPubSub::new(persistence.clone())?;
+
+            let mut engine =
+                Engine::new(LiveSystemTime::new(), pubsub.clone(), persistence.clone(), InstanceType::Live);
+            engine.register("pubsub", pubsub.clone(), 0, 10);
+
+            let execution = match a.venue {
+                VenueName::Binance => BinanceExecution::new(),
+                _ => unimplemented!("Execution service for venue {} is not implemented yet", a.venue),
+            };
+
+            engine.register("execution", execution, 1, 1);
+
+            engine.start().await;
+            engine.wait_for_shutdown().await;
+            engine.stop().await;
+        }
+        Commands::Persistence(a) => {
+            info!("Starting arkin persistence service 🚀");
+            info!("Persistence args: {:?}", a);
+
+            // Init Persistence
+            let instance = Instance::builder()
+                .id(Uuid::from_str("38fb7951-07d1-4a45-a999-59a5bf4ab0c1").expect("Failed to parse UUID"))
+                .name("persistence".to_string())
+                .instance_type(InstanceType::Live)
+                .created(LiveSystemTime::new().now().await)
+                .updated(LiveSystemTime::new().now().await)
+                .build();
+            let persistence = Persistence::from_config(instance, false, false, false);
+            persistence.refresh().await?;
+
+            // Init Redis PubSub
+            let pubsub = RedisPubSub::new(persistence.clone())?;
+
+            let mut engine =
+                Engine::new(LiveSystemTime::new(), pubsub.clone(), persistence.clone(), InstanceType::Live);
+            engine.register("pubsub", pubsub.clone(), 0, 10);
+            engine.register("persistence", persistence.clone(), 0, 10);
+
+            engine.start().await;
+            engine.wait_for_shutdown().await;
+            engine.stop().await;
+        }
+        Commands::Audit(a) => {
+            info!("Starting arkin logger 🚀");
+            info!("Logger args: {:?}", a);
+
+            // Init Persistence
+            let persistence = Persistence::from_config_test();
+            persistence.refresh().await?;
+
+            // Init Redis PubSub
+            let pubsub = RedisPubSub::new(persistence.clone())?;
+            let receiver = pubsub.subscribe(EventFilter::AllWithoutMarket);
+
+            loop {
+                select! {
+                  Some(msg) = receiver.recv() => {
+                      info!("Event: {}", msg);
+                  },
+                  _ = tokio::signal::ctrl_c() => {
+                      info!("Shutting down logger...");
+                      break;
+                  }
+                }
+            }
+        }
+        Commands::SendOrder => {
+            // Init time
+            let time = LiveSystemTime::new();
+
+            // Init Persistence
+            let persistence = Persistence::from_config_test();
+            persistence.refresh().await?;
+
+            // Init Redis PubSub
+            let pubsub = RedisPubSub::new(persistence.clone())?;
+
+            let strategy = persistence
+                .get_strategy(
+                    &StrategyQuery::builder()
+                        .id(Uuid::parse_str("41ba36fb-6171-4d5f-a4b4-25eb5415e426").expect("Invalid UUID"))
+                        .build(),
+                )
+                .await?;
+            let inst = persistence
+                .get_instrument(
+                    &InstrumentQuery::builder()
+                        .id(Uuid::parse_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").expect("Invalid UUID"))
+                        .build(),
+                )
+                .await?;
+
+            info!("Sending orders for {}", inst);
+
+            let last_price = persistence.get_last_tick(&inst).await.unwrap().unwrap().mid_price();
+
+            let lot_size = max(dec!(100) / last_price, inst.lot_size);
+
+            // Create Buy exec order
+            let buy_exec_id = Uuid::new_v4();
+            let buy_exec = ExecutionOrder::builder()
+                .id(buy_exec_id)
+                .strategy(Some(strategy.clone()))
+                .instrument(inst.clone())
+                .exec_strategy_type(ExecutionStrategyType::WideQuoter)
+                .side(MarketSide::Buy)
+                .set_price(dec!(0))
+                .set_quantity(lot_size)
+                .status(ExecutionOrderStatus::New)
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+
+            // Create Sell exec order
+            let sell_exec_id = Uuid::new_v4();
+            let sell_exec = ExecutionOrder::builder()
+                .id(sell_exec_id)
+                .strategy(Some(strategy.clone()))
+                .instrument(inst.clone())
+                .exec_strategy_type(ExecutionStrategyType::WideQuoter)
+                .side(MarketSide::Sell)
+                .set_price(dec!(0))
+                .set_quantity(lot_size)
+                .status(ExecutionOrderStatus::New)
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+
+            pubsub
+                .publish(Event::NewWideQuoterExecutionOrder(buy_exec.clone().into()))
+                .await;
+
+            pubsub
+                .publish(Event::NewWideQuoterExecutionOrder(sell_exec.clone().into()))
+                .await;
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        }
+        Commands::CancelAllOrders => {
+            // Init time
+            let time = LiveSystemTime::new();
+
+            // Init Persistence
+            let persistence = Persistence::from_config_test();
+            persistence.refresh().await?;
+
+            // Init Redis PubSub
+            let pubsub = RedisPubSub::new(persistence.clone())?;
+
+            pubsub
+                .publish(Event::CancelAllWideQuoterExecutionOrders(time.now().await))
+                .await;
+
+            info!("Publishing CancelAllOrders event");
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         }
         _ => {
             unimplemented!()
@@ -806,4 +1036,6 @@ async fn main() {
           //     engine.wait_for_shutdown().await;
           // }
     }
+
+    Ok(())
 }

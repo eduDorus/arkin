@@ -35,14 +35,22 @@ async fn replay_task(
     let buffer_size = 3;
     let window = Frequency::Daily;
 
-    let venue = match core_ctx.persistence.get_venue_by_name(&config.venue).await {
+    let venue = match core_ctx
+        .persistence
+        .get_venue(&VenueQuery::builder().name(config.venue.clone()).build())
+        .await
+    {
         Ok(v) => v,
         Err(e) => {
             error!("Failed to get venue {}: {}", config.venue, e);
             return;
         }
     };
-    let instruments = match core_ctx.persistence.get_instruments_by_venue(&venue).await {
+    let instruments = match core_ctx
+        .persistence
+        .list_instruments(&InstrumentListQuery::builder().venues(vec![venue.name.clone()]).build())
+        .await
+    {
         Ok(ins) => ins,
         Err(e) => {
             error!("Failed to get instruments for venue {}: {}", config.venue, e);

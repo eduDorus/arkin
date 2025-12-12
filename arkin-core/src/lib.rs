@@ -23,7 +23,7 @@ pub use service::*;
 pub use state::*;
 pub use system_time::*;
 pub use traits::*;
-pub use types::{FeatureId, Maturity, Notional, Price, Quantity, Weight};
+pub use types::*;
 
 pub mod test_utils;
 

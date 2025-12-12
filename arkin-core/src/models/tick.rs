@@ -1,10 +1,14 @@
 use std::{cmp::Ordering, fmt, sync::Arc};
 
+use anyhow::{Context, Result};
+use async_trait::async_trait;
 use rust_decimal::prelude::*;
+use serde::{Deserialize, Serialize};
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
-use crate::{prelude::TIMESTAMP_FORMAT, Price, Quantity};
+use crate::{prelude::TIMESTAMP_FORMAT, EventPayload, InstrumentQuery, PersistenceReader, Price, Quantity};
 
 use super::Instrument;
 
@@ -99,5 +103,56 @@ impl fmt::Display for Tick {
             "event_time={} instrument={} bid_price={} bid_quantity={} ask_price={} ask_quantity={}",
             event_time, self.instrument, self.bid_price, self.bid_quantity, self.ask_price, self.ask_quantity
         )
+    }
+}
+
+#[async_trait]
+impl EventPayload for Tick {
+    type Dto = TickDto;
+
+    fn to_dto(&self) -> Self::Dto {
+        self.clone().into()
+    }
+
+    async fn from_dto(dto: Self::Dto, persistence: Arc<dyn PersistenceReader>) -> Result<Self> {
+        let instrument = persistence
+            .get_instrument(&InstrumentQuery::builder().id(dto.instrument_id).build())
+            .await
+            .context(format!("Failed to get instrument with id {}", dto.instrument_id))?;
+
+        Ok(Tick::builder()
+            .event_time(dto.event_time)
+            .instrument(instrument)
+            .tick_id(dto.tick_id)
+            .bid_price(dto.bid_price)
+            .bid_quantity(dto.bid_quantity)
+            .ask_price(dto.ask_price)
+            .ask_quantity(dto.ask_quantity)
+            .build())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TickDto {
+    pub event_time: UtcDateTime,
+    pub instrument_id: Uuid,
+    pub tick_id: u64,
+    pub bid_price: Decimal,
+    pub bid_quantity: Decimal,
+    pub ask_price: Decimal,
+    pub ask_quantity: Decimal,
+}
+
+impl From<Tick> for TickDto {
+    fn from(tick: Tick) -> Self {
+        Self {
+            event_time: tick.event_time,
+            instrument_id: tick.instrument.id,
+            tick_id: tick.tick_id,
+            bid_price: tick.bid_price,
+            bid_quantity: tick.bid_quantity,
+            ask_price: tick.ask_price,
+            ask_quantity: tick.ask_quantity,
+        }
     }
 }

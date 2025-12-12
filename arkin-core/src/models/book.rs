@@ -1,8 +1,15 @@
 use std::{fmt, sync::Arc};
 
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use time::UtcDateTime;
+use uuid::Uuid;
 
-use crate::types::{Price, Quantity};
+use crate::{
+    types::{Price, Quantity},
+    EventPayload, InstrumentQuery, PersistenceReader,
+};
 
 use super::Instrument;
 
@@ -32,6 +39,24 @@ impl Book {
     }
 }
 
+#[async_trait]
+impl EventPayload for Book {
+    type Dto = BookDto;
+
+    fn to_dto(&self) -> Self::Dto {
+        self.clone().into()
+    }
+
+    async fn from_dto(dto: Self::Dto, persistence: Arc<dyn PersistenceReader>) -> Result<Self> {
+        let instrument = persistence
+            .get_instrument(&InstrumentQuery::builder().id(dto.instrument_id).build())
+            .await
+            .context(format!("Failed to get instrument with id {}", dto.instrument_id))?;
+
+        Ok(Book::new(dto.event_time, instrument, dto.bids, dto.asks))
+    }
+}
+
 impl fmt::Display for Book {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -45,7 +70,7 @@ impl fmt::Display for Book {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BookUpdateSide {
     pub price: Price,
     pub quantity: Quantity,
@@ -60,5 +85,26 @@ impl BookUpdateSide {
 impl fmt::Display for BookUpdateSide {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}: {}", self.price, self.quantity)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BookDto {
+    pub received_time: UtcDateTime,
+    pub event_time: UtcDateTime,
+    pub instrument_id: Uuid,
+    pub bids: Vec<BookUpdateSide>,
+    pub asks: Vec<BookUpdateSide>,
+}
+
+impl From<Book> for BookDto {
+    fn from(book: Book) -> Self {
+        Self {
+            received_time: book.received_time,
+            event_time: book.event_time,
+            instrument_id: book.instrument.id,
+            bids: book.bids,
+            asks: book.asks,
+        }
     }
 }

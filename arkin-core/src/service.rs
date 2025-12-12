@@ -9,7 +9,7 @@ use tracing::{info, instrument};
 use crate::{
     barrier::SyncBarrier,
     traits::{Runnable, Subscriber},
-    Event, PersistenceReader, PubSub, SystemTime,
+    Event, PersistenceReader, PubSubTrait, SystemTime,
 };
 
 #[derive(PartialEq, Debug, Copy, Clone, Default, Display)]
@@ -95,13 +95,17 @@ impl ServiceCtx {
 
 pub struct CoreCtx {
     pub time: Arc<dyn SystemTime>,
-    pub pubsub: Arc<PubSub>,
+    pub pubsub: Arc<dyn PubSubTrait>,
     pub persistence: Arc<dyn PersistenceReader>,
     pub simulation_barrier: RwLock<Option<Arc<SyncBarrier>>>,
 }
 
 impl CoreCtx {
-    pub fn new(time: Arc<dyn SystemTime>, pubsub: Arc<PubSub>, persistence: Arc<dyn PersistenceReader>) -> Self {
+    pub fn new(
+        time: Arc<dyn SystemTime>,
+        pubsub: Arc<dyn PubSubTrait>,
+        persistence: Arc<dyn PersistenceReader>,
+    ) -> Self {
         Self {
             time,
             pubsub,
@@ -115,11 +119,14 @@ impl CoreCtx {
     }
 
     pub async fn publish(&self, event: Event) {
-        self.pubsub.publish(event).await
+        self.pubsub.publisher().publish(event).await
     }
 
     pub async fn publish_batch(&self, events: Vec<Event>) {
-        self.pubsub.publish_batch(events).await
+        // self.pubsub.publish_batch(events).await
+        for event in events {
+            self.publish(event).await;
+        }
     }
 }
 

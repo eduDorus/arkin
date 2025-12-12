@@ -32,7 +32,7 @@ pub enum InstrumentOptionType {
     Put,
 }
 
-#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, Serialize, Deserialize)]
+#[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Type, Copy, Serialize, Deserialize)]
 #[sqlx(type_name = "instrument_status", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum InstrumentStatus {

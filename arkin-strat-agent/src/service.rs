@@ -95,7 +95,8 @@ impl AgentStrategy {
         let sequence_length = self.model_settings.sequence_length;
 
         // Initialize input state for new instruments
-        for inst in &update.instruments {
+        let instruments = update.instruments();
+        for inst in &instruments {
             if !self.agent_inst_states.contains_key(inst) {
                 let input_features: HashMap<FeatureId, VecDeque<f32>> = self
                     .input_features_ids
@@ -119,7 +120,7 @@ impl AgentStrategy {
         }
 
         // Add new features
-        for inst in &update.instruments {
+        for inst in &instruments {
             if let Some(mut state) = self.agent_inst_states.get_mut(inst) {
                 for insight in update.insights.iter().filter(|i| {
                     self.input_features_ids.contains(&i.feature_id)
@@ -162,7 +163,8 @@ impl AgentStrategy {
         let model_name_postfix = &self.model_settings.model_name_postfix;
 
         // Add new features
-        for inst in &update.instruments {
+        let instruments = update.instruments();
+        for inst in &instruments {
             if let Some(mut state) = self.agent_inst_states.get_mut(inst) {
                 for insight in update.insights.iter().filter(|i| {
                     self.input_features_ids.contains(&i.feature_id)

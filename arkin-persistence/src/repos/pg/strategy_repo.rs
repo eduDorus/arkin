@@ -159,3 +159,22 @@ pub async fn delete(ctx: &PersistenceContext, id: &Uuid) -> Result<(), Persisten
     .await?;
     Ok(())
 }
+
+pub async fn list_all(ctx: &PersistenceContext) -> Result<Vec<StrategyDTO>, PersistenceError> {
+    let strategies = sqlx::query_as!(
+        StrategyDTO,
+        r#"
+            SELECT 
+                id,
+                name,
+                description,
+                created,
+                updated
+            FROM strategies
+            ORDER BY name
+            "#
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+    Ok(strategies)
+}

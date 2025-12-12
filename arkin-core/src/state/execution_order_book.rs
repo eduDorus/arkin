@@ -14,6 +14,7 @@ use crate::{
 #[derive(TypedBuilder)]
 pub struct ExecutionOrderBook {
     publisher: Arc<dyn Publisher>,
+    #[builder(default)]
     queue: DashMap<ExecutionOrderId, ExecutionOrder>,
     #[builder(default = true)]
     autoclean: bool,

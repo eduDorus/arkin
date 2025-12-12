@@ -195,6 +195,19 @@ impl TakerExecutionStrategy {
 
 #[async_trait]
 impl Runnable for TakerExecutionStrategy {
+    fn event_filter(&self, _instance_type: InstanceType) -> EventFilter {
+        EventFilter::Events(vec![
+            EventType::NewTakerExecutionOrder,
+            EventType::CancelTakerExecutionOrder,
+            EventType::CancelAllTakerExecutionOrders,
+            EventType::VenueOrderInflight,
+            EventType::VenueOrderPlaced,
+            EventType::VenueOrderRejected,
+            EventType::VenueOrderFill,
+            EventType::VenueOrderCancelled,
+            EventType::VenueOrderExpired,
+        ])
+    }
     async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
         match &event {
             Event::NewTakerExecutionOrder(eo) => self.new_execution_order(ctx.clone(), eo).await,

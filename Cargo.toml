@@ -1,7 +1,7 @@
 [workspace]
-# members = [ "arkin-persistence", "arkin-ingestors", "arkin-strategies", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
+# members = [ "arkin-persistence", "arkin-data-providers", "arkin-strategies", "arkin-engine", "arkin-binance", "arkin-executors", "tests" ]
 
-members = [ "arkin", "arkin-accounting", "arkin-audit", "arkin-binance", "arkin-cli", "arkin-core", "arkin-cron", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-ingestor", "arkin-insights", "arkin-persistence", "arkin-sim-ingestor", "arkin-strat-agent", "arkin-strat-crossover", "integration-tests" ]
+members = [ "arkin", "arkin-accounting", "arkin-audit", "arkin-binance", "arkin-cli", "arkin-core", "arkin-cron", "arkin-exec-strat-taker", "arkin-exec-strat-wide", "arkin-data-provider", "arkin-insights", "arkin-persistence", "arkin-sim-ingestor", "arkin-strat-agent", "arkin-strat-crossover", "integration-tests" ]
 
 default-members = [ "arkin" ]
 
@@ -33,7 +33,7 @@ parking_lot = { version = "0.12", features = [  ], default-features = false }
 rayon = "1.11"
 
 # Async
-tokio = { version = "1.48", features = ["full", "tracing"] }
+tokio = { version = "1.48", features = [ "full", "tracing" ] }
 kanal = { version = "0.1.1", features = [ "std-mutex" ] }
 async-trait = "0.1"
 async-stream = "0.3"
@@ -47,7 +47,7 @@ reqwest = { version = "0.12", features = [ "json", "rustls-tls-webpki-roots", "h
 
 # Data Types
 rust_decimal = { version = "1.39", features = [ "maths", "serde", "std", "macros" ], default-features = false }
-bytes = "1.10"
+bytes = "1.11"
 
 # Data Structures
 dashmap = { version = "6.1", features = [ "inline", "rayon" ], default-features = false }
@@ -70,7 +70,7 @@ chrono = { version = "0.4", features = [ "serde" ] }
 tracing = { version = "0.1", features = [  ] }
 tracing-futures = { version = "0.2", features = [ "tokio" ] }
 tracing-subscriber = { version = "0.3", features = [ "local-time", "parking_lot", "env-filter" ] }
-console-subscriber = { version = "0.5.0", features = ["parking_lot"] }
+console-subscriber = { version = "0.5.0", features = [ "parking_lot" ] }
 
 # Error handling
 anyhow = { version = "1.0", features = [ "std" ], default-features = false }

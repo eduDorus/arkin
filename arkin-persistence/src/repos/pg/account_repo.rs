@@ -108,3 +108,23 @@ pub async fn read_by_instance(ctx: &PersistenceContext) -> Result<AccountDTO, Pe
         None => Err(PersistenceError::NotFound),
     }
 }
+pub async fn list_all(ctx: &PersistenceContext) -> Result<Vec<AccountDTO>, PersistenceError> {
+    let accounts = sqlx::query_as!(
+        AccountDTO,
+        r#"
+            SELECT
+                id,
+                venue_id,
+                owner AS "owner:AccountOwner",
+                account_type AS "account_type:AccountType",
+                created,
+                updated
+            FROM accounts
+            ORDER BY id
+            "#,
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+
+    Ok(accounts)
+}

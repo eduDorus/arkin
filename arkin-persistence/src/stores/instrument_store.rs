@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
-use arkin_core::{Instrument, InstrumentQuery, PersistenceError, Venue};
+use arkin_core::{Instrument, InstrumentListQuery, InstrumentQuery, PersistenceError, Venue};
 
 use crate::{
     context::PersistenceContext,
@@ -71,9 +71,9 @@ pub async fn load_instruments(ctx: &PersistenceContext) -> Result<Vec<Arc<Instru
 
 /// Query instruments with in-memory filtering from cache
 /// Assumes cache is already populated via load_instruments()
-pub async fn query(
+pub async fn query_list(
     ctx: &PersistenceContext,
-    query: &InstrumentQuery,
+    query: &InstrumentListQuery,
 ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
     // Get all cached instruments by iterating over the cache
     let all_instruments: Vec<Arc<Instrument>> =
@@ -91,6 +91,17 @@ pub async fn query(
         .collect();
 
     Ok(filtered)
+}
+
+pub async fn query(ctx: &PersistenceContext, query: &InstrumentQuery) -> Result<Arc<Instrument>, PersistenceError> {
+    // Scan cache for match
+    for (_, instrument) in ctx.cache.instrument_id.iter() {
+        if query.matches(&instrument) {
+            return Ok(instrument);
+        }
+    }
+
+    Err(PersistenceError::NotFound)
 }
 
 async fn read_cache_by_id(ctx: &PersistenceContext, id: &Uuid) -> Option<Arc<Instrument>> {
@@ -128,18 +139,19 @@ pub async fn read_by_venue_symbol(
     venue: &Arc<Venue>,
 ) -> Result<Arc<Instrument>, PersistenceError> {
     // Check cache
-    match read_cache_by_venue_symbol(ctx, venue_symbol).await {
-        Some(instrument) => Ok(instrument),
-        None => {
-            debug!("Instrument not found in cache");
-            let instrument_dto = instrument_repo::read_by_venue_symbol(ctx, venue_symbol, venue).await?;
-            let instrument = dto_to_instrument(ctx, instrument_dto).await?;
-
-            // Update cache
-            update_instrument_cache(ctx, instrument.clone()).await;
-            Ok(instrument)
+    if let Some(instrument) = read_cache_by_venue_symbol(ctx, venue_symbol).await {
+        if instrument.venue.id == venue.id {
+            return Ok(instrument);
         }
     }
+
+    debug!("Instrument not found in cache");
+    let instrument_dto = instrument_repo::read_by_venue_symbol(ctx, venue_symbol, venue).await?;
+    let instrument = dto_to_instrument(ctx, instrument_dto).await?;
+
+    // Update cache
+    update_instrument_cache(ctx, instrument.clone()).await;
+    Ok(instrument)
 }
 
 pub async fn list_by_venue(

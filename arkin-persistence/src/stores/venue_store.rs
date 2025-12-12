@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use arkin_core::VenueName;
+use arkin_core::{Venue, VenueListQuery, VenueName, VenueQuery};
 use uuid::Uuid;
-
-use arkin_core::Venue;
 
 use arkin_core::PersistenceError;
 
@@ -35,6 +33,46 @@ pub async fn load_venues(ctx: &PersistenceContext) -> Result<Vec<Arc<Venue>>, Pe
     }
 
     Ok(venues)
+}
+
+/// Query venues with in-memory filtering from cache
+/// Assumes cache is already populated via load_venues()
+pub async fn query(ctx: &PersistenceContext, query: &VenueQuery) -> Result<Arc<Venue>, PersistenceError> {
+    // Try to read from cache first
+    if let Some(name) = &query.name {
+        if let Some(venue) = read_venue_name_cache(ctx, name).await {
+            if query.matches(&venue) {
+                return Ok(venue);
+            }
+        }
+    }
+
+    // Fallback to database
+    if let Some(name) = &query.name {
+        let venue_dto = venues_repo::read_by_name(ctx, name).await?;
+        let venue: Arc<Venue> = Arc::new(venue_dto.into());
+        update_venue_cache(ctx, venue.clone()).await;
+        Ok(venue)
+    } else {
+        Err(PersistenceError::NotFound)
+    }
+}
+
+/// Query venues with in-memory filtering from cache
+/// Assumes cache is already populated via load_venues()
+pub async fn query_list(ctx: &PersistenceContext, query: &VenueListQuery) -> Result<Vec<Arc<Venue>>, PersistenceError> {
+    // Get all cached venues by iterating over the cache
+    let all_venues: Vec<Arc<Venue>> = ctx.cache.venue_id.iter().map(|(_, venue)| venue).collect();
+
+    // If query is empty, return all
+    if query.is_empty() {
+        return Ok(all_venues);
+    }
+
+    // Filter in memory using the query's matches method
+    let filtered: Vec<Arc<Venue>> = all_venues.into_iter().filter(|venue| query.matches(venue)).collect();
+
+    Ok(filtered)
 }
 
 pub async fn insert(ctx: &PersistenceContext, venue: Arc<Venue>) -> Result<(), PersistenceError> {

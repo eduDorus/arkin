@@ -7,7 +7,7 @@ license.workspace = true
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
-arkin-ingestors = { path = "../arkin-ingestors" }
+arkin-data-providers = { path = "../arkin-data-providers" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-accounting = { path = "../arkin-accounting" }
 arkin-insights = { path = "../arkin-insights" }

@@ -1,0 +1,161 @@
+use anyhow::Result;
+use tracing::info;
+
+use arkin_core::prelude::*;
+use arkin_persistence::Persistence;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Init Logger
+    init_tracing();
+
+    // Init Persistence
+    let persistence = Persistence::from_config_test();
+    persistence.refresh().await?;
+
+    // Init Redis PubSub
+    let pubsub = RedisPubSub::new(persistence.clone())?;
+
+    // Spawn Receiver
+    let receiver = pubsub.subscribe(EventFilter::All);
+    tokio::spawn(async move {
+        while let Some(msg) = receiver.recv().await {
+            info!("Received from Redis: {}", msg);
+        }
+    });
+
+    // Wait for ctrl-c
+    tokio::signal::ctrl_c().await?;
+
+    Ok(())
+}
+
+// #[derive(Clone)]
+// struct RedisPubSub {
+//     client: Client,
+//     persistence: Arc<dyn PersistenceReader>,
+// }
+
+// impl RedisPubSub {
+//     pub fn new(persistence: Arc<dyn PersistenceReader>) -> Result<Arc<Self>> {
+//         let client = Client::open("redis://192.168.100.100/?protocol=resp3")?;
+//         Ok(Arc::new(Self {
+//             client,
+//             persistence,
+//         }))
+//     }
+
+//     pub async fn publish(&self, event: Event) {
+//         if let Some(data) = event.to_msgpack() {
+//             let channel = match event.event_type() {
+//                 EventType::TickUpdate => "ticks",
+//                 EventType::AggTradeUpdate => "agg_trades",
+//                 _ => {
+//                     warn!("Event type not supported for Redis pubsub: {}", event.event_type());
+//                     return;
+//                 }
+//             };
+//             let mut con = self.client.get_multiplexed_async_connection().await.unwrap();
+//             let _: () = redis::cmd("PUBLISH")
+//                 .arg(channel)
+//                 .arg(data)
+//                 .query_async(&mut con)
+//                 .await
+//                 .unwrap();
+//         }
+//     }
+
+//     pub fn subscribe(&self, _filter: EventFilter) -> Arc<dyn Subscriber> {
+//         let (tx, rx) = kanal::bounded_async(10240);
+//         let client = self.client.clone();
+//         let persistence = self.persistence.clone();
+//         tokio::spawn(async move {
+//             let (ptx, mut prx) = mpsc::unbounded_channel();
+//             let config = redis::AsyncConnectionConfig::new().set_push_sender(ptx);
+//             let mut sub_con = client.get_multiplexed_async_connection_with_config(&config).await.unwrap();
+//             sub_con.subscribe(&["ticks", "agg_trades"]).await.unwrap();
+//             while let Some(push) = prx.recv().await {
+//                 match push {
+//                     PushInfo {
+//                         kind: PushKind::Message,
+//                         data,
+//                     } => {
+//                         if data.len() >= 2 {
+//                             if let Value::BulkString(bytes) = &data[1] {
+//                                 let channel = if let Value::BulkString(ch) = &data[0] {
+//                                     std::str::from_utf8(ch).unwrap_or("")
+//                                 } else {
+//                                     ""
+//                                 };
+//                                 let event_type = match channel {
+//                                     "ticks" => EventType::TickUpdate,
+//                                     "agg_trades" => EventType::AggTradeUpdate,
+//                                     _ => continue,
+//                                 };
+//                                 if let Some(event) = Event::from_msgpack(&event_type, bytes, persistence.clone()).await
+//                                 {
+//                                     let _ = tx.send(event).await;
+//                                 }
+//                             }
+//                         }
+//                     }
+//                     _ => {}
+//                 }
+//             }
+//         });
+//         Arc::new(RedisSubscriber { rx })
+//     }
+
+//     pub fn publisher(&self) -> Arc<RedisPublisher> {
+//         Arc::new(RedisPublisher {
+//             pubsub: Arc::new(self.clone()),
+//         })
+//     }
+// }
+
+// #[async_trait]
+// impl Runnable for RedisPubSub {
+//     async fn get_tasks(
+//         self: Arc<Self>,
+//         _service_ctx: Arc<ServiceCtx>,
+//         _core_ctx: Arc<CoreCtx>,
+//     ) -> Vec<Pin<Box<dyn Future<Output = ()> + Send>>> {
+//         vec![]
+//     }
+// }
+
+// struct RedisPublisher {
+//     pubsub: Arc<RedisPubSub>,
+// }
+
+// #[async_trait]
+// impl Publisher for RedisPublisher {
+//     async fn publish(&self, event: Event) {
+//         self.pubsub.publish(event).await;
+//     }
+// }
+
+// struct RedisSubscriber {
+//     rx: AsyncReceiver<Event>,
+// }
+
+// #[async_trait]
+// impl Subscriber for RedisSubscriber {
+//     async fn recv(&self) -> Option<Event> {
+//         self.rx.recv().await.ok()
+//     }
+//     fn needs_ack(&self) -> bool {
+//         false
+//     }
+//     async fn send_ack(&self) {}
+// }
+
+// impl PubSubTrait for RedisPubSub {
+//     fn subscribe(&self, filter: EventFilter) -> Arc<dyn Subscriber> {
+//         self.subscribe(filter)
+//     }
+
+//     fn publisher(&self) -> Arc<dyn Publisher> {
+//         self.publisher()
+//     }
+// }

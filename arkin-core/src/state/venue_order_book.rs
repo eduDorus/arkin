@@ -13,6 +13,7 @@ use crate::{
 #[derive(TypedBuilder)]
 pub struct VenueOrderBook {
     publisher: Arc<dyn Publisher>,
+    #[builder(default)]
     queue: DashMap<VenueOrderId, VenueOrder>,
     #[builder(default = true)]
     autoclean: bool,

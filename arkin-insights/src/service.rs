@@ -106,11 +106,20 @@ impl Runnable for InsightService {
                 debug!(target: "insights", "received insights tick" );
                 self.process_tick(ctx, &tick).await;
             }
-            Event::AggTradeUpdate(trade) => {
+            Event::TradeUpdate(trade) => {
                 debug!(target: "insights", "received trade update" );
-                let trade_price_feature = ctx.persistence.get_feature_id("trade_price").await;
-                let trade_quantity_feature = ctx.persistence.get_feature_id("trade_quantity").await;
-                let trade_notional_feature = ctx.persistence.get_feature_id("trade_notional").await;
+                let trade_price_feature = ctx
+                    .persistence
+                    .get_feature(&FeatureQuery::builder().id("trade_price").build())
+                    .await;
+                let trade_quantity_feature = ctx
+                    .persistence
+                    .get_feature(&FeatureQuery::builder().id("trade_quantity").build())
+                    .await;
+                let trade_notional_feature = ctx
+                    .persistence
+                    .get_feature(&FeatureQuery::builder().id("trade_notional").build())
+                    .await;
                 let insights = vec![
                     Insight::builder()
                         .event_time(trade.event_time)
@@ -142,10 +151,22 @@ impl Runnable for InsightService {
             Event::TickUpdate(tick) => {
                 debug!(target: "insights", "received tick update" );
                 // pub fn to_insights(&self) -> Vec<Arc<Insight>> {
-                let tick_bid_price_feature = ctx.persistence.get_feature_id("tick_bid_price").await;
-                let tick_bid_quantity_feature = ctx.persistence.get_feature_id("tick_bid_quantity").await;
-                let tick_ask_price_feature = ctx.persistence.get_feature_id("tick_ask_price").await;
-                let tick_ask_quantity_feature = ctx.persistence.get_feature_id("tick_ask_quantity").await;
+                let tick_bid_price_feature = ctx
+                    .persistence
+                    .get_feature(&FeatureQuery::builder().id("tick_bid_price").build())
+                    .await;
+                let tick_bid_quantity_feature = ctx
+                    .persistence
+                    .get_feature(&FeatureQuery::builder().id("tick_bid_quantity").build())
+                    .await;
+                let tick_ask_price_feature = ctx
+                    .persistence
+                    .get_feature(&FeatureQuery::builder().id("tick_ask_price").build())
+                    .await;
+                let tick_ask_quantity_feature = ctx
+                    .persistence
+                    .get_feature(&FeatureQuery::builder().id("tick_ask_quantity").build())
+                    .await;
                 let insights = vec![
                     Insight::builder()
                         .event_time(tick.event_time)
@@ -184,7 +205,10 @@ impl Runnable for InsightService {
             }
             Event::MetricUpdate(metric) => {
                 debug!(target: "insights", "received metric update" );
-                let metric_feature = ctx.persistence.get_feature_id(&metric.metric_type.to_string()).await;
+                let metric_feature = ctx
+                    .persistence
+                    .get_feature(&FeatureQuery::builder().id(&metric.metric_type.to_string()).build())
+                    .await;
                 let insight = Insight::builder()
                     .event_time(metric.event_time)
                     .instrument(metric.instrument.clone())

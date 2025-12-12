@@ -1,5 +1,5 @@
-pub mod feature_graph;
-pub mod feature_validator;
+// pub mod feature_graph;
+// pub mod feature_validator;
 
 use std::sync::Arc;
 
@@ -7,7 +7,7 @@ use arkin_core::prelude::*;
 use arkin_persistence::{Persistence, PersistenceConfig};
 use time::UtcDateTime;
 
-pub use feature_validator::FeatureValidator;
+// pub use feature_validator::FeatureValidator;
 
 /// Creates a Persistence instance for integration tests by loading configuration
 /// from the standard config files.
@@ -17,17 +17,17 @@ pub use feature_validator::FeatureValidator;
 /// - RUN_MODE: defaults to "test" (e.g., test.yml, test_secrets.yml)
 /// - CONFIG_DIR: defaults to "./configs"
 ///
-pub async fn init_test_persistence() -> Arc<dyn PersistenceReader> {
+pub async fn init_test_persistence() -> Arc<Persistence> {
     // Set defaults for test environment
     // SAFETY: This is safe in test environment as we're setting env vars before any other code runs
-    unsafe {
-        if std::env::var("RUN_MODE").is_err() {
-            std::env::set_var("RUN_MODE", "test");
-        }
-        if std::env::var("CONFIG_DIR").is_err() {
-            std::env::set_var("CONFIG_DIR", "./configs");
-        }
-    }
+    // unsafe {
+    // if std::env::var("RUN_MODE").is_err() {
+    //     std::env::set_var("RUN_MODE", "test");
+    // }
+    // if std::env::var("CONFIG_DIR").is_err() {
+    //     std::env::set_var("CONFIG_DIR", "./configs");
+    // }
+    // }
 
     // Load configuration using arkin-core's config loader
     let config: PersistenceConfig = load();
@@ -48,4 +48,20 @@ pub async fn init_test_persistence() -> Arc<dyn PersistenceReader> {
         false, // only_predictions
         true,  // dry_run (prevents any writes)
     )
+}
+
+pub async fn init_test_pubsub() -> Arc<ChannelPubSub> {
+    // Set defaults for test environment
+    // SAFETY: This is safe in test environment as we're setting env vars before any other code runs
+    // unsafe {
+    //     if std::env::var("RUN_MODE").is_err() {
+    //         std::env::set_var("RUN_MODE", "test");
+    //     }
+    //     // if std::env::var("CONFIG_DIR").is_err() {
+    //         std::env::set_var("CONFIG_DIR", "./configs");
+    //     }
+    // }
+
+    // Initialize PubSub instance for tests
+    ChannelPubSub::new(true)
 }

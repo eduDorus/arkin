@@ -1,6 +1,10 @@
 use std::{fmt, sync::Arc};
 
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use clap::ValueEnum;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use sqlx::Type;
 use strum::Display;
 use time::UtcDateTime;
@@ -8,14 +12,18 @@ use tracing::error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{types::Commission, Notional, Price, Quantity, VenueOrderId};
+use crate::{
+    types::Commission, EventPayload, InstrumentQuery, Notional, PersistenceReader, Price, Quantity, StrategyQuery,
+    VenueOrderId,
+};
 
 use super::{Instrument, MarketSide, Strategy};
 
 pub type ExecutionOrderId = Uuid;
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type, ValueEnum, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "execution_order_type", rename_all = "snake_case")]
 pub enum ExecutionStrategyType {
     WideQuoter,
@@ -23,8 +31,9 @@ pub enum ExecutionStrategyType {
     Taker,
 }
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type, PartialOrd, Ord)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type, PartialOrd, Ord, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "execution_order_status", rename_all = "snake_case")]
 pub enum ExecutionOrderStatus {
     New,
@@ -245,6 +254,48 @@ impl ExecutionOrder {
     }
 }
 
+#[async_trait]
+impl EventPayload for ExecutionOrder {
+    type Dto = ExecutionOrderDto;
+
+    fn to_dto(&self) -> Self::Dto {
+        self.clone().into()
+    }
+
+    async fn from_dto(dto: Self::Dto, persistence: Arc<dyn PersistenceReader>) -> Result<Self> {
+        let instrument = persistence
+            .get_instrument(&InstrumentQuery::builder().id(dto.instrument_id).build())
+            .await
+            .context(format!("Failed to get instrument with id {}", dto.instrument_id))?;
+
+        let strategy = if let Some(sid) = dto.strategy_id {
+            persistence.get_strategy(&StrategyQuery::builder().id(sid).build()).await.ok()
+        } else {
+            None
+        };
+
+        let mut order = ExecutionOrder::builder()
+            .id(dto.id)
+            .instrument(instrument)
+            .strategy(strategy)
+            .venue_order_ids(dto.venue_order_ids)
+            .exec_strategy_type(dto.exec_strategy_type)
+            .side(dto.side)
+            .fill_price(dto.fill_price)
+            .filled_quantity(dto.filled_quantity)
+            .total_commission(dto.total_commission)
+            .status(dto.status)
+            .created(dto.created)
+            .updated(dto.updated)
+            .build();
+
+        order.price = dto.price;
+        order.quantity = dto.quantity;
+
+        Ok(order)
+    }
+}
+
 impl fmt::Display for ExecutionOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -258,5 +309,44 @@ impl fmt::Display for ExecutionOrder {
             self.total_value(),
             self.status
         )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExecutionOrderDto {
+    pub id: ExecutionOrderId,
+    pub instrument_id: Uuid,
+    pub strategy_id: Option<Uuid>,
+    pub venue_order_ids: Vec<VenueOrderId>,
+    pub exec_strategy_type: ExecutionStrategyType,
+    pub side: MarketSide,
+    pub price: Price,
+    pub quantity: Quantity,
+    pub fill_price: Price,
+    pub filled_quantity: Quantity,
+    pub total_commission: Commission,
+    pub status: ExecutionOrderStatus,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
+}
+
+impl From<ExecutionOrder> for ExecutionOrderDto {
+    fn from(order: ExecutionOrder) -> Self {
+        Self {
+            id: order.id,
+            instrument_id: order.instrument.id,
+            strategy_id: order.strategy.map(|s| s.id),
+            venue_order_ids: order.venue_order_ids,
+            exec_strategy_type: order.exec_strategy_type,
+            side: order.side,
+            price: order.price,
+            quantity: order.quantity,
+            fill_price: order.fill_price,
+            filled_quantity: order.filled_quantity,
+            total_commission: order.total_commission,
+            status: order.status,
+            created: order.created,
+            updated: order.updated,
+        }
     }
 }

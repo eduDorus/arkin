@@ -1,0 +1,39 @@
+use std::sync::Arc;
+
+use anyhow::Result;
+use arkin_data_provider::DataProviderService;
+
+use arkin_core::prelude::*;
+use arkin_persistence::Persistence;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Init Logger
+    init_tracing();
+
+    // Init Clock
+    let clock = LiveSystemTime::new();
+
+    // Init Persistence
+    let persistence = Persistence::from_config_test();
+    persistence.refresh().await?;
+
+    // Init Redis PubSub
+    let pubsub = RedisPubSub::new(persistence.clone())?;
+
+    let mut engine = Engine::new(clock, pubsub.clone(), persistence.clone());
+    engine.register("pubsub", pubsub.clone(), 0, 10, None);
+    engine.register("persistence", persistence.clone(), 0, 10, Some(EventFilter::Persistable));
+
+    let data_provider_service = DataProviderService::load_config();
+    engine.register("data_provider", Arc::new(data_provider_service), 1, 1, None);
+
+    engine.start().await;
+
+    // Sleep for a short duration to allow connections to establish
+    // tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    engine.wait_for_shutdown().await;
+    engine.stop().await;
+
+    Ok(())
+}

@@ -1,8 +1,8 @@
 use arkin_core::prelude::init_tracing;
-use arkin_ingestor::{
+use arkin_data_provider::{
     BinanceSubscription, BybitSubscription, CoinbaseSubscription, OkxSubscription, OkxSubscriptionArg, StreamType,
 };
-use arkin_ingestor::{MarketRegistry, WsClient, WsConfig};
+use arkin_data_provider::{MarketRegistry, WsClient, WsConfig};
 use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info};
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut receivers = Vec::new();
     for (url, streams) in url_to_streams.iter() {
         // Determine exchange from first stream
-        let exchange = streams.first().map(|s| s.exchange).unwrap_or(arkin_ingestor::Exchange::Binance);
+        let exchange = streams.first().map(|s| s.exchange).unwrap_or(arkin_data_provider::Exchange::Binance);
 
         // Build subscription messages based on exchange
         let subscription_messages = build_subscriptions(&exchange, streams, &test_symbols);
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Determine ping interval based on exchange
         let send_ping_interval_secs = match exchange {
-            arkin_ingestor::Exchange::Coinbase => 20, // Coinbase requires ping every 15-30 seconds
+            arkin_data_provider::Exchange::Coinbase => 20, // Coinbase requires ping every 15-30 seconds
             _ => 0,                                   // Other exchanges don't require us to send pings
         };
 
@@ -171,24 +171,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn build_subscriptions(
-    exchange: &arkin_ingestor::Exchange,
-    streams: &[arkin_ingestor::StreamConfig],
+    exchange: &arkin_data_provider::Exchange,
+    streams: &[arkin_data_provider::StreamConfig],
     test_symbols: &[&str],
 ) -> Vec<(String, String)> {
     match exchange {
-        arkin_ingestor::Exchange::Binance => build_binance_subscriptions(streams, test_symbols),
-        arkin_ingestor::Exchange::Okx => build_okx_subscriptions(streams, test_symbols),
-        arkin_ingestor::Exchange::Bybit => build_bybit_subscriptions(streams, test_symbols),
-        arkin_ingestor::Exchange::Coinbase => build_coinbase_subscriptions(streams, test_symbols),
+        arkin_data_provider::Exchange::Binance => build_binance_subscriptions(streams, test_symbols),
+        arkin_data_provider::Exchange::Okx => build_okx_subscriptions(streams, test_symbols),
+        arkin_data_provider::Exchange::Bybit => build_bybit_subscriptions(streams, test_symbols),
+        arkin_data_provider::Exchange::Coinbase => build_coinbase_subscriptions(streams, test_symbols),
     }
 }
 
-fn stream_id_from_config(stream: &arkin_ingestor::StreamConfig) -> String {
+fn stream_id_from_config(stream: &arkin_data_provider::StreamConfig) -> String {
     format!("{} {} {}", stream.exchange, stream.market_type, stream.stream_type)
 }
 
 fn build_binance_subscriptions(
-    streams: &[arkin_ingestor::StreamConfig],
+    streams: &[arkin_data_provider::StreamConfig],
     test_symbols: &[&str],
 ) -> Vec<(String, String)> {
     let mut stream_names = Vec::new();
@@ -218,7 +218,7 @@ fn build_binance_subscriptions(
     Vec::new()
 }
 
-fn build_okx_subscriptions(streams: &[arkin_ingestor::StreamConfig], test_symbols: &[&str]) -> Vec<(String, String)> {
+fn build_okx_subscriptions(streams: &[arkin_data_provider::StreamConfig], test_symbols: &[&str]) -> Vec<(String, String)> {
     let mut args = Vec::new();
 
     for stream in streams {
@@ -249,7 +249,7 @@ fn build_okx_subscriptions(streams: &[arkin_ingestor::StreamConfig], test_symbol
     Vec::new()
 }
 
-fn build_bybit_subscriptions(streams: &[arkin_ingestor::StreamConfig], test_symbols: &[&str]) -> Vec<(String, String)> {
+fn build_bybit_subscriptions(streams: &[arkin_data_provider::StreamConfig], test_symbols: &[&str]) -> Vec<(String, String)> {
     let mut stream_names = Vec::new();
 
     for stream in streams {
@@ -278,7 +278,7 @@ fn build_bybit_subscriptions(streams: &[arkin_ingestor::StreamConfig], test_symb
 }
 
 fn build_coinbase_subscriptions(
-    streams: &[arkin_ingestor::StreamConfig],
+    streams: &[arkin_data_provider::StreamConfig],
     test_symbols: &[&str],
 ) -> Vec<(String, String)> {
     let mut subscriptions = Vec::new();

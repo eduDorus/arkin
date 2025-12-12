@@ -1,10 +1,16 @@
 use std::{fmt, sync::Arc};
 
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{BalanceUpdate, PositionUpdate, Venue};
+use crate::{
+    BalanceUpdate, BalanceUpdateDto, EventPayload, PersistenceReader, PositionUpdate, PositionUpdateDto, Venue,
+    VenueQuery,
+};
 
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct VenueAccountUpdate {
@@ -15,6 +21,41 @@ pub struct VenueAccountUpdate {
     pub balances: Vec<BalanceUpdate>,
     pub positions: Vec<PositionUpdate>,
     pub reason: String, // "m" from stream, e.g., "ORDER"
+}
+
+#[async_trait]
+impl EventPayload for VenueAccountUpdate {
+    type Dto = VenueAccountUpdateDto;
+
+    fn to_dto(&self) -> Self::Dto {
+        self.clone().into()
+    }
+
+    async fn from_dto(dto: Self::Dto, persistence: Arc<dyn PersistenceReader>) -> Result<Self> {
+        let venue = persistence
+            .get_venue(&VenueQuery::builder().id(dto.venue_id).build())
+            .await
+            .context(format!("Failed to get venue with id {}", dto.venue_id))?;
+
+        let mut balances = Vec::new();
+        for b in dto.balances {
+            balances.push(BalanceUpdate::from_dto(b, persistence.clone()).await?);
+        }
+
+        let mut positions = Vec::new();
+        for p in dto.positions {
+            positions.push(PositionUpdate::from_dto(p, persistence.clone()).await?);
+        }
+
+        Ok(VenueAccountUpdate::builder()
+            .id(dto.id)
+            .event_time(dto.event_time)
+            .venue(venue)
+            .balances(balances)
+            .positions(positions)
+            .reason(dto.reason)
+            .build())
+    }
 }
 
 impl PartialEq for VenueAccountUpdate {
@@ -54,5 +95,28 @@ impl fmt::Display for VenueAccountUpdate {
             )?;
         }
         Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct VenueAccountUpdateDto {
+    pub id: Uuid,
+    pub event_time: UtcDateTime,
+    pub venue_id: Uuid,
+    pub balances: Vec<BalanceUpdateDto>,
+    pub positions: Vec<PositionUpdateDto>,
+    pub reason: String,
+}
+
+impl From<VenueAccountUpdate> for VenueAccountUpdateDto {
+    fn from(update: VenueAccountUpdate) -> Self {
+        Self {
+            id: update.id,
+            event_time: update.event_time,
+            venue_id: update.venue.id,
+            balances: update.balances.iter().map(|b| b.clone().into()).collect(),
+            positions: update.positions.iter().map(|p| p.clone().into()).collect(),
+            reason: update.reason,
+        }
     }
 }

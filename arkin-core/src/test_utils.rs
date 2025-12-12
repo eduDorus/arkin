@@ -9,9 +9,12 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::{
-    utils::Frequency, AggTrade, Asset, AssetQuery, AssetType, Event, FeatureId, Instance, InstanceType, Instrument,
-    InstrumentQuery, InstrumentStatus, InstrumentType, MetricType, PersistenceError, PersistenceReader, Pipeline,
-    Price, PubSub, Publisher, Quantity, Strategy, SystemTime, Tick, Venue, VenueName, VenueType,
+    utils::Frequency, Account, AccountListQuery, AccountOwner, AccountQuery, AccountType, AggTrade, Asset,
+    AssetListQuery, AssetQuery, AssetType, ChannelPubSub, Event, FeatureId, FeatureListQuery, FeatureQuery, Instance,
+    InstanceListQuery, InstanceQuery, InstanceType, Instrument, InstrumentListQuery, InstrumentQuery, InstrumentStatus,
+    InstrumentType, MetricType, PersistenceError, PersistenceReader, Pipeline, PipelineListQuery, PipelineQuery, Price,
+    Publisher, Quantity, Strategy, StrategyListQuery, StrategyQuery, SystemTime, Tick, Venue, VenueListQuery,
+    VenueName, VenueQuery, VenueType,
 };
 
 // Define this in a test module or separate utils file for reuse
@@ -145,66 +148,68 @@ impl PersistenceReader for MockPersistence {
         Ok(())
     }
 
-    async fn get_instance_by_id(&self, _id: &Uuid) -> Result<Arc<Instance>, PersistenceError> {
-        Ok(test_instance())
+    async fn list_instances(&self, _query: &InstanceListQuery) -> Result<Vec<Arc<Instance>>, PersistenceError> {
+        Ok(vec![test_instance()])
     }
 
-    async fn get_instance_by_name(&self, _name: &str) -> Result<Arc<Instance>, PersistenceError> {
-        Ok(test_instance())
+    async fn list_pipelines(&self, _query: &PipelineListQuery) -> Result<Vec<Arc<Pipeline>>, PersistenceError> {
+        Ok(vec![test_pipeline()])
     }
 
-    async fn get_feature_id(&self, id: &str) -> FeatureId {
-        FeatureId::new(id.to_string())
+    async fn list_venues(&self, _query: &VenueListQuery) -> Result<Vec<Arc<Venue>>, PersistenceError> {
+        Ok(vec![test_binance_venue()])
     }
 
-    async fn get_pipeline_by_id(&self, _id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
-        Ok(test_pipeline())
-    }
-    async fn get_pipeline_by_name(&self, _name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
-        Ok(test_pipeline())
+    async fn list_instruments(&self, _query: &InstrumentListQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        Ok(vec![test_inst_binance_btc_usdt_perp()])
     }
 
-    async fn get_venue_by_id(&self, _id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {
-        Ok(test_binance_venue())
-    }
-    async fn get_venue_by_name(&self, _name: &VenueName) -> Result<Arc<Venue>, PersistenceError> {
-        Ok(test_binance_venue())
+    async fn list_assets(&self, _query: &AssetListQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
+        Ok(vec![test_usdt_asset()])
     }
 
-    async fn get_instrument_by_id(&self, _id: &Uuid) -> Result<Arc<Instrument>, PersistenceError> {
-        Ok(test_inst_binance_btc_usdt_perp())
-    }
-    async fn get_instrument_by_venue_symbol(
-        &self,
-        _symbol: &str,
-        _venue: &Arc<Venue>,
-    ) -> Result<Arc<Instrument>, PersistenceError> {
-        Ok(test_inst_binance_btc_usdt_perp())
-    }
-    async fn get_instruments_by_venue(&self, _venue: &Arc<Venue>) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
-        todo!()
-    }
-    async fn get_instruments_by_venue_and_type(
-        &self,
-        _venue: &Arc<Venue>,
-        _instrument_type: InstrumentType,
-    ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
-        todo!()
+    async fn get_feature(&self, query: &FeatureQuery) -> FeatureId {
+        FeatureId::new(query.id.clone())
     }
 
-    async fn query_instruments(&self, _query: &InstrumentQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
-        unimplemented!()
+    async fn list_features(&self, _query: &FeatureListQuery) -> Result<Vec<FeatureId>, PersistenceError> {
+        Ok(vec![])
     }
 
-    async fn get_asset_by_id(&self, _id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {
-        Ok(test_usdt_asset())
-    }
-    async fn get_asset_by_symbol(&self, _symbol: &str) -> Result<Arc<Asset>, PersistenceError> {
-        Ok(test_usdt_asset())
+    async fn get_asset(&self, query: &AssetQuery) -> Result<Arc<Asset>, PersistenceError> {
+        // Convert single query to list query
+        let list_query = AssetListQuery {
+            symbols: query.symbol.as_ref().map(|s: &String| vec![s.clone()]).unwrap_or_default(),
+            asset_types: query.asset_type.as_ref().map(|t| vec![t.clone()]).unwrap_or_default(),
+        };
+        let results = self.list_assets(&list_query).await?;
+        results.into_iter().next().ok_or(PersistenceError::NotFound)
     }
 
-    async fn query_assets(&self, _query: &AssetQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
-        unimplemented!()
+    async fn get_instance(&self, query: &InstanceQuery) -> Result<Arc<Instance>, PersistenceError> {
+        let list_query = InstanceListQuery {
+            names: query.name.as_ref().map(|n: &String| vec![n.clone()]).unwrap_or_default(),
+            instance_types: query.instance_type.map(|t| vec![t]).unwrap_or_default(),
+        };
+        let results = self.list_instances(&list_query).await?;
+        results.into_iter().next().ok_or(PersistenceError::NotFound)
+    }
+
+    async fn get_pipeline(&self, query: &PipelineQuery) -> Result<Arc<Pipeline>, PersistenceError> {
+        let list_query = PipelineListQuery {
+            names: query.name.as_ref().map(|n: &String| vec![n.clone()]).unwrap_or_default(),
+        };
+        let results = self.list_pipelines(&list_query).await?;
+        results.into_iter().next().ok_or(PersistenceError::NotFound)
+    }
+
+    async fn get_venue(&self, query: &VenueQuery) -> Result<Arc<Venue>, PersistenceError> {
+        let list_query = VenueListQuery {
+            names: query.name.map(|n| vec![n]).unwrap_or_default(),
+            venue_types: query.venue_type.as_ref().map(|t| vec![t.clone()]).unwrap_or_default(),
+        };
+        let results = self.list_venues(&list_query).await?;
+        results.into_iter().next().ok_or(PersistenceError::NotFound)
     }
 
     async fn list_trades(
@@ -215,6 +220,7 @@ impl PersistenceReader for MockPersistence {
     ) -> Result<Vec<Arc<AggTrade>>, PersistenceError> {
         todo!()
     }
+
     async fn get_last_tick(&self, _instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError> {
         Ok(Some(test_tick(
             test_inst_binance_btc_usdt_perp(),
@@ -258,10 +264,73 @@ impl PersistenceReader for MockPersistence {
     ) -> Result<Box<dyn Stream<Item = Event> + Send + Unpin>, PersistenceError> {
         todo!()
     }
+
+    async fn get_instrument(&self, query: &InstrumentQuery) -> Result<Arc<Instrument>, PersistenceError> {
+        // Convert to list query for simplicity in mock
+        let venues = query.venue.map(|v| vec![v]).unwrap_or_default();
+        let base_asset_symbols = query
+            .base_asset_symbol
+            .as_ref()
+            .map(|s: &String| vec![s.clone()])
+            .unwrap_or_default();
+        let quote_asset_symbols = query
+            .quote_asset_symbol
+            .as_ref()
+            .map(|s: &String| vec![s.clone()])
+            .unwrap_or_default();
+        let instrument_types = query.instrument_type.map(|t| vec![t]).unwrap_or_default();
+
+        let list_query = InstrumentListQuery {
+            ids: Some(query.id.map(|id| vec![id]).unwrap_or_default()),
+            venues,
+            base_assets: query.base_asset.as_ref().map(|a| vec![Arc::clone(a)]),
+            base_asset_symbols,
+            quote_assets: query.quote_asset.as_ref().map(|a| vec![Arc::clone(a)]),
+            quote_asset_symbols,
+            margin_assets: query.margin_asset.as_ref().map(|a| vec![Arc::clone(a)]),
+            margin_asset_symbols: query
+                .margin_asset_symbol
+                .as_ref()
+                .map(|s: &String| vec![s.clone()])
+                .unwrap_or_default(),
+            instrument_types,
+            synthetic: query.synthetic,
+            status: query.status,
+            venue_symbol: query.venue_symbol.clone(),
+        };
+
+        let results = self.list_instruments(&list_query).await?;
+        results.into_iter().next().ok_or(PersistenceError::NotFound)
+    }
+
+    async fn list_accounts(&self, _query: &AccountListQuery) -> Result<Vec<Arc<Account>>, PersistenceError> {
+        Ok(vec![test_account()])
+    }
+
+    async fn list_strategies(&self, _query: &StrategyListQuery) -> Result<Vec<Arc<Strategy>>, PersistenceError> {
+        Ok(vec![test_strategy_1(), test_strategy_2()])
+    }
+
+    async fn get_account(&self, query: &AccountQuery) -> Result<Arc<Account>, PersistenceError> {
+        let list_query = AccountListQuery {
+            ids: query.id.map(|id| vec![id]).unwrap_or_default(),
+        };
+        let results = self.list_accounts(&list_query).await?;
+        results.into_iter().next().ok_or(PersistenceError::NotFound)
+    }
+
+    async fn get_strategy(&self, query: &StrategyQuery) -> Result<Arc<Strategy>, PersistenceError> {
+        let list_query = StrategyListQuery {
+            ids: query.id.map(|id| vec![id]).unwrap_or_default(),
+            names: query.name.as_ref().map(|n: &String| vec![n.clone()]).unwrap_or_default(),
+        };
+        let results = self.list_strategies(&list_query).await?;
+        results.into_iter().next().ok_or(PersistenceError::NotFound)
+    }
 }
 
-pub fn test_pubsub() -> Arc<PubSub> {
-    PubSub::new(true)
+pub fn test_pubsub() -> Arc<ChannelPubSub> {
+    ChannelPubSub::new(true)
 }
 
 pub fn test_btc_asset() -> Arc<Asset> {
@@ -429,6 +498,18 @@ pub fn test_instance() -> Arc<Instance> {
         .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
         .build();
     Arc::new(instance)
+}
+
+pub fn test_account() -> Arc<Account> {
+    let account = Account::builder()
+        .id(Uuid::from_str("41c79d6c-8dce-44a5-a5c8-c02578671afb").expect("Invalid UUID"))
+        .venue(test_binance_venue())
+        .owner(AccountOwner::User)
+        .account_type(AccountType::Spot)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .build();
+    Arc::new(account)
 }
 
 pub fn test_strategy_1() -> Arc<Strategy> {

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
+use arkin_core::{Instance, InstanceListQuery, InstanceQuery};
 use tracing::info;
-
-use arkin_core::Instance;
 use uuid::Uuid;
 
 use arkin_core::PersistenceError;
@@ -36,4 +35,44 @@ pub async fn delete_by_name(ctx: &PersistenceContext, name: &str) -> Result<(), 
     instance_repo::delete_by_name(ctx, name).await?;
     info!("Deleted instance: {}", name);
     Ok(())
+}
+
+/// Load all instances from database
+pub async fn load_instances(ctx: &PersistenceContext) -> Result<Vec<Arc<Instance>>, PersistenceError> {
+    let instance_dtos = instance_repo::list_all(ctx).await?;
+    let mut instances = Vec::with_capacity(instance_dtos.len());
+
+    for dto in instance_dtos {
+        let instance: Arc<Instance> = dto.into();
+        instances.push(instance);
+    }
+
+    Ok(instances)
+}
+
+/// Query instances with in-memory filtering
+pub async fn query(ctx: &PersistenceContext, query: &InstanceQuery) -> Result<Arc<Instance>, PersistenceError> {
+    // For now, load all and filter, since instances are few
+    let all_instances = load_instances(ctx).await?;
+    for instance in all_instances {
+        if query.matches(&instance) {
+            return Ok(instance);
+        }
+    }
+    Err(PersistenceError::NotFound)
+}
+
+/// Query instances with in-memory filtering
+pub async fn query_list(ctx: &PersistenceContext, query: &InstanceListQuery) -> Result<Vec<Arc<Instance>>, PersistenceError> {
+    let all_instances = load_instances(ctx).await?;
+
+    // If query is empty, return all
+    if query.is_empty() {
+        return Ok(all_instances);
+    }
+
+    // Filter in memory using the query's matches method
+    let filtered: Vec<Arc<Instance>> = all_instances.into_iter().filter(|instance| query.matches(instance)).collect();
+
+    Ok(filtered)
 }

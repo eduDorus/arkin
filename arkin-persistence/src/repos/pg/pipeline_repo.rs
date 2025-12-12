@@ -113,3 +113,23 @@ pub async fn read_by_name(ctx: &PersistenceContext, name: &str) -> Result<Pipeli
         None => Err(PersistenceError::NotFound),
     }
 }
+
+pub async fn list_all(ctx: &PersistenceContext) -> Result<Vec<PipelineDTO>, PersistenceError> {
+    let pipelines = sqlx::query_as!(
+        PipelineDTO,
+        r#"
+            SELECT
+                id,
+                name,
+                description,
+                created,
+                updated
+            FROM pipelines
+            ORDER BY name
+            "#,
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+
+    Ok(pipelines)
+}

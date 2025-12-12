@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use time::UtcDateTime;
-use tracing::debug;
+use tracing::info;
 
 use arkin_core::prelude::*;
 
@@ -32,12 +32,16 @@ impl Audit {
 
     pub async fn add_event_to_log(&self, event: Event) {
         self.event_log.insert(event.timestamp(), event.to_owned());
-        debug!(target: "audit", "add new event {} to log ({} logs)", event.event_type(), self.event_log.len());
+        info!(target: "audit", "add new event {} to log ({} logs)", event.event_type(), self.event_log.len());
     }
 }
 
 #[async_trait]
 impl Runnable for Audit {
+    fn event_filter(&self, _instance_type: InstanceType) -> EventFilter {
+        EventFilter::AllWithoutMarket
+    }
+
     async fn handle_event(&self, _core_ctx: Arc<CoreCtx>, event: Event) {
         self.add_event_to_log(event).await;
     }

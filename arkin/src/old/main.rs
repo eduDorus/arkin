@@ -6,9 +6,9 @@ use tracing::{error, info};
 
 use arkin_allocation::prelude::*;
 use arkin_core::prelude::*;
+use arkin_data_providers::prelude::*;
 use arkin_engine::prelude::*;
 use arkin_execution::prelude::*;
-use arkin_ingestors::prelude::*;
 use arkin_insights::prelude::*;
 use arkin_persistence::prelude::*;
 

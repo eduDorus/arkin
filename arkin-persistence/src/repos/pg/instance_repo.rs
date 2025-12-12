@@ -149,3 +149,23 @@ pub async fn delete_by_name(ctx: &PersistenceContext, name: &str) -> Result<(), 
     .await?;
     Ok(())
 }
+
+pub async fn list_all(ctx: &PersistenceContext) -> Result<Vec<InstanceDTO>, PersistenceError> {
+    let instances = sqlx::query_as!(
+        InstanceDTO,
+        r#"
+            SELECT
+                id,
+                name,
+                instance_type AS "instance_type:InstanceType",
+                created,
+                updated
+            FROM instances
+            ORDER BY name
+            "#,
+    )
+    .fetch_all(&ctx.pg_pool)
+    .await?;
+
+    Ok(instances)
+}

@@ -1,6 +1,9 @@
 use std::{fmt, sync::Arc};
 
+use anyhow::{Context, Result};
+use async_trait::async_trait;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use sqlx::Type;
 use strum::Display;
 use time::UtcDateTime;
@@ -10,12 +13,15 @@ use uuid::Uuid;
 
 use crate::models::{Asset, Instrument, MarketSide, Strategy};
 use crate::ExecutionOrderId;
-use crate::{types::Commission, Price, Quantity};
+use crate::{
+    types::Commission, AssetQuery, EventPayload, InstrumentQuery, PersistenceReader, Price, Quantity, StrategyQuery,
+};
 
 pub type VenueOrderId = Uuid;
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "venue_order_type", rename_all = "snake_case")]
 pub enum VenueOrderType {
     Market,
@@ -27,8 +33,9 @@ pub enum VenueOrderType {
     TrailingStopMarket,
 }
 
-#[derive(Debug, Display, Clone, Copy, Type)]
+#[derive(Debug, Display, Clone, Copy, Type, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "venue_order_time_in_force", rename_all = "snake_case")]
 pub enum VenueOrderTimeInForce {
     Gtc,
@@ -38,8 +45,9 @@ pub enum VenueOrderTimeInForce {
     Gtd,
 }
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type, PartialOrd, Ord)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Type, PartialOrd, Ord, Serialize, Deserialize)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "venue_order_status", rename_all = "snake_case")]
 pub enum VenueOrderStatus {
     New,
@@ -274,10 +282,66 @@ impl VenueOrder {
         self.filled_quantity > Quantity::ZERO
     }
 
-    pub fn total_value(&self) -> Price {
+    pub fn total_value(&self) -> Decimal {
         self.price * self.quantity * self.instrument.contract_size
     }
+}
 
+#[async_trait]
+impl EventPayload for VenueOrder {
+    type Dto = VenueOrderDto;
+
+    fn to_dto(&self) -> Self::Dto {
+        self.clone().into()
+    }
+
+    async fn from_dto(dto: Self::Dto, persistence: Arc<dyn PersistenceReader>) -> Result<Self> {
+        let instrument = persistence
+            .get_instrument(&InstrumentQuery::builder().id(dto.instrument_id).build())
+            .await
+            .context(format!("Failed to get instrument with id {}", dto.instrument_id))?;
+
+        let strategy = if let Some(sid) = dto.strategy_id {
+            persistence.get_strategy(&StrategyQuery::builder().id(sid).build()).await.ok()
+        } else {
+            None
+        };
+
+        let commission_asset = if let Some(aid) = dto.commission_asset_id {
+            persistence.get_asset(&AssetQuery::builder().id(aid).build()).await.ok()
+        } else {
+            None
+        };
+
+        let mut order = VenueOrder::builder()
+            .id(dto.id)
+            .execution_order_id(dto.execution_order_id)
+            .venue_order_id(dto.venue_order_id)
+            .instrument(instrument)
+            .strategy(strategy)
+            .side(dto.side)
+            .order_type(dto.order_type)
+            .time_in_force(dto.time_in_force)
+            .last_fill_price(dto.last_fill_price)
+            .last_fill_quantity(dto.last_fill_quantity)
+            .last_fill_commission(dto.last_fill_commission)
+            .filled_price(dto.filled_price)
+            .filled_quantity(dto.filled_quantity)
+            .commission_asset(commission_asset)
+            .commission(dto.commission)
+            .status(dto.status)
+            .created(dto.created)
+            .updated(dto.updated)
+            .build();
+
+        order.price = dto.price;
+        order.quantity = dto.quantity;
+
+        Ok(order)
+    }
+}
+
+impl VenueOrder {
     fn is_valid_transition(&self, new_status: &VenueOrderStatus) -> bool {
         matches!(
             (&self.status, new_status),
@@ -347,5 +411,56 @@ impl fmt::Display for VenueOrder {
             self.total_value(),
             self.status
         )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct VenueOrderDto {
+    pub id: VenueOrderId,
+    pub execution_order_id: Option<ExecutionOrderId>,
+    pub venue_order_id: Option<String>,
+    pub instrument_id: Uuid,
+    pub strategy_id: Option<Uuid>,
+    pub side: MarketSide,
+    pub order_type: VenueOrderType,
+    pub time_in_force: VenueOrderTimeInForce,
+    pub price: Price,
+    pub quantity: Quantity,
+    pub last_fill_price: Price,
+    pub last_fill_quantity: Quantity,
+    pub last_fill_commission: Commission,
+    pub filled_price: Price,
+    pub filled_quantity: Quantity,
+    pub commission_asset_id: Option<Uuid>,
+    pub commission: Commission,
+    pub status: VenueOrderStatus,
+    pub created: UtcDateTime,
+    pub updated: UtcDateTime,
+}
+
+impl From<VenueOrder> for VenueOrderDto {
+    fn from(order: VenueOrder) -> Self {
+        Self {
+            id: order.id,
+            execution_order_id: order.execution_order_id,
+            venue_order_id: order.venue_order_id,
+            instrument_id: order.instrument.id,
+            strategy_id: order.strategy.map(|s| s.id),
+            side: order.side,
+            order_type: order.order_type,
+            time_in_force: order.time_in_force,
+            price: order.price,
+            quantity: order.quantity,
+            last_fill_price: order.last_fill_price,
+            last_fill_quantity: order.last_fill_quantity,
+            last_fill_commission: order.last_fill_commission,
+            filled_price: order.filled_price,
+            filled_quantity: order.filled_quantity,
+            commission_asset_id: order.commission_asset.map(|a| a.id),
+            commission: order.commission,
+            status: order.status,
+            created: order.created,
+            updated: order.updated,
+        }
     }
 }

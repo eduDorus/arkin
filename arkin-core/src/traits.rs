@@ -1,14 +1,21 @@
 use std::{pin::Pin, sync::Arc, time::Duration};
 
+use anyhow::Result;
 use async_trait::async_trait;
 use futures::Stream;
+use serde::{de::DeserializeOwned, Serialize};
 use time::UtcDateTime;
-use uuid::Uuid;
 
-use crate::{
-    utils::Frequency, AggTrade, Asset, AssetQuery, CoreCtx, Event, FeatureId, Instance, Instrument, InstrumentQuery,
-    InstrumentType, MetricType, PersistenceError, Pipeline, ServiceCtx, Tick, Venue, VenueName,
-};
+use crate::models::*;
+use crate::prelude::*;
+
+#[async_trait]
+pub trait EventPayload: Sized + Send + Sync {
+    type Dto: Serialize + DeserializeOwned + Send + Sync;
+
+    fn to_dto(&self) -> Self::Dto;
+    async fn from_dto(dto: Self::Dto, persistence: Arc<dyn PersistenceReader>) -> Result<Self>;
+}
 
 #[async_trait]
 pub trait SystemTime: Send + Sync {
@@ -25,46 +32,27 @@ pub trait SystemTime: Send + Sync {
 pub trait PersistenceReader: Send + Sync {
     async fn refresh(&self) -> Result<(), PersistenceError>;
 
-    async fn get_instance_by_id(&self, id: &Uuid) -> Result<Arc<Instance>, PersistenceError>;
-    async fn get_instance_by_name(&self, name: &str) -> Result<Arc<Instance>, PersistenceError>;
+    // === Single Item Getters ===
+    async fn get_instrument(&self, query: &InstrumentQuery) -> Result<Arc<Instrument>, PersistenceError>;
+    async fn get_instance(&self, query: &InstanceQuery) -> Result<Arc<Instance>, PersistenceError>;
+    async fn get_pipeline(&self, query: &PipelineQuery) -> Result<Arc<Pipeline>, PersistenceError>;
+    async fn get_venue(&self, query: &VenueQuery) -> Result<Arc<Venue>, PersistenceError>;
+    async fn get_asset(&self, query: &AssetQuery) -> Result<Arc<Asset>, PersistenceError>;
+    async fn get_account(&self, query: &AccountQuery) -> Result<Arc<Account>, PersistenceError>;
+    async fn get_strategy(&self, query: &StrategyQuery) -> Result<Arc<Strategy>, PersistenceError>;
+    async fn get_feature(&self, query: &FeatureQuery) -> FeatureId;
 
-    async fn get_feature_id(&self, id: &str) -> FeatureId;
+    // === Query Methods ===
+    async fn list_instruments(&self, query: &InstrumentListQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError>;
+    async fn list_instances(&self, query: &InstanceListQuery) -> Result<Vec<Arc<Instance>>, PersistenceError>;
+    async fn list_pipelines(&self, query: &PipelineListQuery) -> Result<Vec<Arc<Pipeline>>, PersistenceError>;
+    async fn list_venues(&self, query: &VenueListQuery) -> Result<Vec<Arc<Venue>>, PersistenceError>;
+    async fn list_assets(&self, query: &AssetListQuery) -> Result<Vec<Arc<Asset>>, PersistenceError>;
+    async fn list_accounts(&self, query: &AccountListQuery) -> Result<Vec<Arc<Account>>, PersistenceError>;
+    async fn list_strategies(&self, query: &StrategyListQuery) -> Result<Vec<Arc<Strategy>>, PersistenceError>;
+    async fn list_features(&self, query: &FeatureListQuery) -> Result<Vec<FeatureId>, PersistenceError>;
 
-    async fn get_pipeline_by_id(&self, id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError>;
-    async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError>;
-
-    // Venues
-    async fn get_venue_by_id(&self, id: &Uuid) -> Result<Arc<Venue>, PersistenceError>;
-    async fn get_venue_by_name(&self, name: &VenueName) -> Result<Arc<Venue>, PersistenceError>;
-
-    // Instruments
-    async fn get_instrument_by_id(&self, id: &Uuid) -> Result<Arc<Instrument>, PersistenceError>;
-    async fn get_instrument_by_venue_symbol(
-        &self,
-        symbol: &str,
-        venue: &Arc<Venue>,
-    ) -> Result<Arc<Instrument>, PersistenceError>;
-    async fn get_instruments_by_venue(&self, venue: &Arc<Venue>) -> Result<Vec<Arc<Instrument>>, PersistenceError>;
-    async fn get_instruments_by_venue_and_type(
-        &self,
-        venue: &Arc<Venue>,
-        instrument_type: InstrumentType,
-    ) -> Result<Vec<Arc<Instrument>>, PersistenceError>;
-
-    /// Query instruments with flexible filtering
-    /// Returns all instruments matching the query criteria
-    /// Supports filtering by venue, base/quote/margin assets (both Arc<Asset> and symbols),
-    /// instrument type, synthetic flag, and status
-    async fn query_instruments(&self, query: &InstrumentQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError>;
-
-    // Assets
-    async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError>;
-    async fn get_asset_by_symbol(&self, symbol: &str) -> Result<Arc<Asset>, PersistenceError>;
-
-    /// Query assets with flexible filtering
-    /// Returns all assets matching the query criteria
-    async fn query_assets(&self, query: &AssetQuery) -> Result<Vec<Arc<Asset>>, PersistenceError>;
-
+    // === Trade Data ===
     async fn list_trades(
         &self,
         instruments: &[Arc<Instrument>],
@@ -74,6 +62,7 @@ pub trait PersistenceReader: Send + Sync {
 
     async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError>;
 
+    // === Streams ===
     async fn agg_trade_stream_range_buffered(
         &self,
         instruments: &[Arc<Instrument>],
@@ -116,6 +105,10 @@ pub trait PersistenceReader: Send + Sync {
 /// transitions, ensuring they integrate smoothly with the system's service management framework.
 #[async_trait]
 pub trait Runnable: Sync + Send {
+    fn event_filter(&self, _instance_type: InstanceType) -> EventFilter {
+        EventFilter::None
+    }
+
     // async fn event_loop(self: Arc<Self>, _ctx: Arc<ServiceCtx>) {}
     async fn handle_event(&self, _core_ctx: Arc<CoreCtx>, _event: Event) {}
 
@@ -173,4 +166,10 @@ pub trait Subscriber: Send + Sync {
     async fn recv(&self) -> Option<Event>;
     fn needs_ack(&self) -> bool;
     async fn send_ack(&self);
+}
+
+#[async_trait]
+pub trait PubSubTrait: Send + Sync {
+    fn subscribe(&self, filter: EventFilter) -> Arc<dyn Subscriber>;
+    fn publisher(&self) -> Arc<dyn Publisher>;
 }

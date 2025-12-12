@@ -7,15 +7,16 @@ license.workspace = true
 
 [dependencies]
 arkin-core = { path = "../arkin-core" }
-arkin-audit = { path = "../arkin-audit" }
-arkin-accounting = { path = "../arkin-accounting" }
 arkin-persistence = { path = "../arkin-persistence" }
-arkin-insights = { path = "../arkin-insights" }
-arkin-strat-crossover = { path = "../arkin-strat-crossover" }
-arkin-strat-agent = { path = "../arkin-strat-agent" }
-arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
-arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
-arkin-binance = { path = "../arkin-binance" }
+arkin-data-provider = { path = "../arkin-data-provider" }
+# arkin-insights = { path = "../arkin-insights" }
+# arkin-audit = { path = "../arkin-audit" }
+# arkin-accounting = { path = "../arkin-accounting" }
+# arkin-strat-crossover = { path = "../arkin-strat-crossover" }
+# arkin-strat-agent = { path = "../arkin-strat-agent" }
+# arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
+# arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
+# arkin-binance = { path = "../arkin-binance" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }

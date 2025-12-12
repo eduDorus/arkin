@@ -2,7 +2,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use time::UtcDateTime;
 
 use arkin_core::prelude::*;
-use arkin_ingestors::prelude::*;
+use arkin_data_providers::prelude::*;
 
 use crate::prelude::AccountingServiceType;
 

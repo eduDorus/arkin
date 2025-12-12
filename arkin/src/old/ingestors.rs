@@ -8,7 +8,7 @@ use tracing::error;
 use tracing::info;
 
 use arkin_core::prelude::*;
-use arkin_ingestors::prelude::*;
+use arkin_data_providers::prelude::*;
 use arkin_persistence::prelude::*;
 
 #[tokio::main(flavor = "multi_thread")]

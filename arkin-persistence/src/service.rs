@@ -1,4 +1,5 @@
 use std::pin::Pin;
+use std::str::FromStr;
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
@@ -77,53 +78,101 @@ impl Persistence {
         .into()
     }
 
-    pub async fn get_pipeline(&self, id: Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
-        pipeline_store::read_by_id(&self.ctx, &id).await
+    pub fn from_config(instance: Instance, only_normalized: bool, only_predictions: bool, dry_run: bool) -> Arc<Self> {
+        let config = load::<PersistenceConfig>();
+        Self::new(&config, instance, only_normalized, only_predictions, dry_run)
     }
 
-    pub async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
-        pipeline_store::read_by_name(&self.ctx, name).await
+    pub fn from_config_test() -> Arc<Self> {
+        let config = load::<PersistenceConfig>();
+        let now: UtcDateTime = time::OffsetDateTime::now_utc().into();
+        let instance = Instance::builder()
+            .id(Uuid::from_str("04432ac5-483d-46a3-811b-6be79d6ef7c1").expect("Failed to parse test instance UUID"))
+            .name("test-instance".to_string())
+            .instance_type(InstanceType::Test)
+            .created(now)
+            .updated(now)
+            .build();
+        Self::new(&config, instance, false, false, true)
     }
+
+    pub async fn refresh(&self) -> Result<(), PersistenceError> {
+        info!(target: "persistence", "refreshing cache...");
+
+        // Load all instances into cache
+        let instances_loaded = instance_store::load_instances(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} instances into cache", instances_loaded.len());
+
+        // Load all venues into cache (must be first as instruments depend on venues)
+        let venues_loaded = venue_store::load_venues(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} venues into cache", venues_loaded.len());
+
+        // Load all assets into cache (must be before instruments as instruments depend on assets)
+        let assets_loaded = asset_store::load_assets(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} assets into cache", assets_loaded.len());
+
+        // Load all instruments into cache
+        let instruments_loaded = instrument_store::load_instruments(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} instruments into cache", instruments_loaded.len());
+
+        // Load all accounts into cache
+        let accounts_loaded = account_store::load_accounts(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} accounts into cache", accounts_loaded.len());
+
+        // Load all strategies into cache
+        let strategies_loaded = strategy_store::load_strategies(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} strategies into cache", strategies_loaded.len());
+
+        Ok(())
+    }
+
+    // pub async fn get_pipeline(&self, id: Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
+    //     pipeline_store::read_by_id(&self.ctx, &id).await
+    // }
+
+    // pub async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
+    //     pipeline_store::read_by_name(&self.ctx, name).await
+    // }
 
     pub async fn insert_pipeline(&self, pipeline: Arc<Pipeline>) -> Result<(), PersistenceError> {
         pipeline_store::insert(&self.ctx, pipeline).await
     }
 
-    pub async fn get_strategy(&self, id: Uuid) -> Result<Arc<Strategy>, PersistenceError> {
-        strategy_store::read_by_id(&self.ctx, &id).await
-    }
+    // pub async fn get_strategy(&self, id: Uuid) -> Result<Arc<Strategy>, PersistenceError> {
+    //     strategy_store::read_by_id(&self.ctx, &id).await
+    // }
 
-    pub async fn get_instrument(&self, id: Uuid) -> Result<Arc<Instrument>, PersistenceError> {
-        instrument_store::read_by_id(&self.ctx, &id).await
-    }
+    // pub async fn get_instrument(&self, id: Uuid) -> Result<Arc<Instrument>, PersistenceError> {
+    //     instrument_store::read_by_id(&self.ctx, &id).await
+    // }
 
-    pub async fn list_instruments_by_venue_symbol(
-        &self,
-        symbols: &[String],
-        venue: &Arc<Venue>,
-    ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
-        let mut instruments = Vec::with_capacity(symbols.len());
-        for symbol in symbols {
-            let inst = instrument_store::read_by_venue_symbol(&self.ctx, symbol, venue).await?;
-            instruments.push(inst);
-        }
-        Ok(instruments)
-    }
+    // pub async fn list_instruments_by_venue_symbol(
+    //     &self,
+    //     symbols: &[String],
+    //     venue: &Arc<Venue>,
+    // ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+    //     let mut instruments = Vec::with_capacity(symbols.len());
+    //     for symbol in symbols {
+    //         let inst = instrument_store::read_by_venue_symbol(&self.ctx, symbol, venue).await?;
+    //         instruments.push(inst);
+    //     }
+    //     Ok(instruments)
+    // }
 
-    pub async fn get_asset(&self, id: Uuid) -> Result<Arc<Asset>, PersistenceError> {
-        asset_store::read_by_id(&self.ctx, &id).await
-    }
+    // pub async fn get_asset(&self, id: Uuid) -> Result<Arc<Asset>, PersistenceError> {
+    //     asset_store::read_by_id(&self.ctx, &id).await
+    // }
 
-    pub async fn get_scaler_data(
-        &self,
-        pipeline: &Arc<Pipeline>,
-        instrument: &Arc<Instrument>,
-        from: UtcDateTime,
-        till: UtcDateTime,
-        levels: &[f64],
-    ) -> Result<Vec<QuantileData>, PersistenceError> {
-        scaler_store::get_iqr(&self.ctx, pipeline, instrument, from, till, levels).await
-    }
+    // pub async fn get_scaler_data(
+    //     &self,
+    //     pipeline: &Arc<Pipeline>,
+    //     instrument: &Arc<Instrument>,
+    //     from: UtcDateTime,
+    //     till: UtcDateTime,
+    //     levels: &[f64],
+    // ) -> Result<Vec<QuantileData>, PersistenceError> {
+    //     scaler_store::get_iqr(&self.ctx, pipeline, instrument, from, till, levels).await
+    // }
 
     pub async fn insert_account(&self, account: Arc<Account>) {
         if let Err(e) = account_store::insert(&self.ctx, account).await {
@@ -213,7 +262,7 @@ impl Persistence {
 
     // TODO: WE NEED TO FLUSH ALSO TRADES AND TICKS
     pub async fn flush_all(&self, ctx: Arc<ServiceCtx>) {
-        debug!(target: "persistence", "flushing...");
+        info!(target: "persistence", "flushing...");
         let insights = {
             let mut lock = self.ctx.buffer.insights.lock().await;
             let insights = std::mem::take(&mut *lock);
@@ -358,75 +407,79 @@ impl PersistenceReader for Persistence {
         let instruments_loaded = instrument_store::load_instruments(&self.ctx).await?;
         info!(target: "persistence", "loaded {} instruments into cache", instruments_loaded.len());
 
+        // Load all accounts into cache
+        let accounts_loaded = account_store::load_accounts(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} accounts into cache", accounts_loaded.len());
+
+        // Load all strategies into cache
+        let strategies_loaded = strategy_store::load_strategies(&self.ctx).await?;
+        info!(target: "persistence", "loaded {} strategies into cache", strategies_loaded.len());
+
         Ok(())
     }
 
-    async fn get_instance_by_id(&self, id: &Uuid) -> Result<Arc<Instance>, PersistenceError> {
-        instance_store::read_by_id(&self.ctx, id).await
+    async fn list_instances(&self, query: &InstanceListQuery) -> Result<Vec<Arc<Instance>>, PersistenceError> {
+        instance_store::query_list(&self.ctx, query).await
     }
 
-    async fn get_instance_by_name(&self, name: &str) -> Result<Arc<Instance>, PersistenceError> {
-        instance_store::read_by_name(&self.ctx, name).await
+    async fn list_pipelines(&self, query: &PipelineListQuery) -> Result<Vec<Arc<Pipeline>>, PersistenceError> {
+        pipeline_store::query_list(&self.ctx, query).await
     }
 
-    async fn get_feature_id(&self, id: &str) -> FeatureId {
-        feature_store::read_feature_id(&self.ctx, id).await
+    async fn list_venues(&self, query: &VenueListQuery) -> Result<Vec<Arc<Venue>>, PersistenceError> {
+        venue_store::query_list(&self.ctx, query).await
     }
 
-    async fn get_pipeline_by_id(&self, id: &Uuid) -> Result<Arc<Pipeline>, PersistenceError> {
-        pipeline_store::read_by_id(&self.ctx, id).await
+    async fn list_assets(&self, query: &AssetListQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
+        asset_store::query_list(&self.ctx, query).await
     }
 
-    async fn get_pipeline_by_name(&self, name: &str) -> Result<Arc<Pipeline>, PersistenceError> {
-        pipeline_store::read_by_name(&self.ctx, name).await
+    async fn list_instruments(&self, query: &InstrumentListQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+        instrument_store::query_list(&self.ctx, query).await
     }
 
-    async fn get_venue_by_id(&self, id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {
-        venue_store::read_by_id(&self.ctx, id).await
-    }
-
-    async fn get_venue_by_name(&self, name: &VenueName) -> Result<Arc<Venue>, PersistenceError> {
-        venue_store::read_by_name(&self.ctx, name).await
-    }
-
-    async fn get_instrument_by_id(&self, id: &Uuid) -> Result<Arc<Instrument>, PersistenceError> {
-        instrument_store::read_by_id(&self.ctx, id).await
-    }
-
-    async fn get_instrument_by_venue_symbol(
-        &self,
-        symbol: &str,
-        venue: &Arc<Venue>,
-    ) -> Result<Arc<Instrument>, PersistenceError> {
-        instrument_store::read_by_venue_symbol(&self.ctx, symbol, venue).await
-    }
-
-    async fn get_instruments_by_venue(&self, venue: &Arc<Venue>) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
-        instrument_store::list_by_venue(&self.ctx, venue).await
-    }
-
-    async fn get_instruments_by_venue_and_type(
-        &self,
-        venue: &Arc<Venue>,
-        instrument_type: InstrumentType,
-    ) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
-        instrument_store::list_by_venue_and_type(&self.ctx, venue, instrument_type).await
-    }
-
-    async fn query_instruments(&self, query: &InstrumentQuery) -> Result<Vec<Arc<Instrument>>, PersistenceError> {
+    async fn get_instrument(&self, query: &InstrumentQuery) -> Result<Arc<Instrument>, PersistenceError> {
         instrument_store::query(&self.ctx, query).await
     }
 
-    async fn get_asset_by_id(&self, id: &Uuid) -> Result<Arc<Asset>, PersistenceError> {
-        asset_store::read_by_id(&self.ctx, id).await
+    async fn get_instance(&self, query: &InstanceQuery) -> Result<Arc<Instance>, PersistenceError> {
+        instance_store::query(&self.ctx, query).await
     }
 
-    async fn get_asset_by_symbol(&self, symbol: &str) -> Result<Arc<Asset>, PersistenceError> {
-        asset_store::read_by_symbol(&self.ctx, symbol).await
+    async fn get_pipeline(&self, query: &PipelineQuery) -> Result<Arc<Pipeline>, PersistenceError> {
+        pipeline_store::query(&self.ctx, query).await
     }
 
-    async fn query_assets(&self, query: &AssetQuery) -> Result<Vec<Arc<Asset>>, PersistenceError> {
+    async fn get_venue(&self, query: &VenueQuery) -> Result<Arc<Venue>, PersistenceError> {
+        venue_store::query(&self.ctx, query).await
+    }
+
+    async fn get_asset(&self, query: &AssetQuery) -> Result<Arc<Asset>, PersistenceError> {
         asset_store::query(&self.ctx, query).await
+    }
+
+    async fn get_feature(&self, query: &FeatureQuery) -> FeatureId {
+        feature_store::read_feature_id(&self.ctx, &query.id).await
+    }
+
+    async fn get_account(&self, query: &AccountQuery) -> Result<Arc<Account>, PersistenceError> {
+        account_store::query(&self.ctx, query).await
+    }
+
+    async fn get_strategy(&self, query: &StrategyQuery) -> Result<Arc<Strategy>, PersistenceError> {
+        strategy_store::query(&self.ctx, query).await
+    }
+
+    async fn list_accounts(&self, query: &AccountListQuery) -> Result<Vec<Arc<Account>>, PersistenceError> {
+        account_store::query_list(&self.ctx, query).await
+    }
+
+    async fn list_strategies(&self, query: &StrategyListQuery) -> Result<Vec<Arc<Strategy>>, PersistenceError> {
+        strategy_store::query_list(&self.ctx, query).await
+    }
+
+    async fn list_features(&self, query: &FeatureListQuery) -> Result<Vec<FeatureId>, PersistenceError> {
+        Ok(feature_store::list_features(&self.ctx, query).await)
     }
 
     async fn get_last_tick(&self, instrument: &Arc<Instrument>) -> Result<Option<Arc<Tick>>, PersistenceError> {
@@ -481,6 +534,37 @@ impl PersistenceReader for Persistence {
 
 #[async_trait]
 impl Runnable for Persistence {
+    fn event_filter(&self, instance_type: InstanceType) -> EventFilter {
+        match instance_type {
+            InstanceType::Live | InstanceType::Utility => EventFilter::Events(vec![
+                EventType::TickUpdate,
+                EventType::AggTradeUpdate,
+                EventType::InsightsUpdate,
+                EventType::MetricUpdate,
+                EventType::NewAccount,
+                EventType::NewTransfer,
+                EventType::NewTransferBatch,
+                EventType::ExecutionOrderBookNew,
+                EventType::ExecutionOrderBookUpdate,
+                EventType::VenueOrderBookNew,
+                EventType::VenueOrderBookUpdate,
+            ]),
+            InstanceType::Simulation => EventFilter::Events(vec![
+                EventType::InsightsUpdate,
+                EventType::MetricUpdate,
+                EventType::NewAccount,
+                EventType::NewTransfer,
+                EventType::NewTransferBatch,
+                EventType::ExecutionOrderBookNew,
+                EventType::ExecutionOrderBookUpdate,
+                EventType::VenueOrderBookNew,
+                EventType::VenueOrderBookUpdate,
+            ]),
+            InstanceType::Insights => EventFilter::Events(vec![EventType::InsightsUpdate]),
+            InstanceType::Test => EventFilter::None,
+        }
+    }
+
     async fn handle_event(&self, _ctx: Arc<CoreCtx>, event: Event) {
         if self.dry_run {
             return;

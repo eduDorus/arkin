@@ -1,83 +1,78 @@
 use futures::future::join_all;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::sync::RwLock;
 use tracing::{info, instrument};
-use typed_builder::TypedBuilder;
 
 use crate::service::Service;
-use crate::{CoreCtx, EventFilter, PersistenceReader, PubSub, Runnable, Subscriber, SystemTime};
+use crate::{CoreCtx, EventFilter, InstanceType, PersistenceReader, PubSubTrait, Runnable, Subscriber, SystemTime};
 
-#[derive(TypedBuilder)]
+#[derive(Clone)]
+struct ServiceEntry {
+    service: Arc<Service>,
+    start_priority: u64,
+    stop_priority: u64,
+}
+
 pub struct Engine {
     core_ctx: Arc<CoreCtx>,
-    #[builder(default)]
-    services: RwLock<HashMap<String, Arc<Service>>>,
-    #[builder(default)]
-    start_order: RwLock<BTreeMap<u64, Vec<String>>>,
-    #[builder(default)]
-    stop_order: RwLock<BTreeMap<u64, Vec<String>>>,
+    services: Vec<ServiceEntry>,
+    instance_type: InstanceType,
 }
 
 impl Engine {
-    pub fn new(time: Arc<dyn SystemTime>, pubsub: Arc<PubSub>, persistence: Arc<dyn PersistenceReader>) -> Arc<Self> {
-        Self {
+    pub fn new(
+        time: Arc<dyn SystemTime>,
+        pubsub: Arc<dyn PubSubTrait>,
+        persistence: Arc<dyn PersistenceReader>,
+        instance_type: InstanceType,
+    ) -> Self {
+        let engine = Self {
             core_ctx: Arc::new(CoreCtx::new(time, pubsub, persistence)),
-            services: RwLock::new(HashMap::new()),
-            start_order: RwLock::new(BTreeMap::new()),
-            stop_order: RwLock::new(BTreeMap::new()),
-        }
-        .into()
+            services: Vec::new(),
+            instance_type,
+        };
+
+        engine
     }
 
-    pub async fn register(
-        &self,
-        identifier: &str,
-        service: Arc<dyn Runnable>,
-        start_priority: u64,
-        stop_priority: u64,
-        event_filter: Option<EventFilter>,
-    ) {
-        let subscriber: Option<Arc<dyn Subscriber>> = match event_filter {
-            Some(f) => Some(self.core_ctx.pubsub.subscribe(f)),
-            None => None,
-        };
-        let service = Service::new(identifier, service, self.core_ctx.clone(), subscriber);
-        info!(target: "engine", "register services {}", service.identifier());
-        let name = service.identifier().to_owned();
-        self.services.write().await.insert(name.clone(), service);
+    pub fn register(&mut self, identifier: &str, service: Arc<dyn Runnable>, start_priority: u64, stop_priority: u64) {
+        let subscriber: Option<Arc<dyn Subscriber>> =
+            if matches!(service.event_filter(self.instance_type), EventFilter::None) {
+                None
+            } else {
+                Some(self.core_ctx.pubsub.subscribe(service.event_filter(self.instance_type)))
+            };
 
-        self.start_order
-            .write()
-            .await
-            .entry(start_priority)
-            .or_insert_with(Vec::new)
-            .push(name.clone());
+        let svc = Service::new(identifier, service, self.core_ctx.clone(), subscriber);
+        info!(target: "engine", "register services {}", identifier);
 
-        self.stop_order
-            .write()
-            .await
-            .entry(stop_priority)
-            .or_insert_with(Vec::new)
-            .push(name);
+        self.services.push(ServiceEntry {
+            service: svc,
+            start_priority,
+            stop_priority,
+        });
     }
 
     #[instrument(parent = None, skip_all)]
     pub async fn start(&self) {
         info!(target: "engine", "starting service");
-        let services = self.services.read().await;
-        let start_order = self.start_order.read().await;
-        for (_priority, service_names) in start_order.iter() {
+        let mut sorted = self.services.clone();
+        sorted.sort_by_key(|e| e.start_priority);
+
+        // Group by priority to handle concurrent starts at same priority
+        let mut priority_groups: BTreeMap<u64, Vec<&ServiceEntry>> = BTreeMap::new();
+        for entry in &sorted {
+            priority_groups.entry(entry.start_priority).or_insert_with(Vec::new).push(entry);
+        }
+
+        for (_priority, entries) in priority_groups.iter() {
             let mut handles = vec![];
-            for name in service_names {
-                if let Some(service) = services.get(name) {
-                    handles.push(service.start());
-                }
+            for entry in entries {
+                handles.push(entry.service.start());
             }
             if !handles.is_empty() {
-                let jh = join_all(handles);
-                jh.await;
+                join_all(handles).await;
             }
         }
         info!(target: "engine", "started services");
@@ -112,18 +107,25 @@ impl Engine {
     #[instrument(parent = None, skip_all)]
     pub async fn stop(&self) {
         info!(target: "engine", "stopping services");
-        let services = self.services.read().await;
-        let stop_order = self.stop_order.read().await;
-        for (_priority, service_names) in stop_order.iter() {
+        let mut sorted = self.services.clone();
+        sorted.sort_by_key(|e| std::cmp::Reverse(e.stop_priority));
+
+        // Group by priority to handle concurrent stops at same priority
+        let mut priority_groups: BTreeMap<std::cmp::Reverse<u64>, Vec<&ServiceEntry>> = BTreeMap::new();
+        for entry in &sorted {
+            priority_groups
+                .entry(std::cmp::Reverse(entry.stop_priority))
+                .or_insert_with(Vec::new)
+                .push(entry);
+        }
+
+        for (_priority, entries) in priority_groups.iter() {
             let mut handles = vec![];
-            for name in service_names {
-                if let Some(service) = services.get(name) {
-                    handles.push(service.stop());
-                }
+            for entry in entries {
+                handles.push(entry.service.stop());
             }
             if !handles.is_empty() {
-                let jh = join_all(handles);
-                jh.await;
+                join_all(handles).await;
             }
         }
         info!(target: "engine", "stopped services");

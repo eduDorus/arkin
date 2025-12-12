@@ -65,9 +65,12 @@ pub enum VenueType {
 }
 
 // Similarly for Channel
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, clap::ValueEnum, Deserialize)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum Channel {
+    Ping,
+    Instruments,
     OrderBook,
     Trades,
     AggTrades,
@@ -79,34 +82,3 @@ pub enum Channel {
     MarkPriceKlines,
     IndexPriceKlines,
 }
-
-// impl Channel {
-//     pub fn channel_name_by_venue(&self, venue: VenueName) -> String {
-//         match (venue, self) {
-//             (VenueName::BinanceSpot, Channel::AggTrades) => "aggTrades".to_string(),
-//             (VenueName::BinanceSpot, Channel::Trades) => "trade".to_string(),
-//             (VenueName::BinanceUsdmFutures, Channel::AggTrades) => "aggTrades".to_string(),
-//             (VenueName::BinanceUsdmFutures, Channel::Trades) => "trade".to_string(),
-//             (VenueName::BinanceUsdmFutures, Channel::Metrics) => "metrics".to_string(),
-//             (VenueName::BinanceUsdmFutures, Channel::MarkPriceKlines) => "markPriceKlines".to_string(),
-//             (VenueName::BinanceUsdmFutures, Channel::IndexPriceKlines) => "indexPriceKlines".to_string(),
-//             (VenueName::BinanceCoinmFutures, Channel::AggTrades) => "aggTrades".to_string(),
-//             (VenueName::BinanceCoinmFutures, Channel::Trades) => "trade".to_string(),
-//             (VenueName::BinanceCoinmFutures, Channel::Metrics) => "metrics".to_string(),
-//             (VenueName::BinanceCoinmFutures, Channel::MarkPriceKlines) => "markPriceKlines".to_string(),
-//             (VenueName::BinanceCoinmFutures, Channel::IndexPriceKlines) => "indexPriceKlines".to_string(),
-//             // Default to lowercase channel name
-//             (_, channel) => channel.to_string().to_lowercase(),
-//         }
-//     }
-//     pub fn is_kline(&self) -> bool {
-//         matches!(self, Channel::MarkPriceKlines | Channel::IndexPriceKlines)
-//     }
-
-//     pub fn has_headers(&self, venue: VenueName) -> bool {
-//         match self {
-//             Self::AggTrades => !matches!(venue, VenueName::BinanceSpot),
-//             _ => true, // Metrics, klines default true
-//         }
-//     }
-// }

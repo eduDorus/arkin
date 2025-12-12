@@ -216,6 +216,9 @@ async fn binance_exec_task(exec: Arc<BinanceExecution>, _ctx: Arc<CoreCtx>, serv
 
 #[async_trait]
 impl Runnable for BinanceExecution {
+    fn event_filter(&self, _instance_type: InstanceType) -> EventFilter {
+        EventFilter::Events(vec![EventType::NewVenueOrder, EventType::CancelVenueOrder])
+    }
     async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
         match &event {
             Event::NewVenueOrder(o) => self.place_order(ctx, o).await,

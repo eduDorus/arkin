@@ -150,7 +150,7 @@ impl SimulationExecutor {
 
     async fn trade_update(
         &self,
-        ctx: Arc<CoreCtx>,
+        _ctx: Arc<CoreCtx>,
         order: &VenueOrder,
         price: Price,
         quantity: Quantity,
@@ -259,21 +259,21 @@ impl SimulationExecutor {
         // info!(target: "executor-simulation", "published account update {}", au);
 
         // Publish VenueOrderTradeUpdate (mimic ORDER_TRADE_UPDATE)
-        let trade_update = VenueTradeUpdate::builder() // Assume new struct
-            .event_time(ctx.now().await)
-            .order(order.clone().into())
-            .fill_price(price)
-            .fill_quantity(quantity)
-            .commission_asset(
-                order
-                    .commission_asset
-                    .clone()
-                    .unwrap_or_else(|| order.instrument.quote_asset.clone()),
-            )
-            .commission(commission)
-            .realized_pnl(pnl) // Per-fill incremental
-            .build();
-        ctx.publish(Event::VenueTradeUpdate(trade_update.into())).await;
+        // let trade_update = VenueTradeUpdate::builder() // Assume new struct
+        //     .event_time(ctx.now().await)
+        //     .order(order.clone().into())
+        //     .fill_price(price)
+        //     .fill_quantity(quantity)
+        //     .commission_asset(
+        //         order
+        //             .commission_asset
+        //             .clone()
+        //             .unwrap_or_else(|| order.instrument.quote_asset.clone()),
+        //     )
+        //     .commission(commission)
+        //     .realized_pnl(pnl) // Per-fill incremental
+        //     .build();
+        // ctx.publish(Event::VenueTradeUpdate(trade_update.into())).await;
         info!(target: "executor-simulation", "published order trade update for order {}", order.id);
     }
 
