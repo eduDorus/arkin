@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use async_trait::async_trait;
 use kanal::{AsyncReceiver, AsyncSender};
-use redis::{aio::ConnectionManager, AsyncTypedCommands, Client, PushInfo, PushKind, Value};
+use redis::{aio::ConnectionManager, Client, PushInfo, PushKind, Value};
 use std::future::Future;
 use std::pin::Pin;
 use tokio::sync::mpsc;
@@ -15,7 +15,7 @@ use crate::{
     CoreCtx, Event, EventFilter, EventType, PersistenceReader, PubSubTrait, Publisher, Runnable, ServiceCtx, Subscriber,
 };
 
-const CONN_COUNT: usize = 32;
+const CONN_COUNT: usize = 1;
 
 #[derive(Clone)]
 pub struct RedisPubSub {
@@ -29,7 +29,7 @@ impl RedisPubSub {
         let client = Client::open("redis://192.168.100.100/?protocol=resp3")?;
 
         // Dedicated pub task: One shared con, fire-and-forget loop
-        let (pub_tx, pub_rx) = kanal::bounded_async::<Event>(50_000); // Tune buffer; drop on full
+        let (pub_tx, pub_rx) = kanal::unbounded_async::<Event>(); // Tune buffer; drop on full
 
         for _ in 0..CONN_COUNT {
             let client_clone = client.clone();
@@ -50,15 +50,39 @@ impl RedisPubSub {
                     }
                 };
 
-                while let Ok(event) = rx.recv().await {
-                    let Some(data) = event.to_msgpack() else {
-                        warn!("Failed to serialize event for Redis: {}", event);
-                        continue;
-                    };
-                    let channel = event.event_type().to_string();
+                let mut buffer = Vec::with_capacity(1000);
+                loop {
+                    // Wait for the first event
+                    match rx.recv().await {
+                        Ok(event) => buffer.push(event),
+                        Err(_) => break, // Channel closed
+                    }
 
-                    if let Err(e) = manager.publish(channel, data).await {
-                        warn!("Redis publish error: {}", e);
+                    // Try to fill buffer with available events up to 1000
+                    while buffer.len() < 1000 {
+                        match rx.try_recv() {
+                            Ok(Some(event)) => buffer.push(event),
+                            Ok(None) => break, // Empty
+                            Err(_) => break,   // Closed
+                        }
+                    }
+
+                    let mut pipe = redis::pipe();
+                    let mut count = 0;
+                    for event in buffer.drain(..) {
+                        let Some(data) = event.to_msgpack() else {
+                            warn!("Failed to serialize event for Redis: {}", event);
+                            continue;
+                        };
+                        let channel = event.event_type().to_string();
+                        pipe.publish(channel, data);
+                        count += 1;
+                    }
+
+                    if count > 0 {
+                        if let Err(e) = pipe.query_async::<()>(&mut manager).await {
+                            warn!("Redis pipeline publish error: {}", e);
+                        }
                     }
                 }
             });
@@ -79,7 +103,7 @@ impl RedisPubSub {
     }
 
     pub fn subscribe(&self, filter: EventFilter) -> Arc<dyn Subscriber> {
-        let (tx, rx) = kanal::bounded_async(10240);
+        let (tx, rx) = kanal::unbounded_async();
         let client = self.client.clone();
         let persistence = self.persistence.clone();
         let event_types: Vec<String> = filter.event_types().iter().map(|et| et.to_string()).collect();

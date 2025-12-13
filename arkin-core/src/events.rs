@@ -35,16 +35,8 @@ pub enum Event {
 
     // Allocation Execution Orders
     NewExecutionOrder(Arc<ExecutionOrder>),
-    NewTakerExecutionOrder(Arc<ExecutionOrder>),
-    NewWideQuoterExecutionOrder(Arc<ExecutionOrder>),
-
     CancelExecutionOrder(Arc<ExecutionOrder>),
-    CancelTakerExecutionOrder(Arc<ExecutionOrder>),
-    CancelWideQuoterExecutionOrder(Arc<ExecutionOrder>),
-
     CancelAllExecutionOrders(UtcDateTime),
-    CancelAllTakerExecutionOrders(UtcDateTime),
-    CancelAllWideQuoterExecutionOrders(UtcDateTime),
 
     // Execution Strategy
     NewVenueOrder(Arc<VenueOrder>),
@@ -92,7 +84,7 @@ impl Event {
             Event::InitialAccountUpdate(event) => event.event_time,
             Event::ReconcileAccountUpdate(event) => event.event_time,
             Event::VenueAccountUpdate(event) => event.event_time,
-            // Event::VenueTradeUpdate(event) => event.event_time,
+
             Event::NewAccount(event) => event.updated,
             Event::NewTransfer(event) => event.created,
             Event::NewTransferBatch(event) => event.event_time, // TODO: This is probably not optimal
@@ -104,16 +96,8 @@ impl Event {
 
             // Allocation Execution Orders
             Event::NewExecutionOrder(event) => event.updated,
-            Event::NewTakerExecutionOrder(event) => event.updated,
-            Event::NewWideQuoterExecutionOrder(event) => event.updated,
-
             Event::CancelExecutionOrder(event) => event.updated,
-            Event::CancelTakerExecutionOrder(event) => event.updated,
-            Event::CancelWideQuoterExecutionOrder(event) => event.updated,
-
             Event::CancelAllExecutionOrders(ts) => *ts,
-            Event::CancelAllTakerExecutionOrders(ts) => *ts,
-            Event::CancelAllWideQuoterExecutionOrders(ts) => *ts,
 
             // Execution Strategy
             Event::NewVenueOrder(event) => event.updated,
@@ -152,20 +136,12 @@ impl Event {
             Event::InitialAccountUpdate(update)
             | Event::ReconcileAccountUpdate(update)
             | Event::VenueAccountUpdate(update) => rmp_serde::to_vec(&update.to_dto()).ok(),
-            // Event::VenueTradeUpdate(update) => {
-            //     let dto: VenueTradeUpdateDto = update.deref().clone().into();
-            //     rmp_serde::to_vec(&dto).ok()
-            // }
             Event::InsightsTick(tick) => rmp_serde::to_vec(&tick.to_dto()).ok(),
             Event::InsightsUpdate(update) | Event::WarmupInsightsUpdate(update) => {
                 rmp_serde::to_vec(&update.to_dto()).ok()
             }
             Event::NewExecutionOrder(order)
-            | Event::NewTakerExecutionOrder(order)
-            | Event::NewWideQuoterExecutionOrder(order)
             | Event::CancelExecutionOrder(order)
-            | Event::CancelTakerExecutionOrder(order)
-            | Event::CancelWideQuoterExecutionOrder(order)
             | Event::ExecutionOrderActive(order)
             | Event::ExecutionOrderCompleted(order)
             | Event::ExecutionOrderCancelled(order)
@@ -185,11 +161,9 @@ impl Event {
             Event::NewAccount(account) => rmp_serde::to_vec(&account.to_dto()).ok(),
             Event::NewTransfer(transfer) => rmp_serde::to_vec(&transfer.to_dto()).ok(),
             Event::NewTransferBatch(batch) => rmp_serde::to_vec(&batch.to_dto()).ok(),
-            Event::CancelAllExecutionOrders(ts)
-            | Event::CancelAllTakerExecutionOrders(ts)
-            | Event::CancelAllWideQuoterExecutionOrders(ts)
-            | Event::CancelAllVenueOrders(ts)
-            | Event::Finished(ts) => rmp_serde::to_vec(ts).ok(),
+            Event::CancelAllExecutionOrders(ts) | Event::CancelAllVenueOrders(ts) | Event::Finished(ts) => {
+                rmp_serde::to_vec(ts).ok()
+            }
             _ => {
                 warn!("to_msgpack not implemented for event type: {}", self.event_type());
                 None
@@ -261,11 +235,7 @@ impl Event {
                 }
             }
             EventType::NewExecutionOrder
-            | EventType::NewTakerExecutionOrder
-            | EventType::NewWideQuoterExecutionOrder
             | EventType::CancelExecutionOrder
-            | EventType::CancelTakerExecutionOrder
-            | EventType::CancelWideQuoterExecutionOrder
             | EventType::ExecutionOrderActive
             | EventType::ExecutionOrderCompleted
             | EventType::ExecutionOrderCancelled
@@ -281,11 +251,7 @@ impl Event {
 
                 match event_type {
                     EventType::NewExecutionOrder => Some(Event::NewExecutionOrder(order)),
-                    EventType::NewTakerExecutionOrder => Some(Event::NewTakerExecutionOrder(order)),
-                    EventType::NewWideQuoterExecutionOrder => Some(Event::NewWideQuoterExecutionOrder(order)),
                     EventType::CancelExecutionOrder => Some(Event::CancelExecutionOrder(order)),
-                    EventType::CancelTakerExecutionOrder => Some(Event::CancelTakerExecutionOrder(order)),
-                    EventType::CancelWideQuoterExecutionOrder => Some(Event::CancelWideQuoterExecutionOrder(order)),
                     EventType::ExecutionOrderActive => Some(Event::ExecutionOrderActive(order)),
                     EventType::ExecutionOrderCompleted => Some(Event::ExecutionOrderCompleted(order)),
                     EventType::ExecutionOrderCancelled => Some(Event::ExecutionOrderCancelled(order)),
@@ -341,18 +307,10 @@ impl Event {
                     .ok()?;
                 Some(Event::NewTransferBatch(Arc::new(batch)))
             }
-            EventType::CancelAllExecutionOrders
-            | EventType::CancelAllTakerExecutionOrders
-            | EventType::CancelAllWideQuoterExecutionOrders
-            | EventType::CancelAllVenueOrders
-            | EventType::Finished => {
+            EventType::CancelAllExecutionOrders | EventType::CancelAllVenueOrders | EventType::Finished => {
                 let ts: UtcDateTime = rmp_serde::from_slice(data).ok()?;
                 match event_type {
                     EventType::CancelAllExecutionOrders => Some(Event::CancelAllExecutionOrders(ts)),
-                    EventType::CancelAllTakerExecutionOrders => Some(Event::CancelAllTakerExecutionOrders(ts)),
-                    EventType::CancelAllWideQuoterExecutionOrders => {
-                        Some(Event::CancelAllWideQuoterExecutionOrders(ts))
-                    }
                     EventType::CancelAllVenueOrders => Some(Event::CancelAllVenueOrders(ts)),
                     EventType::Finished => Some(Event::Finished(ts)),
                     _ => None,
@@ -404,19 +362,12 @@ impl fmt::Display for Event {
             Event::InitialAccountUpdate(inner) => write!(f, "{}", inner),
             Event::ReconcileAccountUpdate(inner) => write!(f, "{}", inner),
             Event::VenueAccountUpdate(inner) => write!(f, "{}", inner),
-            // Event::VenueTradeUpdate(inner) => write!(f, "{}", inner),
             Event::InsightsTick(inner) => write!(f, "{}", inner),
             Event::InsightsUpdate(inner) => write!(f, "{}", inner),
             Event::WarmupInsightsUpdate(inner) => write!(f, "{}", inner),
             Event::NewExecutionOrder(inner) => write!(f, "{}", inner),
-            Event::NewTakerExecutionOrder(inner) => write!(f, "{}", inner),
-            Event::NewWideQuoterExecutionOrder(inner) => write!(f, "{}", inner),
             Event::CancelExecutionOrder(inner) => write!(f, "{}", inner),
-            Event::CancelTakerExecutionOrder(inner) => write!(f, "{}", inner),
-            Event::CancelWideQuoterExecutionOrder(inner) => write!(f, "{}", inner),
             Event::CancelAllExecutionOrders(inner) => write!(f, "{}", inner),
-            Event::CancelAllTakerExecutionOrders(inner) => write!(f, "{}", inner),
-            Event::CancelAllWideQuoterExecutionOrders(inner) => write!(f, "{}", inner),
             Event::NewVenueOrder(inner) => write!(f, "{}", inner),
             Event::CancelVenueOrder(inner) => write!(f, "{}", inner),
             Event::CancelAllVenueOrders(inner) => write!(f, "{}", inner),

@@ -217,7 +217,7 @@ impl ExecutionOrder {
     pub fn is_active(&self) -> bool {
         matches!(
             self.status,
-            ExecutionOrderStatus::Placed | ExecutionOrderStatus::PartiallyFilled
+            ExecutionOrderStatus::Placed | ExecutionOrderStatus::PartiallyFilled | ExecutionOrderStatus::Cancelling
         )
     }
 

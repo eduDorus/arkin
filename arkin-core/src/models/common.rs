@@ -1,9 +1,10 @@
+use clap::ValueEnum;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use sqlx::Type;
 use strum::Display;
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type, Serialize, Deserialize, Default)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Type, Serialize, Deserialize, Default, ValueEnum)]
 #[strum(serialize_all = "snake_case")]
 #[sqlx(type_name = "market_side", rename_all = "snake_case")]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]

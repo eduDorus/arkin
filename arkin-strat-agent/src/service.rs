@@ -264,7 +264,7 @@ impl AgentStrategy {
                         }
                         let time = ctx.now().await;
                         if let Some(order) = self.allocation.update(time, inst, new_weight) {
-                            ctx.publish(Event::NewTakerExecutionOrder(order.clone().into())).await;
+                            ctx.publish(Event::NewExecutionOrder(order.clone().into())).await;
                             info!(target: "strat::agent", "send {} execution order for {} quantity {}", order.side, order.instrument, order.quantity);
                         }
                     } else {

@@ -1,5 +1,5 @@
 [package]
-name = "arkin-exec-strat-taker"
+name = "arkin-exec-strat-default"
 authors.workspace = true
 version.workspace = true
 edition.workspace = true

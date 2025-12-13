@@ -162,7 +162,7 @@ impl Service {
     #[instrument(parent = None, skip_all, fields(service = %self.identifier()))]
     async fn event_loop(&self) {
         info!(target: "service", "starting event loop");
-        let service_ctx = self.service_ctx.clone();
+        // let service_ctx = self.service_ctx.clone();
         let core_ctx = self.core_ctx.clone();
         let service = self.service.clone();
         let token = self.service_ctx.get_shutdown_token();
@@ -171,18 +171,27 @@ impl Service {
             loop {
                 select! {
                   Some(event) = subscriber.recv() => {
+                        // Handle the event
+                        service.handle_event(core_ctx.clone(), event.clone()).await;
+
+                        // Send ack if needed
                         if subscriber.needs_ack() {
-                            // Simulation mode: Process sequentially
-                            service.handle_event(core_ctx.clone(), event).await;
                             subscriber.send_ack().await;
-                        } else {
-                            // Live mode: Spawn a task for concurrent processing
-                            let service_clone = service.clone();
-                            let ctx_clone = core_ctx.clone();
-                            service_ctx.spawn(async move {
-                                service_clone.handle_event(ctx_clone, event).await;
-                            });
                         }
+
+                        // MULTI MODE LOGIC - IGNORE FOR NOW
+                        // if subscriber.needs_ack() {
+                        //     // Simulation mode: Process sequentially
+                        //     service.handle_event(core_ctx.clone(), event).await;
+                        //     subscriber.send_ack().await;
+                        // } else {
+                        //     // Live mode: Spawn a task for concurrent processing
+                        //     let service_clone = service.clone();
+                        //     let ctx_clone = core_ctx.clone();
+                        //     service_ctx.spawn(async move {
+                        //         service_clone.handle_event(ctx_clone, event).await;
+                        //     });
+                        // }
                   },
                   _ = token.cancelled() => {
                     break

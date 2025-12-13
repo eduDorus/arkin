@@ -17,6 +17,7 @@ arkin-persistence = { path = "../arkin-persistence" }
 arkin-data-provider = { path = "../arkin-data-provider" }
 arkin-binance = { path = "../arkin-binance" }
 arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
+arkin-exec-strat-default = { path = "../arkin-exec-strat-default" }
 # arkin-cron = { path = "../arkin-cron" }
 # arkin-accounting = { path = "../arkin-accounting" }
 # arkin-audit = { path = "../arkin-audit" }
@@ -24,7 +25,7 @@ arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
 # arkin-data-provider-historical = { path = "../arkin-data-provider-historical" }
 # arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 # arkin-strat-agent = { path = "../arkin-strat-agent" }
-# arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
+# arkin-exec-strat-default = { path = "../arkin-exec-strat-default" }
 # arkin-sim-ingestor = { path = "../arkin-sim-ingestor" }
 
 tokio = { workspace = true }

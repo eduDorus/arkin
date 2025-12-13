@@ -58,6 +58,10 @@ impl ExecutionOrderBook {
         self.queue.get(&id).map(|entry| entry.value().to_owned())
     }
 
+    pub fn contains(&self, id: &Uuid) -> bool {
+        self.queue.contains_key(id)
+    }
+
     pub async fn place_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.place(event_time);
@@ -160,10 +164,10 @@ impl ExecutionOrderBook {
         self.queue.iter().map(|entry| entry.key().to_owned()).collect()
     }
 
-    pub fn list_ids_by_exec_strategy(&self, exec_type: ExecutionStrategyType) -> Vec<ExecutionOrderId> {
+    pub fn list_ids_by_exec_strategy(&self, exec_type: &[ExecutionStrategyType]) -> Vec<ExecutionOrderId> {
         self.queue
             .iter()
-            .filter(|entry| entry.value().exec_strategy_type == exec_type)
+            .filter(|entry| exec_type.contains(&entry.value().exec_strategy_type))
             .map(|entry| entry.key().to_owned())
             .collect()
     }
@@ -174,23 +178,28 @@ impl ExecutionOrderBook {
         orders
     }
 
-    pub fn list_orders_by_exec_strategy(&self, exec_type: ExecutionStrategyType) -> Vec<ExecutionOrder> {
+    pub fn list_orders_by_exec_strategy(&self, exec_type: &[ExecutionStrategyType]) -> Vec<ExecutionOrder> {
         self.queue
             .iter()
-            .filter(|entry| entry.value().exec_strategy_type == exec_type)
+            .filter(|entry| exec_type.contains(&entry.value().exec_strategy_type))
             .map(|entry| entry.value().to_owned())
             .collect()
     }
 
     pub fn list_active_orders(&self) -> Vec<ExecutionOrder> {
-        let mut orders: Vec<ExecutionOrder> = self
-            .queue
+        self.queue
             .iter()
             .filter(|entry| entry.value().is_active())
             .map(|entry| entry.value().to_owned())
-            .collect();
-        orders.sort_by_key(|order| order.status);
-        orders
+            .collect()
+    }
+
+    pub fn list_active_orders_by_instrument(&self, instrument: &Arc<Instrument>) -> Vec<ExecutionOrder> {
+        self.queue
+            .iter()
+            .filter(|entry| entry.value().is_active() && &entry.value().instrument == instrument)
+            .map(|entry| entry.value().to_owned())
+            .collect()
     }
 
     pub fn list_active_orders_by_instrument_and_strategy(

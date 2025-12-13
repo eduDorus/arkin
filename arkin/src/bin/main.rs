@@ -2,6 +2,7 @@ use std::{cmp::max, str::FromStr, sync::Arc};
 
 use anyhow::Result;
 use arkin_binance::BinanceExecution;
+use arkin_exec_strat_default::DefaultExecutionStrategy;
 use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
 use clap::Parser;
 use rust_decimal::dec;
@@ -20,8 +21,8 @@ use uuid::Uuid;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-// #[tokio::main(flavor = "current_thread")]
-#[tokio::main(flavor = "multi_thread")]
+// #[tokio::main(flavor = "multi_thread")]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     init_tracing();
 
@@ -74,21 +75,28 @@ async fn main() -> Result<()> {
             );
             let venue_orderbook =
                 Arc::new(VenueOrderBook::builder().publisher(pubsub.publisher()).autoclean(true).build());
-            let strategy = match a.strategy {
-                ExecutionStrategyType::WideQuoter => WideQuoterExecutionStrategy::builder()
-                    .exec_order_book(execution_orderbook)
-                    .venue_order_book(venue_orderbook)
-                    .pct_from_mid(dec!(0.0050))
-                    .requote_pct_change(dec!(0.0025))
-                    .build(),
-                _ => unimplemented!("Execution strategy {} is not implemented yet", a.strategy),
+            let strategy: Arc<dyn Runnable + Send + Sync> = match a.strategy {
+                ExecutionStrategyType::WideQuoter => Arc::new(
+                    WideQuoterExecutionStrategy::builder()
+                        .exec_order_book(execution_orderbook.clone())
+                        .venue_order_book(venue_orderbook.clone())
+                        .pct_from_mid(dec!(0.005))
+                        .requote_pct_change(dec!(0.001))
+                        .build(),
+                ),
+                ExecutionStrategyType::Maker | ExecutionStrategyType::Taker => Arc::new(
+                    DefaultExecutionStrategy::builder()
+                        .exec_order_book(execution_orderbook.clone())
+                        .venue_order_book(venue_orderbook.clone())
+                        .build(),
+                ),
             };
 
             // Init Engine
             let mut engine =
                 Engine::new(LiveSystemTime::new(), pubsub.clone(), persistence.clone(), InstanceType::Live);
             engine.register("pubsub", pubsub.clone(), 0, 10);
-            engine.register("execution_strategy", Arc::new(strategy), 1, 1);
+            engine.register("execution_strategy", strategy, 1, 1);
 
             engine.start().await;
             engine.wait_for_shutdown().await;
@@ -171,7 +179,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::SendOrder => {
+        Commands::SendOrder(a) => {
             // Init time
             let time = LiveSystemTime::new();
 
@@ -201,45 +209,68 @@ async fn main() -> Result<()> {
 
             let last_price = persistence.get_last_tick(&inst).await.unwrap().unwrap().mid_price();
 
-            let lot_size = max(dec!(100) / last_price, inst.lot_size);
+            let lot_size = max(a.amount / last_price, inst.lot_size);
 
-            // Create Buy exec order
-            let buy_exec_id = Uuid::new_v4();
-            let buy_exec = ExecutionOrder::builder()
-                .id(buy_exec_id)
-                .strategy(Some(strategy.clone()))
-                .instrument(inst.clone())
-                .exec_strategy_type(ExecutionStrategyType::WideQuoter)
-                .side(MarketSide::Buy)
-                .set_price(dec!(0))
-                .set_quantity(lot_size)
-                .status(ExecutionOrderStatus::New)
-                .created(time.now().await)
-                .updated(time.now().await)
-                .build();
+            match a.strategy {
+                ExecutionStrategyType::WideQuoter => {
+                    // Create Buy exec order
+                    let buy_exec_id = Uuid::new_v4();
+                    let buy_exec = ExecutionOrder::builder()
+                        .id(buy_exec_id)
+                        .strategy(Some(strategy.clone()))
+                        .instrument(inst.clone())
+                        .exec_strategy_type(ExecutionStrategyType::WideQuoter)
+                        .side(MarketSide::Buy)
+                        .set_price(dec!(0))
+                        .set_quantity(lot_size)
+                        .status(ExecutionOrderStatus::New)
+                        .created(time.now().await)
+                        .updated(time.now().await)
+                        .build();
 
-            // Create Sell exec order
-            let sell_exec_id = Uuid::new_v4();
-            let sell_exec = ExecutionOrder::builder()
-                .id(sell_exec_id)
-                .strategy(Some(strategy.clone()))
-                .instrument(inst.clone())
-                .exec_strategy_type(ExecutionStrategyType::WideQuoter)
-                .side(MarketSide::Sell)
-                .set_price(dec!(0))
-                .set_quantity(lot_size)
-                .status(ExecutionOrderStatus::New)
-                .created(time.now().await)
-                .updated(time.now().await)
-                .build();
+                    // Create Sell exec order
+                    let sell_exec_id = Uuid::new_v4();
+                    let sell_exec = ExecutionOrder::builder()
+                        .id(sell_exec_id)
+                        .strategy(Some(strategy.clone()))
+                        .instrument(inst.clone())
+                        .exec_strategy_type(ExecutionStrategyType::WideQuoter)
+                        .side(MarketSide::Sell)
+                        .set_price(dec!(0))
+                        .set_quantity(lot_size)
+                        .status(ExecutionOrderStatus::New)
+                        .created(time.now().await)
+                        .updated(time.now().await)
+                        .build();
 
-            pubsub
-                .publish(Event::NewWideQuoterExecutionOrder(buy_exec.clone().into()))
-                .await;
+                    pubsub.publish(Event::NewExecutionOrder(buy_exec.clone().into())).await;
+                    pubsub.publish(Event::NewExecutionOrder(sell_exec.clone().into())).await;
+                }
+                ExecutionStrategyType::Maker | ExecutionStrategyType::Taker => {
+                    let side = a.side.expect("Side is required for Maker/Taker orders");
+                    let price = if a.strategy == ExecutionStrategyType::Maker {
+                        a.price.expect("Price is required for Maker orders")
+                    } else {
+                        dec!(0)
+                    };
 
-            pubsub
-                .publish(Event::NewWideQuoterExecutionOrder(sell_exec.clone().into()))
-                .await;
+                    let exec_id = Uuid::new_v4();
+                    let exec_order = ExecutionOrder::builder()
+                        .id(exec_id)
+                        .strategy(Some(strategy.clone()))
+                        .instrument(inst.clone())
+                        .exec_strategy_type(a.strategy)
+                        .side(side)
+                        .set_price(price)
+                        .set_quantity(lot_size)
+                        .status(ExecutionOrderStatus::New)
+                        .created(time.now().await)
+                        .updated(time.now().await)
+                        .build();
+
+                    pubsub.publish(Event::NewExecutionOrder(exec_order.clone().into())).await;
+                }
+            }
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         }
         Commands::CancelAllOrders => {
@@ -253,9 +284,7 @@ async fn main() -> Result<()> {
             // Init Redis PubSub
             let pubsub = RedisPubSub::new(persistence.clone())?;
 
-            pubsub
-                .publish(Event::CancelAllWideQuoterExecutionOrders(time.now().await))
-                .await;
+            pubsub.publish(Event::CancelAllExecutionOrders(time.now().await)).await;
 
             info!("Publishing CancelAllOrders event");
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;

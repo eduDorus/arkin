@@ -177,7 +177,7 @@ impl VenueOrderBook {
     pub fn list_orders_by_exec_id(&self, id: ExecutionOrderId) -> Vec<VenueOrder> {
         self.queue
             .iter()
-            .filter(|entry| entry.value().execution_order_id == Some(id))
+            .filter(|entry| entry.value().execution_order_id == id)
             .map(|entry| entry.value().to_owned())
             .collect()
     }

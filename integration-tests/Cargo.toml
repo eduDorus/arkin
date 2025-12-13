@@ -14,7 +14,7 @@ arkin-data-provider = { path = "../arkin-data-provider" }
 # arkin-accounting = { path = "../arkin-accounting" }
 # arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 # arkin-strat-agent = { path = "../arkin-strat-agent" }
-# arkin-exec-strat-taker = { path = "../arkin-exec-strat-taker" }
+# arkin-exec-strat-default = { path = "../arkin-exec-strat-default" }
 # arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
 # arkin-binance = { path = "../arkin-binance" }
 

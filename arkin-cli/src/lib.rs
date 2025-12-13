@@ -85,10 +85,29 @@ pub enum Commands {
     /// Send Order
     ///
     /// Sends a test order via PubSub.
-    SendOrder,
+    SendOrder(SendOrderArgs),
 
     /// Cancel All Orders
     CancelAllOrders,
+}
+
+#[derive(Args, Debug)]
+pub struct SendOrderArgs {
+    /// The execution strategy to use (wide-quoter, maker, taker)
+    #[arg(long, value_enum, default_value_t = ExecutionStrategyType::WideQuoter)]
+    pub strategy: ExecutionStrategyType,
+
+    /// Side of the order (buy, sell). Required for Maker/Taker.
+    #[arg(long, value_enum)]
+    pub side: Option<MarketSide>,
+
+    /// Quantity in USDT (approximate)
+    #[arg(long, default_value = "100")]
+    pub amount: Decimal,
+
+    /// Limit price (optional, for Maker)
+    #[arg(long)]
+    pub price: Option<Decimal>,
 }
 
 /// Arguments for the `download` subcommand.

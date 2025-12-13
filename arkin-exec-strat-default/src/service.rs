@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use arkin_core::prelude::*;
 use async_trait::async_trait;
@@ -8,17 +8,14 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 #[derive(TypedBuilder)]
-pub struct TakerExecutionStrategy {
-    #[builder(default = ExecutionStrategyType::Taker)]
-    strategy_type: ExecutionStrategyType,
+pub struct DefaultExecutionStrategy {
     exec_order_book: Arc<ExecutionOrderBook>,
     venue_order_book: Arc<VenueOrderBook>,
 }
 
-impl TakerExecutionStrategy {
+impl DefaultExecutionStrategy {
     pub fn new(exec_order_book: Arc<ExecutionOrderBook>, venue_order_book: Arc<VenueOrderBook>) -> Arc<Self> {
         Self {
-            strategy_type: ExecutionStrategyType::Taker,
             exec_order_book,
             venue_order_book,
         }
@@ -29,177 +26,216 @@ impl TakerExecutionStrategy {
         self.exec_order_book.check_finalize_order(exec_id, event_time).await;
     }
 
-    async fn new_execution_order(&self, ctx: Arc<CoreCtx>, exec_order: &ExecutionOrder) {
-        info!(target: "exec_strat::taker", "received new execution order {}", exec_order.id);
-        let time = ctx.now().await;
+    async fn new_maker_execution_order(&self, ctx: Arc<CoreCtx>, exec_order: &ExecutionOrder) {
+        info!(target: "exec_strat::default", "received new maker execution order {}", exec_order.id);
 
         // Validate order strategy
-        if exec_order.exec_strategy_type != self.strategy_type {
-            warn!(target: "exec_strat::taker", "received wrong execution order type {}", exec_order.exec_strategy_type);
+        if !matches!(exec_order.exec_strategy_type, ExecutionStrategyType::Maker) {
             return;
         }
+
+        let time = ctx.now().await;
 
         // add to execution order book
         self.exec_order_book.insert(exec_order.clone()).await;
         self.exec_order_book.place_order(exec_order.id, time).await;
 
-        // Create market order
+        // Create limit order immediately
         let venue_order = VenueOrder::builder()
             .id(Uuid::new_v4())
-            .execution_order_id(Some(exec_order.id))
+            .execution_order_id(exec_order.id)
             .strategy(exec_order.strategy.clone())
             .instrument(exec_order.instrument.clone())
             .side(exec_order.side)
-            .set_quantity(exec_order.quantity)
+            .set_quantity(exec_order.remaining_quantity())
             .set_price(exec_order.price)
+            .order_type(VenueOrderType::Limit)
+            .time_in_force(VenueOrderTimeInForce::Gtc) // Post-Only
+            .created(time)
+            .updated(time)
+            .build();
+
+        info!(target: "exec_strat::default", "creating new maker venue order {} at price {}", venue_order.id, exec_order.price);
+        self.venue_order_book.insert(venue_order.clone()).await;
+        ctx.publish(Event::NewVenueOrder(venue_order.into())).await;
+    }
+
+    async fn new_taker_execution_order(&self, ctx: Arc<CoreCtx>, exec_order: &ExecutionOrder) {
+        info!(target: "exec_strat::default", "received new taker execution order {}", exec_order.id);
+
+        // Validate order strategy
+        if !matches!(exec_order.exec_strategy_type, ExecutionStrategyType::Taker) {
+            return;
+        }
+
+        let time = ctx.now().await;
+
+        // add to execution order book
+        self.exec_order_book.insert(exec_order.clone()).await;
+        self.exec_order_book.place_order(exec_order.id, time).await;
+
+        // Create market order immediately
+        let venue_order = VenueOrder::builder()
+            .id(Uuid::new_v4())
+            .execution_order_id(exec_order.id)
+            .strategy(exec_order.strategy.clone())
+            .instrument(exec_order.instrument.clone())
+            .side(exec_order.side)
+            .set_quantity(exec_order.remaining_quantity())
+            .set_price(exec_order.price) // Usually 0 for market
             .order_type(VenueOrderType::Market)
             .created(time)
             .updated(time)
             .build();
-        info!(target: "exec_strat::taker", "created new venue order {}", venue_order.id);
 
-        // Add to the order book
+        info!(target: "exec_strat::default", "creating new taker venue order {}", venue_order.id);
         self.venue_order_book.insert(venue_order.clone()).await;
-
-        // Publish the new venue order
-        ctx.publish(Event::NewVenueOrder(venue_order.clone().into())).await;
-        info!(target: "exec_strat::taker", "published new venue order {}", venue_order.id);
+        ctx.publish(Event::NewVenueOrder(venue_order.into())).await;
     }
 
-    async fn cancel_execution_order(&self, ctx: Arc<CoreCtx>, order_id: ExecutionOrderId) {
-        info!(target: "exec_strat::taker", "received cancel for execution order {}", order_id);
+    async fn cancel_execution_order(&self, ctx: Arc<CoreCtx>, exec_order: &ExecutionOrder) {
+        info!(target: "exec_strat::default", "received cancel for execution order {}", exec_order.id);
+
+        // Validate order strategy
+        if !matches!(exec_order.exec_strategy_type, ExecutionStrategyType::Taker)
+            && !matches!(exec_order.exec_strategy_type, ExecutionStrategyType::Maker)
+        {
+            return;
+        }
+
         let time = ctx.now().await;
 
         // Update the exec order book
-        self.exec_order_book.cancel_order(order_id, time).await;
+        self.exec_order_book.cancel_order(exec_order.id, time).await;
 
         // Cancel all venue orders linked to the exec order
-        let venue_orders = self.venue_order_book.list_orders_by_exec_id(order_id);
+        let venue_orders = self.venue_order_book.list_orders_by_exec_id(exec_order.id);
         for venue_order in venue_orders {
-            ctx.publish(Event::CancelVenueOrder(venue_order.clone().into())).await;
-            info!(target: "exec_strat::taker", "send cancel order for venue order {}", venue_order.id);
+            if venue_order.is_active() {
+                self.venue_order_book.cancel_order(venue_order.id, time).await;
+                ctx.publish(Event::CancelVenueOrder(venue_order.clone().into())).await;
+                info!(target: "exec_strat::default", "send cancel order for venue order {}", venue_order.id);
+            }
         }
     }
 
-    async fn cancel_all_execution_orders(&self, ctx: Arc<CoreCtx>, _time: &UtcDateTime) {
-        info!(target: "exec_strat::taker", "received cancel all execution orders");
+    async fn cancel_all_execution_orders(&self, ctx: Arc<CoreCtx>) {
+        info!(target: "exec_strat::default", "received cancel all execution orders");
         let time = ctx.now().await;
 
         // Change all exec orders to cancelling
-        for exec_order in self.exec_order_book.list_orders_by_exec_strategy(self.strategy_type) {
+        for exec_order in self
+            .exec_order_book
+            .list_orders_by_exec_strategy(&[ExecutionStrategyType::Maker, ExecutionStrategyType::Taker])
+        {
             self.exec_order_book.cancel_order(exec_order.id, time).await;
             let venue_orders = self.venue_order_book.list_orders_by_exec_id(exec_order.id);
             for venue_order in venue_orders {
-                ctx.publish(Event::CancelVenueOrder(venue_order.clone().into())).await;
-                info!(target: "exec_strat::taker", "send cancel order for venue order {}", venue_order.id);
+                if venue_order.is_active() {
+                    self.venue_order_book.cancel_order(venue_order.id, time).await;
+                    ctx.publish(Event::CancelVenueOrder(venue_order.clone().into())).await;
+                    info!(target: "exec_strat::default", "send cancel order for venue order {}", venue_order.id);
+                }
             }
         }
     }
 
     async fn venue_order_inflight(&self, order: &VenueOrder) {
-        info!(target: "exec_strat::taker", "received status inflight for venue order {}", order.id);
-
-        // Check if the order contains exec id and if we are the right strategy
-        if let Some(id) = order.execution_order_id {
-            let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
-            if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.set_inflight(order.id, order.updated).await;
-            }
+        if !self.exec_order_book.contains(&order.execution_order_id) {
+            return;
         }
+        info!(target: "exec_strat::default", "received status inflight for venue order {}", order.id);
+        self.venue_order_book.set_inflight(order.id, order.updated).await;
     }
 
     async fn venue_order_placed(&self, order: &VenueOrder) {
-        info!(target: "exec_strat::taker", "received status placed for venue order {}", order.id);
-
-        // Check if the order contains exec id and if we are the right strategy
-        if let Some(id) = order.execution_order_id {
-            let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
-            if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.place_order(order.id, order.updated).await;
-            }
+        if !self.exec_order_book.contains(&order.execution_order_id) {
+            return;
         }
+        info!(target: "exec_strat::default", "received status placed for venue order {}", order.id);
+        self.venue_order_book.place_order(order.id, order.updated).await;
     }
 
     async fn venue_order_rejected(&self, order: &VenueOrder) {
-        info!(target: "exec_strat::taker", "received status rejected for venue order {}", order.id);
-
-        // Check if the order contains exec id and if we are the right strategy
-        if let Some(id) = order.execution_order_id {
-            let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
-            if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.reject_order(order.id, order.updated).await;
-                if order.is_terminal() {
-                    self.check_finalize_exec(id, order.updated).await;
-                }
-            }
+        if !self.exec_order_book.contains(&order.execution_order_id) {
+            return;
         }
+        info!(target: "exec_strat::default", "received status rejected for venue order {}", order.id);
+        self.venue_order_book.reject_order(order.id, order.updated).await;
+
+        self.check_finalize_exec(order.execution_order_id, order.updated).await;
     }
 
     async fn venue_order_fill(&self, order: &VenueOrder) {
-        info!(target: "exec_strat::taker", "received fill for venue order {}", order.id);
-
-        // Check if the order contains exec id and if we are the right strategy
-        if let Some(id) = order.execution_order_id {
-            let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
-            if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book
-                    .add_fill_to_order(
-                        order.id,
-                        order.updated,
-                        order.last_fill_price,
-                        order.last_fill_quantity,
-                        order.last_fill_commission,
-                    )
-                    .await;
-                self.exec_order_book
-                    .add_fill_to_order(
-                        id,
-                        order.updated,
-                        order.last_fill_price,
-                        order.last_fill_quantity,
-                        order.last_fill_commission,
-                    )
-                    .await;
-            }
+        if !self.exec_order_book.contains(&order.execution_order_id) {
+            return;
         }
+        info!(target: "exec_strat::default", "received fill for venue order {}", order.id);
+        self.venue_order_book
+            .add_fill_to_order(
+                order.id,
+                order.updated,
+                order.last_fill_price,
+                order.last_fill_quantity,
+                order.last_fill_commission,
+            )
+            .await;
+
+        self.exec_order_book
+            .add_fill_to_order(
+                order.execution_order_id,
+                order.updated,
+                order.last_fill_price,
+                order.last_fill_quantity,
+                order.last_fill_commission,
+            )
+            .await;
     }
 
     async fn venue_order_cancelled(&self, order: &VenueOrder) {
-        info!(target: "exec_strat::taker", "received status cancelled for venue order {}", order.id);
-        // Check if the order contains exec id and if we are the right strategy
-        if let Some(id) = order.execution_order_id {
-            let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
-            if order.execution_order_id.is_some() && exec_ids.contains(&id) {
+        if !self.exec_order_book.contains(&order.execution_order_id) {
+            return;
+        }
+        info!(target: "exec_strat::default", "received status cancelled for venue order {}", order.id);
+
+        if let Some(current_order) = self.venue_order_book.get(order.id) {
+            if current_order.status != VenueOrderStatus::Cancelling && !current_order.is_terminal() {
                 self.venue_order_book.cancel_order(order.id, order.updated).await;
-                if order.is_terminal() {
-                    self.check_finalize_exec(id, order.updated).await;
-                }
             }
+        }
+
+        self.venue_order_book.check_finalize_order(order.id, order.updated).await;
+
+        let is_terminal = if let Some(updated_order) = self.venue_order_book.get(order.id) {
+            updated_order.is_terminal()
+        } else {
+            true
+        };
+
+        if is_terminal {
+            self.check_finalize_exec(order.execution_order_id, order.updated).await;
         }
     }
 
     async fn venue_order_expired(&self, order: &VenueOrder) {
-        info!(target: "exec_strat::taker", "received status expired for venue order {}", order.id);
-        // Check if the order contains exec id and if we are the right strategy
-        if let Some(id) = order.execution_order_id {
-            let exec_ids = self.exec_order_book.list_ids_by_exec_strategy(self.strategy_type);
-            if order.execution_order_id.is_some() && exec_ids.contains(&id) {
-                self.venue_order_book.expire_order(order.id, order.updated).await;
-                if order.is_terminal() {
-                    self.check_finalize_exec(id, order.updated).await;
-                }
-            }
+        if !self.exec_order_book.contains(&order.execution_order_id) {
+            return;
+        }
+        info!(target: "exec_strat::default", "received status expired for venue order {}", order.id);
+        self.venue_order_book.expire_order(order.id, order.updated).await;
+        if order.is_terminal() {
+            self.check_finalize_exec(order.execution_order_id, order.updated).await;
         }
     }
 }
 
 #[async_trait]
-impl Runnable for TakerExecutionStrategy {
+impl Runnable for DefaultExecutionStrategy {
     fn event_filter(&self, _instance_type: InstanceType) -> EventFilter {
         EventFilter::Events(vec![
-            EventType::NewTakerExecutionOrder,
-            EventType::CancelTakerExecutionOrder,
-            EventType::CancelAllTakerExecutionOrders,
+            EventType::NewExecutionOrder,
+            EventType::CancelExecutionOrder,
+            EventType::CancelAllExecutionOrders,
             EventType::VenueOrderInflight,
             EventType::VenueOrderPlaced,
             EventType::VenueOrderRejected,
@@ -210,16 +246,58 @@ impl Runnable for TakerExecutionStrategy {
     }
     async fn handle_event(&self, ctx: Arc<CoreCtx>, event: Event) {
         match &event {
-            Event::NewTakerExecutionOrder(eo) => self.new_execution_order(ctx.clone(), eo).await,
-            Event::CancelTakerExecutionOrder(eo) => self.cancel_execution_order(ctx.clone(), eo.id).await,
-            Event::CancelAllTakerExecutionOrders(t) => self.cancel_all_execution_orders(ctx.clone(), t).await,
+            Event::NewExecutionOrder(eo) => {
+                if matches!(eo.exec_strategy_type, ExecutionStrategyType::Maker) {
+                    self.new_maker_execution_order(ctx.clone(), eo).await;
+                }
+
+                if matches!(eo.exec_strategy_type, ExecutionStrategyType::Taker) {
+                    self.new_taker_execution_order(ctx.clone(), eo).await;
+                }
+            }
+            Event::CancelExecutionOrder(eo) => {
+                if matches!(eo.exec_strategy_type, ExecutionStrategyType::Taker)
+                    || matches!(eo.exec_strategy_type, ExecutionStrategyType::Maker)
+                {
+                    self.cancel_execution_order(ctx.clone(), eo).await;
+                }
+            }
+            Event::CancelAllExecutionOrders(_t) => self.cancel_all_execution_orders(ctx.clone()).await,
             Event::VenueOrderInflight(vo) => self.venue_order_inflight(vo).await,
             Event::VenueOrderPlaced(vo) => self.venue_order_placed(vo).await,
             Event::VenueOrderRejected(vo) => self.venue_order_rejected(vo).await,
             Event::VenueOrderFill(vo) => self.venue_order_fill(vo).await,
             Event::VenueOrderCancelled(vo) => self.venue_order_cancelled(vo).await,
             Event::VenueOrderExpired(vo) => self.venue_order_expired(vo).await,
-            e => warn!(target: "exec_strat::taker", "received unused event {}", e),
+            e => warn!(target: "exec_strat::default", "received unused event {}", e),
+        }
+    }
+
+    async fn teardown(&self, _service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
+        let time = core_ctx.now().await;
+        self.cancel_all_execution_orders(core_ctx).await;
+
+        while !self.exec_order_book.list_active_orders().is_empty() {
+            info!(target: "exec_strat::wide", "waiting for orders to cancel");
+            let exec_orders = self.exec_order_book.list_active_orders();
+
+            info!(target: "exec_strat::wide", "--- EXEC ORDERS ---");
+            for order in exec_orders {
+                info!(target: "exec_strat::wide", " - {}", order);
+                let venue_orders = self.venue_order_book.list_orders_by_exec_id(order.id);
+                let has_pending_venue_orders = venue_orders.iter().any(|vo| !vo.is_terminal());
+
+                if !has_pending_venue_orders {
+                    self.exec_order_book.check_finalize_order(order.id, time).await;
+                }
+            }
+
+            info!(target: "exec_strat::wide", "--- VENUE ORDERS ---");
+            let venue_orders = self.venue_order_book.list_orders();
+            for order in venue_orders {
+                info!(target: "exec_strat::wide", " - {}", order);
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
     }
 }
@@ -239,7 +317,7 @@ impl Runnable for TakerExecutionStrategy {
 //         let publisher = MockPublisher::new();
 //         let execution_order_book = ExecutionOrderBook::new(publisher.clone(), true);
 //         let venue_order_book = VenueOrderBook::new(publisher.clone(), true);
-//         let exec_strategy = TakerExecutionStrategy::builder()
+//         let exec_strategy = DefaultExecutionStrategy::builder()
 //             .exec_order_book(execution_order_book.to_owned())
 //             .venue_order_book(venue_order_book.to_owned())
 //             .build();
@@ -260,7 +338,7 @@ impl Runnable for TakerExecutionStrategy {
 
 //         // Execute: Handle the NewExecutionOrder event
 //         exec_strategy
-//             .handle_event(Event::NewTakerExecutionOrder(order_1.clone().into()))
+//             .handle_event(Event::NewExecutionOrder(order_1.clone().into()))
 //             .await;
 
 //         // Verify: Check that the order is in the execution order book with status New
@@ -291,7 +369,7 @@ impl Runnable for TakerExecutionStrategy {
 
 //         // Execute: Handle the NewExecutionOrder event
 //         exec_strategy
-//             .handle_event(Event::NewTakerExecutionOrder(order_2.clone().into()))
+//             .handle_event(Event::NewExecutionOrder(order_2.clone().into()))
 //             .await;
 
 //         // Verify: Check that the order is in the execution order book with status New
@@ -329,7 +407,7 @@ impl Runnable for TakerExecutionStrategy {
 //         let publisher = MockPublisher::new();
 //         let execution_order_book = ExecutionOrderBook::new(publisher.clone(), true);
 //         let venue_order_book = VenueOrderBook::new(publisher.clone(), true);
-//         let exec_strategy = TakerExecutionStrategy::builder()
+//         let exec_strategy = DefaultExecutionStrategy::builder()
 //             .identifier("test".to_string())
 //             .time(time.clone())
 //             .publisher(publisher.clone())
@@ -354,7 +432,7 @@ impl Runnable for TakerExecutionStrategy {
 
 //         // Handle new exec order -> set Active, place market venue immediately
 //         exec_strategy
-//             .handle_event(Event::NewTakerExecutionOrder(exec_order.clone().into()))
+//             .handle_event(Event::NewExecutionOrder(exec_order.clone().into()))
 //             .await;
 //         let retrieved_exec = execution_order_book.get(exec_order_id).unwrap();
 //         assert_eq!(retrieved_exec.status, ExecutionOrderStatus::Placed);
@@ -403,7 +481,7 @@ impl Runnable for TakerExecutionStrategy {
 //         let publisher = MockPublisher::new();
 //         let execution_order_book = ExecutionOrderBook::new(publisher.clone(), true);
 //         let venue_order_book = VenueOrderBook::new(publisher.clone(), true);
-//         let exec_strategy = TakerExecutionStrategy::builder()
+//         let exec_strategy = DefaultExecutionStrategy::builder()
 //             .identifier("test".to_string())
 //             .time(time.clone())
 //             .publisher(publisher.clone())
@@ -427,7 +505,7 @@ impl Runnable for TakerExecutionStrategy {
 //             .build();
 
 //         exec_strategy
-//             .handle_event(Event::NewTakerExecutionOrder(exec_order.clone().into()))
+//             .handle_event(Event::NewExecutionOrder(exec_order.clone().into()))
 //             .await;
 //         assert_eq!(
 //             execution_order_book.get(exec_order_id).unwrap().status,
@@ -449,7 +527,7 @@ impl Runnable for TakerExecutionStrategy {
 
 //         // Cancel exec -> set Cancelling, publish cancel venue
 //         exec_strategy
-//             .handle_event(Event::CancelTakerExecutionOrder(exec_order.clone().into()))
+//             .handle_event(Event::CancelExecutionOrder(exec_order.clone().into()))
 //             .await;
 //         let retrieved_exec_cancelling = execution_order_book.get(exec_order_id).unwrap();
 //         assert_eq!(retrieved_exec_cancelling.status, ExecutionOrderStatus::Cancelling);
@@ -475,10 +553,7 @@ impl Runnable for TakerExecutionStrategy {
 //         let publisher = MockPublisher::new();
 //         let execution_order_book = ExecutionOrderBook::new(publisher.clone(), true);
 //         let venue_order_book = VenueOrderBook::new(publisher.clone(), true);
-//         let exec_strategy = TakerExecutionStrategy::builder()
-//             .identifier("test".to_string())
-//             .time(time.clone())
-//             .publisher(publisher.clone())
+//         let exec_strategy = DefaultExecutionStrategy::builder()
 //             .exec_order_book(execution_order_book.clone())
 //             .venue_order_book(venue_order_book.clone())
 //             .build();
@@ -499,7 +574,7 @@ impl Runnable for TakerExecutionStrategy {
 //             .build();
 
 //         exec_strategy
-//             .handle_event(Event::NewTakerExecutionOrder(exec_order.clone().into()))
+//             .handle_event(Event::NewExecutionOrder(exec_order.clone().into()))
 //             .await;
 
 //         let venue_orders = venue_order_book.list_orders_by_exec_id(exec_order_id);
@@ -525,7 +600,7 @@ impl Runnable for TakerExecutionStrategy {
 
 //         // Cancel -> Cancelling, cancel venue
 //         exec_strategy
-//             .handle_event(Event::CancelTakerExecutionOrder(exec_order.clone().into()))
+//             .handle_event(Event::CancelExecutionOrder(exec_order.clone().into()))
 //             .await;
 //         assert_eq!(
 //             execution_order_book.get(exec_order_id).unwrap().status,

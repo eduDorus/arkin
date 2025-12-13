@@ -96,8 +96,7 @@ pub enum VenueOrderStatus {
 pub struct VenueOrder {
     #[builder(default = Uuid::new_v4())]
     pub id: VenueOrderId,
-    #[builder(default = None)]
-    pub execution_order_id: Option<ExecutionOrderId>,
+    pub execution_order_id: ExecutionOrderId,
     #[builder(default = None)]
     pub venue_order_id: Option<String>,
     pub instrument: Arc<Instrument>,
@@ -378,7 +377,10 @@ impl VenueOrder {
     }
 
     pub fn is_active(&self) -> bool {
-        matches!(self.status, VenueOrderStatus::Placed | VenueOrderStatus::PartiallyFilled)
+        matches!(
+            self.status,
+            VenueOrderStatus::Placed | VenueOrderStatus::PartiallyFilled | VenueOrderStatus::Cancelling
+        )
     }
 
     pub fn is_terminating(&self) -> bool {
@@ -417,7 +419,7 @@ impl fmt::Display for VenueOrder {
 #[derive(Serialize, Deserialize)]
 pub struct VenueOrderDto {
     pub id: VenueOrderId,
-    pub execution_order_id: Option<ExecutionOrderId>,
+    pub execution_order_id: ExecutionOrderId,
     pub venue_order_id: Option<String>,
     pub instrument_id: Uuid,
     pub strategy_id: Option<Uuid>,

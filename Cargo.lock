@@ -162,6 +162,7 @@ dependencies = [
  "arkin-cli",
  "arkin-core",
  "arkin-data-provider",
+ "arkin-exec-strat-default",
  "arkin-exec-strat-wide",
  "arkin-persistence",
  "async-trait",
@@ -365,7 +366,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "arkin-exec-strat-taker"
+name = "arkin-exec-strat-default"
 version = "0.1.0"
 dependencies = [
  "arkin-core",
