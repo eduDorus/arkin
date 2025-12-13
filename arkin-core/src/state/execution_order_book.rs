@@ -173,9 +173,7 @@ impl ExecutionOrderBook {
     }
 
     pub fn list_orders(&self) -> Vec<ExecutionOrder> {
-        let mut orders: Vec<ExecutionOrder> = self.queue.iter().map(|entry| entry.value().to_owned()).collect();
-        orders.sort_by_key(|order| order.status);
-        orders
+        self.queue.iter().map(|entry| entry.value().to_owned()).collect()
     }
 
     pub fn list_orders_by_exec_strategy(&self, exec_type: &[ExecutionStrategyType]) -> Vec<ExecutionOrder> {

@@ -106,12 +106,14 @@ impl DefaultExecutionStrategy {
         let time = ctx.now().await;
 
         // Update the exec order book
-        self.exec_order_book.cancel_order(exec_order.id, time).await;
+        if exec_order.is_active() && !exec_order.is_terminating() {
+            self.exec_order_book.cancel_order(exec_order.id, time).await;
+        }
 
         // Cancel all venue orders linked to the exec order
         let venue_orders = self.venue_order_book.list_orders_by_exec_id(exec_order.id);
         for venue_order in venue_orders {
-            if venue_order.is_active() {
+            if venue_order.is_active() && !venue_order.is_terminating() {
                 self.venue_order_book.cancel_order(venue_order.id, time).await;
                 ctx.publish(Event::CancelVenueOrder(venue_order.clone().into())).await;
                 info!(target: "exec_strat::default", "send cancel order for venue order {}", venue_order.id);
@@ -128,10 +130,12 @@ impl DefaultExecutionStrategy {
             .exec_order_book
             .list_orders_by_exec_strategy(&[ExecutionStrategyType::Maker, ExecutionStrategyType::Taker])
         {
-            self.exec_order_book.cancel_order(exec_order.id, time).await;
+            if exec_order.is_active() && !exec_order.is_terminating() {
+                self.exec_order_book.cancel_order(exec_order.id, time).await;
+            }
             let venue_orders = self.venue_order_book.list_orders_by_exec_id(exec_order.id);
             for venue_order in venue_orders {
-                if venue_order.is_active() {
+                if venue_order.is_active() && !venue_order.is_terminating() {
                     self.venue_order_book.cancel_order(venue_order.id, time).await;
                     ctx.publish(Event::CancelVenueOrder(venue_order.clone().into())).await;
                     info!(target: "exec_strat::default", "send cancel order for venue order {}", venue_order.id);
