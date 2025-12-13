@@ -5,16 +5,23 @@ use uuid::Uuid;
 
 use arkin_core::PersistenceError;
 
-use crate::{context::PersistenceContext, repos::pg::execution_order_repo};
+use crate::{
+    context::PersistenceContext,
+    repos::ch::execution_order_repo::{self, ExecutionOrderClickhouseDTO},
+};
+
+pub async fn create_table(ctx: &PersistenceContext) -> Result<(), PersistenceError> {
+    execution_order_repo::create_table(ctx).await
+}
 
 pub async fn insert(ctx: &PersistenceContext, order: Arc<ExecutionOrder>) -> Result<(), PersistenceError> {
-    execution_order_repo::insert(ctx, order.into()).await
+    execution_order_repo::insert(ctx, ExecutionOrderClickhouseDTO::from_model(&order, ctx.instance.id)).await
 }
 
-pub async fn update(ctx: &PersistenceContext, order: Arc<ExecutionOrder>) -> Result<(), PersistenceError> {
-    execution_order_repo::update(ctx, order.into()).await
-}
-
-pub async fn delete(ctx: &PersistenceContext, id: &Uuid) -> Result<(), PersistenceError> {
-    execution_order_repo::delete(ctx, id).await
+pub async fn insert_batch(ctx: &PersistenceContext, orders: &[Arc<ExecutionOrder>]) -> Result<(), PersistenceError> {
+    let dtos: Vec<_> = orders
+        .iter()
+        .map(|o| ExecutionOrderClickhouseDTO::from_model(o, ctx.instance.id))
+        .collect();
+    execution_order_repo::insert_batch(ctx, &dtos).await
 }

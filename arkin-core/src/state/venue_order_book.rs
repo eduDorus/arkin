@@ -50,7 +50,7 @@ impl VenueOrderBook {
         self.queue.insert(order.id, order.to_owned());
 
         info!(target: "venue_order_book", "inserted order {} in venue orderbook", order.id);
-        self.publisher.publish(Event::VenueOrderBookNew(order.into())).await;
+        self.publisher.publish(Event::VenueOrderBookUpdate(order.into())).await;
     }
 
     pub fn get(&self, id: Uuid) -> Option<VenueOrder> {

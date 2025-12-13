@@ -63,4 +63,6 @@ pub struct Buffers {
     pub ticks: Arc<Mutex<Vec<Arc<Tick>>>>,
     pub trades: Arc<Mutex<Vec<Arc<AggTrade>>>>,
     pub metrics: Arc<Mutex<Vec<Arc<Metric>>>>,
+    pub execution_orders: Arc<Mutex<Vec<Arc<ExecutionOrder>>>>,
+    pub venue_orders: Arc<Mutex<Vec<Arc<VenueOrder>>>>,
 }

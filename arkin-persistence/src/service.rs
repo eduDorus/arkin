@@ -193,26 +193,16 @@ impl Persistence {
     }
 
     pub async fn insert_execution_order(&self, order: Arc<ExecutionOrder>) {
-        if let Err(e) = execution_order_store::insert(&self.ctx, order).await {
-            error!(target: "persistence", "error in inserting execution order: {}",e);
-        }
-    }
-
-    pub async fn update_execution_order(&self, order: Arc<ExecutionOrder>) {
-        if let Err(e) = execution_order_store::update(&self.ctx, order).await {
-            error!(target: "persistence", "error in update execution order: {}",e);
+        if self.mode == InstanceType::Live || self.mode == InstanceType::Utility {
+            let mut lock = self.ctx.buffer.execution_orders.lock().await;
+            lock.push(order);
         }
     }
 
     pub async fn insert_venue_order(&self, order: Arc<VenueOrder>) {
-        if let Err(e) = venue_order_store::insert(&self.ctx, order).await {
-            error!(target: "persistence", "error in inserting venue order: {}",e);
-        }
-    }
-
-    pub async fn update_venue_order(&self, order: Arc<VenueOrder>) {
-        if let Err(e) = venue_order_store::update(&self.ctx, order).await {
-            error!(target: "persistence", "error in update venue order: {}",e);
+        if self.mode == InstanceType::Live || self.mode == InstanceType::Utility {
+            let mut lock = self.ctx.buffer.venue_orders.lock().await;
+            lock.push(order);
         }
     }
 
@@ -368,6 +358,60 @@ impl Persistence {
                         }
                         Err(e) => {
                             error!(target: "persistence", "failed to flush metrics: {}", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
+                    }
+                }
+            });
+        }
+
+        let execution_orders = {
+            let mut lock = self.ctx.buffer.execution_orders.lock().await;
+            let orders = std::mem::take(&mut *lock);
+            debug!(target: "persistence", "execution_order buffer length {}", lock.len());
+            orders
+        };
+
+        if !execution_orders.is_empty() {
+            let persistence_ctx = self.ctx.clone();
+            ctx.spawn(async move {
+                debug!(target: "persistence", "flushing {} execution orders", execution_orders.len());
+
+                loop {
+                    match execution_order_store::insert_batch(&persistence_ctx, &execution_orders).await {
+                        Ok(_) => {
+                            info!(target: "persistence", "successfully flushed {} execution orders", execution_orders.len());
+                            break;
+                        }
+                        Err(e) => {
+                            error!(target: "persistence", "failed to flush execution orders: {}", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
+                    }
+                }
+            });
+        }
+
+        let venue_orders = {
+            let mut lock = self.ctx.buffer.venue_orders.lock().await;
+            let orders = std::mem::take(&mut *lock);
+            debug!(target: "persistence", "venue_order buffer length {}", lock.len());
+            orders
+        };
+
+        if !venue_orders.is_empty() {
+            let persistence_ctx = self.ctx.clone();
+            ctx.spawn(async move {
+                debug!(target: "persistence", "flushing {} venue orders", venue_orders.len());
+
+                loop {
+                    match venue_order_store::insert_batch(&persistence_ctx, &venue_orders).await {
+                        Ok(_) => {
+                            info!(target: "persistence", "successfully flushed {} venue orders", venue_orders.len());
+                            break;
+                        }
+                        Err(e) => {
+                            error!(target: "persistence", "failed to flush venue orders: {}", e);
                             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                         }
                     }
@@ -544,9 +588,7 @@ impl Runnable for Persistence {
                 EventType::NewAccount,
                 EventType::NewTransfer,
                 EventType::NewTransferBatch,
-                EventType::ExecutionOrderBookNew,
                 EventType::ExecutionOrderBookUpdate,
-                EventType::VenueOrderBookNew,
                 EventType::VenueOrderBookUpdate,
             ]),
             InstanceType::Simulation => EventFilter::Events(vec![
@@ -555,9 +597,7 @@ impl Runnable for Persistence {
                 EventType::NewAccount,
                 EventType::NewTransfer,
                 EventType::NewTransferBatch,
-                EventType::ExecutionOrderBookNew,
                 EventType::ExecutionOrderBookUpdate,
-                EventType::VenueOrderBookNew,
                 EventType::VenueOrderBookUpdate,
             ]),
             InstanceType::Insights => EventFilter::Events(vec![EventType::InsightsUpdate]),
@@ -582,12 +622,10 @@ impl Runnable for Persistence {
             Event::NewTransferBatch(tb) => self.insert_transfer_batch(tb).await,
 
             // Execution Orders
-            Event::ExecutionOrderBookNew(o) => self.insert_execution_order(o).await,
-            Event::ExecutionOrderBookUpdate(o) => self.update_execution_order(o).await,
+            Event::ExecutionOrderBookUpdate(o) => self.insert_execution_order(o).await,
 
             // Venue Orders
-            Event::VenueOrderBookNew(o) => self.insert_venue_order(o).await,
-            Event::VenueOrderBookUpdate(o) => self.update_venue_order(o).await,
+            Event::VenueOrderBookUpdate(o) => self.insert_venue_order(o).await,
             e => warn!(target: "persistence", "received unused event {}", e.event_type()),
         }
     }
@@ -623,6 +661,12 @@ impl Runnable for Persistence {
         }
         if let Err(e) = metric_store::create_table(&self.ctx).await {
             error!(target: "persistence", "could not create metrics table: {}", e)
+        }
+        if let Err(e) = execution_order_store::create_table(&self.ctx).await {
+            error!(target: "persistence", "could not create execution_orders table: {}", e)
+        }
+        if let Err(e) = venue_order_store::create_table(&self.ctx).await {
+            error!(target: "persistence", "could not create venue_orders table: {}", e)
         }
 
         // Populate cache with instruments and assets

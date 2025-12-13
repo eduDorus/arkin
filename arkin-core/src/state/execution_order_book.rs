@@ -51,7 +51,7 @@ impl ExecutionOrderBook {
         self.queue.insert(order.id, order.to_owned());
 
         info!(target: "exec_order_book", "inserted order {} in order book", order.id);
-        self.publisher.publish(Event::ExecutionOrderBookNew(order.into())).await;
+        self.publisher.publish(Event::ExecutionOrderBookUpdate(order.into())).await;
     }
 
     pub fn get(&self, id: Uuid) -> Option<ExecutionOrder> {
@@ -141,19 +141,28 @@ impl ExecutionOrderBook {
 
     pub async fn check_finalize_order(&self, id: ExecutionOrderId, event_time: UtcDateTime) {
         info!(target: "exec_order_book", "check for terminating order {} from exec order book", id);
+        let mut should_remove = false;
         if let Some(mut order) = self.queue.get_mut(&id) {
-            let finalized = order.finalize_terminate(event_time);
-            if finalized {
-                info!(target: "exec_order_book", "finalized order {} in exec order book", id);
+            if order.is_terminal() {
+                should_remove = true;
+            } else {
+                let finalized = order.finalize_terminate(event_time);
+                if finalized {
+                    info!(target: "exec_order_book", "finalized order {} in exec order book", id);
 
-                let update = order.clone();
-                drop(order);
-                self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
+                    let update = order.clone();
+                    self.publisher.publish(Event::ExecutionOrderBookUpdate(update.into())).await;
+                    should_remove = true;
+                }
             }
         } else {
             warn!(target: "exec_order_book", "could not find order {} in exec order book", id);
         }
-        self.autoclean_order(id);
+
+        if self.autoclean && should_remove {
+            self.queue.remove(&id);
+            info!(target: "exec_order_book", "auto cleanup removed finalized order {}", id);
+        }
     }
 
     pub fn len(&self) -> usize {

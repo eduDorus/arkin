@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
                         .exec_order_book(execution_orderbook.clone())
                         .venue_order_book(venue_orderbook.clone())
                         .pct_from_mid(dec!(0.005))
-                        .requote_pct_change(dec!(0.001))
+                        .requote_pct_change(dec!(0.0005))
                         .build(),
                 ),
                 ExecutionStrategyType::Maker | ExecutionStrategyType::Taker => Arc::new(

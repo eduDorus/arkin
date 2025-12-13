@@ -61,9 +61,7 @@ pub enum Event {
     NewTransferBatch(Arc<TransferBatch>),
 
     // Order Book
-    ExecutionOrderBookNew(Arc<ExecutionOrder>),
     ExecutionOrderBookUpdate(Arc<ExecutionOrder>),
-    VenueOrderBookNew(Arc<VenueOrder>),
     VenueOrderBookUpdate(Arc<VenueOrder>),
 
     // Other
@@ -117,9 +115,7 @@ impl Event {
             Event::VenueOrderExpired(event) => event.updated,
 
             // Order Books Updates
-            Event::ExecutionOrderBookNew(event) => event.updated,
             Event::ExecutionOrderBookUpdate(event) => event.updated,
-            Event::VenueOrderBookNew(event) => event.updated,
             Event::VenueOrderBookUpdate(event) => event.updated,
 
             // Other
@@ -146,7 +142,6 @@ impl Event {
             | Event::ExecutionOrderCompleted(order)
             | Event::ExecutionOrderCancelled(order)
             | Event::ExecutionOrderExpired(order)
-            | Event::ExecutionOrderBookNew(order)
             | Event::ExecutionOrderBookUpdate(order) => rmp_serde::to_vec(&order.to_dto()).ok(),
             Event::NewVenueOrder(order)
             | Event::CancelVenueOrder(order)
@@ -156,7 +151,6 @@ impl Event {
             | Event::VenueOrderFill(order)
             | Event::VenueOrderCancelled(order)
             | Event::VenueOrderExpired(order)
-            | Event::VenueOrderBookNew(order)
             | Event::VenueOrderBookUpdate(order) => rmp_serde::to_vec(&order.to_dto()).ok(),
             Event::NewAccount(account) => rmp_serde::to_vec(&account.to_dto()).ok(),
             Event::NewTransfer(transfer) => rmp_serde::to_vec(&transfer.to_dto()).ok(),
@@ -240,7 +234,6 @@ impl Event {
             | EventType::ExecutionOrderCompleted
             | EventType::ExecutionOrderCancelled
             | EventType::ExecutionOrderExpired
-            | EventType::ExecutionOrderBookNew
             | EventType::ExecutionOrderBookUpdate => {
                 let dto = rmp_serde::from_slice(data).ok()?;
                 let order = ExecutionOrder::from_dto(dto, persistence)
@@ -256,7 +249,6 @@ impl Event {
                     EventType::ExecutionOrderCompleted => Some(Event::ExecutionOrderCompleted(order)),
                     EventType::ExecutionOrderCancelled => Some(Event::ExecutionOrderCancelled(order)),
                     EventType::ExecutionOrderExpired => Some(Event::ExecutionOrderExpired(order)),
-                    EventType::ExecutionOrderBookNew => Some(Event::ExecutionOrderBookNew(order)),
                     EventType::ExecutionOrderBookUpdate => Some(Event::ExecutionOrderBookUpdate(order)),
                     _ => None,
                 }
@@ -269,7 +261,6 @@ impl Event {
             | EventType::VenueOrderFill
             | EventType::VenueOrderCancelled
             | EventType::VenueOrderExpired
-            | EventType::VenueOrderBookNew
             | EventType::VenueOrderBookUpdate => {
                 let dto = rmp_serde::from_slice(data).ok()?;
                 let order = VenueOrder::from_dto(dto, persistence).await.map_err(|e| error!("{}", e)).ok()?;
@@ -284,7 +275,6 @@ impl Event {
                     EventType::VenueOrderFill => Some(Event::VenueOrderFill(order)),
                     EventType::VenueOrderCancelled => Some(Event::VenueOrderCancelled(order)),
                     EventType::VenueOrderExpired => Some(Event::VenueOrderExpired(order)),
-                    EventType::VenueOrderBookNew => Some(Event::VenueOrderBookNew(order)),
                     EventType::VenueOrderBookUpdate => Some(Event::VenueOrderBookUpdate(order)),
                     _ => None,
                 }
@@ -384,9 +374,7 @@ impl fmt::Display for Event {
             Event::NewAccount(inner) => write!(f, "{}", inner),
             Event::NewTransfer(inner) => write!(f, "{}", inner),
             Event::NewTransferBatch(inner) => write!(f, "{}", inner),
-            Event::ExecutionOrderBookNew(inner) => write!(f, "{}", inner),
             Event::ExecutionOrderBookUpdate(inner) => write!(f, "{}", inner),
-            Event::VenueOrderBookNew(inner) => write!(f, "{}", inner),
             Event::VenueOrderBookUpdate(inner) => write!(f, "{}", inner),
             Event::Finished(inner) => write!(f, "{}", inner),
         }
@@ -415,9 +403,7 @@ impl EventType {
             EventType::NewAccount
                 | EventType::NewTransfer
                 | EventType::NewTransferBatch
-                | EventType::ExecutionOrderBookNew
                 | EventType::ExecutionOrderBookUpdate
-                | EventType::VenueOrderBookNew
                 | EventType::VenueOrderBookUpdate
         )
     }
@@ -432,9 +418,7 @@ impl EventType {
                 | EventType::NewAccount
                 | EventType::NewTransfer
                 | EventType::NewTransferBatch
-                | EventType::ExecutionOrderBookNew
                 | EventType::ExecutionOrderBookUpdate
-                | EventType::VenueOrderBookNew
                 | EventType::VenueOrderBookUpdate
         )
     }
