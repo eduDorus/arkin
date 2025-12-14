@@ -103,7 +103,7 @@ impl Eq for Account {}
 
 impl fmt::Display for Account {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}_{}_{}", self.owner, self.venue, self.account_type)
+        write!(f, "{}@{} ({})", self.owner, self.venue, self.account_type)
     }
 }
 

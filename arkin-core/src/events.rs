@@ -342,41 +342,49 @@ impl Event {
 
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self.event_type())?;
         match self {
-            Event::TickUpdate(inner) => write!(f, "{}", inner),
-            Event::TradeUpdate(inner) => write!(f, "{}", inner),
-            Event::AggTradeUpdate(inner) => write!(f, "{}", inner),
-            Event::BookUpdate(inner) => write!(f, "{}", inner),
-            Event::MetricUpdate(inner) => write!(f, "{}", inner),
-            Event::InitialAccountUpdate(inner) => write!(f, "{}", inner),
-            Event::ReconcileAccountUpdate(inner) => write!(f, "{}", inner),
-            Event::VenueAccountUpdate(inner) => write!(f, "{}", inner),
-            Event::InsightsTick(inner) => write!(f, "{}", inner),
-            Event::InsightsUpdate(inner) => write!(f, "{}", inner),
-            Event::WarmupInsightsUpdate(inner) => write!(f, "{}", inner),
-            Event::NewExecutionOrder(inner) => write!(f, "{}", inner),
-            Event::CancelExecutionOrder(inner) => write!(f, "{}", inner),
-            Event::CancelAllExecutionOrders(inner) => write!(f, "{}", inner),
-            Event::NewVenueOrder(inner) => write!(f, "{}", inner),
-            Event::CancelVenueOrder(inner) => write!(f, "{}", inner),
-            Event::CancelAllVenueOrders(inner) => write!(f, "{}", inner),
-            Event::ExecutionOrderActive(inner) => write!(f, "{}", inner),
-            Event::ExecutionOrderCompleted(inner) => write!(f, "{}", inner),
-            Event::ExecutionOrderCancelled(inner) => write!(f, "{}", inner),
-            Event::ExecutionOrderExpired(inner) => write!(f, "{}", inner),
-            Event::VenueOrderInflight(inner) => write!(f, "{}", inner),
-            Event::VenueOrderPlaced(inner) => write!(f, "{}", inner),
-            Event::VenueOrderRejected(inner) => write!(f, "{}", inner),
-            Event::VenueOrderFill(inner) => write!(f, "{}", inner),
-            Event::VenueOrderCancelled(inner) => write!(f, "{}", inner),
-            Event::VenueOrderExpired(inner) => write!(f, "{}", inner),
-            Event::NewAccount(inner) => write!(f, "{}", inner),
-            Event::NewTransfer(inner) => write!(f, "{}", inner),
-            Event::NewTransferBatch(inner) => write!(f, "{}", inner),
-            Event::ExecutionOrderBookUpdate(inner) => write!(f, "{}", inner),
-            Event::VenueOrderBookUpdate(inner) => write!(f, "{}", inner),
-            Event::Finished(inner) => write!(f, "{}", inner),
+            Event::TickUpdate(t) => write!(f, "Tick update for {} {} / {}", t.instrument, t.bid_price, t.ask_price),
+            Event::TradeUpdate(t) => write!(f, "Trade update on {} {} {} @ {}", t.instrument, t.side, t.quantity, t.price),
+            Event::AggTradeUpdate(t) => write!(f, "Aggregated trade update on {} {} {} @ {}", t.instrument, t.side, t.quantity, t.price),
+            Event::BookUpdate(b) => write!(f, "Book update for {} bids: {} asks: {}", b.instrument, b.bids.len(), b.asks.len()),
+            Event::MetricUpdate(m) => write!(f, "Metric update for {} {}: {}", m.instrument, m.metric_type, m.value),
+
+            Event::InitialAccountUpdate(a) => write!(f, "Initial account update on {} ({})", a.venue, a.reason),
+            Event::ReconcileAccountUpdate(a) => write!(f, "Reconcile account update on {} ({})", a.venue, a.reason),
+            Event::VenueAccountUpdate(a) => write!(f, "Account update on {} ({})", a.venue, a.reason),
+
+            Event::InsightsTick(t) => write!(f, "Insights tick frequency {:?}", t.frequency),
+            Event::InsightsUpdate(i) => write!(f, "Insights update with {} insights", i.insights.len()),
+            Event::WarmupInsightsUpdate(i) => write!(f, "Warmup insights update with {} insights", i.insights.len()),
+
+            Event::NewExecutionOrder(o) => write!(f, "Created execution order to {} {} {} ({})", o.side, o.quantity, o.instrument, o.exec_strategy_type),
+            Event::CancelExecutionOrder(o) => write!(f, "Cancelling execution order to {} {} {}", o.side, o.quantity, o.instrument),
+            Event::CancelAllExecutionOrders(ts) => write!(f, "Cancelling all execution orders at {}", ts),
+
+            Event::NewVenueOrder(o) => write!(f, "Submitting new order to {}: {} {} {} @ {} ({})", o.instrument.venue, o.side, o.quantity, o.instrument, o.price, o.order_type),
+            Event::CancelVenueOrder(o) => write!(f, "Cancelling venue order on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+            Event::CancelAllVenueOrders(ts) => write!(f, "Cancelling all venue orders at {}", ts),
+
+            Event::ExecutionOrderActive(o) => write!(f, "Execution order active for {} {} {}", o.side, o.quantity, o.instrument),
+            Event::ExecutionOrderCompleted(o) => write!(f, "Execution order completed for {} {} {}", o.side, o.quantity, o.instrument),
+            Event::ExecutionOrderCancelled(o) => write!(f, "Execution order cancelled for {} {} {}", o.side, o.quantity, o.instrument),
+            Event::ExecutionOrderExpired(o) => write!(f, "Execution order expired for {} {} {}", o.side, o.quantity, o.instrument),
+
+            Event::VenueOrderInflight(o) => write!(f, "Venue order inflight on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+            Event::VenueOrderPlaced(o) => write!(f, "Placed venue order on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+            Event::VenueOrderRejected(o) => write!(f, "Venue order rejected on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+            Event::VenueOrderFill(o) => write!(f, "Venue order fill on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+            Event::VenueOrderCancelled(o) => write!(f, "Venue order cancelled on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+            Event::VenueOrderExpired(o) => write!(f, "Venue order expired on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+
+            Event::NewAccount(a) => write!(f, "New account {} on {}", a.id, a.venue),
+            Event::NewTransfer(t) => write!(f, "New transfer {}", t),
+            Event::NewTransferBatch(b) => write!(f, "New transfer batch with {} transfers", b.transfers.len()),
+
+            Event::ExecutionOrderBookUpdate(o) => write!(f, "Execution order {} {} {} is now {}", o.side, o.quantity, o.instrument, o.status),
+            Event::VenueOrderBookUpdate(o) => write!(f, "Venue order {} {} {} @ {} is now {}", o.side, o.quantity, o.instrument, o.price, o.status),
+
+            Event::Finished(ts) => write!(f, "Finished at {}", ts),
         }
     }
 }

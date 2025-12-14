@@ -68,31 +68,26 @@ impl Eq for VenueAccountUpdate {}
 
 impl fmt::Display for VenueAccountUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "Account Update (ID: {}, Time: {}, Reason: {})",
-            self.id, self.event_time, self.reason
-        )?;
-        writeln!(f, "Balances:")?;
-        for bal in &self.balances {
-            writeln!(
-                f,
-                "  - Asset: {}, Change: {}, Quantity: {}, Type: {:?}",
-                bal.asset, bal.quantity_change, bal.quantity, bal.account_type
-            )?;
+        write!(f, "AccountUpdate@{} ({})", self.venue, self.reason)?;
+        if !self.balances.is_empty() {
+            write!(f, " Balances: [")?;
+            for (i, bal) in self.balances.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}: {}", bal.asset, bal.quantity_change)?;
+            }
+            write!(f, "]")?;
         }
-        writeln!(f, "Positions:")?;
-        for pos in &self.positions {
-            writeln!(
-                f,
-                "  - Instrument: {}, Entry: {}, Qty: {}, Realized PNL: {}, Unreal PNL: {}, Side: {:?}",
-                pos.instrument.symbol,
-                pos.entry_price,
-                pos.quantity,
-                pos.realized_pnl,
-                pos.unrealized_pnl,
-                pos.position_side
-            )?;
+        if !self.positions.is_empty() {
+            write!(f, " Positions: [")?;
+            for (i, pos) in self.positions.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}: {}", pos.instrument.symbol, pos.quantity)?;
+            }
+            write!(f, "]")?;
         }
         Ok(())
     }

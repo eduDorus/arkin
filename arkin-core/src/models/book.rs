@@ -61,9 +61,8 @@ impl fmt::Display for Book {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} {} bid: {} ask: {}",
+            "{} bids: {} asks: {}",
             self.instrument,
-            self.event_time,
             self.bids.len(),
             self.asks.len()
         )

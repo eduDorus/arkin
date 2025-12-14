@@ -404,14 +404,8 @@ impl fmt::Display for VenueOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "instrument={} side={} order_type={} price={} quantity={} total_value={} status={}",
-            self.instrument,
-            self.side,
-            self.order_type,
-            self.price,
-            self.quantity,
-            self.total_value(),
-            self.status
+            "{} {} {} @ {} ({}) {}",
+            self.side, self.quantity, self.instrument.symbol, self.price, self.order_type, self.status
         )
     }
 }

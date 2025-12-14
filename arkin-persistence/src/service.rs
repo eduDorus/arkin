@@ -18,6 +18,36 @@ use crate::context::PersistenceContext;
 use crate::stores::*;
 use crate::PersistenceConfig;
 
+macro_rules! flush_buffer {
+    ($service_ctx:expr, $persistence_ctx:expr, $buffer:expr, $name:expr, $insert:expr) => {
+        let data = {
+            let mut lock = $buffer.lock().await;
+            std::mem::take(&mut *lock)
+        };
+        debug!(target: "persistence", "{} buffer length {}", $name, data.len());
+
+        if !data.is_empty() {
+            let persistence_ctx = $persistence_ctx.clone();
+            $service_ctx.spawn(async move {
+                debug!(target: "persistence", "flushing {} {}", data.len(), $name);
+
+                loop {
+                    match $insert(&persistence_ctx, &data).await {
+                        Ok(_) => {
+                            info!(target: "persistence", "successfully flushed {} {}", data.len(), $name);
+                            break;
+                        }
+                        Err(e) => {
+                            error!(target: "persistence", "failed to flush {}: {}", $name, e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
+                    }
+                }
+            });
+        }
+    };
+}
+
 pub struct Persistence {
     mode: InstanceType,
     dry_run: bool,
@@ -260,198 +290,32 @@ impl Persistence {
     // TODO: WE NEED TO FLUSH ALSO TRADES AND TICKS
     pub async fn flush_all(&self, ctx: Arc<ServiceCtx>) {
         info!(target: "persistence", "flushing...");
-        let insights = {
-            let mut lock = self.ctx.buffer.insights.lock().await;
-            let insights = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "insights buffer length {}", lock.len());
-            insights
-        };
 
-        if !insights.is_empty() {
-            let persistence_ctx = self.ctx.clone();
-            ctx.spawn(async move {
-                debug!(target: "persistence", "flushing {} insights", insights.len());
-
-                // Insert the insights into the database
-                loop {
-                    match insight_store::insert_vec(&persistence_ctx, &insights).await {
-                        Ok(_) => {
-                            info!(target: "persistence", "successfully flushed {} insights", insights.len());
-                            break;
-                        }
-                        Err(e) => {
-                            error!(target: "persistence", "failed to flush insights: {}", e);
-                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        }
-                    }
-                }
-            });
-        }
-
-        let trades = {
-            let mut lock = self.ctx.buffer.trades.lock().await;
-            let trades = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "trade buffer length {}", lock.len());
-            trades
-        };
-
-        if !trades.is_empty() {
-            let persistence_ctx = self.ctx.clone();
-            ctx.spawn(async move {
-                debug!(target: "persistence", "flushing {} trades", trades.len());
-
-                // Insert the insights into the database
-                loop {
-                    match trade_store::insert_vec(&persistence_ctx, &trades).await {
-                        Ok(_) => {
-                            info!(target: "persistence", "successfully flushed {} trades", trades.len());
-                            break;
-                        }
-                        Err(e) => {
-                            error!(target: "persistence", "failed to flush insights: {}", e);
-                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        }
-                    }
-                }
-            });
-        }
-
-        let ticks = {
-            let mut lock = self.ctx.buffer.ticks.lock().await;
-            let ticks = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "tick buffer length {}", lock.len());
-            ticks
-        };
-
-        if !ticks.is_empty() {
-            let persistence_ctx = self.ctx.clone();
-            ctx.spawn(async move {
-                debug!(target: "persistence", "flushing {} ticks", ticks.len());
-
-                // Insert the ticks into the database
-                loop {
-                    match tick_store::insert_vec(&persistence_ctx, &ticks).await {
-                        Ok(_) => {
-                            info!(target: "persistence", "successfully flushed {} ticks", ticks.len());
-                            break;
-                        }
-                        Err(e) => {
-                            error!(target: "persistence", "failed to flush ticks: {}", e);
-                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        }
-                    }
-                }
-            });
-        }
-
-        let metrics = {
-            let mut lock = self.ctx.buffer.metrics.lock().await;
-            let metrics = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "metric buffer length {}", lock.len());
-            metrics
-        };
-
-        if !metrics.is_empty() {
-            let persistence_ctx = self.ctx.clone();
-            ctx.spawn(async move {
-                debug!(target: "persistence", "flushing {} metrics", metrics.len());
-
-                // Insert the metrics into the database
-                loop {
-                    match metric_store::batch_insert_metric(&persistence_ctx, &metrics).await {
-                        Ok(_) => {
-                            info!(target: "persistence", "successfully flushed {} metrics", metrics.len());
-                            break;
-                        }
-                        Err(e) => {
-                            error!(target: "persistence", "failed to flush metrics: {}", e);
-                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        }
-                    }
-                }
-            });
-        }
-
-        let execution_orders = {
-            let mut lock = self.ctx.buffer.execution_orders.lock().await;
-            let orders = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "execution_order buffer length {}", lock.len());
-            orders
-        };
-
-        if !execution_orders.is_empty() {
-            let persistence_ctx = self.ctx.clone();
-            ctx.spawn(async move {
-                debug!(target: "persistence", "flushing {} execution orders", execution_orders.len());
-
-                loop {
-                    match execution_order_store::insert_batch(&persistence_ctx, &execution_orders).await {
-                        Ok(_) => {
-                            info!(target: "persistence", "successfully flushed {} execution orders", execution_orders.len());
-                            break;
-                        }
-                        Err(e) => {
-                            error!(target: "persistence", "failed to flush execution orders: {}", e);
-                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        }
-                    }
-                }
-            });
-        }
-
-        let venue_orders = {
-            let mut lock = self.ctx.buffer.venue_orders.lock().await;
-            let orders = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "venue_order buffer length {}", lock.len());
-            orders
-        };
-
-        if !venue_orders.is_empty() {
-            let persistence_ctx = self.ctx.clone();
-            ctx.spawn(async move {
-                debug!(target: "persistence", "flushing {} venue orders", venue_orders.len());
-
-                loop {
-                    match venue_order_store::insert_batch(&persistence_ctx, &venue_orders).await {
-                        Ok(_) => {
-                            info!(target: "persistence", "successfully flushed {} venue orders", venue_orders.len());
-                            break;
-                        }
-                        Err(e) => {
-                            error!(target: "persistence", "failed to flush venue orders: {}", e);
-                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        }
-                    }
-                }
-            });
-        }
-
-        let audits = {
-            let mut lock = self.ctx.buffer.audits.lock().await;
-            let audits = std::mem::take(&mut *lock);
-            debug!(target: "persistence", "audit buffer length {}", lock.len());
-            audits
-        };
-
-        if !audits.is_empty() {
-            let persistence_ctx = self.ctx.clone();
-            ctx.spawn(async move {
-                debug!(target: "persistence", "flushing {} audits", audits.len());
-
-                loop {
-                    match audit_store::insert_batch(&persistence_ctx, &audits).await {
-                        Ok(_) => {
-                            info!(target: "persistence", "successfully flushed {} audits", audits.len());
-                            break;
-                        }
-                        Err(e) => {
-                            error!(target: "persistence", "failed to flush audits: {}", e);
-                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        }
-                    }
-                }
-            });
-        }
+        flush_buffer!(ctx, self.ctx, self.ctx.buffer.insights, "insights", |ctx, data| {
+            insight_store::insert_vec(ctx, data)
+        });
+        flush_buffer!(ctx, self.ctx, self.ctx.buffer.trades, "trades", |ctx, data| {
+            trade_store::insert_vec(ctx, data)
+        });
+        flush_buffer!(ctx, self.ctx, self.ctx.buffer.ticks, "ticks", |ctx, data| {
+            tick_store::insert_vec(ctx, data)
+        });
+        flush_buffer!(ctx, self.ctx, self.ctx.buffer.metrics, "metrics", |ctx, data| {
+            metric_store::batch_insert_metric(ctx, data)
+        });
+        flush_buffer!(
+            ctx,
+            self.ctx,
+            self.ctx.buffer.execution_orders,
+            "execution orders",
+            |ctx, data| execution_order_store::insert_batch(ctx, data)
+        );
+        flush_buffer!(ctx, self.ctx, self.ctx.buffer.venue_orders, "venue orders", |ctx, data| {
+            venue_order_store::insert_batch(ctx, data)
+        });
+        flush_buffer!(ctx, self.ctx, self.ctx.buffer.audits, "audits", |ctx, data| {
+            audit_store::insert_batch(ctx, data)
+        });
     }
 }
 

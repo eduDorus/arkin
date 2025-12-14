@@ -8,7 +8,7 @@ use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{prelude::TIMESTAMP_FORMAT, EventPayload, InstrumentQuery, PersistenceReader, Price, Quantity};
+use crate::{EventPayload, InstrumentQuery, PersistenceReader, Price, Quantity};
 
 use super::{Instrument, MarketSide};
 
@@ -91,12 +91,7 @@ impl Ord for AggTrade {
 
 impl fmt::Display for AggTrade {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let event_time = self.event_time.format(TIMESTAMP_FORMAT).expect("Failed to format timestamp");
-        write!(
-            f,
-            "event_time={} instrument={} side={} price={} quantity={}",
-            event_time, self.instrument, self.side, self.price, self.quantity
-        )
+        write!(f, "{} {} {} @ {}", self.side, self.quantity, self.instrument, self.price)
     }
 }
 

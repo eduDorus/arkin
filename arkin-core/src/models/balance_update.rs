@@ -64,7 +64,11 @@ impl Eq for BalanceUpdate {}
 
 impl fmt::Display for BalanceUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "asset={} quantity={}", self.asset, self.quantity)
+        write!(
+            f,
+            "Balance: {} {} (change: {})",
+            self.asset, self.quantity, self.quantity_change
+        )
     }
 }
 

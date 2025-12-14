@@ -152,28 +152,21 @@ impl EventPayload for Transfer {
 
 impl fmt::Display for Transfer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let sign = if self.debit_account.is_user_account() {
+            "-"
+        } else {
+            "+"
+        };
+        let asset_or_inst = match (&self.asset, &self.instrument) {
+            (Some(a), _) => format!(" {}", a),
+            (None, Some(i)) => format!(" {}", i),
+            (None, None) => "".to_string(),
+        };
+
         write!(
             f,
-            "{} {}: {}{} {}{} @ {}",
-            self.created,
-            self.transfer_type,
-            // self.debit_account,
-            // self.credit_account,
-            if self.debit_account.is_user_account() {
-                "-"
-            } else {
-                "+"
-            },
-            self.amount,
-            match &self.asset {
-                Some(asset) => format!("{}", asset),
-                None => "".to_string(),
-            },
-            match &self.instrument {
-                Some(inst) => format!("{}", inst),
-                None => "".to_string(),
-            },
-            self.unit_price
+            "{}: {}{}{} @ {}",
+            self.transfer_type, sign, self.amount, asset_or_inst, self.unit_price
         )
     }
 }
@@ -206,7 +199,7 @@ impl EventPayload for TransferBatch {
 
 impl fmt::Display for TransferBatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "event_time={} transfers_count={}", self.event_time, self.transfers.len())
+        write!(f, "TransferBatch: {} transfers", self.transfers.len())
     }
 }
 

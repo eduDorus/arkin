@@ -36,7 +36,7 @@ impl EventPayload for InsightsTick {
 
 impl fmt::Display for InsightsTick {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "event_time={} frequency={:?}", self.event_time, self.frequency)
+        write!(f, "InsightsTick: {:?}", self.frequency)
     }
 }
 
@@ -103,7 +103,7 @@ impl fmt::Display for Insight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "instrument={} feature={} value={}",
+            "{} {} = {}",
             self.instrument, self.feature_id, self.value
         )
     }
@@ -144,7 +144,7 @@ impl InsightsUpdate {
 
 impl fmt::Display for InsightsUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "event_time={} insights_count={}", self.event_time, self.insights.len())
+        write!(f, "InsightsUpdate: {} insights", self.insights.len())
     }
 }
 

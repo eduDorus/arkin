@@ -98,11 +98,11 @@ impl fmt::Display for PositionUpdate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "instrument={} side={} entry_price={} quantity={} realized_pnl={} unrealized_pnl={}",
+            "Position: {} {} {} @ {} (pnl: {}/{})",
             self.instrument,
             self.position_side,
-            self.entry_price,
             self.quantity,
+            self.entry_price,
             self.realized_pnl,
             self.unrealized_pnl,
         )

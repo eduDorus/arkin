@@ -41,6 +41,7 @@ CREATE TABLE arkin.notional_imbalance_1min (
 ORDER BY (window_start, instrument_id);
 
 
+
 -- 2. MV: SIMPLE 1min notional imbalance
 CREATE MATERIALIZED VIEW arkin.mv_notional_imbalance
 TO arkin.notional_imbalance_1min

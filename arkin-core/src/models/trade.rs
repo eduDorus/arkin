@@ -3,7 +3,7 @@ use std::{cmp::Ordering, fmt, sync::Arc};
 use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 
-use crate::{prelude::TIMESTAMP_FORMAT, Price, Quantity};
+use crate::{Price, Quantity};
 
 use super::{Instrument, MarketSide};
 
@@ -61,11 +61,6 @@ impl Ord for Trade {
 
 impl fmt::Display for Trade {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let event_time = self.event_time.format(TIMESTAMP_FORMAT).expect("Failed to format timestamp");
-        write!(
-            f,
-            "event_time={} instrument={} side={} price={} quantity={}",
-            event_time, self.instrument, self.side, self.price, self.quantity
-        )
+        write!(f, "{} {} {} @ {}", self.side, self.quantity, self.instrument, self.price)
     }
 }

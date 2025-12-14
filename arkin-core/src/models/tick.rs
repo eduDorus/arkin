@@ -8,7 +8,7 @@ use time::UtcDateTime;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use crate::{prelude::TIMESTAMP_FORMAT, EventPayload, InstrumentQuery, PersistenceReader, Price, Quantity};
+use crate::{EventPayload, InstrumentQuery, PersistenceReader, Price, Quantity};
 
 use super::Instrument;
 
@@ -97,12 +97,7 @@ impl Ord for Tick {
 
 impl fmt::Display for Tick {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let event_time = self.event_time.format(TIMESTAMP_FORMAT).expect("Failed to format timestamp");
-        write!(
-            f,
-            "event_time={} instrument={} bid_price={} bid_quantity={} ask_price={} ask_quantity={}",
-            event_time, self.instrument, self.bid_price, self.bid_quantity, self.ask_price, self.ask_quantity
-        )
+        write!(f, "{} {} / {}", self.instrument, self.bid_price, self.ask_price)
     }
 }
 

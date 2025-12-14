@@ -300,14 +300,8 @@ impl fmt::Display for ExecutionOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "instrument={} side={} order_type={} price={} quantity={} total_value={} status={}",
-            self.instrument,
-            self.side,
-            self.exec_strategy_type,
-            self.price,
-            self.quantity,
-            self.total_value(),
-            self.status
+            "{} {} {} ({}) {}",
+            self.side, self.quantity, self.instrument.symbol, self.exec_strategy_type, self.status
         )
     }
 }

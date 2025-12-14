@@ -170,7 +170,7 @@ async fn main() -> Result<()> {
             loop {
                 select! {
                   Some(msg) = receiver.recv() => {
-                      info!("Event: {}", msg);
+                      info!("{}", msg);
                   },
                   _ = tokio::signal::ctrl_c() => {
                       info!("Shutting down logger...");

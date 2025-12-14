@@ -32,15 +32,14 @@ impl Eq for VenueTradeUpdate {}
 impl fmt::Display for VenueTradeUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
-          f,
-          "VenueTradeUpdate event_time: {}, order: {}, fill_price: {}, fill_quantity: {}, commission_asset: {}, commission: {}, realized_pnl: {}",
-          self.event_time,
-          self.order,
-          self.fill_price,
-          self.fill_quantity,
-          self.commission_asset,
-          self.commission,
-          self.realized_pnl
+            f,
+            "VenueTrade: {} filled {} @ {} (comm: {} {}, pnl: {})",
+            self.order,
+            self.fill_quantity,
+            self.fill_price,
+            self.commission,
+            self.commission_asset,
+            self.realized_pnl
         )
     }
 }
