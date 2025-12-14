@@ -131,3 +131,16 @@ ENGINE = ReplacingMergeTree
 PARTITION BY toYYYYMM(event_time)
 ORDER BY (status, id, event_time)
 SETTINGS index_granularity = 8192;
+
+
+CREATE TABLE IF NOT EXISTS arkin.audit
+(
+    event_time DateTime64(3, 'UTC') CODEC(Delta, ZSTD(3)),
+    instance_id UUID CODEC(ZSTD(3)),
+    event_type LowCardinality(String) CODEC(ZSTD(3)),
+    message String CODEC(ZSTD(3))
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(event_time)
+ORDER BY (event_type, instance_id, event_time)
+SETTINGS index_granularity = 8192;

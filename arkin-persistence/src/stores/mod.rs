@@ -1,5 +1,6 @@
 pub mod account_store;
 pub mod asset_store;
+pub mod audit_store;
 pub mod execution_order_store;
 pub mod feature_store;
 pub mod insight_store;

@@ -250,6 +250,13 @@ impl Persistence {
         }
     }
 
+    pub async fn insert_audit(&self, event: Event) {
+        if self.mode != InstanceType::Test {
+            let mut lock = self.ctx.buffer.audits.lock().await;
+            lock.push(event);
+        }
+    }
+
     // TODO: WE NEED TO FLUSH ALSO TRADES AND TICKS
     pub async fn flush_all(&self, ctx: Arc<ServiceCtx>) {
         info!(target: "persistence", "flushing...");
@@ -418,6 +425,33 @@ impl Persistence {
                 }
             });
         }
+
+        let audits = {
+            let mut lock = self.ctx.buffer.audits.lock().await;
+            let audits = std::mem::take(&mut *lock);
+            debug!(target: "persistence", "audit buffer length {}", lock.len());
+            audits
+        };
+
+        if !audits.is_empty() {
+            let persistence_ctx = self.ctx.clone();
+            ctx.spawn(async move {
+                debug!(target: "persistence", "flushing {} audits", audits.len());
+
+                loop {
+                    match audit_store::insert_batch(&persistence_ctx, &audits).await {
+                        Ok(_) => {
+                            info!(target: "persistence", "successfully flushed {} audits", audits.len());
+                            break;
+                        }
+                        Err(e) => {
+                            error!(target: "persistence", "failed to flush audits: {}", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
+                    }
+                }
+            });
+        }
     }
 }
 
@@ -580,17 +614,7 @@ impl PersistenceReader for Persistence {
 impl Runnable for Persistence {
     fn event_filter(&self, instance_type: InstanceType) -> EventFilter {
         match instance_type {
-            InstanceType::Live | InstanceType::Utility => EventFilter::Events(vec![
-                EventType::TickUpdate,
-                EventType::AggTradeUpdate,
-                EventType::InsightsUpdate,
-                EventType::MetricUpdate,
-                EventType::NewAccount,
-                EventType::NewTransfer,
-                EventType::NewTransferBatch,
-                EventType::ExecutionOrderBookUpdate,
-                EventType::VenueOrderBookUpdate,
-            ]),
+            InstanceType::Live | InstanceType::Utility => EventFilter::All,
             InstanceType::Simulation => EventFilter::Events(vec![
                 EventType::InsightsUpdate,
                 EventType::MetricUpdate,
@@ -610,6 +634,10 @@ impl Runnable for Persistence {
             return;
         }
 
+        if !event.event_type().is_market_data() {
+            self.insert_audit(event.clone()).await;
+        }
+
         match event {
             Event::TickUpdate(t) => self.insert_tick(t).await,
             Event::AggTradeUpdate(t) => self.insert_agg_trade(t).await,
@@ -626,7 +654,7 @@ impl Runnable for Persistence {
 
             // Venue Orders
             Event::VenueOrderBookUpdate(o) => self.insert_venue_order(o).await,
-            e => warn!(target: "persistence", "received unused event {}", e.event_type()),
+            _ => {}
         }
     }
 
@@ -667,6 +695,9 @@ impl Runnable for Persistence {
         }
         if let Err(e) = venue_order_store::create_table(&self.ctx).await {
             error!(target: "persistence", "could not create venue_orders table: {}", e)
+        }
+        if let Err(e) = audit_store::create_table(&self.ctx).await {
+            error!(target: "persistence", "could not create audit table: {}", e)
         }
 
         // Populate cache with instruments and assets

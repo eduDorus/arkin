@@ -1,3 +1,4 @@
+pub mod audit_repo;
 pub mod execution_order_repo;
 pub mod insight_repo;
 pub mod metric_repo;
