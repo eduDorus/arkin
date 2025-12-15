@@ -4,12 +4,13 @@ use async_trait::async_trait;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use time::UtcDateTime;
-use tracing::{debug, error};
+use tracing::debug;
 use typed_builder::TypedBuilder;
 use url::Url;
 
 use arkin_core::prelude::*;
 
+use crate::errors::ProviderError;
 use crate::traits::WebSocketProvider;
 
 #[derive(TypedBuilder)]
@@ -26,8 +27,8 @@ impl WebSocketProvider for BinanceSpotWsProvider {
         "BinanceSpot"
     }
 
-    fn url(&self) -> &str {
-        self.url.as_str()
+    fn url(&self) -> String {
+        self.url.to_string()
     }
 
     fn subscribe_msg(&self) -> Option<String> {
@@ -45,13 +46,13 @@ impl WebSocketProvider for BinanceSpotWsProvider {
         serde_json::to_string(&subscription).ok()
     }
 
-    async fn parse(&self, msg: &str) -> Option<Event> {
+    async fn parse(&self, msg: &str) -> Result<Option<Event>, ProviderError> {
         debug!("Parsing message: {}", msg);
         let event = match self.channel {
             Channel::AggTrades => {
-                let trade = serde_json::from_str::<BinanceSpotAggTrade>(msg).ok()?;
+                let trade = serde_json::from_str::<BinanceSpotAggTrade>(msg).map_err(ProviderError::JsonParseError)?;
 
-                let instrument = if let Ok(instrument) = self
+                let instrument = self
                     .persistence
                     .get_instrument(
                         &InstrumentQuery::builder()
@@ -62,12 +63,7 @@ impl WebSocketProvider for BinanceSpotWsProvider {
                             .build(),
                     )
                     .await
-                {
-                    instrument
-                } else {
-                    error!("Instrument with venue symbol {} not found", trade.symbol);
-                    return None;
-                };
+                    .map_err(|e| ProviderError::PersistenceError(e.into()))?;
                 Event::AggTradeUpdate(
                     AggTrade::builder()
                         .event_time(trade.event_time)
@@ -85,9 +81,9 @@ impl WebSocketProvider for BinanceSpotWsProvider {
                 )
             }
             Channel::Trades => {
-                let trade = serde_json::from_str::<BinanceSpotTrade>(msg).ok()?;
+                let trade = serde_json::from_str::<BinanceSpotTrade>(msg).map_err(ProviderError::JsonParseError)?;
 
-                let instrument = if let Ok(instrument) = self
+                let instrument = self
                     .persistence
                     .get_instrument(
                         &InstrumentQuery::builder()
@@ -98,12 +94,7 @@ impl WebSocketProvider for BinanceSpotWsProvider {
                             .build(),
                     )
                     .await
-                {
-                    instrument
-                } else {
-                    error!("Instrument with venue symbol {} not found", trade.symbol);
-                    return None;
-                };
+                    .map_err(|e| ProviderError::PersistenceError(e.into()))?;
                 Event::TradeUpdate(
                     Trade::builder()
                         .event_time(trade.event_time)
@@ -121,9 +112,10 @@ impl WebSocketProvider for BinanceSpotWsProvider {
                 )
             }
             Channel::Ticker => {
-                let top_of_book = serde_json::from_str::<BinanceSpotTopOfBook>(msg).ok()?;
+                let top_of_book =
+                    serde_json::from_str::<BinanceSpotTopOfBook>(msg).map_err(ProviderError::JsonParseError)?;
 
-                let instrument = if let Ok(instrument) = self
+                let instrument = self
                     .persistence
                     .get_instrument(
                         &InstrumentQuery::builder()
@@ -134,12 +126,7 @@ impl WebSocketProvider for BinanceSpotWsProvider {
                             .build(),
                     )
                     .await
-                {
-                    instrument
-                } else {
-                    error!("Instrument with venue symbol {} not found", top_of_book.symbol);
-                    return None;
-                };
+                    .map_err(|e| ProviderError::PersistenceError(e.into()))?;
                 Event::TickUpdate(
                     Tick::builder()
                         .event_time(UtcDateTime::now())
@@ -153,9 +140,9 @@ impl WebSocketProvider for BinanceSpotWsProvider {
                         .into(),
                 )
             }
-            _ => return None,
+            _ => return Ok(None),
         };
-        Some(event)
+        Ok(Some(event))
     }
 }
 

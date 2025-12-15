@@ -294,6 +294,14 @@ impl HttpProvider for BinancetHistoricalHttpProvider {
         ))
     }
 
+    async fn setup(&self) -> Result<(), ProviderError> {
+        Ok(())
+    }
+
+    async fn teardown(&self) -> Result<(), ProviderError> {
+        Ok(())
+    }
+
     async fn parse(&self, _headers: &HeaderMap, _body: &str, _channel: &Channel) -> Option<Event> {
         None
     }

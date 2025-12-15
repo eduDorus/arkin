@@ -21,7 +21,7 @@ mod transfer;
 mod venue;
 mod venue_account_update;
 mod venue_order;
-// mod venue_trade_update;
+mod venue_order_update;
 
 pub use account::*;
 pub use agg_trade::*;
@@ -46,4 +46,4 @@ pub use transfer::*;
 pub use venue::*;
 pub use venue_account_update::*;
 pub use venue_order::*;
-// pub use venue_trade_update::*;
+pub use venue_order_update::*;

@@ -18,6 +18,12 @@ pub enum ProviderError {
     #[error("Not implemented error: {0}")]
     NotImplemented(String),
 
+    #[error("JSON parse error: {0}")]
+    JsonParseError(#[from] serde_json::Error),
+
+    #[error("Persistence error: {0}")]
+    PersistenceError(#[from] anyhow::Error),
+
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
 }

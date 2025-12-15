@@ -26,7 +26,7 @@ pub struct RedisPubSub {
 
 impl RedisPubSub {
     pub fn new(persistence: Arc<dyn PersistenceReader>) -> Result<Arc<Self>> {
-        let client = Client::open("redis://192.168.100.100/?protocol=resp3")?;
+        let client = Client::open("redis://100.104.175.55/?protocol=resp3")?;
 
         // Dedicated pub task: One shared con, fire-and-forget loop
         let (pub_tx, pub_rx) = kanal::unbounded_async::<Event>(); // Tune buffer; drop on full

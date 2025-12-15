@@ -6,7 +6,7 @@ use tracing::{error, warn};
 
 use crate::{
     Account, AggTrade, Book, EventPayload, ExecutionOrder, InsightsTick, InsightsUpdate, Metric, PersistenceReader,
-    Tick, Trade, Transfer, TransferBatch, VenueAccountUpdate, VenueOrder,
+    Tick, Trade, Transfer, TransferBatch, VenueAccountUpdate, VenueOrder, VenueOrderUpdate,
 };
 
 #[derive(Debug, Clone, EnumDiscriminants)]
@@ -26,6 +26,7 @@ pub enum Event {
     InitialAccountUpdate(Arc<VenueAccountUpdate>),
     ReconcileAccountUpdate(Arc<VenueAccountUpdate>),
     VenueAccountUpdate(Arc<VenueAccountUpdate>),
+    VenueOrderUpdate(Arc<VenueOrderUpdate>),
     // VenueTradeUpdate(Arc<VenueTradeUpdate>),
 
     // Insights
@@ -82,6 +83,7 @@ impl Event {
             Event::InitialAccountUpdate(event) => event.event_time,
             Event::ReconcileAccountUpdate(event) => event.event_time,
             Event::VenueAccountUpdate(event) => event.event_time,
+            Event::VenueOrderUpdate(event) => event.event_time,
 
             Event::NewAccount(event) => event.updated,
             Event::NewTransfer(event) => event.created,
@@ -132,6 +134,7 @@ impl Event {
             Event::InitialAccountUpdate(update)
             | Event::ReconcileAccountUpdate(update)
             | Event::VenueAccountUpdate(update) => rmp_serde::to_vec(&update.to_dto()).ok(),
+            Event::VenueOrderUpdate(update) => rmp_serde::to_vec(&update.to_dto()).ok(),
             Event::InsightsTick(tick) => rmp_serde::to_vec(&tick.to_dto()).ok(),
             Event::InsightsUpdate(update) | Event::WarmupInsightsUpdate(update) => {
                 rmp_serde::to_vec(&update.to_dto()).ok()
@@ -205,6 +208,14 @@ impl Event {
                     EventType::VenueAccountUpdate => Some(Event::VenueAccountUpdate(update)),
                     _ => None,
                 }
+            }
+            EventType::VenueOrderUpdate => {
+                let dto = rmp_serde::from_slice(data).ok()?;
+                let update = VenueOrderUpdate::from_dto(dto, persistence)
+                    .await
+                    .map_err(|e| error!("{}", e))
+                    .ok()?;
+                Some(Event::VenueOrderUpdate(Arc::new(update)))
             }
             EventType::InsightsTick => {
                 let dto = rmp_serde::from_slice(data).ok()?;
@@ -344,45 +355,112 @@ impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Event::TickUpdate(t) => write!(f, "Tick update for {} {} / {}", t.instrument, t.bid_price, t.ask_price),
-            Event::TradeUpdate(t) => write!(f, "Trade update on {} {} {} @ {}", t.instrument, t.side, t.quantity, t.price),
-            Event::AggTradeUpdate(t) => write!(f, "Aggregated trade update on {} {} {} @ {}", t.instrument, t.side, t.quantity, t.price),
-            Event::BookUpdate(b) => write!(f, "Book update for {} bids: {} asks: {}", b.instrument, b.bids.len(), b.asks.len()),
+            Event::TradeUpdate(t) => {
+                write!(f, "Trade update on {} {} {} @ {}", t.instrument, t.side, t.quantity, t.price)
+            }
+            Event::AggTradeUpdate(t) => write!(
+                f,
+                "Aggregated trade update on {} {} {} @ {}",
+                t.instrument, t.side, t.quantity, t.price
+            ),
+            Event::BookUpdate(b) => write!(
+                f,
+                "Book update for {} bids: {} asks: {}",
+                b.instrument,
+                b.bids.len(),
+                b.asks.len()
+            ),
             Event::MetricUpdate(m) => write!(f, "Metric update for {} {}: {}", m.instrument, m.metric_type, m.value),
 
             Event::InitialAccountUpdate(a) => write!(f, "Initial account update on {} ({})", a.venue, a.reason),
             Event::ReconcileAccountUpdate(a) => write!(f, "Reconcile account update on {} ({})", a.venue, a.reason),
             Event::VenueAccountUpdate(a) => write!(f, "Account update on {} ({})", a.venue, a.reason),
+            Event::VenueOrderUpdate(o) => write!(f, "Venue order update for {} status {}", o.id, o.status),
 
             Event::InsightsTick(t) => write!(f, "Insights tick frequency {:?}", t.frequency),
             Event::InsightsUpdate(i) => write!(f, "Insights update with {} insights", i.insights.len()),
             Event::WarmupInsightsUpdate(i) => write!(f, "Warmup insights update with {} insights", i.insights.len()),
 
-            Event::NewExecutionOrder(o) => write!(f, "Created execution order to {} {} {} ({})", o.side, o.quantity, o.instrument, o.exec_strategy_type),
-            Event::CancelExecutionOrder(o) => write!(f, "Cancelling execution order to {} {} {}", o.side, o.quantity, o.instrument),
+            Event::NewExecutionOrder(o) => write!(
+                f,
+                "Created execution order to {} {} {} ({})",
+                o.side, o.quantity, o.instrument, o.exec_strategy_type
+            ),
+            Event::CancelExecutionOrder(o) => {
+                write!(f, "Cancelling execution order to {} {} {}", o.side, o.quantity, o.instrument)
+            }
             Event::CancelAllExecutionOrders(ts) => write!(f, "Cancelling all execution orders at {}", ts),
 
-            Event::NewVenueOrder(o) => write!(f, "Submitting new order to {}: {} {} {} @ {} ({})", o.instrument.venue, o.side, o.quantity, o.instrument, o.price, o.order_type),
-            Event::CancelVenueOrder(o) => write!(f, "Cancelling venue order on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+            Event::NewVenueOrder(o) => write!(
+                f,
+                "Submitting new order to {}: {} {} {} @ {} ({})",
+                o.instrument.venue, o.side, o.quantity, o.instrument, o.price, o.order_type
+            ),
+            Event::CancelVenueOrder(o) => write!(
+                f,
+                "Cancelling venue order on {} for {} {} {} @ {}",
+                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
+            ),
             Event::CancelAllVenueOrders(ts) => write!(f, "Cancelling all venue orders at {}", ts),
 
-            Event::ExecutionOrderActive(o) => write!(f, "Execution order active for {} {} {}", o.side, o.quantity, o.instrument),
-            Event::ExecutionOrderCompleted(o) => write!(f, "Execution order completed for {} {} {}", o.side, o.quantity, o.instrument),
-            Event::ExecutionOrderCancelled(o) => write!(f, "Execution order cancelled for {} {} {}", o.side, o.quantity, o.instrument),
-            Event::ExecutionOrderExpired(o) => write!(f, "Execution order expired for {} {} {}", o.side, o.quantity, o.instrument),
+            Event::ExecutionOrderActive(o) => {
+                write!(f, "Execution order active for {} {} {}", o.side, o.quantity, o.instrument)
+            }
+            Event::ExecutionOrderCompleted(o) => {
+                write!(f, "Execution order completed for {} {} {}", o.side, o.quantity, o.instrument)
+            }
+            Event::ExecutionOrderCancelled(o) => {
+                write!(f, "Execution order cancelled for {} {} {}", o.side, o.quantity, o.instrument)
+            }
+            Event::ExecutionOrderExpired(o) => {
+                write!(f, "Execution order expired for {} {} {}", o.side, o.quantity, o.instrument)
+            }
 
-            Event::VenueOrderInflight(o) => write!(f, "Venue order inflight on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
-            Event::VenueOrderPlaced(o) => write!(f, "Placed venue order on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
-            Event::VenueOrderRejected(o) => write!(f, "Venue order rejected on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
-            Event::VenueOrderFill(o) => write!(f, "Venue order fill on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
-            Event::VenueOrderCancelled(o) => write!(f, "Venue order cancelled on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
-            Event::VenueOrderExpired(o) => write!(f, "Venue order expired on {} for {} {} {} @ {}", o.instrument.venue, o.side, o.quantity, o.instrument, o.price),
+            Event::VenueOrderInflight(o) => write!(
+                f,
+                "Venue order inflight on {} for {} {} {} @ {}",
+                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
+            ),
+            Event::VenueOrderPlaced(o) => write!(
+                f,
+                "Placed venue order on {} for {} {} {} @ {}",
+                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
+            ),
+            Event::VenueOrderRejected(o) => write!(
+                f,
+                "Venue order rejected on {} for {} {} {} @ {}",
+                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
+            ),
+            Event::VenueOrderFill(o) => write!(
+                f,
+                "Venue order fill on {} for {} {} {} @ {}",
+                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
+            ),
+            Event::VenueOrderCancelled(o) => write!(
+                f,
+                "Venue order cancelled on {} for {} {} {} @ {}",
+                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
+            ),
+            Event::VenueOrderExpired(o) => write!(
+                f,
+                "Venue order expired on {} for {} {} {} @ {}",
+                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
+            ),
 
             Event::NewAccount(a) => write!(f, "New account {} on {}", a.id, a.venue),
             Event::NewTransfer(t) => write!(f, "New transfer {}", t),
             Event::NewTransferBatch(b) => write!(f, "New transfer batch with {} transfers", b.transfers.len()),
 
-            Event::ExecutionOrderBookUpdate(o) => write!(f, "Execution order {} {} {} is now {}", o.side, o.quantity, o.instrument, o.status),
-            Event::VenueOrderBookUpdate(o) => write!(f, "Venue order {} {} {} @ {} is now {}", o.side, o.quantity, o.instrument, o.price, o.status),
+            Event::ExecutionOrderBookUpdate(o) => write!(
+                f,
+                "Execution order {} {} {} is now {}",
+                o.side, o.quantity, o.instrument, o.status
+            ),
+            Event::VenueOrderBookUpdate(o) => write!(
+                f,
+                "Venue order {} {} {} @ {} is now {}",
+                o.side, o.quantity, o.instrument, o.price, o.status
+            ),
 
             Event::Finished(ts) => write!(f, "Finished at {}", ts),
         }

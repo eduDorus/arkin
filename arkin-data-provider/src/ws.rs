@@ -13,17 +13,26 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tokio_util::bytes::Bytes;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
+use typed_builder::TypedBuilder;
 
 use crate::WebSocketProvider;
 
+#[derive(TypedBuilder)]
 pub struct WsClient {
     provider: Box<dyn WebSocketProvider>,
+    #[builder(default = 0)]
     reconnect_attempts: u32,
+    #[builder(default = Arc::new(AtomicBool::new(false)))]
     is_connected: Arc<AtomicBool>,
+    #[builder(default = Arc::new(AtomicU64::new(0)))]
     last_message_timestamp: Arc<AtomicU64>, // Track last message time for stale detection
+    #[builder(default = 30)]
     stale_connection_timeout_secs: u64,
+    #[builder(default = 1000)]
     reconnect_backoff_ms: u64,
+    #[builder(default = 30000)]
     max_reconnect_backoff_ms: u64,
+    #[builder(default = 15)]
     ping_interval_secs: u64,
 }
 
@@ -47,6 +56,12 @@ impl WsClient {
 
     /// Start the WebSocket connection with automatic reconnection
     pub async fn run(&mut self, sender: AsyncSender<Event>, shutdown: CancellationToken) {
+        // Setup the provider
+        if let Err(e) = self.provider.setup().await {
+            error!("Failed to setup provider: {:?}", e);
+            return;
+        }
+
         loop {
             match self.connect_and_handle(sender.clone(), shutdown.clone()).await {
                 Ok(_) => {
@@ -74,6 +89,11 @@ impl WsClient {
                     sleep(backoff).await;
                 }
             }
+        }
+
+        // Teardown the provider
+        if let Err(e) = self.provider.teardown().await {
+            error!("Failed to teardown provider: {:?}", e);
         }
     }
 
@@ -129,13 +149,20 @@ impl WsClient {
                             match msg {
                                 Message::Text(text) => {
                                     // Parse and broadcast the JSON message
-                                      if let Some(event) = self.provider.parse(&text).await {
-                                        debug!("Parsed event: {}", event);
-                                        if sender.send(event).await.is_err() {
-                                            warn!("Failed to send event");
+                                    match self.provider.parse(&text).await {
+                                        Ok(Some(event)) => {
+                                            debug!("Parsed event: {}", event);
+                                            if sender.send(event).await.is_err() {
+                                                warn!("Failed to send event");
+                                            }
                                         }
-                                      } else {
-                                        warn!("Unrecognized message format: {}", text);
+                                        Ok(None) => {
+                                            // Message handled but no event produced (e.g. heartbeat, ignored message)
+                                            debug!("Message handled but ignored: {}", text);
+                                        }
+                                        Err(e) => {
+                                            warn!("Failed to parse message: {} - Error: {:?}", text, e);
+                                        }
                                     }
                                 }
                                 Message::Binary(_data) => {
@@ -279,7 +306,7 @@ impl WsClient {
                 // Signal that we need to reconnect by marking as disconnected
                 is_connected.store(false, Ordering::SeqCst);
             } else {
-                info!("Stream healthy - last message received {}s ago", elapsed);
+                debug!("Stream healthy - last message received {}s ago", elapsed);
             }
         }
     }

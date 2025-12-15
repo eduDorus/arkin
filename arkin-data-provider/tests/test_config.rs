@@ -37,7 +37,13 @@ data_providers:
           - "btcusdt"
           - "ethusdt"
           - "solusdt"
-  - type: binance_perpetual
+  - type: binance_spot_user
+    api_key: test_api_key_1234567890
+    api_secret: test_api_secret_0987654321
+    http_url: "https://api.binance.com"
+    ws_url: "wss://stream.binance.com:9443/ws"
+    enabled: true
+  - type: binance_usdm
     http_url: "https://api.binance.com"
     ws_url: "wss://fstream.binance.com/ws"
     ws_endpoints:
@@ -57,11 +63,17 @@ data_providers:
           - "btcusdt"
           - "ethusdt"
           - "solusdt"
+  - type: binance_usdm_user
+    api_key: test_api_key_1234567890
+    api_secret: test_api_secret_0987654321
+    http_url: "https://fapi.binance.com"
+    ws_url: "wss://fstream.binance.com/ws"
+    enabled: true
 "#;
 
     let persistence = MockPersistence::new();
     let config: DataProviderConfig = serde_yaml::from_str(yaml).expect("Failed to parse config");
-    assert_eq!(config.data_providers.len(), 2);
+    assert_eq!(config.data_providers.len(), 4);
     let data_providers = ProviderFactory::from_config(config, persistence.clone());
 
     // Start Providers
