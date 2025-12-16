@@ -127,14 +127,26 @@ impl WsClient {
         // Spawn stale connection detector
         let is_connected_clone = self.is_connected.clone();
         let last_message_timestamp = self.last_message_timestamp.clone();
-        let stale_connection_timeout_secs = self.stale_connection_timeout_secs;
-        let _stale_detector = tokio::spawn(async move {
-            Self::stale_connection_detector(is_connected_clone, last_message_timestamp, stale_connection_timeout_secs)
+        if !self.stale_connection_timeout_secs == 0 {
+            let stale_connection_timeout_secs = self.stale_connection_timeout_secs;
+            let _stale_detector = tokio::spawn(async move {
+                Self::stale_connection_detector(
+                    is_connected_clone,
+                    last_message_timestamp,
+                    stale_connection_timeout_secs,
+                )
                 .await
-        });
+            });
+        } else {
+            info!("Stale connection detection disabled");
+        }
 
         // Main message handling loop with stale connection timeout
-        let stale_timeout = Duration::from_secs(self.stale_connection_timeout_secs);
+        let stale_timeout = if self.stale_connection_timeout_secs > 0 {
+            Duration::from_secs(self.stale_connection_timeout_secs)
+        } else {
+            Duration::from_secs(86400) // 24 hours when disabled
+        };
 
         loop {
             tokio::select! {
@@ -151,7 +163,7 @@ impl WsClient {
                                     // Parse and broadcast the JSON message
                                     match self.provider.parse(&text).await {
                                         Ok(Some(event)) => {
-                                            debug!("Parsed event: {}", event);
+                                            info!("Parsed event: {}", event);
                                             if sender.send(event).await.is_err() {
                                                 warn!("Failed to send event");
                                             }
@@ -197,13 +209,10 @@ impl WsClient {
                             info!("WebSocket stream ended");
                             return Err("WebSocket closed by server".to_string());
                         }
-                        Err(_) => {
+                        Err(e) => {
                             // Timeout: no messages received for stale_connection_timeout_secs
-                            error!(
-                                "Stale connection detected - no messages received within {:?}. Reconnecting...",
-                                stale_timeout
-                            );
-                            return Err("Stale connection - no messages received".to_string());
+                            error!("Websocket error: {:?}. Reconnecting...", e);
+                            return Err(format!("Websocket error: {:?}", e));
                         }
                     }
                 }

@@ -269,7 +269,12 @@ impl WebSocketProvider for BinanceSpotUserWsProvider {
                 let event_time = UtcDateTime::from_unix_timestamp((e.event_time / 1000) as i64).unwrap();
 
                 // Parse client_order_id as the update ID
-                let id = match Uuid::parse_str(&e.client_order_id) {
+                let id_str = if e.client_order_id.starts_with("web_") {
+                    &e.client_order_id[4..]
+                } else {
+                    &e.client_order_id
+                };
+                let id = match Uuid::parse_str(id_str) {
                     Ok(uuid) => uuid,
                     Err(_) => {
                         warn!("Failed to parse client_order_id '{}' as UUID", e.client_order_id);
@@ -288,18 +293,25 @@ impl WebSocketProvider for BinanceSpotUserWsProvider {
                     _ => VenueOrderStatus::New,
                 };
 
-                // For spot, commission is not directly in the event, so set to zero
-                let commission_asset = None; // Spot doesn't specify commission asset in execution report
+                // For spot, use the values from the event
+                let commission_asset = if let Some(asset_symbol) = &e.commission_asset {
+                    self.persistence
+                        .get_asset(&AssetQuery::builder().symbol(asset_symbol.clone()).build())
+                        .await
+                        .ok()
+                } else {
+                    None
+                };
 
                 let update = VenueOrderUpdate::builder()
                     .id(id)
                     .event_time(event_time)
                     .status(status)
-                    .filled_quantity(Decimal::ZERO) // ExecutionReport doesn't have cumulative filled qty
-                    .filled_price(Decimal::ZERO) // Nor average price
-                    .last_filled_quantity(Decimal::ZERO) // Nor last filled
-                    .last_filled_price(Decimal::ZERO)
-                    .commission(Decimal::ZERO)
+                    .filled_quantity(e.cumulative_filled_quantity)
+                    .filled_price(e.last_executed_price) // Use last executed price as filled price
+                    .last_filled_quantity(e.last_executed_quantity)
+                    .last_filled_price(e.last_executed_price)
+                    .commission(e.commission_amount)
                     .commission_asset(commission_asset)
                     .build();
 

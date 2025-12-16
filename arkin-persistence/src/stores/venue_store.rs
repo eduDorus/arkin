@@ -7,16 +7,16 @@ use arkin_core::PersistenceError;
 
 use crate::{context::PersistenceContext, repos::pg::venues_repo};
 
-async fn update_venue_cache(ctx: &PersistenceContext, venue: Arc<Venue>) {
+async fn update_cache(ctx: &PersistenceContext, venue: Arc<Venue>) {
     ctx.cache.venue_id.insert(venue.id, venue.clone()).await;
     ctx.cache.venue_name.insert(venue.name, venue).await;
 }
 
-async fn read_venue_id_cache(ctx: &PersistenceContext, id: &Uuid) -> Option<Arc<Venue>> {
+async fn read_cache_by_id(ctx: &PersistenceContext, id: &Uuid) -> Option<Arc<Venue>> {
     ctx.cache.venue_id.get(id).await
 }
 
-async fn read_venue_name_cache(ctx: &PersistenceContext, name: &VenueName) -> Option<Arc<Venue>> {
+async fn read_cache_by_name(ctx: &PersistenceContext, name: &VenueName) -> Option<Arc<Venue>> {
     ctx.cache.venue_name.get(name).await
 }
 
@@ -27,8 +27,8 @@ pub async fn load_venues(ctx: &PersistenceContext) -> Result<Vec<Arc<Venue>>, Pe
     let mut venues = Vec::with_capacity(venue_dtos.len());
 
     for dto in venue_dtos {
-        let venue: Arc<Venue> = Arc::new(dto.into());
-        update_venue_cache(ctx, venue.clone()).await;
+        let venue: Arc<Venue> = dto.into();
+        update_cache(ctx, venue.clone()).await;
         venues.push(venue);
     }
 
@@ -39,19 +39,32 @@ pub async fn load_venues(ctx: &PersistenceContext) -> Result<Vec<Arc<Venue>>, Pe
 /// Assumes cache is already populated via load_venues()
 pub async fn query(ctx: &PersistenceContext, query: &VenueQuery) -> Result<Arc<Venue>, PersistenceError> {
     // Try to read from cache first
-    if let Some(name) = &query.name {
-        if let Some(venue) = read_venue_name_cache(ctx, name).await {
-            if query.matches(&venue) {
-                return Ok(venue);
-            }
+    let asset = if let Some(id) = query.id {
+        read_cache_by_id(ctx, &id).await
+    } else if let Some(ref name) = query.name {
+        read_cache_by_name(ctx, name).await
+    } else {
+        None
+    };
+
+    if let Some(asset) = asset {
+        if query.matches(&asset) {
+            return Ok(asset);
         }
     }
 
     // Fallback to database
-    if let Some(name) = &query.name {
-        let venue_dto = venues_repo::read_by_name(ctx, name).await?;
-        let venue: Arc<Venue> = Arc::new(venue_dto.into());
-        update_venue_cache(ctx, venue.clone()).await;
+    let dto = if let Some(id) = query.id {
+        venues_repo::read_by_id(ctx, &id).await?
+    } else if let Some(ref symbol) = query.name {
+        venues_repo::read_by_name(ctx, symbol).await?
+    } else {
+        return Err(PersistenceError::NotFound);
+    };
+
+    let venue: Arc<Venue> = dto.into();
+    if query.matches(&venue) {
+        update_cache(ctx, venue.clone()).await;
         Ok(venue)
     } else {
         Err(PersistenceError::NotFound)
@@ -76,29 +89,29 @@ pub async fn query_list(ctx: &PersistenceContext, query: &VenueListQuery) -> Res
 }
 
 pub async fn insert(ctx: &PersistenceContext, venue: Arc<Venue>) -> Result<(), PersistenceError> {
-    update_venue_cache(ctx, venue.clone()).await;
+    update_cache(ctx, venue.clone()).await;
     venues_repo::insert(ctx, venue.into()).await
 }
 
 pub async fn read_by_id(ctx: &PersistenceContext, id: &Uuid) -> Result<Arc<Venue>, PersistenceError> {
-    match read_venue_id_cache(ctx, id).await {
+    match read_cache_by_id(ctx, id).await {
         Some(venue) => Ok(venue),
         None => {
             let venue = venues_repo::read_by_id(ctx, id).await?;
-            let venue: Arc<Venue> = Arc::new(venue.into());
-            update_venue_cache(ctx, venue.clone()).await;
+            let venue: Arc<Venue> = venue.into();
+            update_cache(ctx, venue.clone()).await;
             Ok(venue)
         }
     }
 }
 
 pub async fn read_by_name(ctx: &PersistenceContext, name: &VenueName) -> Result<Arc<Venue>, PersistenceError> {
-    match read_venue_name_cache(ctx, &name).await {
+    match read_cache_by_name(ctx, &name).await {
         Some(venue) => Ok(venue),
         None => {
             let venue = venues_repo::read_by_name(ctx, name).await?;
-            let venue: Arc<Venue> = Arc::new(venue.into());
-            update_venue_cache(ctx, venue.clone()).await;
+            let venue: Arc<Venue> = venue.into();
+            update_cache(ctx, venue.clone()).await;
             Ok(venue)
         }
     }

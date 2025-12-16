@@ -235,7 +235,12 @@ impl WebSocketProvider for BinanceUsdmUserWsProvider {
                 let event_time = UtcDateTime::from_unix_timestamp((e.transaction_time / 1000) as i64).unwrap();
 
                 // Parse client_order_id as the update ID
-                let id = match Uuid::parse_str(&e.order.client_order_id) {
+                let id_str = if e.order.client_order_id.starts_with("web_") {
+                    &e.order.client_order_id[4..]
+                } else {
+                    &e.order.client_order_id
+                };
+                let id = match Uuid::parse_str(id_str) {
                     Ok(uuid) => uuid,
                     Err(_) => {
                         warn!("Failed to parse client_order_id '{}' as UUID", e.order.client_order_id);

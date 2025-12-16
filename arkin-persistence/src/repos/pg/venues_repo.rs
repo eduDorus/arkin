@@ -31,15 +31,16 @@ impl From<Arc<Venue>> for VenueDTO {
     }
 }
 
-impl From<VenueDTO> for Venue {
+impl From<VenueDTO> for Arc<Venue> {
     fn from(venue: VenueDTO) -> Self {
-        Self {
+        let venue = Venue {
             id: venue.id,
             name: venue.name,
             venue_type: venue.venue_type,
             created: venue.created.into(),
             updated: venue.updated.into(),
-        }
+        };
+        Arc::new(venue)
     }
 }
 
