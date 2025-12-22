@@ -3,7 +3,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use arkin_core::prelude::*;
 use async_trait::async_trait;
 use rust_decimal::prelude::*;
-use time::UtcDateTime;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use typed_builder::TypedBuilder;
@@ -36,9 +35,9 @@ impl WideQuoterExecutionStrategy {
         .into()
     }
 
-    async fn check_finalize_exec(&self, exec_id: Uuid, time: UtcDateTime) {
-        self.exec_order_book.check_finalize_order(exec_id, time).await;
-    }
+    // async fn check_finalize_exec(&self, exec_id: Uuid, time: UtcDateTime) {
+    //     self.exec_order_book.check_finalize_order(exec_id, time).await;
+    // }
 
     async fn new_execution_order(&self, ctx: Arc<CoreCtx>, exec_order: &ExecutionOrder) {
         info!(target: "exec_strat::wide", "received new execution order {}", exec_order.id);
@@ -114,92 +113,160 @@ impl WideQuoterExecutionStrategy {
         }
     }
 
-    async fn venue_order_inflight(&self, order: &VenueOrder) {
-        if !self.exec_order_book.contains(&order.execution_order_id) {
-            return;
-        }
-        info!(target: "exec_strat::wide", "received status inflight for venue order {}", order.id);
-        self.venue_order_book.set_inflight(order.id, order.updated).await;
-    }
+    async fn venue_order_update(&self, order: &VenueOrderUpdate) {
+        let event_time = order.event_time;
 
-    async fn venue_order_placed(&self, order: &VenueOrder) {
-        if !self.exec_order_book.contains(&order.execution_order_id) {
+        // Look up the current venue order so we can reference exec_order_id and state.
+        let Some(current_order) = self.venue_order_book.get(order.id) else {
             return;
-        }
-        info!(target: "exec_strat::wide", "received status placed for venue order {}", order.id);
-        self.venue_order_book.place_order(order.id, order.updated).await;
-    }
+        };
+        info!(target: "exec_strat::wide", "received venue order update for venue order {}", order.id);
 
-    async fn venue_order_rejected(&self, order: &VenueOrder) {
-        if !self.exec_order_book.contains(&order.execution_order_id) {
-            return;
-        }
-        info!(target: "exec_strat::wide", "received status rejected for venue order {}", order.id);
-        self.venue_order_book.reject_order(order.id, order.updated).await;
-        self.check_finalize_exec(order.execution_order_id, order.updated).await;
-    }
+        match order.status {
+            VenueOrderStatus::New | VenueOrderStatus::Placed => {
+                // Treat as placed
+                self.venue_order_book.place_order(order.id, event_time).await;
+            }
+            VenueOrderStatus::PartiallyFilled | VenueOrderStatus::Filled => {
+                // Apply the last fill
+                let last_qty = order.last_filled_quantity;
+                let last_price = order.last_filled_price;
+                let commission = order.commission;
 
-    async fn venue_order_fill(&self, order: &VenueOrder) {
-        if !self.exec_order_book.contains(&order.execution_order_id) {
-            return;
-        }
-        info!(target: "exec_strat::wide", "received fill for venue order {}", order.id);
-        self.venue_order_book
-            .add_fill_to_order(
-                order.id,
-                order.updated,
-                order.last_fill_price,
-                order.last_fill_quantity,
-                order.last_fill_commission,
-            )
-            .await;
-        self.exec_order_book
-            .add_fill_to_order(
-                order.execution_order_id,
-                order.updated,
-                order.last_fill_price,
-                order.last_fill_quantity,
-                order.last_fill_commission,
-            )
-            .await;
-        self.check_finalize_exec(order.execution_order_id, order.updated).await;
-    }
+                self.venue_order_book
+                    .add_fill_to_order(order.id, event_time, last_price, last_qty, commission)
+                    .await;
 
-    async fn venue_order_cancelled(&self, order: &VenueOrder) {
-        if !self.exec_order_book.contains(&order.execution_order_id) {
-            return;
-        }
-        info!(target: "exec_strat::wide", "received status cancelled for venue order {}", order.id);
+                self.exec_order_book
+                    .add_fill_to_order(current_order.execution_order_id, event_time, last_price, last_qty, commission)
+                    .await;
 
-        if let Some(current_order) = self.venue_order_book.get(order.id) {
-            if current_order.is_active() && !current_order.is_terminating() {
-                self.venue_order_book.cancel_order(order.id, order.updated).await;
+                self.exec_order_book
+                    .check_finalize_order(current_order.execution_order_id, event_time)
+                    .await;
+            }
+            VenueOrderStatus::PartiallyFilledCancelled | VenueOrderStatus::Cancelled => {
+                if current_order.is_active() && !current_order.is_terminating() {
+                    self.venue_order_book.cancel_order(order.id, order.event_time).await;
+                }
+                self.venue_order_book.check_finalize_order(order.id, event_time).await;
+
+                self.exec_order_book
+                    .check_finalize_order(current_order.execution_order_id, event_time)
+                    .await;
+            }
+            VenueOrderStatus::Rejected => {
+                self.venue_order_book.reject_order(order.id, event_time).await;
+                self.exec_order_book
+                    .check_finalize_order(current_order.execution_order_id, event_time)
+                    .await;
+            }
+            VenueOrderStatus::PartiallyFilledExpired | VenueOrderStatus::Expired => {
+                self.venue_order_book.expire_order(order.id, event_time).await;
+                self.exec_order_book
+                    .check_finalize_order(current_order.execution_order_id, event_time)
+                    .await;
+            }
+            _ => {
+                warn!(target: "exec_strat::wide", "received unhandled venue order status update {} for venue order {}", order.status, order.id);
             }
         }
-
-        self.venue_order_book.check_finalize_order(order.id, order.updated).await;
-
-        let is_terminal = if let Some(updated_order) = self.venue_order_book.get(order.id) {
-            updated_order.is_terminal()
-        } else {
-            true
-        };
-
-        if is_terminal {
-            self.check_finalize_exec(order.execution_order_id, order.updated).await;
-        }
     }
 
-    async fn venue_order_expired(&self, order: &VenueOrder) {
-        if !self.exec_order_book.contains(&order.execution_order_id) {
-            return;
-        }
-        info!(target: "exec_strat::wide", "received status expired for venue order {}", order.id);
-        self.venue_order_book.expire_order(order.id, order.updated).await;
-        if order.is_terminal() {
-            self.check_finalize_exec(order.execution_order_id, order.updated).await;
-        }
-    }
+    // async fn venue_order_inflight(&self, order: &VenueOrder) {
+    //     if !self.exec_order_book.contains(&order.execution_order_id) {
+    //         return;
+    //     }
+    //     info!(target: "exec_strat::wide", "received status inflight for venue order {}", order.id);
+    //     self.venue_order_book.set_inflight(order.id, order.updated).await;
+    // }
+
+    // async fn venue_order_placed(&self, order: &VenueOrder) {
+    //     if !self.exec_order_book.contains(&order.execution_order_id) {
+    //         return;
+    //     }
+    //     info!(target: "exec_strat::wide", "received status placed for venue order {}", order.id);
+    //     self.venue_order_book.place_order(order.id, order.updated).await;
+    // }
+
+    // async fn venue_order_rejected(&self, order: &VenueOrder) {
+    //     if !self.exec_order_book.contains(&order.execution_order_id) {
+    //         return;
+    //     }
+    //     info!(target: "exec_strat::wide", "received status rejected for venue order {}", order.id);
+    //     self.venue_order_book.reject_order(order.id, order.updated).await;
+    //     self.exec_order_book
+    //         .check_finalize_order(order.execution_order_id, order.updated)
+    //         .await;
+    // }
+
+    // async fn venue_order_fill(&self, order: &VenueOrder) {
+    //     if !self.exec_order_book.contains(&order.execution_order_id) {
+    //         return;
+    //     }
+    //     info!(target: "exec_strat::wide", "received fill for venue order {}", order.id);
+    //     self.venue_order_book
+    //         .add_fill_to_order(
+    //             order.id,
+    //             order.updated,
+    //             order.last_fill_price,
+    //             order.last_fill_quantity,
+    //             order.last_fill_commission,
+    //         )
+    //         .await;
+    //     self.exec_order_book
+    //         .add_fill_to_order(
+    //             order.execution_order_id,
+    //             order.updated,
+    //             order.last_fill_price,
+    //             order.last_fill_quantity,
+    //             order.last_fill_commission,
+    //         )
+    //         .await;
+    //     self.exec_order_book
+    //         .check_finalize_order(order.execution_order_id, order.updated)
+    //         .await;
+    // }
+
+    // async fn venue_order_cancelled(&self, order: &VenueOrder) {
+    //     if !self.exec_order_book.contains(&order.execution_order_id) {
+    //         return;
+    //     }
+    //     info!(target: "exec_strat::wide", "received status cancelled for venue order {}", order.id);
+
+    //     if let Some(current_order) = self.venue_order_book.get(order.id) {
+    //         if current_order.is_active() && !current_order.is_terminating() {
+    //             self.venue_order_book.cancel_order(order.id, order.updated).await;
+    //         }
+    //     }
+
+    //     self.venue_order_book.check_finalize_order(order.id, order.updated).await;
+
+    //     let is_terminal = if let Some(updated_order) = self.venue_order_book.get(order.id) {
+    //         updated_order.is_terminal()
+    //     } else {
+    //         true
+    //     };
+
+    //     if is_terminal {
+    //         self.exec_order_book
+    //             .check_finalize_order(order.execution_order_id, order.updated)
+    //             .await;
+    //     }
+    // }
+
+    // async fn venue_order_expired(&self, order: &VenueOrder) {
+    //     if !self.exec_order_book.contains(&order.execution_order_id) {
+    //         return;
+    //     }
+    //     info!(target: "exec_strat::wide", "received status expired for venue order {}", order.id);
+    //     self.venue_order_book.expire_order(order.id, order.updated).await;
+    //     if order.is_terminal() {
+    //         self.exec_order_book
+    //             .check_finalize_order(order.execution_order_id, order.updated)
+    //             .await;
+    //     }
+    // }
 
     async fn requote_order(&self, ctx: Arc<CoreCtx>, tick: &Tick, exec_order: &ExecutionOrder) {
         // Do not requote if the execution order is terminating
@@ -289,13 +356,14 @@ impl Runnable for WideQuoterExecutionStrategy {
             EventType::NewExecutionOrder,
             EventType::CancelExecutionOrder,
             EventType::CancelAllExecutionOrders,
-            EventType::VenueOrderInflight,
-            EventType::VenueOrderPlaced,
-            EventType::VenueOrderRejected,
-            EventType::VenueOrderFill,
-            EventType::VenueOrderCancelled,
-            EventType::VenueOrderExpired,
+            // EventType::VenueOrderInflight,
+            // EventType::VenueOrderPlaced,
+            // EventType::VenueOrderRejected,
+            // EventType::VenueOrderFill,
+            // EventType::VenueOrderCancelled,
+            // EventType::VenueOrderExpired,
             EventType::TickUpdate,
+            EventType::VenueOrderUpdate,
         ])
     }
 
@@ -314,12 +382,13 @@ impl Runnable for WideQuoterExecutionStrategy {
                 }
             }
             Event::CancelAllExecutionOrders(_t) => self.cancel_all_execution_orders(ctx).await,
-            Event::VenueOrderInflight(vo) => self.venue_order_inflight(vo).await,
-            Event::VenueOrderPlaced(vo) => self.venue_order_placed(vo).await,
-            Event::VenueOrderRejected(vo) => self.venue_order_rejected(vo).await,
-            Event::VenueOrderFill(vo) => self.venue_order_fill(vo).await,
-            Event::VenueOrderCancelled(vo) => self.venue_order_cancelled(vo).await,
-            Event::VenueOrderExpired(vo) => self.venue_order_expired(vo).await,
+            // Event::VenueOrderInflight(vo) => self.venue_order_inflight(vo).await,
+            // Event::VenueOrderPlaced(vo) => self.venue_order_placed(vo).await,
+            // Event::VenueOrderRejected(vo) => self.venue_order_rejected(vo).await,
+            // Event::VenueOrderFill(vo) => self.venue_order_fill(vo).await,
+            // Event::VenueOrderCancelled(vo) => self.venue_order_cancelled(vo).await,
+            // Event::VenueOrderExpired(vo) => self.venue_order_expired(vo).await,
+            Event::VenueOrderUpdate(vo) => self.venue_order_update(vo).await,
             Event::TickUpdate(t) => self.tick_update(ctx, t).await,
             e => warn!(target: "exec_strat::wide", "received unused event {}", e),
         }

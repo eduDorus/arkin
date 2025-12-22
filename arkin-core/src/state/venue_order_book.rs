@@ -57,6 +57,10 @@ impl VenueOrderBook {
         self.queue.get(&id).map(|entry| entry.value().to_owned())
     }
 
+    pub fn contains(&self, id: VenueOrderId) -> bool {
+        self.queue.contains_key(&id)
+    }
+
     pub async fn set_inflight(&self, id: VenueOrderId, event_time: UtcDateTime) {
         if let Some(mut order) = self.queue.get_mut(&id) {
             order.set_inflight(event_time);

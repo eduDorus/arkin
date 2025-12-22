@@ -32,17 +32,11 @@ pub struct BinanceSpotClient {
 
 impl BinanceSpotClient {
     pub fn new(config: BinanceSpotExecutionConfig) -> Self {
-        Self::new_with_client(config, None)
-    }
-
-    pub fn new_with_client(config: BinanceSpotExecutionConfig, client: Option<Client>) -> Self {
-        let client = client.unwrap_or_else(|| {
-            Client::builder()
-                .pool_max_idle_per_host(10) // Keep connections alive
-                .pool_idle_timeout(std::time::Duration::from_secs(300)) // 5 minutes
-                .build()
-                .expect("Failed to build reqwest client")
-        });
+        let client = Client::builder()
+            .pool_max_idle_per_host(10) // Keep connections alive
+            .pool_idle_timeout(std::time::Duration::from_secs(300)) // 5 minutes
+            .build()
+            .expect("Failed to build reqwest client");
 
         Self {
             client,
@@ -95,34 +89,10 @@ impl BinanceSpotClient {
         req_builder = req_builder.header("User-Agent", "Arkin-Binance-Client/1.0");
         req_builder = req_builder.header("Accept-Encoding", "gzip, deflate, br");
 
-        // Handle parameters based on HTTP method
-        match request.method() {
-            Method::GET => {
-                // For GET requests, add all parameters as query parameters
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
-            }
-            Method::POST | Method::PUT | Method::DELETE => {
-                // For POST/PUT/DELETE requests, send ALL parameters as query parameters (including signature)
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
-            }
-            _ => {
-                // For other methods, add as query parameters
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
+        // Add all parameters as query parameters (Binance Spot API accepts query params for all methods)
+        for (key, value) in &params {
+            if let Some(str_value) = value.as_str() {
+                req_builder = req_builder.query(&[(key, str_value)]);
             }
         }
 
@@ -216,7 +186,10 @@ impl BinanceSpotRequest for PlaceOrderRequest {
             params.insert("reduceOnly".to_string(), serde_json::Value::String(reduce_only.clone()));
         }
         if let Some(ref new_client_order_id) = self.params.new_client_order_id {
-            params.insert("newClientOrderId".to_string(), serde_json::Value::String(new_client_order_id.clone()));
+            params.insert(
+                "newClientOrderId".to_string(),
+                serde_json::Value::String(new_client_order_id.clone()),
+            );
         }
 
         params

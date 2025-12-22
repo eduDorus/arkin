@@ -32,17 +32,11 @@ pub struct BinanceMarginClient {
 
 impl BinanceMarginClient {
     pub fn new(config: BinanceMarginExecutionConfig) -> Self {
-        Self::new_with_client(config, None)
-    }
-
-    pub fn new_with_client(config: BinanceMarginExecutionConfig, client: Option<Client>) -> Self {
-        let client = client.unwrap_or_else(|| {
-            Client::builder()
-                .pool_max_idle_per_host(10) // Keep connections alive
-                .pool_idle_timeout(std::time::Duration::from_secs(300)) // 5 minutes
-                .build()
-                .expect("Failed to build reqwest client")
-        });
+        let client = Client::builder()
+            .pool_max_idle_per_host(10) // Keep connections alive
+            .pool_idle_timeout(std::time::Duration::from_secs(300)) // 5 minutes
+            .build()
+            .expect("Failed to build reqwest client");
 
         Self {
             client,
@@ -99,34 +93,10 @@ impl BinanceMarginClient {
         req_builder = req_builder.header("User-Agent", "Arkin-Binance-Client/1.0");
         req_builder = req_builder.header("Accept-Encoding", "gzip, deflate, br");
 
-        // Handle parameters based on HTTP method
-        match request.method() {
-            Method::GET => {
-                // For GET requests, add all parameters as query parameters
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
-            }
-            Method::POST | Method::PUT | Method::DELETE => {
-                // For POST/PUT/DELETE requests, send ALL parameters as query parameters (including signature)
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
-            }
-            _ => {
-                // For other methods, add as query parameters
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
+        // Add all parameters as query parameters (Binance Margin API accepts query params for all methods)
+        for (key, value) in &params {
+            if let Some(str_value) = value.as_str() {
+                req_builder = req_builder.query(&[(key, str_value)]);
             }
         }
 

@@ -4,7 +4,7 @@ use serde_urlencoded;
 use sha2::Sha256;
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::debug;
+use tracing::{debug, error};
 use typed_builder::TypedBuilder;
 
 use crate::config::BinanceUsdmExecutionConfig;
@@ -32,17 +32,11 @@ pub struct BinanceUsdmClient {
 
 impl BinanceUsdmClient {
     pub fn new(config: BinanceUsdmExecutionConfig) -> Self {
-        Self::new_with_client(config, None)
-    }
-
-    pub fn new_with_client(config: BinanceUsdmExecutionConfig, client: Option<Client>) -> Self {
-        let client = client.unwrap_or_else(|| {
-            Client::builder()
-                .pool_max_idle_per_host(10) // Keep connections alive
-                .pool_idle_timeout(std::time::Duration::from_secs(300)) // 5 minutes
-                .build()
-                .expect("Failed to build reqwest client")
-        });
+        let client = Client::builder()
+            .pool_max_idle_per_host(10) // Keep connections alive
+            .pool_idle_timeout(std::time::Duration::from_secs(300)) // 5 minutes
+            .build()
+            .expect("Failed to build reqwest client");
 
         Self {
             client,
@@ -95,34 +89,10 @@ impl BinanceUsdmClient {
         req_builder = req_builder.header("User-Agent", "Arkin-Binance-Client/1.0");
         req_builder = req_builder.header("Accept-Encoding", "gzip, deflate, br");
 
-        // Handle parameters based on HTTP method
-        match request.method() {
-            reqwest::Method::GET => {
-                // For GET requests, add all parameters as query parameters
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
-            }
-            reqwest::Method::POST | reqwest::Method::PUT | reqwest::Method::DELETE => {
-                // For POST/PUT/DELETE requests, send ALL parameters as query parameters (including signature)
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
-            }
-            _ => {
-                // For other methods, add as query parameters
-                req_builder = req_builder.header("Content-Type", "application/x-www-form-urlencoded");
-                for (key, value) in &params {
-                    if let Some(str_value) = value.as_str() {
-                        req_builder = req_builder.query(&[(key, str_value)]);
-                    }
-                }
+        // Add all parameters as query parameters (Binance USDM API accepts query params for all methods)
+        for (key, value) in &params {
+            if let Some(str_value) = value.as_str() {
+                req_builder = req_builder.query(&[(key, str_value)]);
             }
         }
 
@@ -131,7 +101,7 @@ impl BinanceUsdmClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await?;
-            tracing::error!("Binance USDM API error: {} - {}", status, body);
+            error!("Binance USDM API error: {} - {}", status, body);
             return Err(format!("API error: {} - {}", status, body).into());
         }
 

@@ -1,109 +1,172 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use arkin_core::prelude::*;
 use async_trait::async_trait;
-use tokio::task;
+use tokio::time::timeout;
+use tokio_util::task::TaskTracker;
 use tracing::{error, info, warn};
 use typed_builder::TypedBuilder;
 
-use crate::{
-    client::BinanceClient,
-    config::{BinanceExecutionConfig, BinanceExecutionServiceConfig},
-    types::BinanceMarketType,
-};
+use crate::{client::BinanceClient, types::BinanceMarketType};
+const ORDER_TIMEOUT: Duration = Duration::from_secs(5);
+const MAX_RETRIES: u32 = 3;
 
 #[derive(TypedBuilder)]
 pub struct BinanceExecution {
     client: Arc<BinanceClient>,
+    #[builder(default = TaskTracker::new())]
+    task_tracker: TaskTracker,
 }
 
 pub type BinanceExecutionService = BinanceExecution;
 
 impl BinanceExecution {
-    pub fn new(config: BinanceExecutionServiceConfig) -> Arc<Self> {
-        Self::new_with_clients(config.binance_execution, None, None)
-    }
-
-    pub fn new_with_clients(
-        config: BinanceExecutionConfig,
-        spot_client: Option<reqwest::Client>,
-        usdm_client: Option<reqwest::Client>,
-    ) -> Arc<Self> {
-        let client = Arc::new(BinanceClient::new_with_clients(config, spot_client, usdm_client));
-        Self { client }.into()
-    }
-
     pub fn from_config() -> Arc<Self> {
         let client = Arc::new(BinanceClient::from_config());
-        Self { client }.into()
+        Self {
+            client,
+            task_tracker: TaskTracker::new(),
+        }
+        .into()
+    }
+
+    /// Gracefully shutdown, waiting for all in-flight order requests to complete
+    pub async fn shutdown(&self) {
+        info!("Shutting down BinanceExecution, waiting for in-flight requests...");
+        self.task_tracker.close();
+        self.task_tracker.wait().await;
+        info!("All order requests completed");
     }
 
     async fn handle_new_venue_order(&self, ctx: Arc<CoreCtx>, order: Arc<VenueOrder>) {
-        info!("Handling new venue order: {}", order.id);
         if !matches!(order.instrument.venue.name, VenueName::Binance) {
             warn!(
-                "Received order for different venue: {}, expected: {}",
-                order.instrument.venue.name,
-                VenueName::Binance
+                "Order {} for wrong venue: {}, expected Binance",
+                order.id, order.instrument.venue.name
             );
-            return; // Not for this venue
+            return;
         }
 
         let client = Arc::clone(&self.client);
         let ctx_clone = Arc::clone(&ctx);
         let order_clone = Arc::clone(&order);
 
-        task::spawn(async move {
+        // Track spawned task for graceful shutdown
+        self.task_tracker.spawn(async move {
             info!("Placing venue order: {}", order_clone.id);
 
-            match client.place_order(&order_clone).await {
-                Ok(response) => {
-                    info!(
-                        "Successfully placed order {} with Binance ID: {}",
-                        order_clone.id, response.order_id
-                    );
+            // Retry logic with timeout
+            let mut attempts = 0u32;
+            loop {
+                attempts += 1;
 
-                    // Update the order with venue order ID
-                    // Note: In a real implementation, you'd need to update the VenueOrderBook
-                    // For now, we'll just publish the placed event
-                    let _ = ctx_clone.publish(Event::VenueOrderPlaced(order_clone)).await;
-                }
-                Err(e) => {
-                    error!("Failed to place order {}: {}", order_clone.id, e);
-                    // Publish failed event if needed
+                match timeout(ORDER_TIMEOUT, client.place_order(&order_clone)).await {
+                    Ok(Ok(response)) => {
+                        info!(
+                            "Successfully placed order {} with Binance ID: {} (attempt {})",
+                            order_clone.id, response.order_id, attempts
+                        );
+                        // Don't publish VenueOrderPlaced - user data stream handles this
+                        return;
+                    }
+                    Ok(Err(e)) => {
+                        if attempts >= MAX_RETRIES {
+                            error!("Failed to place order {} after {} attempts: {}", order_clone.id, attempts, e);
+                            // Publish rejection so system knows order failed
+                            let venue_order_update = VenueOrderUpdate::builder()
+                                .event_time(ctx_clone.now().await)
+                                .id(order_clone.id)
+                                .status(VenueOrderStatus::Rejected)
+                                .build();
+                            let _ = ctx_clone.publish(Event::VenueOrderUpdate(venue_order_update.into())).await;
+                            return;
+                        }
+                        warn!(
+                            "Failed to place order {} (attempt {}): {}, retrying...",
+                            order_clone.id, attempts, e
+                        );
+                        tokio::time::sleep(Duration::from_millis(100 * attempts as u64)).await;
+                    }
+                    Err(_) => {
+                        if attempts >= MAX_RETRIES {
+                            error!("Order {} timed out after {} attempts", order_clone.id, attempts);
+                            let venue_order_update = VenueOrderUpdate::builder()
+                                .event_time(ctx_clone.now().await)
+                                .id(order_clone.id)
+                                .status(VenueOrderStatus::Rejected)
+                                .build();
+                            let _ = ctx_clone.publish(Event::VenueOrderUpdate(venue_order_update.into())).await;
+                            return;
+                        }
+                        warn!("Order {} timed out (attempt {}), retrying...", order_clone.id, attempts);
+                        tokio::time::sleep(Duration::from_millis(100 * attempts as u64)).await;
+                    }
                 }
             }
         });
     }
 
-    async fn handle_cancel_venue_order(&self, ctx: Arc<CoreCtx>, order: Arc<VenueOrder>) {
-        info!("Handling cancel venue order: {}", order.id);
+    async fn handle_cancel_venue_order(&self, _ctx: Arc<CoreCtx>, order: Arc<VenueOrder>) {
         if !matches!(order.instrument.venue.name, VenueName::Binance) {
             warn!(
-                "Received order for different venue: {}, expected: {}",
-                order.instrument.venue.name,
-                VenueName::Binance
+                "Cancel request for {} for wrong venue: {}, expected Binance",
+                order.id, order.instrument.venue.name
             );
-            return; // Not for this venue
+            return;
         }
 
         let client = Arc::clone(&self.client);
-        let ctx_clone = Arc::clone(&ctx);
         let order_clone = Arc::clone(&order);
 
-        task::spawn(async move {
+        // Track spawned task for graceful shutdown
+        self.task_tracker.spawn(async move {
             info!("Canceling venue order: {}", order_clone.id);
 
-            match client.cancel_order(&order_clone).await {
-                Ok(response) => {
-                    info!(
-                        "Successfully cancelled order {} with Binance ID: {}",
-                        order_clone.id, response.order_id
-                    );
-                    let _ = ctx_clone.publish(Event::VenueOrderCancelled(order_clone)).await;
-                }
-                Err(e) => {
-                    error!("Failed to cancel order {}: {}", order_clone.id, e);
+            // Retry logic with timeout
+            let mut attempts = 0u32;
+            loop {
+                attempts += 1;
+
+                match timeout(ORDER_TIMEOUT, client.cancel_order(&order_clone)).await {
+                    Ok(Ok(response)) => {
+                        info!(
+                            "Successfully cancelled order {} with Binance ID: {} (attempt {})",
+                            order_clone.id, response.order_id, attempts
+                        );
+                        // Don't publish VenueOrderCancelled - user data stream handles this
+                        return;
+                    }
+                    Ok(Err(e)) => {
+                        let error_msg = e.to_string();
+
+                        // Check if order was already filled/cancelled (not an error)
+                        if error_msg.contains("-2011") || error_msg.contains("Unknown order") {
+                            info!("Order {} no longer exists (likely filled/cancelled) - ignoring", order_clone.id);
+                            return;
+                        }
+
+                        if attempts >= MAX_RETRIES {
+                            error!("Failed to cancel order {} after {} attempts: {}", order_clone.id, attempts, e);
+                            return;
+                        }
+                        warn!(
+                            "Failed to cancel order {} (attempt {}): {}, retrying...",
+                            order_clone.id, attempts, e
+                        );
+                        tokio::time::sleep(Duration::from_millis(100 * attempts as u64)).await;
+                    }
+                    Err(_) => {
+                        if attempts >= MAX_RETRIES {
+                            error!("Cancel request for {} timed out after {} attempts", order_clone.id, attempts);
+                            return;
+                        }
+                        warn!(
+                            "Cancel request for {} timed out (attempt {}), retrying...",
+                            order_clone.id, attempts
+                        );
+                        tokio::time::sleep(Duration::from_millis(100 * attempts as u64)).await;
+                    }
                 }
             }
         });
@@ -112,7 +175,7 @@ impl BinanceExecution {
     async fn handle_cancel_all_venue_orders(&self, _ctx: Arc<CoreCtx>, symbol: Option<String>) {
         let client = Arc::clone(&self.client);
 
-        task::spawn(async move {
+        self.task_tracker.spawn(async move {
             info!("Canceling all venue orders for symbol: {:?}", symbol);
 
             // Cancel on both spot and futures markets
@@ -148,7 +211,6 @@ impl Runnable for BinanceExecution {
     }
 
     async fn handle_event(&self, core_ctx: Arc<CoreCtx>, event: Event) {
-        info!("BinanceExecution handling event: {}", event);
         match event {
             Event::NewVenueOrder(order) => {
                 self.handle_new_venue_order(core_ctx, order).await;
@@ -157,8 +219,6 @@ impl Runnable for BinanceExecution {
                 self.handle_cancel_venue_order(core_ctx, order).await;
             }
             Event::CancelAllVenueOrders(_time) => {
-                // For cancel all, we don't have symbol filtering in the event
-                // In a real implementation, you might want to filter by venue
                 self.handle_cancel_all_venue_orders(core_ctx, None).await;
             }
             _ => {}

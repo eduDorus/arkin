@@ -1,3 +1,4 @@
+use core::fmt;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -15,16 +16,37 @@ pub struct VenueOrderUpdate {
     pub event_time: UtcDateTime,
 
     // State
+    #[builder(default = Quantity::ZERO)]
     pub filled_quantity: Quantity,
+    #[builder(default = Price::ZERO)]
     pub filled_price: Price,
 
     // Delta
+    #[builder(default = Quantity::ZERO)]
     pub last_filled_quantity: Quantity,
+    #[builder(default = Price::ZERO)]
     pub last_filled_price: Price,
+    #[builder(default = Commission::ZERO)]
     pub commission: Commission,
+    #[builder(default)]
     pub commission_asset: Option<Arc<Asset>>,
 
     pub status: VenueOrderStatus,
+}
+
+impl fmt::Display for VenueOrderUpdate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} {} {} @ {} {} @ {}",
+            self.id,
+            self.status,
+            self.filled_quantity,
+            self.filled_price,
+            self.last_filled_quantity,
+            self.last_filled_price
+        )
+    }
 }
 
 #[async_trait]

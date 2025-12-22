@@ -26,7 +26,6 @@ pub enum Event {
     InitialAccountUpdate(Arc<VenueAccountUpdate>),
     ReconcileAccountUpdate(Arc<VenueAccountUpdate>),
     VenueAccountUpdate(Arc<VenueAccountUpdate>),
-    VenueOrderUpdate(Arc<VenueOrderUpdate>),
     // VenueTradeUpdate(Arc<VenueTradeUpdate>),
 
     // Insights
@@ -49,12 +48,7 @@ pub enum Event {
     ExecutionOrderExpired(Arc<ExecutionOrder>),
 
     // Execution
-    VenueOrderInflight(Arc<VenueOrder>),
-    VenueOrderPlaced(Arc<VenueOrder>),
-    VenueOrderRejected(Arc<VenueOrder>),
-    VenueOrderFill(Arc<VenueOrder>),
-    VenueOrderCancelled(Arc<VenueOrder>),
-    VenueOrderExpired(Arc<VenueOrder>),
+    VenueOrderUpdate(Arc<VenueOrderUpdate>),
 
     // Ledger
     NewAccount(Arc<Account>),
@@ -83,7 +77,6 @@ impl Event {
             Event::InitialAccountUpdate(event) => event.event_time,
             Event::ReconcileAccountUpdate(event) => event.event_time,
             Event::VenueAccountUpdate(event) => event.event_time,
-            Event::VenueOrderUpdate(event) => event.event_time,
 
             Event::NewAccount(event) => event.updated,
             Event::NewTransfer(event) => event.created,
@@ -109,12 +102,7 @@ impl Event {
             Event::ExecutionOrderExpired(event) => event.updated,
 
             // Execution
-            Event::VenueOrderInflight(event) => event.updated,
-            Event::VenueOrderPlaced(event) => event.updated,
-            Event::VenueOrderRejected(event) => event.updated,
-            Event::VenueOrderFill(event) => event.updated,
-            Event::VenueOrderCancelled(event) => event.updated,
-            Event::VenueOrderExpired(event) => event.updated,
+            Event::VenueOrderUpdate(event) => event.event_time,
 
             // Order Books Updates
             Event::ExecutionOrderBookUpdate(event) => event.updated,
@@ -134,7 +122,6 @@ impl Event {
             Event::InitialAccountUpdate(update)
             | Event::ReconcileAccountUpdate(update)
             | Event::VenueAccountUpdate(update) => rmp_serde::to_vec(&update.to_dto()).ok(),
-            Event::VenueOrderUpdate(update) => rmp_serde::to_vec(&update.to_dto()).ok(),
             Event::InsightsTick(tick) => rmp_serde::to_vec(&tick.to_dto()).ok(),
             Event::InsightsUpdate(update) | Event::WarmupInsightsUpdate(update) => {
                 rmp_serde::to_vec(&update.to_dto()).ok()
@@ -146,15 +133,10 @@ impl Event {
             | Event::ExecutionOrderCancelled(order)
             | Event::ExecutionOrderExpired(order)
             | Event::ExecutionOrderBookUpdate(order) => rmp_serde::to_vec(&order.to_dto()).ok(),
-            Event::NewVenueOrder(order)
-            | Event::CancelVenueOrder(order)
-            | Event::VenueOrderInflight(order)
-            | Event::VenueOrderPlaced(order)
-            | Event::VenueOrderRejected(order)
-            | Event::VenueOrderFill(order)
-            | Event::VenueOrderCancelled(order)
-            | Event::VenueOrderExpired(order)
-            | Event::VenueOrderBookUpdate(order) => rmp_serde::to_vec(&order.to_dto()).ok(),
+            Event::NewVenueOrder(order) | Event::CancelVenueOrder(order) | Event::VenueOrderBookUpdate(order) => {
+                rmp_serde::to_vec(&order.to_dto()).ok()
+            }
+            Event::VenueOrderUpdate(update) => rmp_serde::to_vec(&update.to_dto()).ok(),
             Event::NewAccount(account) => rmp_serde::to_vec(&account.to_dto()).ok(),
             Event::NewTransfer(transfer) => rmp_serde::to_vec(&transfer.to_dto()).ok(),
             Event::NewTransferBatch(batch) => rmp_serde::to_vec(&batch.to_dto()).ok(),
@@ -264,15 +246,7 @@ impl Event {
                     _ => None,
                 }
             }
-            EventType::NewVenueOrder
-            | EventType::CancelVenueOrder
-            | EventType::VenueOrderInflight
-            | EventType::VenueOrderPlaced
-            | EventType::VenueOrderRejected
-            | EventType::VenueOrderFill
-            | EventType::VenueOrderCancelled
-            | EventType::VenueOrderExpired
-            | EventType::VenueOrderBookUpdate => {
+            EventType::NewVenueOrder | EventType::CancelVenueOrder | EventType::VenueOrderBookUpdate => {
                 let dto = rmp_serde::from_slice(data).ok()?;
                 let order = VenueOrder::from_dto(dto, persistence).await.map_err(|e| error!("{}", e)).ok()?;
                 let order = Arc::new(order);
@@ -280,12 +254,6 @@ impl Event {
                 match event_type {
                     EventType::NewVenueOrder => Some(Event::NewVenueOrder(order)),
                     EventType::CancelVenueOrder => Some(Event::CancelVenueOrder(order)),
-                    EventType::VenueOrderInflight => Some(Event::VenueOrderInflight(order)),
-                    EventType::VenueOrderPlaced => Some(Event::VenueOrderPlaced(order)),
-                    EventType::VenueOrderRejected => Some(Event::VenueOrderRejected(order)),
-                    EventType::VenueOrderFill => Some(Event::VenueOrderFill(order)),
-                    EventType::VenueOrderCancelled => Some(Event::VenueOrderCancelled(order)),
-                    EventType::VenueOrderExpired => Some(Event::VenueOrderExpired(order)),
                     EventType::VenueOrderBookUpdate => Some(Event::VenueOrderBookUpdate(order)),
                     _ => None,
                 }
@@ -415,37 +383,6 @@ impl fmt::Display for Event {
             Event::ExecutionOrderExpired(o) => {
                 write!(f, "Execution order expired for {} {} {}", o.side, o.quantity, o.instrument)
             }
-
-            Event::VenueOrderInflight(o) => write!(
-                f,
-                "Venue order inflight on {} for {} {} {} @ {}",
-                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
-            ),
-            Event::VenueOrderPlaced(o) => write!(
-                f,
-                "Placed venue order on {} for {} {} {} @ {}",
-                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
-            ),
-            Event::VenueOrderRejected(o) => write!(
-                f,
-                "Venue order rejected on {} for {} {} {} @ {}",
-                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
-            ),
-            Event::VenueOrderFill(o) => write!(
-                f,
-                "Venue order fill on {} for {} {} {} @ {}",
-                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
-            ),
-            Event::VenueOrderCancelled(o) => write!(
-                f,
-                "Venue order cancelled on {} for {} {} {} @ {}",
-                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
-            ),
-            Event::VenueOrderExpired(o) => write!(
-                f,
-                "Venue order expired on {} for {} {} {} @ {}",
-                o.instrument.venue, o.side, o.quantity, o.instrument, o.price
-            ),
 
             Event::NewAccount(a) => write!(f, "New account {} on {}", a.id, a.venue),
             Event::NewTransfer(t) => write!(f, "New transfer {}", t),

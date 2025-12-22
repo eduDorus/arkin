@@ -1,7 +1,6 @@
 use arkin_core::prelude::*;
-use reqwest::Client;
 
-use crate::config::{BinanceExecutionConfig, BinanceExecutionServiceConfig};
+use crate::config::BinanceExecutionServiceConfig;
 use crate::margin::BinanceMarginClient;
 use crate::spot::BinanceSpotClient;
 use crate::types::{BinanceCancelResponse, BinanceMarketType, BinanceOrderResponse};
@@ -16,38 +15,22 @@ pub struct BinanceClient {
 }
 
 impl BinanceClient {
-    pub fn new(config: BinanceExecutionConfig) -> Self {
-        Self::new_with_clients(config, None, None)
+    pub fn from_config() -> Self {
+        let service_config = load::<BinanceExecutionServiceConfig>();
+        let config = service_config.binance_execution;
+        Self::new(config)
     }
 
-    pub fn new_with_clients(
-        config: BinanceExecutionConfig,
-        spot_client: Option<Client>,
-        usdm_client: Option<Client>,
-    ) -> Self {
-        let spot_client_instance = config
-            .spot
-            .filter(|c| c.enabled)
-            .map(|c| BinanceSpotClient::new_with_client(c, spot_client.clone()));
-        let margin_client = config
-            .margin
-            .filter(|c| c.enabled)
-            .map(|c| BinanceMarginClient::new_with_client(c, spot_client)); // Reuse spot client if available
-        let usdm_client_instance = config
-            .usdm
-            .filter(|c| c.enabled)
-            .map(|c| BinanceUsdmClient::new_with_client(c, usdm_client));
+    pub fn new(config: crate::config::BinanceExecutionConfig) -> Self {
+        let spot_client = config.spot.filter(|c| c.enabled).map(|c| BinanceSpotClient::new(c));
+        let margin_client = config.margin.filter(|c| c.enabled).map(|c| BinanceMarginClient::new(c));
+        let usdm_client = config.usdm.filter(|c| c.enabled).map(|c| BinanceUsdmClient::new(c));
 
         Self {
-            spot_client: spot_client_instance,
+            spot_client,
             margin_client,
-            usdm_client: usdm_client_instance,
+            usdm_client,
         }
-    }
-
-    pub fn from_config() -> Self {
-        let service_config = arkin_core::utils::load::<BinanceExecutionServiceConfig>();
-        Self::new(service_config.binance_execution)
     }
 
     pub async fn place_order(
