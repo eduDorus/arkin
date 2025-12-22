@@ -233,6 +233,8 @@ impl WebSocketProvider for BinanceSpotUserWsProvider {
                     .positions(Vec::new()) // Spot doesn't have positions like futures
                     .reason("ACCOUNT_UPDATE".to_string())
                     .build();
+
+                info!("Parsed VenueAccountUpdate: {:?}", account_update);
                 Ok(Some(Event::VenueAccountUpdate(Arc::new(account_update))))
             }
             SpotUserDataEvent::BalanceUpdate(e) => {
@@ -263,6 +265,8 @@ impl WebSocketProvider for BinanceSpotUserWsProvider {
                     .positions(Vec::new())
                     .reason("BALANCE_UPDATE".to_string())
                     .build();
+
+                info!("Parsed VenueAccountUpdate: {:?}", account_update);
                 Ok(Some(Event::VenueAccountUpdate(Arc::new(account_update))))
             }
             SpotUserDataEvent::ExecutionReport(e) => {
@@ -315,6 +319,7 @@ impl WebSocketProvider for BinanceSpotUserWsProvider {
                     .commission_asset(commission_asset)
                     .build();
 
+                info!("Parsed VenueOrderUpdate: {:?}", update);
                 Ok(Some(Event::VenueOrderUpdate(Arc::new(update))))
             }
         }

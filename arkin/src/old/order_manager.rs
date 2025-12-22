@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use arkin_binance::{prelude::*, AggTradeStream, BookTickerStream};
+use arkin_exec_binance::{prelude::*, AggTradeStream, BookTickerStream};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use flume::{Receiver, Sender};

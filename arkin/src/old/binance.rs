@@ -5,8 +5,8 @@ use futures::StreamExt;
 use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 
-use arkin_binance::{prelude::*, AggTradeStream, PartialDepthStream};
 use arkin_core::prelude::*;
+use arkin_exec_binance::{prelude::*, AggTradeStream, PartialDepthStream};
 use trade::CancelOpenOrdersRequest;
 
 #[tokio::main(flavor = "multi_thread")]

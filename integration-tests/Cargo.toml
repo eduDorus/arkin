@@ -16,7 +16,7 @@ arkin-data-provider = { path = "../arkin-data-provider" }
 # arkin-strat-agent = { path = "../arkin-strat-agent" }
 # arkin-exec-strat-default = { path = "../arkin-exec-strat-default" }
 # arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
-# arkin-binance = { path = "../arkin-binance" }
+# arkin-exec-binance = { path = "../arkin-exec-binance" }
 
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }

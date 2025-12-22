@@ -3,6 +3,7 @@ use rust_decimal::{dec, Decimal};
 use time::UtcDateTime;
 
 use arkin_core::prelude::*;
+use uuid::Uuid;
 
 /// CLI application for Arkin.
 ///
@@ -93,6 +94,10 @@ pub enum Commands {
 
 #[derive(Args, Debug)]
 pub struct SendOrderArgs {
+    /// Instrument UUID to send the order for.
+    #[arg(long, short)]
+    pub instrument: Uuid,
+
     /// The execution strategy to use (wide-quoter, maker, taker)
     #[arg(long, value_enum, default_value_t = ExecutionStrategyType::WideQuoter)]
     pub strategy: ExecutionStrategyType,

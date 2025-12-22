@@ -15,7 +15,7 @@ arkin-cli = { path = "../arkin-cli" }
 arkin-core = { path = "../arkin-core" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-data-provider = { path = "../arkin-data-provider" }
-arkin-binance = { path = "../arkin-binance" }
+arkin-exec-binance = { path = "../arkin-exec-binance" }
 arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
 arkin-exec-strat-default = { path = "../arkin-exec-strat-default" }
 # arkin-cron = { path = "../arkin-cron" }

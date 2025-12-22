@@ -29,7 +29,8 @@
                 "crypto",
                 "stock",
                 "fiat",
-                "commodity"
+                "commodity",
+                "stablecoin"
               ]
             }
           }

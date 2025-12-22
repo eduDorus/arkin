@@ -1,7 +1,7 @@
 use std::{cmp::max, str::FromStr, sync::Arc};
 
 use anyhow::Result;
-use arkin_binance::BinanceExecution;
+use arkin_exec_binance::BinanceExecution;
 use arkin_exec_strat_default::DefaultExecutionStrategy;
 use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
 use clap::Parser;
@@ -118,7 +118,7 @@ async fn main() -> Result<()> {
             engine.register("pubsub", pubsub.clone(), 0, 10);
 
             let execution = match a.venue {
-                VenueName::Binance => BinanceExecution::new(),
+                VenueName::Binance => BinanceExecution::from_config(),
                 _ => unimplemented!("Execution service for venue {} is not implemented yet", a.venue),
             };
 
@@ -197,12 +197,11 @@ async fn main() -> Result<()> {
                         .build(),
                 )
                 .await?;
+
+            // ETH USDT SPOT: "95b3e6e7-d39d-4cea-a70b-a4da23103a0a"
+            // ETH USDT PERP: "0a6400f4-abb5-4ff3-8720-cf2eeebef26e"
             let inst = persistence
-                .get_instrument(
-                    &InstrumentQuery::builder()
-                        .id(Uuid::parse_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").expect("Invalid UUID"))
-                        .build(),
-                )
+                .get_instrument(&InstrumentQuery::builder().id(a.instrument).build())
                 .await?;
 
             info!("Sending orders for {}", inst);

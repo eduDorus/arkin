@@ -163,7 +163,7 @@ impl WsClient {
                                     // Parse and broadcast the JSON message
                                     match self.provider.parse(&text).await {
                                         Ok(Some(event)) => {
-                                            info!("Parsed event: {}", event);
+                                            debug!("Parsed event: {}", event);
                                             if sender.send(event).await.is_err() {
                                                 warn!("Failed to send event");
                                             }

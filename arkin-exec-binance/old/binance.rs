@@ -12,8 +12,8 @@ use tracing::{debug, error, info, warn};
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-use arkin_binance::prelude::*;
 use arkin_core::prelude::*;
+use arkin_exec_binance::prelude::*;
 use arkin_persistence::prelude::*;
 
 use crate::errors::ExecutorError;
@@ -554,7 +554,7 @@ impl ExecutorService for BinanceExecutor {}
 
 //     use super::*;
 
-//     use arkin_binance::Credentials;
+//     use arkin_exec_binance::Credentials;
 //     use rust_decimal_macros::dec;
 //     use tokio_rustls::rustls::crypto::{aws_lc_rs, CryptoProvider};
 //     use tokio_util::task::TaskTracker;

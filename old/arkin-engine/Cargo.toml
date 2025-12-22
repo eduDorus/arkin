@@ -15,7 +15,7 @@ arkin-strategies = { path = "../arkin-strategies" }
 arkin-allocation = { path = "../arkin-allocation" }
 arkin-ordermanager = { path = "../arkin-ordermanager" }
 arkin-executors = { path = "../arkin-executors" }
-arkin-binance = { path = "../arkin-binance" }
+arkin-exec-binance = { path = "../arkin-exec-binance" }
 
 tokio = { workspace = true }
 tokio-util = { workspace = true }

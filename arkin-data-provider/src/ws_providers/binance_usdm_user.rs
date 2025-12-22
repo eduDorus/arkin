@@ -268,8 +268,6 @@ impl WebSocketProvider for BinanceUsdmUserWsProvider {
                     None
                 };
 
-                println!("Building VenueOrderUpdate");
-                println!("Building VenueOrderUpdate");
                 let update = VenueOrderUpdate::builder()
                     .id(id)
                     .event_time(event_time)
@@ -281,8 +279,7 @@ impl WebSocketProvider for BinanceUsdmUserWsProvider {
                     .commission(e.order.commission.unwrap_or(Decimal::ZERO))
                     .commission_asset(commission_asset)
                     .build();
-                println!("Built update: {:?}", update);
-                println!("Built update: {:?}", update);
+
                 info!("Parsed VenueOrderUpdate: {:?}", update);
                 Ok(Some(Event::VenueOrderUpdate(Arc::new(update))))
             }
@@ -344,6 +341,8 @@ impl WebSocketProvider for BinanceUsdmUserWsProvider {
                     .positions(positions)
                     .reason(e.update.reason)
                     .build();
+
+                info!("Parsed VenueAccountUpdate: {:?}", account_update);
                 Ok(Some(Event::VenueAccountUpdate(Arc::new(account_update))))
             }
             UserDataEvent::MarginCall(e) => {
@@ -387,6 +386,8 @@ impl WebSocketProvider for BinanceUsdmUserWsProvider {
                     .positions(positions)
                     .reason("MARGIN_CALL".to_string())
                     .build();
+
+                info!("Parsed VenueAccountUpdate: {:?}", account_update);
                 Ok(Some(Event::VenueAccountUpdate(Arc::new(account_update))))
             }
         }

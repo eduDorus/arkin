@@ -87,10 +87,10 @@ services:
       - network
     restart: unless-stopped
 
-  # arkin-binance-ingestor-1:
-  #   container_name: arkin-binance-ingestor-1
+  # arkin-exec-binance-ingestor-1:
+  #   container_name: arkin-exec-binance-ingestor-1
   #   image: arkin:v1.0.0
-  #   hostname: arkin-binance-ingestor-1
+  #   hostname: arkin-exec-binance-ingestor-1
   #   command: ["./main", "ingestor",  "-i", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,TRXUSDT,DOGEUSDT,ADAUSDT,LINKUSDT,XLMUSDT,HBARUSDT,AVAXUSDT,LTCUSDT"]
   #   environment:
   #     - RUST_LOG=info,persistence=warn
@@ -106,10 +106,10 @@ services:
   #     - postgres
   #   restart: unless-stopped
 
-  # arkin-binance-ingestor-2:
-  #   container_name: arkin-binance-ingestor-2
+  # arkin-exec-binance-ingestor-2:
+  #   container_name: arkin-exec-binance-ingestor-2
   #   image: arkin:v1.0.0
-  #   hostname: arkin-binance-ingestor-2
+  #   hostname: arkin-exec-binance-ingestor-2
   #   command: ["./main", "ingestor",  "-i", "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,TRXUSDT,DOGEUSDT,ADAUSDT,LINKUSDT,XLMUSDT,HBARUSDT,AVAXUSDT,LTCUSDT"]
   #   environment:
   #     - RUST_LOG=info,persistence=warn

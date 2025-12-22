@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT \n                id,\n                name,\n                venue_type AS \"venue_type:VenueType\",\n                created,\n                updated\n            FROM venues\n            WHERE name = $1\n            ",
+  "query": "\n            SELECT \n                id,\n                name AS \"name:VenueName\",\n                venue_type AS \"venue_type:VenueType\",\n                created,\n                updated\n            FROM venues\n            WHERE id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -10,8 +10,24 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
-        "type_info": "Text"
+        "name": "name:VenueName",
+        "type_info": {
+          "Custom": {
+            "name": "venue_name",
+            "kind": {
+              "Enum": [
+                "personal",
+                "index",
+                "binance",
+                "okx",
+                "bybit",
+                "deribit",
+                "coinbase",
+                "hyperliquid"
+              ]
+            }
+          }
+        }
       },
       {
         "ordinal": 2,
@@ -24,7 +40,8 @@
                 "cex",
                 "dex",
                 "otc",
-                "user_funds"
+                "user_funds",
+                "virtual"
               ]
             }
           }
@@ -43,7 +60,7 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -54,5 +71,5 @@
       false
     ]
   },
-  "hash": "2ed3addd1970b10a7a6c16a0d394ed9586cb5b89dba6032c47cbda82d6dcfc60"
+  "hash": "ebdae5e40d969a9a7bb88e88e5a5888cee61acdc6b207d15ac403b8195d15acb"
 }

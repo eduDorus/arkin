@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                symbol,\n                name,\n                asset_type AS \"asset_type:AssetType\",\n                created,\n                updated\n            FROM assets\n            WHERE LOWER(symbol) = LOWER($1)\n            ",
+  "query": "\n            SELECT\n                id,\n                symbol,\n                name,\n                asset_type AS \"asset_type:AssetType\",\n                created,\n                updated\n            FROM assets\n            ORDER BY symbol\n            ",
   "describe": {
     "columns": [
       {
@@ -48,9 +48,7 @@
       }
     ],
     "parameters": {
-      "Left": [
-        "Text"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -61,5 +59,5 @@
       false
     ]
   },
-  "hash": "236609652c822c10189ada48893ca4db09212bfe698d70fda780e6071709bf52"
+  "hash": "2ed8cd2ec606f0ce3a83dcba46854e00330af883916702812bb52adb90ef7b5c"
 }

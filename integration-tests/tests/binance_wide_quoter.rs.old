@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use arkin_binance::BinanceExecution;
+use arkin_exec_binance::BinanceExecution;
 use arkin_exec_sim::SimulationExecutor;
 use arkin_data_provider_binance::SimBinanceIngestor;
 use arkin_persistence::{Persistence, PersistenceConfig};

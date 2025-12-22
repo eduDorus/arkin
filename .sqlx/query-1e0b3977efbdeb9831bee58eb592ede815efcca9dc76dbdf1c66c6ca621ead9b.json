@@ -6,7 +6,23 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Text",
+        {
+          "Custom": {
+            "name": "venue_name",
+            "kind": {
+              "Enum": [
+                "personal",
+                "index",
+                "binance",
+                "okx",
+                "bybit",
+                "deribit",
+                "coinbase",
+                "hyperliquid"
+              ]
+            }
+          }
+        },
         {
           "Custom": {
             "name": "venue_type",
@@ -15,7 +31,8 @@
                 "cex",
                 "dex",
                 "otc",
-                "user_funds"
+                "user_funds",
+                "virtual"
               ]
             }
           }

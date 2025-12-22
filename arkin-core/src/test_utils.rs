@@ -431,6 +431,34 @@ pub fn test_inst_binance_btc_usdt_perp() -> Arc<Instrument> {
     Arc::new(instrument)
 }
 
+pub fn test_inst_binance_btc_usdt_spot() -> Arc<Instrument> {
+    let instrument = Instrument::builder()
+        .id(Uuid::from_str("55dd7db6-89da-4c68-b62e-6f80b763bef6").expect("Invalid UUID"))
+        .venue(test_binance_venue())
+        .symbol("spot-btc-usdt@binance".into())
+        .venue_symbol("BTCUSDT".into())
+        .instrument_type(InstrumentType::Spot)
+        .synthetic(false)
+        .base_asset(test_btc_asset())
+        .quote_asset(test_usdt_asset())
+        .margin_asset(test_usdt_asset())
+        .maturity(None)
+        .strike(None)
+        .option_type(None)
+        .contract_size(dec!(1.0))
+        .price_precision(2_u32)
+        .quantity_precision(3_u32)
+        .base_precision(8_u32)
+        .quote_precision(8_u32)
+        .tick_size(dec!(0.10))
+        .lot_size(dec!(0.001))
+        .status(InstrumentStatus::Trading)
+        .created(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .updated(datetime!(2025-01-01 00:00:00 UTC).to_utc())
+        .build();
+    Arc::new(instrument)
+}
+
 pub fn test_inst_binance_eth_usdt_perp() -> Arc<Instrument> {
     let instrument = Instrument::builder()
         .id(Uuid::from_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").expect("Invalid UUID"))

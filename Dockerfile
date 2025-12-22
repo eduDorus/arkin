@@ -3,7 +3,7 @@ ARG BINARY_NAME=main
 ARG PROFILE=maxperf
 
 # BUILD IMAGE
-FROM rust:1.89.0-bookworm AS build
+FROM rust:1.92.0-bookworm AS build
 # Set arguments
 ARG BINARY_NAME
 ARG PROFILE

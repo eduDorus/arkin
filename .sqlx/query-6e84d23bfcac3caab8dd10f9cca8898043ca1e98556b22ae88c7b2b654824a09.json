@@ -1,0 +1,198 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                venue_id,\n                symbol,\n                venue_symbol,\n                instrument_type AS \"instrument_type:InstrumentType\",\n                synthetic,\n                base_asset_id,\n                quote_asset_id,\n                margin_asset_id,\n                strike,\n                maturity,\n                option_type AS \"option_type:InstrumentOptionType\",\n                contract_size,\n                price_precision,\n                quantity_precision,\n                base_precision,\n                quote_precision,\n                lot_size,\n                tick_size,\n                status AS \"status:InstrumentStatus\",\n                created,\n                updated\n            FROM instruments\n            WHERE venue_id = $1 AND instrument_type = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "venue_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "symbol",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "venue_symbol",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "instrument_type:InstrumentType",
+        "type_info": {
+          "Custom": {
+            "name": "instrument_type",
+            "kind": {
+              "Enum": [
+                "spot",
+                "perpetual",
+                "future",
+                "option",
+                "index",
+                "inverse_perpetual"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "synthetic",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "base_asset_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "quote_asset_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "margin_asset_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "strike",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "maturity",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "option_type:InstrumentOptionType",
+        "type_info": {
+          "Custom": {
+            "name": "instrument_option_type",
+            "kind": {
+              "Enum": [
+                "call",
+                "put"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "contract_size",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 13,
+        "name": "price_precision",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "quantity_precision",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 15,
+        "name": "base_precision",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 16,
+        "name": "quote_precision",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 17,
+        "name": "lot_size",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 18,
+        "name": "tick_size",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 19,
+        "name": "status:InstrumentStatus",
+        "type_info": {
+          "Custom": {
+            "name": "instrument_status",
+            "kind": {
+              "Enum": [
+                "trading",
+                "halted",
+                "setteled"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "created",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 21,
+        "name": "updated",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "instrument_type",
+            "kind": {
+              "Enum": [
+                "spot",
+                "perpetual",
+                "future",
+                "option",
+                "index",
+                "inverse_perpetual"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6e84d23bfcac3caab8dd10f9cca8898043ca1e98556b22ae88c7b2b654824a09"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                venue_id,\n                symbol,\n                venue_symbol,\n                instrument_type AS \"instrument_type:InstrumentType\",\n                base_asset_id,\n                quote_asset_id,\n                margin_asset_id,\n                strike,\n                maturity,\n                option_type AS \"option_type:InstrumentOptionType\",\n                contract_size,\n                price_precision,\n                quantity_precision,\n                base_precision,\n                quote_precision,\n                lot_size,\n                tick_size,\n                status AS \"status:InstrumentStatus\",\n                created,\n                updated\n            FROM instruments\n            WHERE venue_symbol = $1\n            ",
+  "query": "\n            SELECT\n                id,\n                venue_id,\n                symbol,\n                venue_symbol,\n                instrument_type AS \"instrument_type:InstrumentType\",\n                synthetic,\n                base_asset_id,\n                quote_asset_id,\n                margin_asset_id,\n                strike,\n                maturity,\n                option_type AS \"option_type:InstrumentOptionType\",\n                contract_size,\n                price_precision,\n                quantity_precision,\n                base_precision,\n                quote_precision,\n                lot_size,\n                tick_size,\n                status AS \"status:InstrumentStatus\",\n                created,\n                updated\n            FROM instruments\n            WHERE venue_symbol = $1 AND venue_id = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -34,7 +34,9 @@
                 "spot",
                 "perpetual",
                 "future",
-                "option"
+                "option",
+                "index",
+                "inverse_perpetual"
               ]
             }
           }
@@ -42,31 +44,36 @@
       },
       {
         "ordinal": 5,
+        "name": "synthetic",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
         "name": "base_asset_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "quote_asset_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "margin_asset_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "strike",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "maturity",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "option_type:InstrumentOptionType",
         "type_info": {
           "Custom": {
@@ -81,42 +88,42 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "contract_size",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "price_precision",
         "type_info": "Int4"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "quantity_precision",
         "type_info": "Int4"
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "base_precision",
         "type_info": "Int4"
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "quote_precision",
         "type_info": "Int4"
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "lot_size",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 17,
+        "ordinal": 18,
         "name": "tick_size",
         "type_info": "Numeric"
       },
       {
-        "ordinal": 18,
+        "ordinal": 19,
         "name": "status:InstrumentStatus",
         "type_info": {
           "Custom": {
@@ -132,22 +139,24 @@
         }
       },
       {
-        "ordinal": 19,
+        "ordinal": 20,
         "name": "created",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 20,
+        "ordinal": 21,
         "name": "updated",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Uuid"
       ]
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -171,5 +180,5 @@
       false
     ]
   },
-  "hash": "e0189b84e18b6f57034cff2e5ba46fb07054c0f4c0f5793ebc5e098e971e65a4"
+  "hash": "a4f9bbf25618ce008b58ad8374615c4e125031361a091bbcab9f221a590b3e52"
 }
