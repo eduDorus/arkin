@@ -1,4 +1,3 @@
-
 use arkin_core::prelude::*;
 use arkin_core::test_utils::{MockPersistence, MockPublisher, MockTime};
 use arkin_exec_strat_wide::WideQuoterExecutionStrategy;
@@ -31,12 +30,16 @@ impl MockPubSub {
     }
 }
 
+#[async_trait]
 impl PubSubTrait for MockPubSub {
     fn publisher(&self) -> Arc<dyn Publisher> {
         self.publisher.clone()
     }
     fn subscribe(&self, _filter: EventFilter) -> Arc<dyn Subscriber> {
         Arc::new(MockSubscriber)
+    }
+    async fn publish(&self, event: Event) {
+        self.publisher.publish(event).await;
     }
 }
 

@@ -211,6 +211,7 @@ impl Subscriber for RedisSubscriber {
     async fn send_ack(&self) {}
 }
 
+#[async_trait]
 impl PubSubTrait for RedisPubSub {
     fn subscribe(&self, filter: EventFilter) -> Arc<dyn Subscriber> {
         self.subscribe(filter)
@@ -218,5 +219,9 @@ impl PubSubTrait for RedisPubSub {
 
     fn publisher(&self) -> Arc<dyn Publisher> {
         self.publisher()
+    }
+
+    async fn publish(&self, event: Event) {
+        self.publish(event).await;
     }
 }

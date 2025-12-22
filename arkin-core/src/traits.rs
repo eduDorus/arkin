@@ -172,4 +172,5 @@ pub trait Subscriber: Send + Sync {
 pub trait PubSubTrait: Send + Sync {
     fn subscribe(&self, filter: EventFilter) -> Arc<dyn Subscriber>;
     fn publisher(&self) -> Arc<dyn Publisher>;
+    async fn publish(&self, event: Event);
 }

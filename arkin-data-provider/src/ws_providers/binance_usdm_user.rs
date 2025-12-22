@@ -280,7 +280,7 @@ impl WebSocketProvider for BinanceUsdmUserWsProvider {
                     .commission_asset(commission_asset)
                     .build();
 
-                info!("Parsed VenueOrderUpdate: {:?}", update);
+                info!("Parsed VenueOrderUpdate: {}", update);
                 Ok(Some(Event::VenueOrderUpdate(Arc::new(update))))
             }
             UserDataEvent::TradeLite(_) => Ok(None),
@@ -387,7 +387,7 @@ impl WebSocketProvider for BinanceUsdmUserWsProvider {
                     .reason("MARGIN_CALL".to_string())
                     .build();
 
-                info!("Parsed VenueAccountUpdate: {:?}", account_update);
+                info!("Parsed VenueAccountUpdate: {}", account_update);
                 Ok(Some(Event::VenueAccountUpdate(Arc::new(account_update))))
             }
         }
@@ -397,7 +397,7 @@ impl WebSocketProvider for BinanceUsdmUserWsProvider {
 impl BinanceUsdmUserWsProvider {
     async fn start_listen_key(&self) -> Result<String, ProviderError> {
         let client = Client::new();
-        info!("Http URL: {}", self.http_url);
+        debug!("Http URL: {}", self.http_url);
         // Combine url
         let req_url = self.http_url.join("/fapi/v1/listenKey").unwrap();
         let request = client
@@ -406,7 +406,7 @@ impl BinanceUsdmUserWsProvider {
             .header("Content-Type", "application/json")
             .header("User-Agent", "arkin-data-provider/1.0")
             .build()?;
-        info!("Starting listen key with request: {:?}", request);
+        debug!("Starting listen key with request: {:?}", request);
         let response = client.execute(request).await?;
 
         if !response.status().is_success() {
@@ -434,7 +434,7 @@ impl BinanceUsdmUserWsProvider {
             .query(&[("listenKey", listen_key)])
             .build()?;
 
-        info!("Closing listen key with request: {:?}", request);
+        debug!("Closing listen key with request: {:?}", request);
         let response = client.execute(request).await?;
 
         if !response.status().is_success() {
@@ -460,7 +460,7 @@ async fn keepalive_listen_key(http_url: &Url, api_key: &str, listen_key: &str) -
         .query(&[("listenKey", listen_key)])
         .build()?;
 
-    info!("Keeping alive listen key with request: {:?}", request);
+    debug!("Keeping alive listen key with request: {:?}", request);
     let response = client.execute(request).await?;
 
     if !response.status().is_success() {

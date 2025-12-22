@@ -288,6 +288,116 @@ async fn main() -> Result<()> {
             info!("Publishing CancelAllOrders event");
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         }
+        Commands::Full => {
+            // Init time
+            let time = LiveSystemTime::new();
+
+            // Init Persistence
+            let instance = Instance::builder()
+                .id(Uuid::from_str("38fb7951-07d1-4a45-a999-59a5bf4ab0c1").expect("Failed to parse UUID"))
+                .name("persistence".to_string())
+                .instance_type(InstanceType::Live)
+                .created(LiveSystemTime::new().now().await)
+                .updated(LiveSystemTime::new().now().await)
+                .build();
+            let persistence = Persistence::from_config(instance, false, false, false);
+            persistence.refresh().await?;
+
+            // Init PubSub
+            let pubsub = InmemoryPubSub::new(false);
+
+            let mut engine = Engine::new(time.clone(), pubsub.clone(), persistence.clone(), InstanceType::Live);
+
+            engine.register("persistence", persistence.clone(), 0, 0);
+            engine.register("pubsub", pubsub.clone(), 0, 0);
+
+            // Register services
+            let data_provider_service = DataProviderService::load_config();
+            engine.register("data_provider", Arc::new(data_provider_service), 1, 1);
+
+            let wide_quoter_strategy = Arc::new(
+                WideQuoterExecutionStrategy::builder()
+                    .exec_order_book(Arc::new(
+                        ExecutionOrderBook::builder()
+                            .publisher(pubsub.publisher())
+                            .autoclean(true)
+                            .build(),
+                    ))
+                    .venue_order_book(Arc::new(
+                        VenueOrderBook::builder().publisher(pubsub.publisher()).autoclean(true).build(),
+                    ))
+                    .pct_from_mid(dec!(0.005))
+                    .requote_pct_change(dec!(0.001))
+                    .build(),
+            );
+            engine.register("wide_quoter_strategy", wide_quoter_strategy, 2, 2);
+
+            let binance_execution = BinanceExecution::from_config();
+            engine.register("binance_execution", binance_execution, 0, 0);
+
+            engine.start().await;
+
+            // Wait a bit and send two wide quoter orders
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            let strategy = persistence
+                .get_strategy(
+                    &StrategyQuery::builder()
+                        .id(Uuid::parse_str("41ba36fb-6171-4d5f-a4b4-25eb5415e426").expect("Invalid UUID"))
+                        .build(),
+                )
+                .await?;
+
+            // ETH USDT SPOT: "95b3e6e7-d39d-4cea-a70b-a4da23103a0a"
+            // ETH USDT PERP: ""
+            let inst = persistence
+                .get_instrument(
+                    &InstrumentQuery::builder()
+                        .id(Uuid::parse_str("0a6400f4-abb5-4ff3-8720-cf2eeebef26e").expect("Invalid UUID"))
+                        .build(),
+                )
+                .await?;
+
+            info!("Sending orders for {}", inst);
+
+            let last_price = persistence.get_last_tick(&inst).await.unwrap().unwrap().mid_price();
+            let lot_size = max(dec!(20) / last_price, inst.lot_size);
+
+            // Create Buy exec order
+            let buy_exec_id = Uuid::new_v4();
+            let buy_exec = ExecutionOrder::builder()
+                .id(buy_exec_id)
+                .strategy(Some(strategy.clone()))
+                .instrument(inst.clone())
+                .exec_strategy_type(ExecutionStrategyType::WideQuoter)
+                .side(MarketSide::Buy)
+                .set_price(dec!(0))
+                .set_quantity(lot_size)
+                .status(ExecutionOrderStatus::New)
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+
+            // Create Sell exec order
+            let sell_exec_id = Uuid::new_v4();
+            let sell_exec = ExecutionOrder::builder()
+                .id(sell_exec_id)
+                .strategy(Some(strategy.clone()))
+                .instrument(inst.clone())
+                .exec_strategy_type(ExecutionStrategyType::WideQuoter)
+                .side(MarketSide::Sell)
+                .set_price(dec!(0))
+                .set_quantity(lot_size)
+                .status(ExecutionOrderStatus::New)
+                .created(time.now().await)
+                .updated(time.now().await)
+                .build();
+
+            pubsub.publish(Event::NewExecutionOrder(buy_exec.clone().into())).await;
+            pubsub.publish(Event::NewExecutionOrder(sell_exec.clone().into())).await;
+
+            // Wait for shutdown signal
+            engine.wait_for_shutdown().await;
+        }
         _ => {
             unimplemented!()
         } // Commands::DownloadBinance(a) => {

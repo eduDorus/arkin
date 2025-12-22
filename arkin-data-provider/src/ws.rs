@@ -190,7 +190,7 @@ impl WsClient {
                                     }
                                 }
                                 Message::Pong(_data) => {
-                                    info!("Received pong from server {}", self.provider.name());
+                                    debug!("Received pong from server {}", self.provider.name());
                                 }
                                 Message::Close(frame) => {
                                     info!("Received close frame: {:?}", frame);
@@ -223,7 +223,7 @@ impl WsClient {
                         error!("Failed to send ping: {}", e);
                         return Err("Failed to send ping".to_string());
                     } else {
-                        info!("Sent ping to server {}", self.provider.name());
+                        debug!("Sent ping to server {}", self.provider.name());
                     }
                 }
 

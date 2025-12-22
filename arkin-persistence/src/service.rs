@@ -34,7 +34,7 @@ macro_rules! flush_buffer {
                 loop {
                     match $insert(&persistence_ctx, &data).await {
                         Ok(_) => {
-                            info!(target: "persistence", "successfully flushed {} {}", data.len(), $name);
+                            debug!(target: "persistence", "successfully flushed {} {}", data.len(), $name);
                             break;
                         }
                         Err(e) => {
@@ -289,7 +289,7 @@ impl Persistence {
 
     // TODO: WE NEED TO FLUSH ALSO TRADES AND TICKS
     pub async fn flush_all(&self, ctx: Arc<ServiceCtx>) {
-        info!(target: "persistence", "flushing...");
+        debug!(target: "persistence", "flushing...");
 
         flush_buffer!(ctx, self.ctx, self.ctx.buffer.insights, "insights", |ctx, data| {
             insight_store::insert_vec(ctx, data)

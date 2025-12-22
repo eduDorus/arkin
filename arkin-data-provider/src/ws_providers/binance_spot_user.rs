@@ -319,7 +319,7 @@ impl WebSocketProvider for BinanceSpotUserWsProvider {
                     .commission_asset(commission_asset)
                     .build();
 
-                info!("Parsed VenueOrderUpdate: {:?}", update);
+                info!("Parsed VenueOrderUpdate: {}", update);
                 Ok(Some(Event::VenueOrderUpdate(Arc::new(update))))
             }
         }

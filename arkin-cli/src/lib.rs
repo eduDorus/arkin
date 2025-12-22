@@ -89,7 +89,14 @@ pub enum Commands {
     SendOrder(SendOrderArgs),
 
     /// Cancel All Orders
+    ///
+    /// Sends cancel all orders command via PubSub.
     CancelAllOrders,
+
+    /// Full System
+    ///
+    /// Runs the full Arkin system with all services.
+    Full,
 }
 
 #[derive(Args, Debug)]

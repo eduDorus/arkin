@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     utils::Frequency, Account, AccountListQuery, AccountOwner, AccountQuery, AccountType, AggTrade, Asset,
-    AssetListQuery, AssetQuery, AssetType, ChannelPubSub, Event, FeatureId, FeatureListQuery, FeatureQuery, Instance,
+    AssetListQuery, AssetQuery, AssetType, Event, FeatureId, FeatureListQuery, FeatureQuery, InmemoryPubSub, Instance,
     InstanceListQuery, InstanceQuery, InstanceType, Instrument, InstrumentListQuery, InstrumentQuery, InstrumentStatus,
     InstrumentType, MetricType, PersistenceError, PersistenceReader, Pipeline, PipelineListQuery, PipelineQuery, Price,
     Publisher, Quantity, Strategy, StrategyListQuery, StrategyQuery, SystemTime, Tick, Venue, VenueListQuery,
@@ -329,8 +329,8 @@ impl PersistenceReader for MockPersistence {
     }
 }
 
-pub fn test_pubsub() -> Arc<ChannelPubSub> {
-    ChannelPubSub::new(true)
+pub fn test_pubsub() -> Arc<InmemoryPubSub> {
+    InmemoryPubSub::new(true)
 }
 
 pub fn test_btc_asset() -> Arc<Asset> {

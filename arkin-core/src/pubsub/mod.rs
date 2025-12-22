@@ -1,7 +1,7 @@
-mod monolith;
+mod inmemory;
 mod redis;
 
-pub use monolith::*;
+pub use inmemory::*;
 pub use redis::*;
 use strum::IntoEnumIterator;
 

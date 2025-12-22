@@ -13,16 +13,16 @@ use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
-use crate::prelude::{Publisher, Runnable, Subscriber};
-use crate::{CoreCtx, Event, EventFilter, EventType, InsightsTick, PubSubTrait, ServiceCtx};
+use crate::prelude::{PubSubTrait, Runnable, Subscriber};
+use crate::{CoreCtx, Event, EventFilter, EventType, InsightsTick, Publisher, ServiceCtx};
 
 #[derive(Debug, Clone)]
-pub struct PubSubPublisher {
+pub struct InmemoryPubSubPublisher {
     event_queue: Arc<Mutex<BinaryHeap<Reverse<Event>>>>,
 }
 
 #[async_trait]
-impl Publisher for PubSubPublisher {
+impl Publisher for InmemoryPubSubPublisher {
     async fn publish(&self, event: Event) {
         debug!(target: "publisher", "publishing event {}", event);
         let mut queue = self.event_queue.lock().await;
@@ -31,14 +31,14 @@ impl Publisher for PubSubPublisher {
 }
 
 #[derive(Debug, Clone)]
-pub struct PubSubSubscriber {
+pub struct InmemoryPubSubSubscriber {
     rx: AsyncReceiver<Event>,
     ack: bool,
     ack_tx: AsyncSender<()>,
 }
 
 #[async_trait]
-impl Subscriber for PubSubSubscriber {
+impl Subscriber for InmemoryPubSubSubscriber {
     async fn recv(&self) -> Option<Event> {
         match self.rx.recv().await {
             Ok(event) => Some(event),
@@ -62,7 +62,7 @@ impl Subscriber for PubSubSubscriber {
     }
 }
 
-pub struct ChannelPubSub {
+pub struct InmemoryPubSub {
     event_queue: Arc<Mutex<BinaryHeap<Reverse<Event>>>>,
     next_id: AtomicU64,
     subscribers: DashMap<u64, AsyncSender<Event>>,
@@ -71,7 +71,7 @@ pub struct ChannelPubSub {
     subscribers_acknowledge_channel: (AsyncSender<()>, AsyncReceiver<()>),
 }
 
-impl ChannelPubSub {
+impl InmemoryPubSub {
     pub fn new(ack: bool) -> Arc<Self> {
         Self {
             event_queue: Arc::new(Mutex::new(BinaryHeap::<Reverse<Event>>::new())),
@@ -87,7 +87,7 @@ impl ChannelPubSub {
         self.next_id.fetch_add(1, Ordering::Relaxed)
     }
 
-    pub fn subscribe(&self, filter: EventFilter) -> Arc<PubSubSubscriber> {
+    pub fn subscribe(&self, filter: EventFilter) -> Arc<InmemoryPubSubSubscriber> {
         info!(target: "pubsub", "new subscriber");
         let (tx, rx) = kanal::bounded_async(10240);
 
@@ -101,7 +101,7 @@ impl ChannelPubSub {
             self.event_subscriptions.entry(event).or_default().push(id);
         }
 
-        PubSubSubscriber {
+        InmemoryPubSubSubscriber {
             rx,
             ack: self.subscribers_acknowledge,
             ack_tx: self.subscribers_acknowledge_channel.0.clone(),
@@ -129,9 +129,9 @@ impl ChannelPubSub {
         // }
     }
 
-    pub fn publisher(&self) -> Arc<PubSubPublisher> {
+    pub fn publisher(&self) -> Arc<InmemoryPubSubPublisher> {
         info!(target: "pubsub", "new publisher");
-        PubSubPublisher {
+        InmemoryPubSubPublisher {
             event_queue: self.event_queue.clone(),
         }
         .into()
@@ -206,7 +206,7 @@ impl ChannelPubSub {
     }
 }
 
-async fn event_processor_task(pubsub: Arc<ChannelPubSub>, service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
+async fn event_processor_task(pubsub: Arc<InmemoryPubSub>, service_ctx: Arc<ServiceCtx>, core_ctx: Arc<CoreCtx>) {
     info!(target: "pubsub", "starting event processor task");
 
     let shutdown = service_ctx.get_shutdown_token();
@@ -275,7 +275,7 @@ async fn event_processor_task(pubsub: Arc<ChannelPubSub>, service_ctx: Arc<Servi
 }
 
 #[async_trait]
-impl Runnable for ChannelPubSub {
+impl Runnable for InmemoryPubSub {
     async fn get_tasks(
         self: Arc<Self>,
         service_ctx: Arc<ServiceCtx>,
@@ -290,12 +290,16 @@ impl Runnable for ChannelPubSub {
 }
 
 #[async_trait]
-impl PubSubTrait for ChannelPubSub {
+impl PubSubTrait for InmemoryPubSub {
     fn subscribe(&self, filter: EventFilter) -> Arc<dyn Subscriber> {
         self.subscribe(filter)
     }
 
     fn publisher(&self) -> Arc<dyn Publisher> {
         self.publisher()
+    }
+
+    async fn publish(&self, event: Event) {
+        self.publish(event).await;
     }
 }

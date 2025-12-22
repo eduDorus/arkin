@@ -119,7 +119,7 @@ impl CoreCtx {
     }
 
     pub async fn publish(&self, event: Event) {
-        self.pubsub.publisher().publish(event).await
+        self.pubsub.publish(event).await
     }
 
     pub async fn publish_batch(&self, events: Vec<Event>) {

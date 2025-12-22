@@ -50,7 +50,7 @@ pub async fn init_test_persistence() -> Arc<Persistence> {
     )
 }
 
-pub async fn init_test_pubsub() -> Arc<ChannelPubSub> {
+pub async fn init_test_pubsub() -> Arc<InmemoryPubSub> {
     // Set defaults for test environment
     // SAFETY: This is safe in test environment as we're setting env vars before any other code runs
     // unsafe {
@@ -63,5 +63,5 @@ pub async fn init_test_pubsub() -> Arc<ChannelPubSub> {
     // }
 
     // Initialize PubSub instance for tests
-    ChannelPubSub::new(true)
+    InmemoryPubSub::new(true)
 }

@@ -54,6 +54,7 @@ pub struct BinanceCancelResponse {
     pub status: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct BinanceCancelAllResponse {
     pub code: i32,
