@@ -1,0 +1,21 @@
+[package]
+name = "arkin-insights-polars"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+arkin-core = { path = "../arkin-core" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+time = { workspace = true }
+uuid = { workspace = true }
+async-trait = { workspace = true }
+typed-builder = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+
+# Polars dependencies
+polars = { version = "0.52", features = [ "lazy", "timezones", "dynamic_group_by", "rolling_window", "abs" ] }

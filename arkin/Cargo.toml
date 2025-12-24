@@ -18,38 +18,34 @@ arkin-data-provider = { path = "../arkin-data-provider" }
 arkin-exec-binance = { path = "../arkin-exec-binance" }
 arkin-exec-strat-wide = { path = "../arkin-exec-strat-wide" }
 arkin-exec-strat-default = { path = "../arkin-exec-strat-default" }
+arkin-insights = { path = "../arkin-insights" }
 # arkin-cron = { path = "../arkin-cron" }
 # arkin-accounting = { path = "../arkin-accounting" }
 # arkin-audit = { path = "../arkin-audit" }
-# arkin-insights = { path = "../arkin-insights" }
 # arkin-data-provider-historical = { path = "../arkin-data-provider-historical" }
 # arkin-strat-crossover = { path = "../arkin-strat-crossover" }
 # arkin-strat-agent = { path = "../arkin-strat-agent" }
 # arkin-exec-strat-default = { path = "../arkin-exec-strat-default" }
 # arkin-sim-ingestor = { path = "../arkin-sim-ingestor" }
 
+mimalloc = { version = "0.1", features = [ "v3" ] }
+
+# Main
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
-tokio-util = { workspace = true }
-futures = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
-kanal = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-rand = { workspace = true }
-time = { workspace = true }
-reqwest = { workspace = true }
-clickhouse = { workspace = true }
 uuid = { workspace = true }
-statrs = { workspace = true }
 clap = { workspace = true }
 rust_decimal = { workspace = true }
-mimalloc = { version = "0.1", features = [ "v3" ] }
-tonic = { workspace = true }
-strum = { workspace = true }
-tokio-tungstenite = { workspace = true }
-url = { workspace = true }
-async-trait = { workspace = true }
+time = { workspace = true }
 
-rmp-serde = "1.3.0"
+# Quantile Export
+serde = { workspace = true }
+serde_json = { workspace = true }
+clickhouse = { workspace = true }
+statrs = { workspace = true }
+
+# Triton GRPC
+rand = { workspace = true }
+tonic = { workspace = true }

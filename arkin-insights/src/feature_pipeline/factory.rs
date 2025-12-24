@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use arkin_core::{Instrument, PersistenceReader};
+use arkin_core::{FeatureQuery, Instrument, InstrumentListQuery, PersistenceReader};
 use tracing::info;
 
 use crate::{
     config::{FeatureConfig, GroupBy, InstrumentSelector, PipelineConfig},
     features::{
-        DistributionType, DualRangeFeature, LagFeature, NormalizeFeature, QuantileTransformer, RangeFeature,
+        DistributionType, DualRangeFeature, LagFeature, LiquidityFeature, NormalizeFeature, QuantileTransformer, RangeFeature,
         RobustScaler, TwoValueFeature,
     },
     synthetics::SyntheticGenerator,
@@ -30,13 +30,9 @@ impl FeatureFactory {
         info!("FeatureFactory: Creating features from config");
 
         // Step 1: Query real instruments using global filter - this is our universe
-        let mut instrument_query =
-            SyntheticGenerator::build_instrument_query(&pipeline_config.global_instrument_selector);
-        // Ensure we only get real instruments (not synthetics)
-        instrument_query.synthetic = Some(false);
-
+        let instrument_query = InstrumentListQuery::builder().synthetic(Some(false)).build();
         let real_instruments = persistence
-            .query_instruments(&instrument_query)
+            .list_instruments(&instrument_query)
             .await
             .expect("Failed to query real instruments");
         info!("FeatureFactory: Loaded {} real instruments", real_instruments.len());
@@ -93,8 +89,10 @@ impl FeatureFactory {
                     );
 
                     for i in 0..c.input.len() {
-                        let input_feature = persistence.get_feature_id(&c.input[i]).await;
-                        let output_feature = persistence.get_feature_id(&c.output[i]).await;
+                        let input_feature =
+                            persistence.get_feature(&FeatureQuery::builder().id(&c.input[i]).build()).await;
+                        let output_feature =
+                            persistence.get_feature(&FeatureQuery::builder().id(&c.output[i]).build()).await;
 
                         features.push(Arc::new(
                             LagFeature::builder()
@@ -134,8 +132,10 @@ impl FeatureFactory {
                     );
 
                     for i in 0..c.input.len() {
-                        let input_feature = persistence.get_feature_id(&c.input[i]).await;
-                        let output_feature = persistence.get_feature_id(&c.output[i]).await;
+                        let input_feature =
+                            persistence.get_feature(&FeatureQuery::builder().id(&c.input[i]).build()).await;
+                        let output_feature =
+                            persistence.get_feature(&FeatureQuery::builder().id(&c.output[i]).build()).await;
 
                         features.push(Arc::new(
                             RangeFeature::builder()
@@ -173,9 +173,14 @@ impl FeatureFactory {
                     );
 
                     for i in 0..c.input_1.len() {
-                        let input_1_feature = persistence.get_feature_id(&c.input_1[i]).await;
-                        let input_2_feature = persistence.get_feature_id(&c.input_2[i]).await;
-                        let output_feature = persistence.get_feature_id(&c.output[i]).await;
+                        let input_1_feature = persistence
+                            .get_feature(&FeatureQuery::builder().id(&c.input_1[i]).build())
+                            .await;
+                        let input_2_feature = persistence
+                            .get_feature(&FeatureQuery::builder().id(&c.input_2[i]).build())
+                            .await;
+                        let output_feature =
+                            persistence.get_feature(&FeatureQuery::builder().id(&c.output[i]).build()).await;
 
                         features.push(Arc::new(
                             DualRangeFeature::builder()
@@ -219,9 +224,14 @@ impl FeatureFactory {
                         Self::build_scopes_from_filtered(&merged, real_instruments, synthetic_instruments, &c.group_by);
 
                     for i in 0..c.input_1.len() {
-                        let input_1_feature = persistence.get_feature_id(&c.input_1[i]).await;
-                        let input_2_feature = persistence.get_feature_id(&c.input_2[i]).await;
-                        let output_feature = persistence.get_feature_id(&c.output[i]).await;
+                        let input_1_feature = persistence
+                            .get_feature(&FeatureQuery::builder().id(&c.input_1[i]).build())
+                            .await;
+                        let input_2_feature = persistence
+                            .get_feature(&FeatureQuery::builder().id(&c.input_2[i]).build())
+                            .await;
+                        let output_feature =
+                            persistence.get_feature(&FeatureQuery::builder().id(&c.output[i]).build()).await;
 
                         features.push(Arc::new(
                             TwoValueFeature::builder()
@@ -242,12 +252,11 @@ impl FeatureFactory {
                     // Register input features
                     let mut input_features = Vec::new();
                     for input in &c.input {
-                        input_features.push(persistence.get_feature_id(input).await);
+                        input_features.push(persistence.get_feature(&FeatureQuery::builder().id(input).build()).await);
                     }
 
                     // Register output feature
-                    let output_feature = persistence.get_feature_id(&c.output).await;
-
+                    let output_feature = persistence.get_feature(&FeatureQuery::builder().id(&c.output).build()).await;
                     // Build scopes using the new two-step approach
                     let filtered = Self::filter_instruments_by_selector(
                         real_instruments,
@@ -271,6 +280,28 @@ impl FeatureFactory {
                             .scopes(scopes)
                             .build(),
                     ) as Arc<dyn Feature>);
+                }
+                FeatureConfig::Liquidity(c) => {
+                    // Register output features
+                    let mut output_ids = Vec::new();
+                    for output in &c.outputs {
+                        output_ids.push(persistence.get_feature(&FeatureQuery::builder().id(output).build()).await);
+                    }
+
+                    // Build scopes
+                    let filtered = Self::filter_instruments_by_selector(
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.instrument_selector,
+                    );
+                    let scopes = Self::build_scopes_from_filtered(
+                        &filtered,
+                        real_instruments,
+                        synthetic_instruments,
+                        &c.group_by,
+                    );
+
+                    features.push(Arc::new(LiquidityFeature::new(c.clone(), scopes, output_ids)) as Arc<dyn Feature>);
                 }
             }
         }
@@ -409,6 +440,7 @@ impl FeatureFactory {
     }
 
     /// Determine if a real instrument should aggregate into a synthetic based on grouping rules
+    #[allow(dead_code)]
     fn should_aggregate_into(real_inst: &Instrument, synthetic: &Instrument, group_by: &GroupBy) -> bool {
         // Match by base asset (BTC, ETH, etc.)
         if real_inst.base_asset.symbol != synthetic.base_asset.symbol {

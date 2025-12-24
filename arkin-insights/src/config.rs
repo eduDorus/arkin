@@ -51,6 +51,9 @@ pub enum FeatureConfig {
     // Transformers
     #[serde(rename = "normalize")]
     Normalize(NormalizeConfig),
+
+    #[serde(rename = "liquidity")]
+    Liquidity(LiquidityConfig),
 }
 
 /// Simple filter for selecting instruments
@@ -158,4 +161,13 @@ pub struct NormalizeConfig {
     pub data_location: String,
     pub version: String,
     pub method: NormalizeFeatureType,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct LiquidityConfig {
+    pub instrument_selector: InstrumentSelector,
+    pub group_by: GroupBy,
+    pub outputs: Vec<String>, // e.g., ["total_volume", "spread", "depth"]
+    pub window_seconds: usize, // Rolling window for calculations
+    pub fill_strategy: FillStrategy,
 }

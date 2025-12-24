@@ -52,12 +52,7 @@ impl InsightService {
         if !insights.is_empty() {
             info!(target: "insights", "calculated {} insights", insights.len());
 
-            let insights_update = InsightsUpdate::builder()
-                .event_time(tick.event_time)
-                // TODO: FIX INSTRUMENTS
-                .instruments(vec![])
-                .insights(insights)
-                .build();
+            let insights_update = InsightsUpdate::builder().event_time(tick.event_time).insights(insights).build();
 
             ctx.publish(Event::InsightsUpdate(insights_update.into())).await;
             debug!(target: "insights", "published insights update");

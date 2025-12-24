@@ -34,7 +34,7 @@ rayon = "1.11"
 
 # Async
 tokio = { version = "1.48", features = [ "full", "tracing" ] }
-kanal = { version = "0.1.1", features = [ "std-mutex" ] }
+kanal = { version = "0.1", features = [ "std-mutex" ] }
 async-trait = "0.1"
 async-stream = "0.3"
 futures = { version = "0.3" }
@@ -69,7 +69,7 @@ time = { version = "0.3", features = [ "macros", "serde-human-readable" ] }
 tracing = { version = "0.1", features = [  ] }
 tracing-futures = { version = "0.2", features = [ "tokio" ] }
 tracing-subscriber = { version = "0.3", features = [ "local-time", "parking_lot", "env-filter" ] }
-console-subscriber = { version = "0.5.0", features = [ "parking_lot" ] }
+console-subscriber = { version = "0.5", features = [ "parking_lot" ] }
 
 # Error handling
 anyhow = { version = "1.0", features = [ "std" ], default-features = false }
@@ -85,7 +85,7 @@ backoff = { version = "0.4", features = [ "tokio" ] }
 petgraph = { version = "0.8", features = [ "graphmap" ], default-features = false }
 
 # Caching
-moka2 = { version = "0.13.0", features = [ "future" ] }
+moka2 = { version = "0.13", features = [ "future" ] }
 
 # TA
 #yata = "0.7"

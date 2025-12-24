@@ -49,12 +49,13 @@ impl SyntheticGenerator {
         let mut synthetics = Vec::new();
 
         // Get Index venue
-        let index_venue = persistence.get_venue_by_name(&VenueName::Index).await?;
+        let index_venue_query = VenueQuery::builder().name(VenueName::Index).build();
+        let index_venue = persistence.get_venue(&index_venue_query).await?;
 
         // Get reference currency asset (e.g., USD)
-        let ref_asset_query = AssetQuery::builder().symbols(vec![config.reference_currency.clone()]).build();
+        let ref_asset_query = AssetListQuery::builder().symbols(vec![config.reference_currency.clone()]).build();
         let ref_asset = persistence
-            .query_assets(&ref_asset_query)
+            .list_assets(&ref_asset_query)
             .await?
             .into_iter()
             .next()
@@ -100,7 +101,7 @@ impl SyntheticGenerator {
 
                 // Query real instruments matching the merged selector
                 let instrument_query = Self::build_instrument_query(&merged_selector);
-                let real_instruments = persistence.query_instruments(&instrument_query).await?;
+                let real_instruments = persistence.list_instruments(&instrument_query).await?;
 
                 if real_instruments.is_empty() {
                     continue;
@@ -182,12 +183,13 @@ impl SyntheticGenerator {
         let mut synthetics = Vec::new();
 
         // Get Index venue
-        let index_venue = persistence.get_venue_by_name(&VenueName::Index).await?;
+        let index_venue_query = VenueQuery::builder().name(VenueName::Index).build();
+        let index_venue = persistence.get_venue(&index_venue_query).await?;
 
         // Get reference currency asset
-        let ref_asset_query = AssetQuery::builder().symbols(vec![config.reference_currency.clone()]).build();
+        let ref_asset_query = AssetListQuery::builder().symbols(vec![config.reference_currency.clone()]).build();
         let ref_asset = persistence
-            .query_assets(&ref_asset_query)
+            .list_assets(&ref_asset_query)
             .await?
             .into_iter()
             .next()
@@ -250,9 +252,9 @@ impl SyntheticGenerator {
         }
     }
 
-    /// Build InstrumentQuery from InstrumentSelector
-    pub fn build_instrument_query(selector: &InstrumentSelector) -> InstrumentQuery {
-        InstrumentQuery::builder()
+    /// Build InstrumentListQuery from InstrumentSelector
+    pub fn build_instrument_query(selector: &InstrumentSelector) -> InstrumentListQuery {
+        InstrumentListQuery::builder()
             .base_asset_symbols(
                 selector
                     .base_asset

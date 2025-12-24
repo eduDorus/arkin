@@ -9,7 +9,7 @@ license.workspace = true
 arkin-core = { path = "../arkin-core" }
 arkin-persistence = { path = "../arkin-persistence" }
 arkin-data-provider = { path = "../arkin-data-provider" }
-# arkin-insights = { path = "../arkin-insights" }
+arkin-insights = { path = "../arkin-insights" }
 # arkin-audit = { path = "../arkin-audit" }
 # arkin-accounting = { path = "../arkin-accounting" }
 # arkin-strat-crossover = { path = "../arkin-strat-crossover" }
